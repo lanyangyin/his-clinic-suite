@@ -274,6 +274,9 @@ class ApiClient:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)
 
+    def list_expiry_alerts(self, days: int = 90) -> dict:
+        return self._request("GET", "/warehouse/expiry-alerts", params={"days": days})
+
     # ---- 医保目录 ----
     def search_insurance_catalog(
         self, q: str | None = None, category: str | None = None, limit: int = 50

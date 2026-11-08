@@ -218,6 +218,14 @@ def test_outbound_methods():
     assert session.calls[8][2]["json"] == {"items": [{"item_id": 9, "quantity": 2}]}
 
 
+def test_expiry_alerts_method():
+    session = FakeSession([FakeResponse(200, {"days": 90, "expired": [], "near_expiry": []})])
+    client = ApiClient("http://x", "warehouse", "pw", session=session)
+    client.list_expiry_alerts(30)
+    assert session.calls[0][1] == "http://x/warehouse/expiry-alerts"
+    assert session.calls[0][2]["params"] == {"days": 30}
+
+
 def test_local_override(monkeypatch):
     work = _work_dir()
     try:

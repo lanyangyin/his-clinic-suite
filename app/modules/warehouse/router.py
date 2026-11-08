@@ -7,6 +7,7 @@ from app.modules.auth.security import require_role
 from .schemas import (
     CheckCreate,
     CheckResponse,
+    ExpiryAlertResponse,
     OutboundIssueRequest,
     OutboundOrderCreate,
     OutboundOrderResponse,
@@ -22,6 +23,7 @@ from .service import (
     cancel_outbound,
     check,
     create_outbound,
+    expiry_alerts,
     get_outbound,
     issue_outbound,
     list_adjustments,
@@ -170,6 +172,16 @@ def get_adjustments(
 ):
     """盘点差异自动调整单。"""
     return list_adjustments(db, kind)
+
+
+@router.get("/expiry-alerts", response_model=ExpiryAlertResponse)
+def get_expiry_alerts(
+    days: int = 90,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse", "pharmacist")),
+):
+    """效期预警：过期批次 + 近效期（默认 90 天）。"""
+    return expiry_alerts(db, min(max(days, 1), 3650))
 
 
 @router.post("/outbound-orders/{order_id}/cancel", response_model=OutboundOrderResponse)

@@ -50,6 +50,7 @@ class PharmacyWidget(QWidget):
             tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
             tabs.addTab(self._build_stock_tab(), "库存查询")
             tabs.addTab(self._build_catalog_tab(), "医保目录")
+        tabs.addTab(self._build_expiry_tab(), "效期预警")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
 
@@ -931,6 +932,63 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.wh_material_table.setItem(row, col, QTableWidgetItem(value))
         self.wh_msg.setText(f"药品批次 {len(drugs)}，物资 {len(materials)}")
+
+    # ---------- 效期预警 ----------
+    def _build_expiry_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        row = QHBoxLayout()
+        self.expiry_days = QSpinBox()
+        self.expiry_days.setRange(1, 3650)
+        self.expiry_days.setValue(90)
+        refresh = QPushButton("刷新预警")
+        refresh.clicked.connect(self._load_expiry_alerts)
+        row.addWidget(QLabel("近效期天数"))
+        row.addWidget(self.expiry_days)
+        row.addWidget(refresh)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        layout.addWidget(QLabel("已过期"))
+        self.expired_table = QTableWidget(0, 5)
+        self.expired_table.setHorizontalHeaderLabels(["药品", "库房", "批次", "效期", "数量"])
+        layout.addWidget(self.expired_table)
+
+        layout.addWidget(QLabel("近效期"))
+        self.near_table = QTableWidget(0, 5)
+        self.near_table.setHorizontalHeaderLabels(["药品", "库房", "批次", "效期", "剩余天数"])
+        layout.addWidget(self.near_table)
+        self.expiry_msg = QLabel("")
+        self.expiry_msg.setWordWrap(True)
+        layout.addWidget(self.expiry_msg)
+        return page
+
+    def _load_expiry_alerts(self) -> None:
+        try:
+            alerts = self.api.list_expiry_alerts(self.expiry_days.value())
+        except ApiError as e:
+            self.expiry_msg.setText(f"加载效期预警失败：{e.detail}")
+            return
+        expired = alerts.get("expired") or []
+        near = alerts.get("near_expiry") or []
+        self.expired_table.setRowCount(len(expired))
+        for r, row in enumerate(expired):
+            values = [
+                row["name"], row["warehouse"], row["batch_no"],
+                row["expiry"], str(row["quantity"]),
+            ]
+            for c, value in enumerate(values):
+                self.expired_table.setItem(r, c, QTableWidgetItem(value))
+        self.near_table.setRowCount(len(near))
+        for r, row in enumerate(near):
+            values = [
+                row["name"], row["warehouse"], row["batch_no"],
+                row["expiry"], str(row["days_left"]),
+            ]
+            for c, value in enumerate(values):
+                self.near_table.setItem(r, c, QTableWidgetItem(value))
+        self.expiry_msg.setText(f"过期 {len(expired)} 批，近效期 {len(near)} 批")
 
     # ---------- 库存查询 ----------
     def _build_stock_tab(self) -> QWidget:

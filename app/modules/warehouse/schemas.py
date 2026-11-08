@@ -150,3 +150,22 @@ class StockAdjustmentResponse(BaseModel):
     note: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class ExpiryAlertItem(BaseModel):
+    warehouse: str
+    drug_id: int
+    name: str
+    spec: str
+    unit: str
+    batch_no: str
+    expiry: date
+    quantity: int
+    days_left: int
+    status: str
+
+
+class ExpiryAlertResponse(BaseModel):
+    days: int
+    expired: list[ExpiryAlertItem]
+    near_expiry: list[ExpiryAlertItem]

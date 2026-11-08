@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}效期预警 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>效期预警</h2>
+<div class="panel">
+  <form class="inline" method="get" action="/admin/expiry-alerts">
+    <label>近效期天数 <input type="number" name="days" value="{{ days }}" min="1" max="3650" style="width:100px"></label>
+    <button type="submit">刷新</button>
+  </form>
+
+  <h2>已过期（{{ alerts.expired|length }} 批）</h2>
+  <table>
+    <tr><th>药品</th><th>规格</th><th>库房</th><th>批次</th><th>效期</th><th>数量</th><th>状态</th></tr>
+    {% for row in alerts.expired %}
+    <tr>
+      <td>{{ row.name }}</td>
+      <td>{{ row.spec }}</td>
+      <td>{{ row.warehouse }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.expiry }}</td>
+      <td>{{ row.quantity }}</td>
+      <td>已过期 {{ -row.days_left }} 天</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">无过期批次</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>近效期（{{ days }} 天内，{{ alerts.near_expiry|length }} 批）</h2>
+  <table>
+    <tr><th>药品</th><th>规格</th><th>库房</th><th>批次</th><th>效期</th><th>数量</th><th>剩余天数</th></tr>
+    {% for row in alerts.near_expiry %}
+    <tr>
+      <td>{{ row.name }}</td>
+      <td>{{ row.spec }}</td>
+      <td>{{ row.warehouse }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.expiry }}</td>
+      <td>{{ row.quantity }}</td>
+      <td>{{ row.days_left }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">无近效期批次</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -150,15 +150,34 @@ def test_outbound_cancel_and_permissions(client, auth):
     assert approve.status_code == 400
 
 
-def test_outbound_requires_batch(client, auth):
+def test_outbound_batch_rules(client, auth):
     drug, material = setup_stock(client, auth)
-    r = client.post(
+    # 领用可不填批号：近效期先出自动分配
+    auto = client.post(
         "/warehouse/outbound-orders",
         json={"items": [{"kind": "drug", "drug_id": drug["id"], "quantity": 1}]},
         headers=auth["pharmacist"],
     )
-    assert r.status_code == 400
-    assert "批号" in r.json()["detail"]
+    assert auto.status_code == 201
+    assert auto.json()["items"][0]["batch_no"] == ""
+
+    # 退库必须指定批号
+    ret = client.post(
+        "/warehouse/outbound-orders",
+        json={"outbound_type": "return", "items": [{"kind": "drug", "drug_id": drug["id"], "quantity": 1}]},
+        headers=auth["pharmacist"],
+    )
+    assert ret.status_code == 400
+    assert "批号" in ret.json()["detail"]
+
+    # 报损必须指定批号
+    scrap = client.post(
+        "/warehouse/outbound-orders",
+        json={"outbound_type": "scrap", "items": [{"kind": "drug", "drug_id": drug["id"], "quantity": 1}]},
+        headers=auth["warehouse"],
+    )
+    assert scrap.status_code == 400
+    assert "批号" in scrap.json()["detail"]
 
 
 def test_outbound_roles_split(client, auth):

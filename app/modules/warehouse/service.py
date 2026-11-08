@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -48,7 +48,7 @@ def create_outbound(
             drug = get_drug(db, item.drug_id)
             if not drug:
                 raise ValueError(f"药品不存在：{item.drug_id}")
-            if not item.batch_no:
+            if not item.batch_no and data.outbound_type != "requisition":
                 raise ValueError(f"药品「{drug.name}」必须指定批号")
             price = item.unit_price or drug.base_price
             items.append(
@@ -265,11 +265,81 @@ def _add_material(
         )
 
 
+def _issue_drug_fefo(
+    db: Session, order: OutboundOrder, item: OutboundItem, quantity: int, issuer: str
+) -> None:
+    """近效期先出：未指定批号时，按效期从总库多批次自动分配。"""
+    today = date.today()
+    rows = (
+        db.query(WarehouseStock)
+        .filter(
+            WarehouseStock.drug_id == item.drug_id,
+            WarehouseStock.quantity > 0,
+            WarehouseStock.expiry >= today,
+        )
+        .order_by(WarehouseStock.expiry.asc(), WarehouseStock.id.asc())
+        .all()
+    )
+    available = sum(row.quantity for row in rows)
+    if available < quantity:
+        raise ValueError(
+            f"总库库存不足：{item.name}（可用 {available}，需 {quantity}，已排除过期批次）"
+        )
+
+    drug = get_drug(db, item.drug_id)
+    remaining = quantity
+    target = order.target_name or "药房"
+    for row in rows:
+        if remaining <= 0:
+            break
+        take = min(row.quantity, remaining)
+        affected = (
+            db.query(WarehouseStock)
+            .filter(
+                WarehouseStock.id == row.id,
+                WarehouseStock.quantity >= take,
+            )
+            .update(
+                {WarehouseStock.quantity: WarehouseStock.quantity - take},
+                synchronize_session=False,
+            )
+        )
+        if affected != 1:
+            raise ValueError(f"总库库存不足：{item.name}")
+        _add_drug(db, drug.id, row.batch_no, row.expiry, take, target)
+        db.flush()
+        for warehouse_name, direction in (("总库", "out"), (target, "in")):
+            record_drug(
+                db,
+                drug,
+                batch_no=row.batch_no,
+                expiry=row.expiry,
+                warehouse=warehouse_name,
+                direction=direction,
+                quantity=take,
+                unit_price=item.unit_price,
+                ref_type="outbound",
+                ref_id=order.id,
+                operator=issuer,
+                note=f"出库单 {order.outbound_no}（近效期先出自动分配）",
+            )
+        remaining -= take
+
+
 def _issue_item(
     db: Session, order: OutboundOrder, item: OutboundItem, quantity: int, issuer: str
 ) -> None:
     """按单据类型执行一条明细的出库/退库/报损，并记流水。"""
     target = order.target_name or "药房"
+
+    if (
+        item.kind == "drug"
+        and order.outbound_type == "requisition"
+        and not item.batch_no
+    ):
+        _issue_drug_fefo(db, order, item, quantity, issuer)
+        return
+
     if item.kind == "drug":
         drug = get_drug(db, item.drug_id)
         expiry = item.expiry
@@ -603,6 +673,51 @@ def list_adjustments(db: Session, kind: str | None = None) -> list[StockAdjustme
     if kind:
         query = query.filter(StockAdjustment.kind == kind)
     return query.order_by(StockAdjustment.id.desc()).all()
+
+
+def expiry_alerts(db: Session, days: int = 90) -> dict:
+    """效期预警：过期 + 近效期（总库与药房，仅数量>0 的批次）。"""
+    today = date.today()
+    cutoff = today + timedelta(days=days)
+    rows = []
+
+    warehouse_rows = (
+        db.query(WarehouseStock)
+        .filter(WarehouseStock.quantity > 0, WarehouseStock.expiry <= cutoff)
+        .order_by(WarehouseStock.expiry)
+        .all()
+    )
+    for stock in warehouse_rows:
+        rows.append(_alert_item(stock.drug, "总库", stock, today))
+
+    pharmacy_rows = (
+        db.query(DrugStock)
+        .filter(DrugStock.quantity > 0, DrugStock.expiry <= cutoff)
+        .order_by(DrugStock.expiry)
+        .all()
+    )
+    for stock in pharmacy_rows:
+        rows.append(_alert_item(stock.drug, "药房", stock, today))
+
+    expired = [row for row in rows if row["days_left"] < 0]
+    near = [row for row in rows if 0 <= row["days_left"] <= days]
+    return {"days": days, "expired": expired, "near_expiry": near}
+
+
+def _alert_item(drug, warehouse: str, stock, today: date) -> dict:
+    days_left = (stock.expiry - today).days
+    return {
+        "warehouse": warehouse,
+        "drug_id": stock.drug_id,
+        "name": drug.name if drug else "",
+        "spec": drug.spec if drug else "",
+        "unit": drug.unit if drug else "",
+        "batch_no": stock.batch_no,
+        "expiry": stock.expiry,
+        "quantity": stock.quantity,
+        "days_left": days_left,
+        "status": "expired" if days_left < 0 else "near",
+    }
 
 
 def list_checks(db: Session, drug_id: int | None = None) -> list[WarehouseCheck]:

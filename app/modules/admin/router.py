@@ -55,6 +55,7 @@ from app.modules.staff.service import (
 from app.modules.warehouse.service import (
     approve_outbound as warehouse_approve,
     cancel_outbound as warehouse_cancel,
+    expiry_alerts as warehouse_expiry_alerts,
     get_outbound as get_warehouse_outbound,
     issue_outbound as warehouse_issue,
     list_adjustments as list_stock_adjustments,
@@ -576,6 +577,22 @@ def stock_ledger_page(
             ref_type=ref_type or "",
             message=request.query_params.get("msg", ""),
         ),
+    )
+
+
+# ---------- 效期预警 ----------
+@router.get("/expiry-alerts", response_class=HTMLResponse)
+def expiry_alerts_page(
+    request: Request, days: int = 90, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    days = min(max(days, 1), 3650)
+    return templates.TemplateResponse(
+        request,
+        "expiry_alerts.html",
+        _ctx(request, alerts=warehouse_expiry_alerts(db, days), days=days),
     )
 
 
