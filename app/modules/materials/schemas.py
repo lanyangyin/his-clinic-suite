@@ -10,6 +10,10 @@ class MaterialItemCreate(BaseModel):
     unit: str = Field(default="", max_length=20)
     price: float = Field(default=0, ge=0)
     is_high_value: bool = False
+    # consumable 耗材 / device 医疗器械 / office 办公用品 / other
+    category: str = Field(default="consumable", pattern="^(consumable|device|office|other)$")
+    manufacturer: str = Field(default="", max_length=100)
+    registration_no: str = Field(default="", max_length=60)
 
 
 class MaterialItemResponse(MaterialItemCreate):

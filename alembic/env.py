@@ -53,6 +53,8 @@ import app.modules.treatment.models  # noqa: F401
 import app.modules.appointment.models  # noqa: F401
 import app.modules.facility.models  # noqa: F401
 import app.modules.sms.models  # noqa: F401
+import app.modules.receiving.models  # noqa: F401
+import app.modules.insurance_catalog.models  # noqa: F401
 
 target_metadata = app.database.Base.metadata
 

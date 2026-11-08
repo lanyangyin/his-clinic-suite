@@ -18,6 +18,17 @@ class MaterialItem(Base):
     is_high_value: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", nullable=False
     )
+    # 分类：consumable 耗材 / device 医疗器械 / office 办公用品 / other 其他
+    category: Mapped[str] = mapped_column(
+        String(20), default="consumable", server_default="consumable", nullable=False
+    )
+    manufacturer: Mapped[str] = mapped_column(
+        String(100), default="", server_default="", nullable=False
+    )
+    # 医疗器械注册证/备案号
+    registration_no: Mapped[str] = mapped_column(
+        String(60), default="", server_default="", nullable=False
+    )
 
 
 class MaterialStock(Base):

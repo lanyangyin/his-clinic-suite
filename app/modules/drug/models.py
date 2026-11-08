@@ -19,3 +19,16 @@ class Drug(Base):
     antibiotic_level: Mapped[int] = mapped_column(
         default=0, server_default="0", nullable=False
     )
+    # 医保贯标：国家医保药品代码（与医保目录对应）
+    insurance_code: Mapped[str] = mapped_column(
+        String(40), default="", server_default="", nullable=False
+    )
+    approval_no: Mapped[str] = mapped_column(
+        String(60), default="", server_default="", nullable=False
+    )
+    manufacturer: Mapped[str] = mapped_column(
+        String(100), default="", server_default="", nullable=False
+    )
+    dosage_form: Mapped[str] = mapped_column(
+        String(30), default="", server_default="", nullable=False
+    )

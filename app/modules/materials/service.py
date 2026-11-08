@@ -23,6 +23,14 @@ def get_item(db: Session, item_id: int) -> MaterialItem | None:
     return db.get(MaterialItem, item_id)
 
 
+def list_items(db: Session, category: str | None = None) -> list[MaterialItem]:
+    """物资目录（可按分类：器械/耗材/办公）。"""
+    query = db.query(MaterialItem)
+    if category:
+        query = query.filter(MaterialItem.category == category)
+    return query.order_by(MaterialItem.id).all()
+
+
 def stock_in(db: Session, data: StockInCreate) -> MaterialStock:
     """物资入库：同物品同库房合并数量。"""
     if not get_item(db, data.item_id):

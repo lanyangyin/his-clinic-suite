@@ -15,6 +15,7 @@ from .schemas import (
 from .service import (
     create_item,
     get_item,
+    list_items,
     list_stocks,
     list_usages,
     stock_in,
@@ -34,6 +35,11 @@ def new_item(
         return create_item(db, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/items/", response_model=list[MaterialItemResponse])
+def get_items(category: str | None = None, db: Session = Depends(get_db)):
+    return list_items(db, category)
 
 
 @router.get("/items/{item_id}", response_model=MaterialItemResponse)

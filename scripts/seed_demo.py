@@ -95,6 +95,27 @@ def seed(db) -> None:
         item = create_charge_item(db, data)
         print(f"  创建   收费项目 {item.code} {item.name}（{item.price} 元）")
 
+    # 医保药品目录示例（幂等：内容未变化会返回 unchanged）
+    from pathlib import Path
+
+    from app.modules.insurance_catalog.service import import_bytes
+
+    catalog_path = (
+        Path(__file__).resolve().parent.parent / "docs" / "示例数据" / "医保药品目录示例.csv"
+    )
+    if catalog_path.is_file():
+        result = import_bytes(
+            db,
+            catalog_path.read_bytes(),
+            file_name=catalog_path.name,
+            source="seed",
+            imported_by="seed",
+        )
+        print(
+            f"  医保目录 {result['status']}：新增 {result['inserted']}，"
+            f"更新 {result['updated']}，跳过 {result['skipped']}"
+        )
+
     # 药品主数据（同名幂等；报销比例收敛更新）
     demo_drugs = [
         DrugCreate(name="阿莫西林胶囊", spec="0.25g*24粒", unit="盒", base_price=12.5, insurance_ratio=0.8, antibiotic_level=1),
