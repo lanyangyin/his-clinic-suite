@@ -161,6 +161,24 @@ def test_treatment_pending_list():
         shutil.rmtree(work, ignore_errors=True)
 
 
+def test_local_override(monkeypatch):
+    work = _work_dir()
+    try:
+        (work / "config.ini").write_text(
+            "[server]\nurl = http://10.0.0.1:8000\n[client]\ntimeout = 30\n", encoding="utf-8"
+        )
+        (work / "config.local.ini").write_text(
+            "[server]\nurl = http://127.0.0.1:8001\n", encoding="utf-8"
+        )
+        monkeypatch.chdir(work)
+        config = load_config()
+        assert config.server_url == "http://127.0.0.1:8001"
+        assert config.timeout == 30  # 未覆盖的项保持主配置
+    finally:
+        monkeypatch.chdir(Path(__file__).resolve().parent.parent)
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def test_load_config_falls_back_to_defaults(monkeypatch):
     work = _work_dir()
     try:

@@ -27,10 +27,15 @@ ALEMBIC_INI = BUNDLE_DIR / "alembic.ini"
 
 def _load_ini() -> configparser.ConfigParser:
     parser = configparser.ConfigParser()
-    for candidate in (BASE_DIR / "config.ini", Path.cwd() / "config.ini"):
+    # 先读主配置，再用本地覆盖配置（config.local.ini，不入库；后读的覆盖前面的）
+    for candidate in (
+        BASE_DIR / "config.ini",
+        Path.cwd() / "config.ini",
+        BASE_DIR / "config.local.ini",
+        Path.cwd() / "config.local.ini",
+    ):
         if candidate.is_file():
             parser.read(candidate, encoding="utf-8")
-            break
     return parser
 
 

@@ -18,8 +18,7 @@ if errorlevel 1 (
 )
 
 echo [2/3] 打开浏览器...
-start "" "http://127.0.0.1:8000/admin"
-start "" "http://127.0.0.1:8000/docs"
+".venv\Scripts\python.exe" -c "import webbrowser; from app.settings import PORT; webbrowser.open(f'http://127.0.0.1:{PORT}/admin'); webbrowser.open(f'http://127.0.0.1:{PORT}/docs')"
 
 echo [3/3] 启动 HIS 服务（关闭此窗口即停止服务；局域网访问地址见窗口输出）
 ".venv\Scripts\python.exe" scripts\run_server.py
