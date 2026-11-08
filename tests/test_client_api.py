@@ -255,3 +255,23 @@ def test_load_config_falls_back_to_defaults(monkeypatch):
     finally:
         monkeypatch.chdir(Path(__file__).resolve().parent.parent)
         shutil.rmtree(work, ignore_errors=True)
+
+def test_trace_methods():
+    session = FakeSession(
+        [
+            FakeResponse(200, {"accepted": 2, "status": "in_stock", "message": "ok", "codes": ["A", "B"]}),
+            FakeResponse(200, [{"trace_code": "A", "drug_id": 1, "batch_no": "B1", "warehouse": "总库", "status": "in_stock", "patient_id": None}]),
+            FakeResponse(200, {"items": [], "total": 0}),
+        ]
+    )
+    client = ApiClient("http://x", "warehouse", "pw", session=session)
+    client.trace_scan("inbound", {"codes": ["A", "B"], "drug_id": 1, "batch_no": "B1"})
+    client.trace_codes(trace_code="A")
+    client.trace_summary(drug_id=1)
+
+    assert session.calls[0][1] == "http://x/trace/scan/inbound"
+    assert session.calls[0][2]["json"]["codes"] == ["A", "B"]
+    assert session.calls[1][1] == "http://x/trace/codes"
+    assert session.calls[1][2]["params"]["trace_code"] == "A"
+    assert session.calls[2][1] == "http://x/trace/codes/summary"
+    assert session.calls[2][2]["params"] == {"drug_id": 1}

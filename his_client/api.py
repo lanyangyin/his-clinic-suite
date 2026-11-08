@@ -277,6 +277,38 @@ class ApiClient:
     def list_expiry_alerts(self, days: int = 90) -> dict:
         return self._request("GET", "/warehouse/expiry-alerts", params={"days": days})
 
+    # ---- 追溯码 ----
+    def trace_scan(self, mode: str, payload: dict) -> dict:
+        return self._request("POST", f"/trace/scan/{mode}", json=payload)
+
+    def trace_codes(
+        self,
+        trace_code: str | None = None,
+        drug_id: int | None = None,
+        batch_no: str | None = None,
+        status: str | None = None,
+        warehouse: str | None = None,
+    ) -> list:
+        params = {}
+        for key, value in (
+            ("trace_code", trace_code),
+            ("drug_id", drug_id),
+            ("batch_no", batch_no),
+            ("status", status),
+            ("warehouse", warehouse),
+        ):
+            if value:
+                params[key] = value
+        return self._request("GET", "/trace/codes", params=params)
+
+    def trace_summary(self, drug_id: int | None = None, batch_no: str | None = None) -> dict:
+        params = {}
+        if drug_id:
+            params["drug_id"] = drug_id
+        if batch_no:
+            params["batch_no"] = batch_no
+        return self._request("GET", "/trace/codes/summary", params=params)
+
     # ---- 医保目录 ----
     def search_insurance_catalog(
         self, q: str | None = None, category: str | None = None, limit: int = 50

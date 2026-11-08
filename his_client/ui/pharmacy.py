@@ -51,6 +51,7 @@ class PharmacyWidget(QWidget):
             tabs.addTab(self._build_stock_tab(), "库存查询")
             tabs.addTab(self._build_catalog_tab(), "医保目录")
         tabs.addTab(self._build_expiry_tab(), "效期预警")
+        tabs.addTab(self._build_trace_tab(), "追溯码")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
 
@@ -989,6 +990,180 @@ class PharmacyWidget(QWidget):
             for c, value in enumerate(values):
                 self.near_table.setItem(r, c, QTableWidgetItem(value))
         self.expiry_msg.setText(f"过期 {len(expired)} 批，近效期 {len(near)} 批")
+
+    # ---------- 追溯码 ----------
+    def _build_trace_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        box = QGroupBox("扫码（扫码枪扫描后回车录入）")
+        form = QFormLayout(box)
+        self.trace_mode = QComboBox()
+        if self.role in ("warehouse", "admin"):
+            self.trace_mode.addItem("入库扫码（总库登记）", "inbound")
+            self.trace_mode.addItem("出库扫码（总库→药房）", "outbound")
+        if self.role in ("pharmacist", "admin"):
+            self.trace_mode.addItem("发药扫码（核销）", "dispense")
+            self.trace_mode.addItem("退药扫码（回药房）", "return")
+        form.addRow("模式", self.trace_mode)
+
+        self.trace_drug = QComboBox()
+        load_drug = QPushButton("刷新药品")
+        load_drug.clicked.connect(self._load_trace_drugs)
+        drug_row = QHBoxLayout()
+        drug_row.addWidget(self.trace_drug)
+        drug_row.addWidget(load_drug)
+        self.trace_batch = QLineEdit()
+        self.trace_batch.setPlaceholderText("批号（入库扫码必填）")
+        form.addRow("药品", drug_row)
+        form.addRow("批号", self.trace_batch)
+
+        self.trace_encounter = QSpinBox()
+        self.trace_encounter.setRange(0, 10_000_000)
+        self.trace_encounter.setSpecialValueText("不关联就诊")
+        form.addRow("就诊 ID", self.trace_encounter)
+
+        scan_row = QHBoxLayout()
+        self.trace_scan = QLineEdit()
+        self.trace_scan.setPlaceholderText("扫描追溯码后回车")
+        self.trace_scan.returnPressed.connect(self._add_trace_code)
+        add = QPushButton("添加")
+        add.clicked.connect(self._add_trace_code)
+        scan_row.addWidget(self.trace_scan)
+        scan_row.addWidget(add)
+        form.addRow("扫码", scan_row)
+
+        self.trace_codes_table = QTableWidget(0, 1)
+        self.trace_codes_table.setHorizontalHeaderLabels(["本次扫码"])
+        form.addRow("已扫", self.trace_codes_table)
+
+        buttons = QHBoxLayout()
+        submit = QPushButton("提交扫码")
+        submit.clicked.connect(self._submit_trace)
+        clear = QPushButton("清空")
+        clear.clicked.connect(self._clear_trace)
+        buttons.addWidget(submit)
+        buttons.addWidget(clear)
+        buttons.addStretch(1)
+        form.addRow("", buttons)
+        self.trace_msg = QLabel("")
+        self.trace_msg.setWordWrap(True)
+        form.addRow("", self.trace_msg)
+        layout.addWidget(box)
+
+        query_box = QGroupBox("追溯码查询")
+        query_layout = QVBoxLayout(query_box)
+        query_row = QHBoxLayout()
+        self.trace_query = QLineEdit()
+        self.trace_query.setPlaceholderText("追溯码（留空=最近 50 条）")
+        query = QPushButton("查询")
+        query.clicked.connect(self._query_trace)
+        query_row.addWidget(self.trace_query)
+        query_row.addWidget(query)
+        query_layout.addLayout(query_row)
+        self.trace_result_table = QTableWidget(0, 6)
+        self.trace_result_table.setHorizontalHeaderLabels(
+            ["追溯码", "药品ID", "批号", "库房", "状态", "患者"]
+        )
+        query_layout.addWidget(self.trace_result_table)
+        self.trace_query_msg = QLabel("")
+        self.trace_query_msg.setWordWrap(True)
+        query_layout.addWidget(self.trace_query_msg)
+        layout.addWidget(query_box)
+        layout.addStretch(1)
+
+        self.trace_scanned: list[str] = []
+        self.trace_mode.currentIndexChanged.connect(self._update_trace_mode_hint)
+        self._update_trace_mode_hint()
+        return page
+
+    def _update_trace_mode_hint(self) -> None:
+        mode = self.trace_mode.currentData()
+        inbound = mode == "inbound"
+        self.trace_drug.setEnabled(inbound)
+        self.trace_batch.setEnabled(inbound)
+        self.trace_encounter.setEnabled(mode == "dispense")
+
+    def _load_trace_drugs(self) -> None:
+        try:
+            drugs = self.api.list_drugs()
+        except ApiError as e:
+            self.trace_msg.setText(f"加载药品失败：{e.detail}")
+            return
+        self.trace_drug.clear()
+        for drug in drugs:
+            self.trace_drug.addItem(drug["name"], drug["id"])
+
+    def _add_trace_code(self) -> None:
+        code = self.trace_scan.text().strip()
+        if not code:
+            return
+        if code in self.trace_scanned:
+            self.trace_msg.setText(f"重复扫码：{code}")
+        else:
+            self.trace_scanned.append(code)
+            self._refresh_trace_codes()
+        self.trace_scan.clear()
+        self.trace_scan.setFocus()
+
+    def _refresh_trace_codes(self) -> None:
+        self.trace_codes_table.setRowCount(len(self.trace_scanned))
+        for row, code in enumerate(self.trace_scanned):
+            self.trace_codes_table.setItem(row, 0, QTableWidgetItem(code))
+
+    def _clear_trace(self) -> None:
+        self.trace_scanned = []
+        self._refresh_trace_codes()
+        self.trace_msg.setText("")
+
+    def _submit_trace(self) -> None:
+        mode = self.trace_mode.currentData()
+        if not mode:
+            self.trace_msg.setText("当前角色没有扫码权限")
+            return
+        if not self.trace_scanned:
+            self.trace_msg.setText("请先扫码")
+            return
+        payload = {"codes": self.trace_scanned}
+        if mode == "inbound":
+            drug_id = self.trace_drug.currentData()
+            batch = self.trace_batch.text().strip()
+            if not drug_id or not batch:
+                self.trace_msg.setText("入库扫码请选择药品并填写批号")
+                return
+            payload["drug_id"] = drug_id
+            payload["batch_no"] = batch
+        if mode == "dispense" and self.trace_encounter.value() > 0:
+            payload["encounter_id"] = self.trace_encounter.value()
+        try:
+            result = self.api.trace_scan(mode, payload)
+        except ApiError as e:
+            self.trace_msg.setText(f"扫码提交失败（{e.status_code}）：{e.detail}")
+            return
+        self.trace_msg.setText(result.get("message", "扫码成功"))
+        self._clear_trace()
+        self._query_trace()
+
+    def _query_trace(self) -> None:
+        code = self.trace_query.text().strip() or None
+        try:
+            rows = self.api.trace_codes(trace_code=code)
+        except ApiError as e:
+            self.trace_query_msg.setText(f"查询失败：{e.detail}")
+            return
+        self.trace_result_table.setRowCount(len(rows))
+        for row, item in enumerate(rows):
+            values = [
+                item["trace_code"],
+                str(item["drug_id"]),
+                item["batch_no"],
+                item["warehouse"],
+                item["status"],
+                str(item.get("patient_id") or "—"),
+            ]
+            for col, value in enumerate(values):
+                self.trace_result_table.setItem(row, col, QTableWidgetItem(value))
+        self.trace_query_msg.setText(f"共 {len(rows)} 条")
 
     # ---------- 库存查询 ----------
     def _build_stock_tab(self) -> QWidget:

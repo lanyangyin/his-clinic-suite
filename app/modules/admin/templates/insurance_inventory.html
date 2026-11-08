@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}医保进销存 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医保进销存上传</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+  {% if error %}<div class="warn">{{ error }}</div>{% endif %}
+
+  <form class="inline" method="get" action="/admin/insurance-inventory">
+    <label>开始日期 <input type="date" name="start_date" value="{{ start_date }}"></label>
+    <label>结束日期 <input type="date" name="end_date" value="{{ end_date }}"></label>
+    <button type="submit">预览</button>
+  </form>
+
+  {% if preview %}
+  <h2>预览：{{ preview.record_count }} 条，金额 {{ '%.2f'|format(preview.total_amount) }}，未对码 {{ preview.unmatched_count }}</h2>
+  <form method="post" action="/admin/insurance-inventory/upload">
+    <input type="hidden" name="start_date" value="{{ start_date }}">
+    <input type="hidden" name="end_date" value="{{ end_date }}">
+    <button type="submit">生成报文并上传医保（Mock）</button>
+  </form>
+  <table>
+    <tr><th>医保代码</th><th>药品</th><th>批号</th><th>库房</th><th>业务</th><th>方向</th><th>数量</th><th>金额</th><th>时间</th><th>结存</th></tr>
+    {% for row in preview.records %}
+    <tr>
+      <td>{{ row.insurance_code or '—' }}</td>
+      <td>{{ row.drug_name }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.warehouse }}</td>
+      <td>{{ row.business_type }}</td>
+      <td>{{ '入' if row.direction == 'in' else '出' }}</td>
+      <td>{{ row.quantity }}</td>
+      <td>{{ '%.2f'|format(row.amount) }}</td>
+      <td>{{ row.occurred_at }}</td>
+      <td>{{ row.balance_after }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <h2>上传历史（{{ uploads|length }}）</h2>
+  <table>
+    <tr><th>上传单号</th><th>期间</th><th>条数</th><th>金额</th><th>状态</th><th>操作人</th><th>时间</th><th>操作</th></tr>
+    {% for item in uploads %}
+    <tr>
+      <td>{{ item.upload_no }}</td>
+      <td>{{ item.start_date }} ~ {{ item.end_date }}</td>
+      <td>{{ item.record_count }}</td>
+      <td>{{ '%.2f'|format(item.total_amount) }}</td>
+      <td>{{ item.status }}</td>
+      <td>{{ item.created_by }}</td>
+      <td>{{ item.created_at.strftime('%m-%d %H:%M') }}</td>
+      <td><a href="/admin/insurance-inventory/{{ item.id }}">详情</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无上传记录</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

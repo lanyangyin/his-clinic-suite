@@ -47,6 +47,16 @@ from app.modules.receiving.service import (
 from app.modules.reports.service import department_revenue
 from app.modules.review.service import summary as review_summary
 from app.modules.stock_ledger.service import list_movements as list_stock_movements
+from app.modules.traceability.service import (
+    list_codes as list_trace_codes,
+    summary as trace_summary,
+)
+from app.modules.insurance_inventory.service import (
+    create_upload as insurance_inventory_upload,
+    get_upload as get_insurance_inventory_upload,
+    list_uploads as list_insurance_inventory_uploads,
+    preview as insurance_inventory_preview,
+)
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
 from app.modules.staff.service import (
     create_department,
@@ -611,6 +621,114 @@ def expiry_alerts_page(
         request,
         "expiry_alerts.html",
         _ctx(request, alerts=warehouse_expiry_alerts(db, days), days=days),
+    )
+
+
+# ---------- 追溯码 ----------
+@router.get("/trace-codes", response_class=HTMLResponse)
+def trace_codes_page(
+    request: Request,
+    trace_code: str | None = None,
+    drug_id: int | None = None,
+    batch_no: str | None = None,
+    status: str | None = None,
+    warehouse: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "trace_codes.html",
+        _ctx(
+            request,
+            rows=list_trace_codes(
+                db, trace_code, drug_id, batch_no, status, warehouse
+            ),
+            summary=trace_summary(db, drug_id, batch_no),
+            trace_code=trace_code or "",
+            drug_id=drug_id or "",
+            batch_no=batch_no or "",
+            status=status or "",
+            warehouse=warehouse or "",
+        ),
+    )
+
+
+# ---------- 医保进销存 ----------
+@router.get("/insurance-inventory", response_class=HTMLResponse)
+def insurance_inventory_page(
+    request: Request,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    today = date.today()
+    start = start_date or today.replace(day=1)
+    end = end_date or today
+    try:
+        preview = insurance_inventory_preview(db, start, end)
+        error = ""
+    except ValueError as e:
+        preview = None
+        error = str(e)
+    return templates.TemplateResponse(
+        request,
+        "insurance_inventory.html",
+        _ctx(
+            request,
+            preview=preview,
+            error=error,
+            uploads=list_insurance_inventory_uploads(db),
+            start_date=start,
+            end_date=end,
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/insurance-inventory/upload")
+def insurance_inventory_do_upload(
+    request: Request,
+    start_date: date = Form(...),
+    end_date: date = Form(...),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        upload = insurance_inventory_upload(
+            db, start_date, end_date,
+            created_by=request.session.get("admin_user", "admin"),
+        )
+        msg = f"上传完成：{upload.upload_no}，{upload.record_count} 条，{upload.status}"
+    except ValueError as e:
+        msg = f"上传失败：{e}"
+    return RedirectResponse(
+        f"/admin/insurance-inventory?start_date={start_date}&end_date={end_date}&msg={quote(msg)}",
+        status_code=302,
+    )
+
+
+@router.get("/insurance-inventory/{upload_id}", response_class=HTMLResponse)
+def insurance_inventory_detail(
+    request: Request, upload_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    upload = get_insurance_inventory_upload(db, upload_id)
+    if not upload:
+        raise HTTPException(status_code=404, detail="上传记录不存在")
+    return templates.TemplateResponse(
+        request,
+        "insurance_inventory_detail.html",
+        _ctx(request, upload=upload),
     )
 
 

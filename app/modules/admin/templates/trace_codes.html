@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}追溯码 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>药品追溯码</h2>
+<div class="panel">
+  <form class="inline" method="get" action="/admin/trace-codes">
+    <label>追溯码 <input type="text" name="trace_code" value="{{ trace_code }}"></label>
+    <label>药品ID <input type="text" name="drug_id" value="{{ drug_id }}" style="width:80px"></label>
+    <label>批号 <input type="text" name="batch_no" value="{{ batch_no }}"></label>
+    <label>状态
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>全部</option>
+        <option value="in_stock" {% if status == 'in_stock' %}selected{% endif %}>在库</option>
+        <option value="used" {% if status == 'used' %}selected{% endif %}>已使用</option>
+        <option value="returned" {% if status == 'returned' %}selected{% endif %}>已退回</option>
+        <option value="void" {% if status == 'void' %}selected{% endif %}>作废</option>
+      </select>
+    </label>
+    <label>库房
+      <select name="warehouse">
+        <option value="" {% if not warehouse %}selected{% endif %}>全部</option>
+        <option value="总库" {% if warehouse == '总库' %}selected{% endif %}>总库</option>
+        <option value="药房" {% if warehouse == '药房' %}selected{% endif %}>药房</option>
+      </select>
+    </label>
+    <button type="submit">查询</button>
+  </form>
+
+  <h2>汇总（共 {{ summary["total"] }} 个码）</h2>
+  <table>
+    <tr><th>状态</th><th>库房</th><th>数量</th></tr>
+    {% for item in summary["items"] %}
+    <tr><td>{{ item.status }}</td><td>{{ item.warehouse }}</td><td>{{ item.count }}</td></tr>
+    {% else %}
+    <tr><td colspan="3">暂无追溯码</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>明细（{{ rows|length }}）</h2>
+  <table>
+    <tr><th>追溯码</th><th>药品ID</th><th>批号</th><th>库房</th><th>状态</th><th>单据</th><th>患者</th><th>操作人</th><th>时间</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.trace_code }}</td>
+      <td>{{ row.drug_id }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.warehouse }}</td>
+      <td>{{ row.status }}</td>
+      <td>{{ row.ref_type }}{% if row.ref_id %}#{{ row.ref_id }}{% endif %}</td>
+      <td>{{ row.patient_id or '—' }}</td>
+      <td>{{ row.scanned_by or '—' }}</td>
+      <td>{{ row.scanned_at.strftime('%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">暂无追溯码记录</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
+

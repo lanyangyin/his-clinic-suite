@@ -56,6 +56,8 @@ import app.modules.sms.models  # noqa: F401
 import app.modules.receiving.models  # noqa: F401
 import app.modules.insurance_catalog.models  # noqa: F401
 import app.modules.stock_ledger.models  # noqa: F401
+import app.modules.traceability.models  # noqa: F401
+import app.modules.insurance_inventory.models  # noqa: F401
 
 target_metadata = app.database.Base.metadata
 
