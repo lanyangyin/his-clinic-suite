@@ -144,7 +144,10 @@ def add_prescription_item(
         else:
             warning = review["message"] if review["result"] == "warn" else None
 
-    warnings = [text for text in (catalog_warning, warning) if text]
+    warnings: list[str] = []
+    for text in (catalog_warning, warning):
+        if text and text not in warnings:
+            warnings.append(text)
     item = PrescriptionItem(
         encounter_id=encounter_id,
         drug_id=data.drug_id,
