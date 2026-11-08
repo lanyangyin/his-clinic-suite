@@ -33,6 +33,7 @@ class DoctorWidget(QWidget):
         super().__init__(parent)
         self.api = api
         tabs = QTabWidget()
+        tabs.addTab(self._build_register_tab(), "挂号")
         tabs.addTab(self._build_reception_tab(), "接诊")
         tabs.addTab(self._build_record_tab(), "病历")
         tabs.addTab(self._build_prescription_tab(), "开方")
@@ -40,6 +41,118 @@ class DoctorWidget(QWidget):
         tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
+
+    # ---------- 挂号（医生站现场挂号） ----------
+    def _build_register_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        search_box = QGroupBox("查询患者（未建档请先到收费员工作站建档）")
+        search_layout = QVBoxLayout(search_box)
+        row = QHBoxLayout()
+        self.reg_patient_name = QLineEdit()
+        self.reg_patient_name.setPlaceholderText("姓名（可空）")
+        self.reg_patient_id_number = QLineEdit()
+        self.reg_patient_id_number.setPlaceholderText("身份证号（可空）")
+        search = QPushButton("查询患者")
+        search.clicked.connect(self._search_registration_patients)
+        row.addWidget(QLabel("姓名"))
+        row.addWidget(self.reg_patient_name)
+        row.addWidget(QLabel("身份证号"))
+        row.addWidget(self.reg_patient_id_number)
+        row.addWidget(search)
+        search_layout.addLayout(row)
+
+        self.reg_patient_table = QTableWidget(0, 4)
+        self.reg_patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号", "电话"])
+        search_layout.addWidget(self.reg_patient_table)
+        layout.addWidget(search_box)
+
+        box = QGroupBox("现场挂号")
+        form = QFormLayout(box)
+        self.reg_patient_id = QLineEdit()
+        self.reg_patient_id.setReadOnly(True)
+        self.reg_patient_id.setPlaceholderText("在上表选择患者")
+        self.reg_doctor = QComboBox()
+        load_doctors = QPushButton("刷新医生")
+        load_doctors.clicked.connect(self._load_registration_doctors)
+        doctor_row = QHBoxLayout()
+        doctor_row.addWidget(self.reg_doctor)
+        doctor_row.addWidget(load_doctors)
+        self.reg_msg = QLabel("")
+        self.reg_msg.setWordWrap(True)
+        submit = QPushButton("挂号")
+        submit.clicked.connect(self._create_registration)
+        form.addRow("患者 ID", self.reg_patient_id)
+        form.addRow("医生", doctor_row)
+        form.addRow("", submit)
+        form.addRow("", self.reg_msg)
+        layout.addWidget(box)
+        layout.addStretch(1)
+
+        self.reg_patient_table.cellClicked.connect(self._select_registration_patient)
+        return page
+
+    def _search_registration_patients(self) -> None:
+        try:
+            patients = self.api.list_patients(
+                name=self.reg_patient_name.text().strip() or None,
+                id_number=self.reg_patient_id_number.text().strip() or None,
+            )
+        except ApiError as e:
+            self.reg_msg.setText(f"查询患者失败（{e.status_code}）：{e.detail}")
+            return
+        self.reg_patient_table.setRowCount(len(patients))
+        for row, patient in enumerate(patients):
+            values = [
+                str(patient["id"]),
+                patient["name"],
+                patient.get("id_number", ""),
+                patient.get("phone", ""),
+            ]
+            for col, value in enumerate(values):
+                self.reg_patient_table.setItem(row, col, QTableWidgetItem(value))
+        self.reg_msg.setText(f"共 {len(patients)} 位患者")
+
+    def _select_registration_patient(self, row: int, _col: int) -> None:
+        item = self.reg_patient_table.item(row, 0)
+        if item:
+            self.reg_patient_id.setText(item.text())
+
+    def _load_registration_doctors(self) -> None:
+        try:
+            doctors = self.api.list_doctors()
+        except ApiError as e:
+            self.reg_msg.setText(f"加载医生失败（{e.status_code}）：{e.detail}")
+            return
+        self.reg_doctor.clear()
+        for doctor in doctors:
+            self.reg_doctor.addItem(
+                f"{doctor['name']}（科室 {doctor.get('department_id')}）", doctor["id"]
+            )
+        self.reg_msg.setText(f"医生 {len(doctors)} 位")
+
+    def _create_registration(self) -> None:
+        patient_id = self.reg_patient_id.text().strip()
+        doctor_id = self.reg_doctor.currentData()
+        if not patient_id:
+            self.reg_msg.setText("请先在上表选择患者")
+            return
+        if not doctor_id:
+            self.reg_msg.setText("请先刷新并选择医生")
+            return
+        try:
+            registration = self.api.create_registration(int(patient_id), doctor_id)
+        except ApiError as e:
+            self.reg_msg.setText(f"挂号失败（{e.status_code}）：{e.detail}")
+            return
+        self.reg_msg.setText(
+            f"挂号成功：挂号 ID {registration['id']}，状态 "
+            f"{zh('registration_status', registration['status'])}，可到「接诊」页开始接诊"
+        )
+        if hasattr(self, "reg_id"):
+            self.reg_id.setValue(registration["id"])
+        self._load_pending_registrations()
 
     # ---------- 接诊 ----------
     def _build_reception_tab(self) -> QWidget:

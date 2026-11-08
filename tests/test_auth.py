@@ -23,10 +23,33 @@ def test_wrong_role_rejected(client, auth):
     r = client.post(
         "/registrations/",
         json={"patient_id": 1, "doctor_id": 1},
-        headers=auth["doctor"],
+        headers=auth["nurse"],
     )
     assert r.status_code == 403
-    assert r.json()["detail"] == "需要角色：cashier"
+    assert r.json()["detail"] == "需要角色：cashier/doctor"
+
+
+def test_doctor_can_register_patient(client, auth):
+    patient = client.post(
+        "/patients/",
+        json={"name": "现场患者", "id_number": "110101199001019999"},
+        headers=auth["cashier"],
+    ).json()
+    department = client.post(
+        "/departments/", json={"name": "全科"}, headers=auth["admin"]
+    ).json()
+    doctor = client.post(
+        "/doctors/",
+        json={"name": "陈医生", "department_id": department["id"]},
+        headers=auth["admin"],
+    ).json()
+    r = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
+        headers=auth["doctor"],
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "registered"
 
 
 def test_admin_can_do_everything(client, auth):

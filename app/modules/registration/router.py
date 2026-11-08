@@ -27,7 +27,7 @@ _NOT_FOUND_MESSAGES = {"患者不存在", "医生不存在", "排班不存在"}
 def register(
     data: RegistrationCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier")),
+    _: None = Depends(require_role("cashier", "doctor")),
 ):
     try:
         return create_registration(db, data)
