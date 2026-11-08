@@ -18,6 +18,14 @@
     <button type="submit">检索</button>
   </form>
 
+  <h2>官方查询入口（免登录查看）</h2>
+  <ul>
+    <li><a href="https://www.nhsa.gov.cn/art/2026/1/5/art_14_19235.html" target="_blank">国家医保局：哪些药品能报销？（公众号「微服务→国家医保药品目录查询」指引）</a></li>
+    <li><a href="https://code.nhsa.gov.cn" target="_blank">医保医用耗材分类与代码数据库（国家医保局动态维护，可公开查询）</a></li>
+    <li><a href="https://www.nhsa.gov.cn" target="_blank">国家医保局官网（目录公告与文件下载）</a></li>
+  </ul>
+  <p>说明：官方提供的是查询页面和目录文件，并未提供面向开发者的公开 API；批量导入请用下方上传或 URL 同步（支持 CSV/XLSX）。</p>
+
   <h2>导入 / 同步</h2>
   <form class="inline" method="post" action="/admin/insurance-catalog/import" enctype="multipart/form-data">
     <label>目录文件（CSV/XLSX） <input type="file" name="file" accept=".csv,.xlsx" required></label>
