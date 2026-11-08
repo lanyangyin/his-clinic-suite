@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}库存流水 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>库存流水台账</h2>
+<div class="panel">
+  <form class="inline" method="get" action="/admin/stock-ledger">
+    <label>类型
+      <select name="kind">
+        <option value="" {% if not kind %}selected{% endif %}>全部</option>
+        <option value="drug" {% if kind == 'drug' %}selected{% endif %}>药品</option>
+        <option value="material" {% if kind == 'material' %}selected{% endif %}>物资</option>
+      </select>
+    </label>
+    <label>库房 <input type="text" name="warehouse" value="{{ warehouse }}" placeholder="总库/药房"></label>
+    <label>方向
+      <select name="direction">
+        <option value="" {% if not direction %}selected{% endif %}>全部</option>
+        <option value="in" {% if direction == 'in' %}selected{% endif %}>入库</option>
+        <option value="out" {% if direction == 'out' %}selected{% endif %}>出库</option>
+      </select>
+    </label>
+    <label>单据类型 <input type="text" name="ref_type" value="{{ ref_type }}" placeholder="inbound/purchase/outbound/dispense"></label>
+    <button type="submit">筛选</button>
+  </form>
+
+  <table>
+    <tr><th>时间</th><th>类型</th><th>名称</th><th>批次</th><th>库房</th><th>方向</th><th>数量</th><th>单价</th><th>金额</th><th>结存</th><th>单据</th><th>操作人</th></tr>
+    {% for m in movements %}
+    <tr>
+      <td>{{ m.created_at.strftime('%m-%d %H:%M') }}</td>
+      <td>{{ '药品' if m.kind == 'drug' else '物资' }}</td>
+      <td>{{ m.name }}</td>
+      <td>{{ m.batch_no or '—' }}</td>
+      <td>{{ m.warehouse }}</td>
+      <td>{{ '入' if m.direction == 'in' else '出' }}</td>
+      <td>{{ m.quantity }}</td>
+      <td>{{ '%.2f'|format(m.unit_price) }}</td>
+      <td>{{ '%.2f'|format(m.amount) }}</td>
+      <td>{{ m.balance_after }}</td>
+      <td>{{ m.ref_type }}{% if m.ref_id %}#{{ m.ref_id }}{% endif %}</td>
+      <td>{{ m.operator or '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="12">暂无库存流水</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

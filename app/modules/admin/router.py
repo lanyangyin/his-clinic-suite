@@ -44,6 +44,7 @@ from app.modules.receiving.service import (
 )
 from app.modules.reports.service import department_revenue
 from app.modules.review.service import summary as review_summary
+from app.modules.stock_ledger.service import list_movements as list_stock_movements
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
 from app.modules.staff.service import (
     create_department,
@@ -539,6 +540,41 @@ def insurance_catalog_sync(
         msg = f"同步失败：{e}"
     return RedirectResponse(
         f"/admin/insurance-catalog?msg={quote(msg)}", status_code=302
+    )
+
+
+# ---------- 库存流水台账 ----------
+@router.get("/stock-ledger", response_class=HTMLResponse)
+def stock_ledger_page(
+    request: Request,
+    kind: str | None = None,
+    warehouse: str | None = None,
+    direction: str | None = None,
+    ref_type: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "stock_ledger.html",
+        _ctx(
+            request,
+            movements=list_stock_movements(
+                db,
+                kind=kind,
+                warehouse=warehouse,
+                direction=direction,
+                ref_type=ref_type,
+                limit=200,
+            ),
+            kind=kind or "",
+            warehouse=warehouse or "",
+            direction=direction or "",
+            ref_type=ref_type or "",
+            message=request.query_params.get("msg", ""),
+        ),
     )
 
 

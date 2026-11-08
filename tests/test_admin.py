@@ -233,6 +233,41 @@ def test_inbound_admin_pages(client, auth):
     assert "stocked" in detail.text or "已入库" in detail.text
 
 
+def test_stock_ledger_admin_page(client, auth):
+    drug = client.post(
+        "/drugs/", json={"name": "台账管理台药", "base_price": 10.0},
+        headers=auth["admin"],
+    ).json()
+    inbound = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "LEDGER-B1",
+                    "expiry": "2027-12-31",
+                    "quantity": 3,
+                }
+            ],
+        },
+        headers=auth["warehouse"],
+    ).json()
+    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["warehouse"])
+    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["warehouse"])
+
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    page = client.get("/admin/stock-ledger")
+    assert page.status_code == 200
+    assert "库存流水台账" in page.text
+    assert "LEDGER-B1" in page.text
+    filtered = client.get("/admin/stock-ledger?ref_type=inbound&warehouse=总库")
+    assert filtered.status_code == 200
+    assert "inbound" in filtered.text
+
+
 def test_warehouse_admin_pages(client, auth):
     # 先造总库库存：入库单
     drug = client.post(

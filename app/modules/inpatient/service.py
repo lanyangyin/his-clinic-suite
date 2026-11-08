@@ -357,7 +357,13 @@ def dispense_request(db: Session, request_id: int) -> InpatientDispenseRequest:
     if affected != 1:
         raise ValueError("该摆药单已处理")
 
-    deduct_stock(db, request.drug, request.quantity)
+    deduct_stock(
+        db,
+        request.drug,
+        request.quantity,
+        ref_type="inpatient_dispense",
+        ref_id=request.id,
+    )
 
     db.commit()
     db.refresh(request)
@@ -392,7 +398,13 @@ def return_dispense(db: Session, request_id: int) -> InpatientDispenseRequest:
     if affected != 1:
         raise ValueError("仅已发药的摆药单可以退药")
 
-    restore_stock(db, request.drug, request.quantity)
+    restore_stock(
+        db,
+        request.drug,
+        request.quantity,
+        ref_type="inpatient_return",
+        ref_id=request.id,
+    )
 
     db.commit()
     db.refresh(request)

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.modules.encounter.service import get_encounter
+from app.modules.stock_ledger.service import record_material
 
 from .models import MaterialItem, MaterialStock, MaterialUsage
 from .schemas import MaterialItemCreate, StockInCreate, UsageCreate
@@ -31,9 +32,12 @@ def list_items(db: Session, category: str | None = None) -> list[MaterialItem]:
     return query.order_by(MaterialItem.id).all()
 
 
-def stock_in(db: Session, data: StockInCreate) -> MaterialStock:
-    """物资入库：同物品同库房合并数量。"""
-    if not get_item(db, data.item_id):
+def stock_in(
+    db: Session, data: StockInCreate, record: bool = True
+) -> MaterialStock:
+    """物资入库：同物品同库房合并数量（record=False 时由调用方记流水）。"""
+    item = get_item(db, data.item_id)
+    if not item:
         raise ValueError("物资不存在")
 
     stock = (
@@ -46,14 +50,23 @@ def stock_in(db: Session, data: StockInCreate) -> MaterialStock:
     )
     if stock:
         stock.quantity += data.quantity
-        db.commit()
-        db.refresh(stock)
-        return stock
-
-    stock = MaterialStock(
-        item_id=data.item_id, warehouse=data.warehouse, quantity=data.quantity
-    )
-    db.add(stock)
+    else:
+        stock = MaterialStock(
+            item_id=data.item_id, warehouse=data.warehouse, quantity=data.quantity
+        )
+        db.add(stock)
+    db.flush()
+    if record:
+        record_material(
+            db,
+            item,
+            warehouse=data.warehouse,
+            direction="in",
+            quantity=data.quantity,
+            unit_price=item.price,
+            ref_type="material_stock_in",
+            ref_id=stock.id,
+        )
     db.commit()
     db.refresh(stock)
     return stock
@@ -98,6 +111,19 @@ def use_material(db: Session, data: UsageCreate, used_by: str = "") -> MaterialU
         used_by=used_by,
     )
     db.add(usage)
+    db.flush()
+    record_material(
+        db,
+        item,
+        warehouse=data.warehouse,
+        direction="out",
+        quantity=1,
+        unit_price=item.price,
+        ref_type="usage",
+        ref_id=usage.id,
+        operator=used_by,
+        note=f"高值耗材序列号 {data.serial_no}",
+    )
     db.commit()
     db.refresh(usage)
     return usage

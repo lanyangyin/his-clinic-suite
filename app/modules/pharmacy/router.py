@@ -20,10 +20,10 @@ router = APIRouter(prefix="/pharmacy", tags=["pharmacy"])
 def dispense_medicines(
     data: DispenseRequest,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    user=Depends(require_role("pharmacist")),
 ):
     try:
-        return dispense(db, data)
+        return dispense(db, data, operator=user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -32,11 +32,11 @@ def dispense_medicines(
 def return_medicines(
     dispense_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    user=Depends(require_role("pharmacist")),
 ):
     """门诊退药：库存回补；退药后可继续退费。"""
     try:
-        return return_dispense(db, dispense_id)
+        return return_dispense(db, dispense_id, operator=user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

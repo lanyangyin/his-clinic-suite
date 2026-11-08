@@ -14,6 +14,7 @@ from app.modules.drug.service import get_drug
 from app.modules.materials.service import get_item as get_material_item
 from app.modules.materials.schemas import StockInCreate
 from app.modules.materials.service import stock_in as material_stock_in
+from app.modules.stock_ledger.service import record_drug, record_material
 from app.modules.supplier.service import get_supplier
 from app.modules.warehouse.service import receive_stock as warehouse_receive
 
@@ -175,15 +176,44 @@ def stock_order(db: Session, order_id: int) -> InboundOrder:
             continue
         if item.kind == "drug":
             # 入库进总库（药库），药房通过出库单领用
-            warehouse_receive(db, item.drug_id, item.batch_no, item.expiry, quantity)
+            stock = warehouse_receive(
+                db, item.drug_id, item.batch_no, item.expiry, quantity
+            )
+            record_drug(
+                db,
+                stock.drug,
+                batch_no=item.batch_no,
+                expiry=item.expiry,
+                warehouse="总库",
+                direction="in",
+                quantity=quantity,
+                unit_price=item.unit_price,
+                ref_type="inbound",
+                ref_id=order.id,
+                operator=order.checked_by or order.received_by,
+                note=f"入库单 {order.order_no}",
+            )
         else:
-            material_stock_in(
+            stock = material_stock_in(
                 db,
                 StockInCreate(
                     item_id=item.material_id,
                     warehouse=item.warehouse,
                     quantity=quantity,
                 ),
+                record=False,
+            )
+            record_material(
+                db,
+                stock.item,
+                warehouse=item.warehouse,
+                direction="in",
+                quantity=quantity,
+                unit_price=item.unit_price,
+                ref_type="inbound",
+                ref_id=order.id,
+                operator=order.checked_by or order.received_by,
+                note=f"入库单 {order.order_no}",
             )
 
     order.status = "stocked"

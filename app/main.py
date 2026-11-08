@@ -44,6 +44,7 @@ from app.modules.facility.router import router as facility_router
 from app.modules.sms.router import router as sms_router
 from app.modules.receiving.router import router as receiving_router
 from app.modules.insurance_catalog.router import router as insurance_catalog_router
+from app.modules.stock_ledger.router import router as stock_ledger_router
 from app.modules.reports.router import router as reports_router
 from app.modules.review.router import router as review_router
 from app.modules.admin.router import router as admin_router
@@ -197,6 +198,7 @@ app.include_router(facility_router)
 app.include_router(sms_router)
 app.include_router(receiving_router)
 app.include_router(insurance_catalog_router)
+app.include_router(stock_ledger_router)
 app.include_router(reports_router)
 app.include_router(review_router)
 

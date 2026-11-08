@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session
 from app.modules.drug.service import get_drug
 from app.modules.encounter.service import get_encounter, list_prescription_items
 from app.modules.billing.service import get_payment_by_encounter
+from app.modules.stock_ledger.service import record_drug
 
 from .models import Dispense, DrugStock
 from .schemas import DispenseRequest, StockInRequest
 
 
 def stock_in(db: Session, data: StockInRequest) -> DrugStock:
-    """入库：同药品同批次累加数量，否则新建批次行。"""
+    """入库（历史遗留入口）：同药品同批次累加数量，并记库存流水。"""
     drug = get_drug(db, data.drug_id)
     if not drug:
         raise ValueError("药品不存在")
@@ -27,6 +28,19 @@ def stock_in(db: Session, data: StockInRequest) -> DrugStock:
     )
     if existing:
         existing.quantity += data.quantity
+        db.flush()
+        record_drug(
+            db,
+            drug,
+            batch_no=data.batch_no,
+            expiry=data.expiry,
+            warehouse="药房",
+            direction="in",
+            quantity=data.quantity,
+            unit_price=drug.base_price,
+            ref_type="stock_in",
+            ref_id=existing.id,
+        )
         db.commit()
         db.refresh(existing)
         return existing
@@ -39,6 +53,19 @@ def stock_in(db: Session, data: StockInRequest) -> DrugStock:
         quantity=data.quantity,
     )
     db.add(stock)
+    db.flush()
+    record_drug(
+        db,
+        drug,
+        batch_no=data.batch_no,
+        expiry=data.expiry,
+        warehouse="药房",
+        direction="in",
+        quantity=data.quantity,
+        unit_price=drug.base_price,
+        ref_type="stock_in",
+        ref_id=stock.id,
+    )
     db.commit()
     db.refresh(stock)
     return stock
@@ -57,7 +84,7 @@ def list_stocks(db: Session, drug_id: int | None = None) -> list[DrugStock]:
     return query.order_by(DrugStock.drug_id, DrugStock.expiry).all()
 
 
-def dispense(db: Session, data: DispenseRequest) -> Dispense:
+def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense:
     """发药：就诊已收费且未发药时，按近效期先出扣减库存并记录发药。"""
     encounter = get_encounter(db, data.encounter_id)
     if not encounter:
@@ -73,26 +100,44 @@ def dispense(db: Session, data: DispenseRequest) -> Dispense:
     if existing:
         raise ValueError("该就诊已发药")
 
-    # 扣库存：逐条处方明细按近效期先出
-    for item in list_prescription_items(db, encounter.id):
-        deduct_stock(db, item.drug, item.quantity)
-
     record = Dispense(encounter_id=data.encounter_id)
     db.add(record)
     try:
-        db.commit()
+        db.flush()
     except IntegrityError:
         # 并发发药兜底：dispensations.encounter_id 唯一约束
         db.rollback()
         raise ValueError("该就诊已发药")
+
+    # 扣库存：逐条处方明细按近效期先出（同时记库存流水）
+    for item in list_prescription_items(db, encounter.id):
+        deduct_stock(
+            db,
+            item.drug,
+            item.quantity,
+            ref_type="dispense",
+            ref_id=record.id,
+            operator=operator,
+        )
+
+    db.commit()
     db.refresh(record)
     return record
 
 
-def deduct_stock(db: Session, drug, quantity: int) -> None:
+def deduct_stock(
+    db: Session,
+    drug,
+    quantity: int,
+    *,
+    ref_type: str = "dispense",
+    ref_id: int | None = None,
+    operator: str = "",
+    note: str = "",
+) -> None:
     """按近效期先出扣减库存（不提交事务）；不足抛 ValueError。
 
-    过期批次自然锁定（不在可选范围）。门诊发药与住院摆药共用。
+    过期批次自然锁定（不在可选范围）。门诊发药与住院摆药共用，每次扣减记流水。
     """
     stock_rows = (
         db.query(DrugStock)
@@ -122,13 +167,37 @@ def deduct_stock(db: Session, drug, quantity: int) -> None:
         )
         if affected != 1:
             raise ValueError(f"库存不足：{drug.name}")
+        db.expire(stock)
+        record_drug(
+            db,
+            drug,
+            batch_no=stock.batch_no,
+            expiry=stock.expiry,
+            warehouse="药房",
+            direction="out",
+            quantity=take,
+            unit_price=drug.base_price,
+            ref_type=ref_type,
+            ref_id=ref_id,
+            operator=operator,
+            note=note,
+        )
         remaining -= take
     if remaining > 0:
         raise ValueError(f"库存不足：{drug.name}")
 
 
-def restore_stock(db: Session, drug, quantity: int) -> None:
-    """退药回补库存（不提交事务）：回补到该药最早的批次行。"""
+def restore_stock(
+    db: Session,
+    drug,
+    quantity: int,
+    *,
+    ref_type: str = "dispense_return",
+    ref_id: int | None = None,
+    operator: str = "",
+    note: str = "",
+) -> None:
+    """退药回补库存（不提交事务）：回补到该药最早的批次行，并记流水。"""
     batch = (
         db.query(DrugStock)
         .filter(DrugStock.drug_id == drug.id)
@@ -138,6 +207,21 @@ def restore_stock(db: Session, drug, quantity: int) -> None:
     if not batch:
         raise ValueError("没有可回退的药品批次")
     batch.quantity += quantity
+    db.flush()
+    record_drug(
+        db,
+        drug,
+        batch_no=batch.batch_no,
+        expiry=batch.expiry,
+        warehouse="药房",
+        direction="in",
+        quantity=quantity,
+        unit_price=drug.base_price,
+        ref_type=ref_type,
+        ref_id=ref_id,
+        operator=operator,
+        note=note,
+    )
 
 
 def get_dispense(db: Session, dispense_id: int) -> Dispense | None:
@@ -164,7 +248,7 @@ def get_active_dispense_by_encounter(
     )
 
 
-def return_dispense(db: Session, dispense_id: int) -> Dispense:
+def return_dispense(db: Session, dispense_id: int, operator: str = "") -> Dispense:
     """门诊退药：库存回补，状态置 returned（原子状态机防并发重复退）。"""
     dispense = get_dispense(db, dispense_id)
     if not dispense:
@@ -187,7 +271,14 @@ def return_dispense(db: Session, dispense_id: int) -> Dispense:
         raise ValueError("该发药记录已退回")
 
     for item in list_prescription_items(db, dispense.encounter_id):
-        restore_stock(db, item.drug, item.quantity)
+        restore_stock(
+            db,
+            item.drug,
+            item.quantity,
+            ref_type="dispense_return",
+            ref_id=dispense.id,
+            operator=operator,
+        )
 
     db.commit()
     db.refresh(dispense)

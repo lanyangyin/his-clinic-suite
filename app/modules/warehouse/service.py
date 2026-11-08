@@ -6,6 +6,7 @@ from app.modules.drug.service import get_drug
 from app.modules.materials.models import MaterialStock
 from app.modules.materials.service import get_item as get_material_item
 from app.modules.pharmacy.models import DrugStock
+from app.modules.stock_ledger.service import record_drug, record_material
 from app.modules.supplier.service import get_supplier
 
 from .models import (
@@ -171,6 +172,23 @@ def issue_outbound(db: Session, order_id: int, issuer: str) -> OutboundOrder:
                 db.rollback()
                 raise ValueError(f"总库库存不足：{item.name}（批次 {item.batch_no}）")
 
+            drug = get_drug(db, item.drug_id)
+            db.expire(warehouse_stock)
+            record_drug(
+                db,
+                drug,
+                batch_no=item.batch_no,
+                expiry=expiry,
+                warehouse="总库",
+                direction="out",
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                ref_type="outbound",
+                ref_id=order.id,
+                operator=issuer,
+                note=f"出库单 {order.outbound_no}",
+            )
+
             stock = (
                 db.query(DrugStock)
                 .filter(
@@ -190,6 +208,21 @@ def issue_outbound(db: Session, order_id: int, issuer: str) -> OutboundOrder:
                         quantity=item.quantity,
                     )
                 )
+            db.flush()
+            record_drug(
+                db,
+                drug,
+                batch_no=item.batch_no,
+                expiry=expiry,
+                warehouse="药房",
+                direction="in",
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                ref_type="outbound",
+                ref_id=order.id,
+                operator=issuer,
+                note=f"出库单 {order.outbound_no}",
+            )
         else:
             affected = (
                 db.query(MaterialStock)
@@ -206,6 +239,20 @@ def issue_outbound(db: Session, order_id: int, issuer: str) -> OutboundOrder:
             if affected != 1:
                 db.rollback()
                 raise ValueError(f"总库库存不足：{item.name}")
+
+            material = get_material_item(db, item.material_id)
+            record_material(
+                db,
+                material,
+                warehouse="总库",
+                direction="out",
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                ref_type="outbound",
+                ref_id=order.id,
+                operator=issuer,
+                note=f"出库单 {order.outbound_no}",
+            )
 
             target = order.target_name or "药房"
             stock = (
@@ -226,6 +273,19 @@ def issue_outbound(db: Session, order_id: int, issuer: str) -> OutboundOrder:
                         quantity=item.quantity,
                     )
                 )
+            db.flush()
+            record_material(
+                db,
+                material,
+                warehouse=target,
+                direction="in",
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                ref_type="outbound",
+                ref_id=order.id,
+                operator=issuer,
+                note=f"出库单 {order.outbound_no}",
+            )
 
     order.status = "issued"
     order.issuer = issuer
@@ -266,7 +326,8 @@ def purchase(
     db: Session, data: PurchaseCreate, purchased_by: str = ""
 ) -> WarehouseStock:
     """采购入库：同药品同批次合并数量，并记录采购流水（可关联供应商）。"""
-    if not get_drug(db, data.drug_id):
+    drug = get_drug(db, data.drug_id)
+    if not drug:
         raise ValueError("药品不存在")
     if data.supplier_id is not None and not get_supplier(db, data.supplier_id):
         raise ValueError("供应商不存在")
@@ -283,14 +344,27 @@ def purchase(
         )
         db.add(stock)
 
-    db.add(
-        PurchaseRecord(
-            drug_id=data.drug_id,
-            batch_no=data.batch_no,
-            quantity=data.quantity,
-            supplier_id=data.supplier_id,
-            purchased_by=purchased_by,
-        )
+    purchase_record = PurchaseRecord(
+        drug_id=data.drug_id,
+        batch_no=data.batch_no,
+        quantity=data.quantity,
+        supplier_id=data.supplier_id,
+        purchased_by=purchased_by,
+    )
+    db.add(purchase_record)
+    db.flush()
+    record_drug(
+        db,
+        drug,
+        batch_no=data.batch_no,
+        expiry=data.expiry,
+        warehouse="总库",
+        direction="in",
+        quantity=data.quantity,
+        unit_price=drug.base_price,
+        ref_type="purchase",
+        ref_id=purchase_record.id,
+        operator=purchased_by,
     )
     db.commit()
     db.refresh(stock)
@@ -305,8 +379,9 @@ def list_stocks(db: Session, drug_id: int | None = None) -> list[WarehouseStock]
     return query.order_by(WarehouseStock.id).all()
 
 
-def transfer(db: Session, data: TransferCreate) -> dict:
-    """调拨：药库扣减 → 药房同批次入库（不存在则新建）。"""
+def transfer(db: Session, data: TransferCreate, operator: str = "") -> dict:
+    """调拨：药库扣减 → 药房同批次入库（不存在则新建），并记双向流水。"""
+    drug = get_drug(db, data.drug_id)
     wh = get_warehouse_stock(db, data.drug_id, data.batch_no)
     if not wh:
         raise ValueError("药库无该批次库存")
@@ -335,6 +410,20 @@ def transfer(db: Session, data: TransferCreate) -> dict:
         )
         db.add(pharmacy)
 
+    db.flush()
+    for warehouse_name, direction in (("总库", "out"), ("药房", "in")):
+        record_drug(
+            db,
+            drug,
+            batch_no=data.batch_no,
+            expiry=wh.expiry,
+            warehouse=warehouse_name,
+            direction=direction,
+            quantity=data.quantity,
+            unit_price=drug.base_price,
+            ref_type="transfer",
+            operator=operator,
+        )
     db.commit()
     db.refresh(wh)
     db.refresh(pharmacy)
@@ -349,7 +438,8 @@ def transfer(db: Session, data: TransferCreate) -> dict:
 
 
 def check(db: Session, data: CheckCreate, checked_by: str = "") -> WarehouseCheck:
-    """盘点：按实际数量调整库存，并留痕差异（盘盈/盘亏）。"""
+    """盘点：按实际数量调整库存，留痕差异并记调整流水。"""
+    drug = get_drug(db, data.drug_id)
     wh = get_warehouse_stock(db, data.drug_id, data.batch_no)
     if not wh:
         raise ValueError("药库无该批次库存")
@@ -367,6 +457,22 @@ def check(db: Session, data: CheckCreate, checked_by: str = "") -> WarehouseChec
         checked_by=checked_by,
     )
     db.add(record)
+    db.flush()
+    if diff != 0:
+        record_drug(
+            db,
+            drug,
+            batch_no=data.batch_no,
+            expiry=wh.expiry,
+            warehouse="总库",
+            direction="in" if diff > 0 else "out",
+            quantity=abs(diff),
+            unit_price=drug.base_price,
+            ref_type="adjust",
+            ref_id=record.id,
+            operator=checked_by,
+            note=f"盘点差异 {diff:+d}",
+        )
     db.commit()
     db.refresh(record)
     return record
