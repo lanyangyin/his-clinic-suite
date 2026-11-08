@@ -1,0 +1,33 @@
+[project]
+name = "his"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "gmssl>=3.2.2",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.33",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.1.8",
+    "uvicorn>=0.54.0",
+]
+
+[project.optional-dependencies]
+# 桌面客户端依赖（服务端部署不需要）：uv sync --extra client
+client = ["pyside6>=6.12.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "httpx2>=0.0.0",
+    "alembic>=1.20.1",
+    "pyinstaller>=6.22.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

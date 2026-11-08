@@ -1,0 +1,91 @@
+from tests.conftest import basic_auth
+
+
+def test_write_without_login_rejected(client):
+    r = client.post(
+        "/patients/", json={"name": "张三", "id_number": "110101199001011234"}
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"] == "需要登录"
+
+
+def test_write_wrong_password_rejected(client, auth):
+    r = client.post(
+        "/patients/",
+        json={"name": "张三", "id_number": "110101199001011234"},
+        headers=basic_auth("cashier", "wrong-password"),
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"] == "用户名或密码错误"
+
+
+def test_wrong_role_rejected(client, auth):
+    r = client.post(
+        "/registrations/",
+        json={"patient_id": 1, "doctor_id": 1},
+        headers=auth["doctor"],
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"] == "需要角色：cashier"
+
+
+def test_admin_can_do_everything(client, auth):
+    r = client.post(
+        "/patients/",
+        json={"name": "张三", "id_number": "110101199001011234"},
+        headers=auth["admin"],
+    )
+    assert r.status_code == 201
+
+
+def test_user_creation_requires_admin(client, auth):
+    payload = {"username": "newbie", "password": "pw123456", "role": "doctor"}
+    r = client.post("/users/", json=payload, headers=auth["cashier"])
+    assert r.status_code == 403
+    r = client.post("/users/", json=payload, headers=auth["admin"])
+    assert r.status_code == 201
+    assert r.json()["username"] == "newbie"
+
+
+def test_duplicate_username_rejected(client, auth):
+    r = client.post(
+        "/users/",
+        json={"username": "admin", "password": "x123456", "role": "doctor"},
+        headers=auth["admin"],
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "用户名已存在"
+
+
+def test_invalid_role_rejected(client, auth):
+    r = client.post(
+        "/users/",
+        json={"username": "boss", "password": "x123456", "role": "boss"},
+        headers=auth["admin"],
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"].startswith("非法角色")
+
+
+def test_audit_logs_recorded(client, auth):
+    client.post(
+        "/patients/",
+        json={"name": "张三", "id_number": "110101199001011234"},
+        headers=auth["cashier"],
+    )
+    logs = client.get("/audit/logs").json()
+    assert len(logs) >= 1
+    top = logs[0]
+    assert top["username"] == "cashier"
+    assert top["role"] == "cashier"
+    assert top["path"] == "/patients/"
+    assert top["status_code"] == 201
+
+
+def test_audit_logs_record_anonymous_failures(client, auth):
+    client.post(
+        "/patients/", json={"name": "张三", "id_number": "110101199001011234"}
+    )
+    logs = client.get("/audit/logs").json()
+    anonymous = [l for l in logs if l["username"] == "anonymous"]
+    assert any(l["path"] == "/patients/" and l["status_code"] == 401 for l in anonymous)

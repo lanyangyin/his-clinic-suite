@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}HIS 管理台{% endblock %}</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e3e8f0;--text:#1f2937;--muted:#6b7280;--brand:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+header{background:#111827;color:#fff;display:flex;align-items:center;gap:18px;padding:10px 20px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:#d1d5db;text-decoration:none;padding:4px 8px;border-radius:6px}
+nav a:hover{background:#374151;color:#fff}
+.who{margin-left:auto;color:#9ca3af}
+.who a{color:#93c5fd}
+main{padding:20px;max-width:1200px;margin:0 auto}
+h2{font-size:18px;margin:0 0 14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card .num{font-size:24px;font-weight:700;color:var(--brand)}
+.card .label{color:var(--muted);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr:hover td{background:#f9fafb}
+form.inline{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px;min-width:120px}
+button{padding:8px 14px;border:0;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer;font-size:14px}
+button:hover{background:#1d4ed8}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#111827}
+.login-card{background:#fff;border-radius:12px;padding:28px;width:340px}
+.login-card h1{font-size:18px;margin:0 0 18px;text-align:center}
+.login-card label{margin-bottom:10px}
+.login-card button{width:100%;margin-top:8px}
+.hint{color:var(--muted);font-size:12px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+{% block body %}
+<header>
+  <h1>HIS 门诊部管理台</h1>
+  <nav>
+    <a href="/admin">仪表盘</a>
+    <a href="/admin/master/departments">科室</a>
+    <a href="/admin/master/doctors">医生</a>
+    <a href="/admin/master/drugs">药品</a>
+    <a href="/admin/master/charge-items">收费项目</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/reports">报表</a>
+    <a href="/download/client">客户端下载</a>
+    <a href="/docs" target="_blank">API 文档</a>
+  </nav>
+  <div class="who">{{ admin_name }} · <a href="/admin/logout">退出</a></div>
+</header>
+<main>
+{% if request.query_params.get('ok') %}<div class="ok">操作成功</div>{% endif %}
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+{% endblock %}
+</body>
+</html>

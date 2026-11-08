@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}药品 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>药品维护</h2>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/master/drugs">
+    <label>药品名称 <input type="text" name="name" required maxlength="100"></label>
+    <label>规格 <input type="text" name="spec" maxlength="50"></label>
+    <label>单位 <input type="text" name="unit" maxlength="20"></label>
+    <label>基准价 <input type="number" step="0.01" min="0" name="base_price" required></label>
+    <label>医保比例 <input type="number" step="0.01" min="0" max="1" name="insurance_ratio" value="0.7"></label>
+    <label>抗菌级别
+      <select name="antibiotic_level">
+        <option value="0">非抗菌</option>
+        <option value="1">非限制使用</option>
+        <option value="2">限制使用</option>
+        <option value="3">特殊使用</option>
+      </select>
+    </label>
+    <button type="submit">新增药品</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>规格</th><th>单位</th><th>基准价</th><th>医保比例</th><th>抗菌级别</th></tr>
+    {% for drug in drugs %}
+    <tr>
+      <td>{{ drug.id }}</td>
+      <td>{{ drug.name }}</td>
+      <td>{{ drug.spec }}</td>
+      <td>{{ drug.unit }}</td>
+      <td>{{ '%.2f'|format(drug.base_price) }}</td>
+      <td>{{ drug.insurance_ratio }}</td>
+      <td>{{ drug.antibiotic_level }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无药品</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

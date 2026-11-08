@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}报表 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>运营报表</h2>
+<div class="panel">
+  <form class="inline" method="get" action="/admin/reports">
+    <label>开始日期 <input type="date" name="start_date" value="{{ start_date }}"></label>
+    <label>结束日期 <input type="date" name="end_date" value="{{ end_date }}"></label>
+    <button type="submit">查询</button>
+  </form>
+
+  <h2>科室收入</h2>
+  <table>
+    <tr><th>科室</th><th>门诊量</th><th>已收</th><th>已退</th><th>挂号</th><th>诊疗</th><th>药品</th><th>检验</th><th>检查</th><th>治疗</th></tr>
+    {% for row in revenue %}
+    <tr>
+      <td>{{ row.department_name }}</td>
+      <td>{{ row.encounter_count }}</td>
+      <td>{{ '%.2f'|format(row.paid_amount) }}</td>
+      <td>{{ '%.2f'|format(row.refunded_amount) }}</td>
+      <td>{{ '%.2f'|format(row.registration_amount) }}</td>
+      <td>{{ '%.2f'|format(row.consultation_amount) }}</td>
+      <td>{{ '%.2f'|format(row.drug_amount) }}</td>
+      <td>{{ '%.2f'|format(row.lab_amount) }}</td>
+      <td>{{ '%.2f'|format(row.imaging_amount) }}</td>
+      <td>{{ '%.2f'|format(row.treatment_amount) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10">暂无数据</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h2>处方点评汇总</h2>
+  <div class="cards">
+    <div class="card"><div class="num">{{ review.prescription_count }}</div><div class="label">处方数</div></div>
+    <div class="card"><div class="num">{{ review.item_count }}</div><div class="label">处方条目</div></div>
+    <div class="card"><div class="num">￥{{ '%.2f'|format(review.avg_amount) }}</div><div class="label">平均每张金额</div></div>
+    <div class="card"><div class="num">{{ '%.1f'|format(review.antibiotic_rate * 100) }}%</div><div class="label">抗菌药物使用率</div></div>
+    <div class="card"><div class="num">{{ '%.1f'|format(review.injection_rate * 100) }}%</div><div class="label">注射剂使用率</div></div>
+  </div>
+</div>
+{% endblock %}

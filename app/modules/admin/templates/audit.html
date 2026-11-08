@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}审计日志 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>审计日志（最近 100 条）</h2>
+<div class="panel">
+  <form class="inline" method="get" action="/admin/audit">
+    <label>按用户名筛选 <input type="text" name="username" value="{{ username }}" placeholder="如 doctor"></label>
+    <button type="submit">筛选</button>
+  </form>
+  <table>
+    <tr><th>时间</th><th>用户</th><th>角色</th><th>方法</th><th>路径</th><th>状态码</th></tr>
+    {% for log in logs %}
+    <tr>
+      <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+      <td>{{ log.username }}</td>
+      <td>{{ log.role }}</td>
+      <td>{{ log.method }}</td>
+      <td>{{ log.path }}</td>
+      <td>{{ log.status_code }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">暂无日志</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

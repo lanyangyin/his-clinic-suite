@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}科室 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>科室维护</h2>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/master/departments">
+    <label>科室名称 <input type="text" name="name" required maxlength="50"></label>
+    <button type="submit">新增科室</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>科室名称</th></tr>
+    {% for d in departments %}
+    <tr><td>{{ d.id }}</td><td>{{ d.name }}</td></tr>
+    {% else %}
+    <tr><td colspan="2">暂无科室</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

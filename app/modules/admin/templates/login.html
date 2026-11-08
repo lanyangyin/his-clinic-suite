@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}登录 · HIS 管理台{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>HIS 门诊部管理台</h1>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post" action="/admin/login">
+      <label>账号
+        <input type="text" name="username" required autofocus>
+      </label>
+      <label>密码
+        <input type="password" name="password" required>
+      </label>
+      <button type="submit">登录</button>
+    </form>
+    <div class="hint">仅管理员账号可进入（演示：admin / admin123）</div>
+  </div>
+</div>
+{% endblock %}

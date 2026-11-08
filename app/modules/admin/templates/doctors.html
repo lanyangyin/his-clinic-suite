@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}医生 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医生维护</h2>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/master/doctors">
+    <label>姓名 <input type="text" name="name" required maxlength="50"></label>
+    <label>科室
+      <select name="department_id" required>
+        {% for d in departments %}
+        <option value="{{ d.id }}">{{ d.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">新增医生</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>姓名</th><th>科室</th></tr>
+    {% for doc in doctors %}
+    <tr>
+      <td>{{ doc.id }}</td>
+      <td>{{ doc.name }}</td>
+      <td>
+        {% for d in departments %}{% if d.id == doc.department_id %}{{ d.name }}{% endif %}{% endfor %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">暂无医生</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
