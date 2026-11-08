@@ -193,6 +193,7 @@ def test_outbound_methods():
             FakeResponse(200, {"id": 5, "status": "approved"}),
             FakeResponse(200, {"id": 5, "status": "issued"}),
             FakeResponse(200, {"id": 5, "status": "cancelled"}),
+            FakeResponse(200, {"id": 5, "status": "partially_issued"}),
         ]
     )
     client = ApiClient("http://x", "pharmacist", "pw", session=session)
@@ -204,6 +205,7 @@ def test_outbound_methods():
     client.approve_outbound_order(5)
     client.issue_outbound_order(5)
     client.cancel_outbound_order(5)
+    client.issue_outbound_order(5, items=[{"item_id": 9, "quantity": 2}])
 
     assert session.calls[0][1] == "http://x/warehouse/stocks"
     assert session.calls[1][1] == "http://x/warehouse/outbound-orders"
@@ -213,6 +215,7 @@ def test_outbound_methods():
     assert session.calls[5][1].endswith("/outbound-orders/5/approve")
     assert session.calls[6][1].endswith("/outbound-orders/5/issue")
     assert session.calls[7][1].endswith("/outbound-orders/5/cancel")
+    assert session.calls[8][2]["json"] == {"items": [{"item_id": 9, "quantity": 2}]}
 
 
 def test_local_override(monkeypatch):

@@ -13,6 +13,7 @@ from .models import (
     OutboundItem,
     OutboundOrder,
     PurchaseRecord,
+    StockAdjustment,
     WarehouseCheck,
     WarehouseStock,
 )
@@ -134,163 +135,265 @@ def approve_outbound(db: Session, order_id: int, approver: str) -> OutboundOrder
     return order
 
 
-def issue_outbound(db: Session, order_id: int, issuer: str) -> OutboundOrder:
-    """库房出库：扣总库库存，增药房批次库存 / 科室物资库存。"""
+def _deduct_drug(
+    db: Session, drug_id: int, batch_no: str, quantity: int, warehouse: str, item_name: str
+):
+    if warehouse == "总库":
+        affected = (
+            db.query(WarehouseStock)
+            .filter(
+                WarehouseStock.drug_id == drug_id,
+                WarehouseStock.batch_no == batch_no,
+                WarehouseStock.quantity >= quantity,
+            )
+            .update(
+                {WarehouseStock.quantity: WarehouseStock.quantity - quantity},
+                synchronize_session=False,
+            )
+        )
+        if affected != 1:
+            raise ValueError(f"总库库存不足：{item_name}（批次 {batch_no}）")
+        row = (
+            db.query(WarehouseStock)
+            .filter(
+                WarehouseStock.drug_id == drug_id,
+                WarehouseStock.batch_no == batch_no,
+            )
+            .first()
+        )
+        return row.expiry
+    affected = (
+        db.query(DrugStock)
+        .filter(
+            DrugStock.drug_id == drug_id,
+            DrugStock.batch_no == batch_no,
+            DrugStock.quantity >= quantity,
+        )
+        .update(
+            {DrugStock.quantity: DrugStock.quantity - quantity},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        raise ValueError(f"{warehouse}库存不足：{item_name}（批次 {batch_no}）")
+    row = (
+        db.query(DrugStock)
+        .filter(DrugStock.drug_id == drug_id, DrugStock.batch_no == batch_no)
+        .first()
+    )
+    return row.expiry
+
+
+def _add_drug(
+    db: Session, drug_id: int, batch_no: str, expiry, quantity: int, warehouse: str
+) -> None:
+    if warehouse == "总库":
+        row = (
+            db.query(WarehouseStock)
+            .filter(
+                WarehouseStock.drug_id == drug_id,
+                WarehouseStock.batch_no == batch_no,
+            )
+            .first()
+        )
+        if row:
+            row.quantity += quantity
+        else:
+            db.add(
+                WarehouseStock(
+                    drug_id=drug_id,
+                    batch_no=batch_no,
+                    expiry=expiry,
+                    quantity=quantity,
+                )
+            )
+    else:
+        row = (
+            db.query(DrugStock)
+            .filter(DrugStock.drug_id == drug_id, DrugStock.batch_no == batch_no)
+            .first()
+        )
+        if row:
+            row.quantity += quantity
+        else:
+            db.add(
+                DrugStock(
+                    drug_id=drug_id,
+                    batch_no=batch_no,
+                    expiry=expiry,
+                    location="",
+                    quantity=quantity,
+                )
+            )
+
+
+def _deduct_material(
+    db: Session, item_id: int, quantity: int, warehouse: str, item_name: str
+) -> None:
+    affected = (
+        db.query(MaterialStock)
+        .filter(
+            MaterialStock.item_id == item_id,
+            MaterialStock.warehouse == warehouse,
+            MaterialStock.quantity >= quantity,
+        )
+        .update(
+            {MaterialStock.quantity: MaterialStock.quantity - quantity},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        raise ValueError(f"{warehouse}库存不足：{item_name}")
+
+
+def _add_material(
+    db: Session, item_id: int, quantity: int, warehouse: str
+) -> None:
+    row = (
+        db.query(MaterialStock)
+        .filter(
+            MaterialStock.item_id == item_id,
+            MaterialStock.warehouse == warehouse,
+        )
+        .first()
+    )
+    if row:
+        row.quantity += quantity
+    else:
+        db.add(
+            MaterialStock(item_id=item_id, warehouse=warehouse, quantity=quantity)
+        )
+
+
+def _issue_item(
+    db: Session, order: OutboundOrder, item: OutboundItem, quantity: int, issuer: str
+) -> None:
+    """按单据类型执行一条明细的出库/退库/报损，并记流水。"""
+    target = order.target_name or "药房"
+    if item.kind == "drug":
+        drug = get_drug(db, item.drug_id)
+        expiry = item.expiry
+
+        if order.outbound_type == "scrap":
+            expiry = _deduct_drug(db, drug.id, item.batch_no, quantity, "总库", item.name)
+            record_drug(
+                db, drug, batch_no=item.batch_no, expiry=expiry, warehouse="总库",
+                direction="out", quantity=quantity, unit_price=item.unit_price,
+                ref_type="scrap", ref_id=order.id, operator=issuer,
+                note=f"报损出库 {order.outbound_no}",
+            )
+            return
+
+        if order.outbound_type == "return":
+            expiry = _deduct_drug(db, drug.id, item.batch_no, quantity, target, item.name)
+            _add_drug(db, drug.id, item.batch_no, expiry, quantity, "总库")
+            db.flush()
+            for warehouse_name, direction in ((target, "out"), ("总库", "in")):
+                record_drug(
+                    db, drug, batch_no=item.batch_no, expiry=expiry,
+                    warehouse=warehouse_name, direction=direction, quantity=quantity,
+                    unit_price=item.unit_price, ref_type="return", ref_id=order.id,
+                    operator=issuer, note=f"退库 {order.outbound_no}",
+                )
+            return
+
+        expiry = _deduct_drug(db, drug.id, item.batch_no, quantity, "总库", item.name)
+        _add_drug(db, drug.id, item.batch_no, expiry, quantity, target)
+        db.flush()
+        for warehouse_name, direction in (("总库", "out"), (target, "in")):
+            record_drug(
+                db, drug, batch_no=item.batch_no, expiry=expiry,
+                warehouse=warehouse_name, direction=direction, quantity=quantity,
+                unit_price=item.unit_price, ref_type="outbound", ref_id=order.id,
+                operator=issuer, note=f"出库单 {order.outbound_no}",
+            )
+        return
+
+    material = get_material_item(db, item.material_id)
+    if order.outbound_type == "scrap":
+        _deduct_material(db, material.id, quantity, "总库", item.name)
+        record_material(
+            db, material, warehouse="总库", direction="out", quantity=quantity,
+            unit_price=item.unit_price, ref_type="scrap", ref_id=order.id,
+            operator=issuer, note=f"报损出库 {order.outbound_no}",
+        )
+        return
+
+    if order.outbound_type == "return":
+        _deduct_material(db, material.id, quantity, target, item.name)
+        _add_material(db, material.id, quantity, "总库")
+        db.flush()
+        for warehouse_name, direction in ((target, "out"), ("总库", "in")):
+            record_material(
+                db, material, warehouse=warehouse_name, direction=direction,
+                quantity=quantity, unit_price=item.unit_price, ref_type="return",
+                ref_id=order.id, operator=issuer, note=f"退库 {order.outbound_no}",
+            )
+        return
+
+    _deduct_material(db, material.id, quantity, "总库", item.name)
+    _add_material(db, material.id, quantity, target)
+    db.flush()
+    for warehouse_name, direction in (("总库", "out"), (target, "in")):
+        record_material(
+            db, material, warehouse=warehouse_name, direction=direction,
+            quantity=quantity, unit_price=item.unit_price, ref_type="outbound",
+            ref_id=order.id, operator=issuer, note=f"出库单 {order.outbound_no}",
+        )
+
+
+def issue_outbound(
+    db: Session,
+    order_id: int,
+    issuer: str,
+    items: list | None = None,
+) -> OutboundOrder:
+    """库房出库：支持整单/部分出库；退库与报损按单据类型处理。"""
     order = get_outbound(db, order_id)
     if not order:
         raise ValueError("出库单不存在")
-    if order.status != "approved":
-        raise ValueError("仅已审核的出库单可以出库")
+    if order.status not in ("approved", "partially_issued"):
+        raise ValueError("仅已审核或部分出库的出库单可以出库")
 
+    requested: dict[int, int] = {}
+    if items:
+        for entry in items:
+            item_id = entry.item_id if hasattr(entry, "item_id") else entry["item_id"]
+            quantity = entry.quantity if hasattr(entry, "quantity") else entry["quantity"]
+            matched = next((i for i in order.items if i.id == item_id), None)
+            if not matched:
+                raise ValueError(f"明细不存在：{item_id}")
+            requested[item_id] = quantity
+
+    plan: list[tuple] = []
     for item in order.items:
-        if item.kind == "drug":
-            warehouse_stock = (
-                db.query(WarehouseStock)
-                .filter(
-                    WarehouseStock.drug_id == item.drug_id,
-                    WarehouseStock.batch_no == item.batch_no,
-                )
-                .first()
-            )
-            if not warehouse_stock or warehouse_stock.quantity < item.quantity:
-                db.rollback()
-                raise ValueError(f"总库库存不足：{item.name}（批次 {item.batch_no}）")
-            expiry = item.expiry or warehouse_stock.expiry
+        remaining = item.quantity - item.issued_quantity
+        quantity = requested.get(item.id, remaining if not items else 0)
+        if quantity < 0:
+            raise ValueError("出库数量不能为负")
+        if quantity > remaining:
+            raise ValueError(f"出库数量超过剩余：{item.name}")
+        if quantity > 0:
+            plan.append((item, quantity))
 
-            affected = (
-                db.query(WarehouseStock)
-                .filter(
-                    WarehouseStock.id == warehouse_stock.id,
-                    WarehouseStock.quantity >= item.quantity,
-                )
-                .update(
-                    {WarehouseStock.quantity: WarehouseStock.quantity - item.quantity},
-                    synchronize_session=False,
-                )
-            )
-            if affected != 1:
-                db.rollback()
-                raise ValueError(f"总库库存不足：{item.name}（批次 {item.batch_no}）")
+    if not plan:
+        raise ValueError("本次没有可出库数量")
 
-            drug = get_drug(db, item.drug_id)
-            db.expire(warehouse_stock)
-            record_drug(
-                db,
-                drug,
-                batch_no=item.batch_no,
-                expiry=expiry,
-                warehouse="总库",
-                direction="out",
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                ref_type="outbound",
-                ref_id=order.id,
-                operator=issuer,
-                note=f"出库单 {order.outbound_no}",
-            )
+    try:
+        for item, quantity in plan:
+            _issue_item(db, order, item, quantity, issuer)
+            item.issued_quantity += quantity
 
-            stock = (
-                db.query(DrugStock)
-                .filter(
-                    DrugStock.drug_id == item.drug_id,
-                    DrugStock.batch_no == item.batch_no,
-                )
-                .first()
-            )
-            if stock:
-                stock.quantity += item.quantity
-            else:
-                db.add(
-                    DrugStock(
-                        drug_id=item.drug_id,
-                        batch_no=item.batch_no,
-                        expiry=expiry,
-                        quantity=item.quantity,
-                    )
-                )
-            db.flush()
-            record_drug(
-                db,
-                drug,
-                batch_no=item.batch_no,
-                expiry=expiry,
-                warehouse="药房",
-                direction="in",
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                ref_type="outbound",
-                ref_id=order.id,
-                operator=issuer,
-                note=f"出库单 {order.outbound_no}",
-            )
+        if all(item.issued_quantity >= item.quantity for item in order.items):
+            order.status = "issued"
+            order.issued_at = datetime.now()
         else:
-            affected = (
-                db.query(MaterialStock)
-                .filter(
-                    MaterialStock.item_id == item.material_id,
-                    MaterialStock.warehouse == "总库",
-                    MaterialStock.quantity >= item.quantity,
-                )
-                .update(
-                    {MaterialStock.quantity: MaterialStock.quantity - item.quantity},
-                    synchronize_session=False,
-                )
-            )
-            if affected != 1:
-                db.rollback()
-                raise ValueError(f"总库库存不足：{item.name}")
-
-            material = get_material_item(db, item.material_id)
-            record_material(
-                db,
-                material,
-                warehouse="总库",
-                direction="out",
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                ref_type="outbound",
-                ref_id=order.id,
-                operator=issuer,
-                note=f"出库单 {order.outbound_no}",
-            )
-
-            target = order.target_name or "药房"
-            stock = (
-                db.query(MaterialStock)
-                .filter(
-                    MaterialStock.item_id == item.material_id,
-                    MaterialStock.warehouse == target,
-                )
-                .first()
-            )
-            if stock:
-                stock.quantity += item.quantity
-            else:
-                db.add(
-                    MaterialStock(
-                        item_id=item.material_id,
-                        warehouse=target,
-                        quantity=item.quantity,
-                    )
-                )
-            db.flush()
-            record_material(
-                db,
-                material,
-                warehouse=target,
-                direction="in",
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                ref_type="outbound",
-                ref_id=order.id,
-                operator=issuer,
-                note=f"出库单 {order.outbound_no}",
-            )
-
-    order.status = "issued"
-    order.issuer = issuer
-    order.issued_at = datetime.now()
-    db.commit()
+            order.status = "partially_issued"
+        order.issuer = issuer
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(order)
     return order
 
@@ -459,6 +562,23 @@ def check(db: Session, data: CheckCreate, checked_by: str = "") -> WarehouseChec
     db.add(record)
     db.flush()
     if diff != 0:
+        adjustment = StockAdjustment(
+            adjust_no=f"AJ{datetime.now():%Y%m%d}{record.id:04d}",
+            kind="drug",
+            drug_id=drug.id,
+            name=drug.name,
+            batch_no=data.batch_no,
+            expected_quantity=expected,
+            actual_quantity=data.actual_quantity,
+            diff=diff,
+            direction="in" if diff > 0 else "out",
+            quantity=abs(diff),
+            check_id=record.id,
+            operator=checked_by,
+            note=f"盘点差异 {diff:+d}",
+        )
+        db.add(adjustment)
+        db.flush()
         record_drug(
             db,
             drug,
@@ -469,13 +589,20 @@ def check(db: Session, data: CheckCreate, checked_by: str = "") -> WarehouseChec
             quantity=abs(diff),
             unit_price=drug.base_price,
             ref_type="adjust",
-            ref_id=record.id,
+            ref_id=adjustment.id,
             operator=checked_by,
-            note=f"盘点差异 {diff:+d}",
+            note=f"调整单 {adjustment.adjust_no}",
         )
     db.commit()
     db.refresh(record)
     return record
+
+
+def list_adjustments(db: Session, kind: str | None = None) -> list[StockAdjustment]:
+    query = db.query(StockAdjustment)
+    if kind:
+        query = query.filter(StockAdjustment.kind == kind)
+    return query.order_by(StockAdjustment.id.desc()).all()
 
 
 def list_checks(db: Session, drug_id: int | None = None) -> list[WarehouseCheck]:
@@ -496,3 +623,4 @@ def list_purchases(
     if supplier_id is not None:
         query = query.filter(PurchaseRecord.supplier_id == supplier_id)
     return query.order_by(PurchaseRecord.id.desc()).all()
+

@@ -260,7 +260,11 @@ class ApiClient:
     def approve_outbound_order(self, order_id: int) -> dict:
         return self._request("POST", f"/warehouse/outbound-orders/{order_id}/approve")
 
-    def issue_outbound_order(self, order_id: int) -> dict:
+    def issue_outbound_order(self, order_id: int, items: list | None = None) -> dict:
+        if items:
+            return self._request(
+                "POST", f"/warehouse/outbound-orders/{order_id}/issue", json={"items": items}
+            )
         return self._request("POST", f"/warehouse/outbound-orders/{order_id}/issue")
 
     def cancel_outbound_order(self, order_id: int) -> dict:

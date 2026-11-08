@@ -98,6 +98,7 @@ class OutboundItemResponse(BaseModel):
     batch_no: str
     expiry: date | None
     quantity: int
+    issued_quantity: int
     unit_price: float
     amount: float
     insurance_code: str
@@ -120,4 +121,32 @@ class OutboundOrderResponse(BaseModel):
     approved_at: datetime | None
     issued_at: datetime | None
     items: list[OutboundItemResponse]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OutboundIssueItem(BaseModel):
+    item_id: int
+    quantity: int = Field(gt=0)
+
+
+class OutboundIssueRequest(BaseModel):
+    items: list[OutboundIssueItem] = Field(default_factory=list)
+
+
+class StockAdjustmentResponse(BaseModel):
+    id: int
+    adjust_no: str
+    kind: str
+    drug_id: int | None
+    material_id: int | None
+    name: str
+    batch_no: str
+    expected_quantity: int
+    actual_quantity: int
+    diff: int
+    direction: str
+    quantity: int
+    operator: str
+    note: str
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)

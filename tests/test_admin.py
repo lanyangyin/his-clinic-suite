@@ -326,6 +326,17 @@ def test_warehouse_admin_pages(client, auth):
         f"/admin/warehouse/outbound/{order['id']}/approve", follow_redirects=False
     )
     assert approved.status_code == 302
+
+    item_id = order["items"][0]["id"]
+    partial = client.post(
+        f"/admin/warehouse/outbound/{order['id']}/issue",
+        data={f"qty_{item_id}": "2"},
+        follow_redirects=False,
+    )
+    assert partial.status_code == 302
+    detail = client.get(f"/admin/warehouse/outbound/{order['id']}")
+    assert "partially_issued" in detail.text
+
     issued = client.post(
         f"/admin/warehouse/outbound/{order['id']}/issue", follow_redirects=False
     )

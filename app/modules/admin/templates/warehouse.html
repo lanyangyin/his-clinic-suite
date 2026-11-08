@@ -51,6 +51,27 @@
     {% endfor %}
   </table>
 
+  <h2>盘点差异调整单（{{ adjustments|length }}）</h2>
+  <table>
+    <tr><th>调整单号</th><th>物品</th><th>批次</th><th>账面</th><th>实盘</th><th>差异</th><th>方向</th><th>数量</th><th>操作人</th><th>时间</th></tr>
+    {% for row in adjustments %}
+    <tr>
+      <td>{{ row.adjust_no }}</td>
+      <td>{{ row.name }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.expected_quantity }}</td>
+      <td>{{ row.actual_quantity }}</td>
+      <td>{{ row.diff }}</td>
+      <td>{{ '盘盈' if row.direction == 'in' else '盘亏' }}</td>
+      <td>{{ row.quantity }}</td>
+      <td>{{ row.operator or '—' }}</td>
+      <td>{{ row.created_at.strftime('%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10">暂无盘点差异</td></tr>
+    {% endfor %}
+  </table>
+
   <h2>物资总库库存（{{ material_stocks|length }} 项）</h2>
   <table>
     <tr><th>ID</th><th>物资</th><th>库房</th><th>数量</th></tr>

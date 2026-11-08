@@ -57,6 +57,7 @@ from app.modules.warehouse.service import (
     cancel_outbound as warehouse_cancel,
     get_outbound as get_warehouse_outbound,
     issue_outbound as warehouse_issue,
+    list_adjustments as list_stock_adjustments,
     list_outbounds as list_warehouse_outbounds,
     list_stocks as list_warehouse_stocks,
 )
@@ -597,6 +598,7 @@ def warehouse_page(
             drug_stocks=list_warehouse_stocks(db),
             material_stocks=materials,
             outbounds=list_warehouse_outbounds(db, status, None),
+            adjustments=list_stock_adjustments(db),
             status=status or "",
             message=request.query_params.get("msg", ""),
         ),
@@ -638,14 +640,30 @@ def warehouse_outbound_approve(
 
 
 @router.post("/warehouse/outbound/{order_id}/issue")
-def warehouse_outbound_issue(
+async def warehouse_outbound_issue(
     request: Request, order_id: int, db: Session = Depends(get_db)
 ):
     redirect = _guard(request, db)
     if redirect:
         return redirect
+    form = await request.form()
+    items = []
+    for key, value in form.items():
+        if not key.startswith("qty_"):
+            continue
+        try:
+            quantity = int(value or 0)
+        except ValueError:
+            quantity = 0
+        if quantity > 0:
+            items.append({"item_id": int(key.removeprefix("qty_")), "quantity": quantity})
     try:
-        warehouse_issue(db, order_id, issuer=request.session.get("admin_user", "admin"))
+        warehouse_issue(
+            db,
+            order_id,
+            issuer=request.session.get("admin_user", "admin"),
+            items=items or None,
+        )
         msg = "已出库"
     except ValueError as e:
         msg = f"出库失败：{e}"

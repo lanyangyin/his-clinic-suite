@@ -13,7 +13,7 @@
 
   <h2>明细</h2>
   <table>
-    <tr><th>ID</th><th>类型</th><th>名称</th><th>批号</th><th>效期</th><th>数量</th><th>单价</th><th>金额</th></tr>
+    <tr><th>ID</th><th>类型</th><th>名称</th><th>批号</th><th>效期</th><th>数量</th><th>已出库</th><th>剩余</th><th>单价</th><th>金额</th></tr>
     {% for item in order.items %}
     <tr>
       <td>{{ item.id }}</td>
@@ -22,6 +22,8 @@
       <td>{{ item.batch_no or '—' }}</td>
       <td>{{ item.expiry or '—' }}</td>
       <td>{{ item.quantity }}</td>
+      <td>{{ item.issued_quantity }}</td>
+      <td>{{ item.quantity - item.issued_quantity }}</td>
       <td>{{ '%.2f'|format(item.unit_price) }}</td>
       <td>{{ '%.2f'|format(item.amount) }}</td>
     </tr>
@@ -33,9 +35,26 @@
     <button type="submit">审核通过</button>
   </form>
   {% endif %}
-  {% if order.status == 'approved' %}
+  {% if order.status in ('approved', 'partially_issued') %}
   <form method="post" action="/admin/warehouse/outbound/{{ order.id }}/issue" style="margin-top:12px">
-    <button type="submit">确认出库（扣总库、增药房/科室库存）</button>
+    <p>部分出库：填写本次数量（留空=出全部剩余）</p>
+    <table>
+      <tr><th>物品</th><th>剩余</th><th>本次出库</th></tr>
+      {% for item in order.items %}
+      {% set remaining = item.quantity - item.issued_quantity %}
+      {% if remaining > 0 %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td>{{ remaining }}</td>
+        <td><input type="number" name="qty_{{ item.id }}" min="0" max="{{ remaining }}" style="width:100px"></td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    <button type="submit">按填写数量出库</button>
+  </form>
+  <form method="post" action="/admin/warehouse/outbound/{{ order.id }}/issue" style="margin-top:12px">
+    <button type="submit">全部剩余出库</button>
   </form>
   {% endif %}
   {% if order.status in ('submitted', 'approved') %}

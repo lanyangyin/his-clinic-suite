@@ -143,6 +143,10 @@ class OutboundItem(Base):
     )
     expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
     quantity: Mapped[int] = mapped_column(nullable=False)
+    # 已出库数量（支持部分出库）
+    issued_quantity: Mapped[int] = mapped_column(
+        default=0, server_default="0", nullable=False
+    )
     unit_price: Mapped[float] = mapped_column(
         default=0.0, server_default="0", nullable=False
     )
@@ -157,3 +161,41 @@ class OutboundItem(Base):
     )
 
     order: Mapped["OutboundOrder"] = relationship(back_populates="items")
+
+
+class StockAdjustment(Base):
+    """盘点差异自动调整单（盘盈/盘亏）。"""
+
+    __tablename__ = "stock_adjustments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    adjust_no: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String(10), default="drug", server_default="drug", nullable=False
+    )
+    drug_id: Mapped[int | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_items.id"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    batch_no: Mapped[str] = mapped_column(
+        String(30), default="", server_default="", nullable=False
+    )
+    expected_quantity: Mapped[int] = mapped_column(nullable=False)
+    actual_quantity: Mapped[int] = mapped_column(nullable=False)
+    diff: Mapped[int] = mapped_column(nullable=False)
+    # in 盘盈 / out 盘亏
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    check_id: Mapped[int | None] = mapped_column(
+        ForeignKey("warehouse_checks.id"), nullable=True
+    )
+    operator: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    note: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )

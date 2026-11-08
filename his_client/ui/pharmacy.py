@@ -491,13 +491,17 @@ class PharmacyWidget(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        form_box = QGroupBox("向库房申请领用（审核/出库由库房操作）")
+        form_box = QGroupBox("向库房申请（审核/出库由库房操作）")
         form = QFormLayout(form_box)
+        self.out_type = QComboBox()
+        self.out_type.addItem("领用出库", "requisition")
+        self.out_type.addItem("退库", "return")
         self.out_target_type = QComboBox()
         self.out_target_type.addItem("药房", "pharmacy")
         self.out_target_type.addItem("科室", "department")
         self.out_target_name = QLineEdit("药房")
         self.out_note = QLineEdit()
+        form.addRow("类型", self.out_type)
         form.addRow("目标类型", self.out_target_type)
         form.addRow("目标名称", self.out_target_name)
         form.addRow("备注", self.out_note)
@@ -652,7 +656,7 @@ class PharmacyWidget(QWidget):
             self.out_msg.setText("请先添加至少一行明细")
             return
         payload = {
-            "outbound_type": "requisition",
+            "outbound_type": self.out_type.currentData(),
             "target_type": self.out_target_type.currentData(),
             "target_name": self.out_target_name.text().strip() or "药房",
             "note": self.out_note.text().strip(),
@@ -739,12 +743,18 @@ class PharmacyWidget(QWidget):
         layout.addWidget(self.handle_items_table)
 
         buttons = QHBoxLayout()
+        self.partial_qty = QSpinBox()
+        self.partial_qty.setRange(1, 100000)
+        partial = QPushButton("部分出库（选中明细）")
+        partial.clicked.connect(self._issue_partial)
         approve = QPushButton("审核通过")
         approve.clicked.connect(self._approve_handle)
-        issue = QPushButton("确认出库")
+        issue = QPushButton("全部出库")
         issue.clicked.connect(self._issue_handle)
         cancel = QPushButton("取消出库单")
         cancel.clicked.connect(self._cancel_handle)
+        buttons.addWidget(self.partial_qty)
+        buttons.addWidget(partial)
         buttons.addWidget(approve)
         buttons.addWidget(issue)
         buttons.addWidget(cancel)
@@ -822,7 +832,36 @@ class PharmacyWidget(QWidget):
         except ApiError as e:
             self.handle_msg.setText(f"出库失败（{e.status_code}）：{e.detail}")
             return
-        self.handle_msg.setText(f"已出库：{order['outbound_no']}")
+        self.handle_msg.setText(f"出库完成：{order['outbound_no']}（{order['status']}）")
+        self._load_handle_orders()
+
+    def _issue_partial(self) -> None:
+        if not self.handle_order:
+            self.handle_msg.setText("请先选择出库单")
+            return
+        row = self.handle_items_table.currentRow()
+        if row < 0:
+            self.handle_msg.setText("请在明细中选中一行")
+            return
+        item_id = None
+        for item in self.handle_order.get("items") or []:
+            if item["name"] == self.handle_items_table.item(row, 0).text():
+                item_id = item["id"]
+                break
+        if item_id is None:
+            self.handle_msg.setText("无法识别选中明细")
+            return
+        try:
+            order = self.api.issue_outbound_order(
+                self.handle_order["id"],
+                items=[{"item_id": item_id, "quantity": self.partial_qty.value()}],
+            )
+        except ApiError as e:
+            self.handle_msg.setText(f"部分出库失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(
+            f"部分出库完成：{order['outbound_no']}（{order['status']}）"
+        )
         self._load_handle_orders()
 
     def _cancel_handle(self) -> None:

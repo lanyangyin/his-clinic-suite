@@ -7,10 +7,12 @@ from app.modules.auth.security import require_role
 from .schemas import (
     CheckCreate,
     CheckResponse,
+    OutboundIssueRequest,
     OutboundOrderCreate,
     OutboundOrderResponse,
     PurchaseCreate,
     PurchaseRecordResponse,
+    StockAdjustmentResponse,
     TransferCreate,
     TransferResponse,
     WarehouseStockResponse,
@@ -22,6 +24,7 @@ from .service import (
     create_outbound,
     get_outbound,
     issue_outbound,
+    list_adjustments,
     list_checks,
     list_outbounds,
     list_purchases,
@@ -93,9 +96,17 @@ def get_checks(drug_id: int | None = None, db: Session = Depends(get_db)):
 def new_outbound(
     data: OutboundOrderCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("pharmacist", "warehouse")),
 ):
-    """药房/科室提交领用申请（库房出库单）。"""
+    """出库单创建：药房提交领用/退库；库房创建报损/调拨。"""
+    allowed = {
+        "pharmacist": {"requisition", "return"},
+        "warehouse": {"scrap", "transfer"},
+    }
+    if user.role != "admin" and data.outbound_type not in allowed.get(user.role, set()):
+        raise HTTPException(
+            status_code=403, detail="当前角色不能创建该类型出库单"
+        )
     try:
         return create_outbound(db, data, applicant=user.username)
     except ValueError as e:
@@ -135,14 +146,30 @@ def approve(
 @router.post("/outbound-orders/{order_id}/issue", response_model=OutboundOrderResponse)
 def issue(
     order_id: int,
+    data: OutboundIssueRequest | None = None,
     db: Session = Depends(get_db),
     user=Depends(require_role("warehouse")),
 ):
-    """库房出库：扣总库、增药房/科室库存。"""
+    """库房出库（可部分出库）：扣总库、增药房/科室库存；退库/报损按类型处理。"""
     try:
-        return issue_outbound(db, order_id, issuer=user.username)
+        return issue_outbound(
+            db,
+            order_id,
+            issuer=user.username,
+            items=data.items if data else None,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/adjustments", response_model=list[StockAdjustmentResponse])
+def get_adjustments(
+    kind: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse", "pharmacist")),
+):
+    """盘点差异自动调整单。"""
+    return list_adjustments(db, kind)
 
 
 @router.post("/outbound-orders/{order_id}/cancel", response_model=OutboundOrderResponse)

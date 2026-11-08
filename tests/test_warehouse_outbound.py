@@ -191,3 +191,120 @@ def test_outbound_roles_split(client, auth):
     assert approved.status_code == 200
 
 
+def test_partial_issue(client, auth):
+    drug, material = setup_stock(client, auth, drug_qty=10)
+    order = make_outbound(client, auth, drug, 10).json()
+    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"])
+    item_id = order["items"][0]["id"]
+
+    partial = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/issue",
+        json={"items": [{"item_id": item_id, "quantity": 4}]},
+        headers=auth["warehouse"],
+    )
+    assert partial.status_code == 200
+    assert partial.json()["status"] == "partially_issued"
+    assert partial.json()["items"][0]["issued_quantity"] == 4
+    assert client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 6
+    assert client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 4
+
+    over = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/issue",
+        json={"items": [{"item_id": item_id, "quantity": 7}]},
+        headers=auth["warehouse"],
+    )
+    assert over.status_code == 400
+
+    rest = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"]
+    )
+    assert rest.status_code == 200
+    assert rest.json()["status"] == "issued"
+    assert client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 0
+    assert client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 10
+
+
+def test_return_order_to_warehouse(client, auth):
+    drug, material = setup_stock(client, auth, drug_qty=10)
+    order = make_outbound(client, auth, drug, 10).json()
+    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"])
+    client.post(f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"])
+
+    ret = client.post(
+        "/warehouse/outbound-orders",
+        json={
+            "outbound_type": "return",
+            "target_type": "pharmacy",
+            "target_name": "药房",
+            "items": [{"kind": "drug", "drug_id": drug["id"], "batch_no": "OUT-B1", "quantity": 3}],
+        },
+        headers=auth["pharmacist"],
+    )
+    assert ret.status_code == 201
+    rid = ret.json()["id"]
+    client.post(f"/warehouse/outbound-orders/{rid}/approve", headers=auth["warehouse"])
+    issued = client.post(f"/warehouse/outbound-orders/{rid}/issue", headers=auth["warehouse"])
+    assert issued.status_code == 200
+
+    assert client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 7
+    assert client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 3
+    rows = client.get("/stock/ledger?ref_type=return", headers=auth["admin"]).json()
+    assert {row["direction"] for row in rows} == {"in", "out"}
+
+
+def test_scrap_order(client, auth):
+    drug, material = setup_stock(client, auth, drug_qty=10)
+
+    denied = client.post(
+        "/warehouse/outbound-orders",
+        json={
+            "outbound_type": "scrap",
+            "target_type": "pharmacy",
+            "items": [{"kind": "drug", "drug_id": drug["id"], "batch_no": "OUT-B1", "quantity": 4}],
+        },
+        headers=auth["pharmacist"],
+    )
+    assert denied.status_code == 403
+
+    scrap = client.post(
+        "/warehouse/outbound-orders",
+        json={
+            "outbound_type": "scrap",
+            "target_type": "pharmacy",
+            "items": [{"kind": "drug", "drug_id": drug["id"], "batch_no": "OUT-B1", "quantity": 4}],
+        },
+        headers=auth["warehouse"],
+    )
+    assert scrap.status_code == 201
+    sid = scrap.json()["id"]
+    client.post(f"/warehouse/outbound-orders/{sid}/approve", headers=auth["warehouse"])
+    issued = client.post(f"/warehouse/outbound-orders/{sid}/issue", headers=auth["warehouse"])
+    assert issued.status_code == 200
+
+    assert client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()[0]["quantity"] == 6
+    assert client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json() == []
+    rows = client.get("/stock/ledger?ref_type=scrap", headers=auth["admin"]).json()
+    assert len(rows) == 1
+    assert rows[0]["direction"] == "out"
+    assert rows[0]["quantity"] == 4
+
+
+def test_check_creates_adjustment(client, auth):
+    drug, material = setup_stock(client, auth, drug_qty=10)
+    client.post(
+        "/warehouse/check",
+        json={"drug_id": drug["id"], "batch_no": "OUT-B1", "actual_quantity": 7},
+        headers=auth["warehouse"],
+    )
+    adjustments = client.get("/warehouse/adjustments", headers=auth["admin"]).json()
+    assert len(adjustments) == 1
+    row = adjustments[0]
+    assert row["diff"] == -3
+    assert row["direction"] == "out"
+    assert row["quantity"] == 3
+    assert row["name"] == "出库测试药"
+    ledger = client.get("/stock/ledger?ref_type=adjust", headers=auth["admin"]).json()
+    assert ledger[0]["ref_id"] == row["id"]
+    assert ledger[0]["quantity"] == 3
+
+
