@@ -46,6 +46,13 @@ uv sync --extra client
 uv run python -m his_client   # 或用 scripts\build_client.bat 打包 exe
 ```
 
+演示时可直接自动登录（跳过登录框，仅本地演示用）：
+
+```powershell
+$env:HIS_CLIENT_USER = "admin"; $env:HIS_CLIENT_PASSWORD = "admin123"
+uv run python -m his_client --auto-login
+```
+
 ## 演示账号
 
 | 账号 | 密码 | 角色 |
