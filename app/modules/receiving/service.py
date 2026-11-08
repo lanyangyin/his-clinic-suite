@@ -14,9 +14,8 @@ from app.modules.drug.service import get_drug
 from app.modules.materials.service import get_item as get_material_item
 from app.modules.materials.schemas import StockInCreate
 from app.modules.materials.service import stock_in as material_stock_in
-from app.modules.pharmacy.schemas import StockInRequest
-from app.modules.pharmacy.service import stock_in as drug_stock_in
 from app.modules.supplier.service import get_supplier
+from app.modules.warehouse.service import receive_stock as warehouse_receive
 
 from .models import InboundItem, InboundOrder
 from .schemas import InboundCheckRequest, InboundOrderCreate
@@ -175,16 +174,8 @@ def stock_order(db: Session, order_id: int) -> InboundOrder:
         if quantity <= 0:
             continue
         if item.kind == "drug":
-            drug_stock_in(
-                db,
-                StockInRequest(
-                    drug_id=item.drug_id,
-                    batch_no=item.batch_no,
-                    expiry=item.expiry,
-                    location=item.location,
-                    quantity=quantity,
-                ),
-            )
+            # 入库进总库（药库），药房通过出库单领用
+            warehouse_receive(db, item.drug_id, item.batch_no, item.expiry, quantity)
         else:
             material_stock_in(
                 db,

@@ -233,6 +233,75 @@ def test_inbound_admin_pages(client, auth):
     assert "stocked" in detail.text or "已入库" in detail.text
 
 
+def test_warehouse_admin_pages(client, auth):
+    # 先造总库库存：入库单
+    drug = client.post(
+        "/drugs/", json={"name": "库房测试药", "base_price": 10.0},
+        headers=auth["admin"],
+    ).json()
+    inbound = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "WH-B1",
+                    "expiry": "2027-12-31",
+                    "quantity": 10,
+                }
+            ],
+        },
+        headers=auth["pharmacist"],
+    ).json()
+    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["pharmacist"])
+    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["pharmacist"])
+
+    order = client.post(
+        "/warehouse/outbound-orders",
+        json={
+            "target_type": "pharmacy",
+            "target_name": "药房",
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "WH-B1",
+                    "quantity": 4,
+                }
+            ],
+        },
+        headers=auth["pharmacist"],
+    ).json()
+
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    page = client.get("/admin/warehouse")
+    assert page.status_code == 200
+    assert "库房管理" in page.text
+    assert "WH-B1" in page.text
+    assert order["outbound_no"] in page.text
+
+    detail = client.get(f"/admin/warehouse/outbound/{order['id']}")
+    assert detail.status_code == 200
+    assert "审核通过" in detail.text
+
+    approved = client.post(
+        f"/admin/warehouse/outbound/{order['id']}/approve", follow_redirects=False
+    )
+    assert approved.status_code == 302
+    issued = client.post(
+        f"/admin/warehouse/outbound/{order['id']}/issue", follow_redirects=False
+    )
+    assert issued.status_code == 302
+
+    detail = client.get(f"/admin/warehouse/outbound/{order['id']}")
+    assert "issued" in detail.text
+    stocks = client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()
+    assert stocks[0]["quantity"] == 4
+
+
 def test_insurance_catalog_admin_page(client, auth):
     client.cookies.clear()
     assert login(client).status_code == 302

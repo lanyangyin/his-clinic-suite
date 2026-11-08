@@ -90,8 +90,10 @@ def test_inbound_flow_stock_posted(client, auth):
     assert stocked.status_code == 200
     assert stocked.json()["status"] == "stocked"
 
-    stocks = client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()
-    assert stocks[0]["quantity"] == 8
+    # 入库进总库（药库）；药房库存需通过出库单领用
+    warehouse = client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()
+    assert warehouse[0]["quantity"] == 8
+    assert client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json() == []
     material_stocks = client.get(f"/materials/stocks?item_id={device['id']}").json()
     assert material_stocks[0]["quantity"] == 5
 

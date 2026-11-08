@@ -150,12 +150,11 @@ def _write_audit_safely(username: str, role: str, method: str, path: str, status
 async def audit_middleware(request: Request, call_next):
     response = await call_next(request)
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        user = getattr(request.state, "user", None)
-        # 同步数据库写入放到线程池，绝不能在事件循环里阻塞等待数据库锁
+        # 使用认证时保存的字符串，避免 ORM 对象在会话关闭/回滚后过期
         await asyncio.to_thread(
             _write_audit_safely,
-            user.username if user else "anonymous",
-            user.role if user else "-",
+            getattr(request.state, "user_name", None) or "anonymous",
+            getattr(request.state, "user_role", None) or "-",
             request.method,
             request.url.path,
             response.status_code,

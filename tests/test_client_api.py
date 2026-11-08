@@ -182,6 +182,27 @@ def test_inbound_and_catalog_methods():
     assert session.calls[3][2]["params"] == {"limit": 50, "q": "阿莫", "category": "乙"}
 
 
+def test_outbound_methods():
+    session = FakeSession(
+        [
+            FakeResponse(200, [{"id": 1, "quantity": 10}]),
+            FakeResponse(201, {"id": 5, "outbound_no": "OUT20261108", "status": "submitted"}),
+            FakeResponse(200, [{"id": 5, "status": "submitted"}]),
+            FakeResponse(200, {"id": 5, "items": []}),
+        ]
+    )
+    client = ApiClient("http://x", "pharmacist", "pw", session=session)
+    client.list_warehouse_stocks(1)
+    client.create_outbound_order({"items": []})
+    client.list_outbound_orders("submitted")
+    client.get_outbound_order(5)
+
+    assert session.calls[0][1] == "http://x/warehouse/stocks"
+    assert session.calls[1][1] == "http://x/warehouse/outbound-orders"
+    assert session.calls[2][2]["params"] == {"status": "submitted"}
+    assert session.calls[3][1] == "http://x/warehouse/outbound-orders/5"
+
+
 def test_local_override(monkeypatch):
     work = _work_dir()
     try:

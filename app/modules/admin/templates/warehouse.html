@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}库房 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>库房管理</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+
+  <h2>出库单（药房/科室领用）</h2>
+  <form class="inline" method="get" action="/admin/warehouse">
+    <label>状态
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>全部</option>
+        <option value="submitted" {% if status == 'submitted' %}selected{% endif %}>已申请</option>
+        <option value="approved" {% if status == 'approved' %}selected{% endif %}>已审核</option>
+        <option value="issued" {% if status == 'issued' %}selected{% endif %}>已出库</option>
+        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
+      </select>
+    </label>
+    <button type="submit">筛选</button>
+  </form>
+  <table>
+    <tr><th>单号</th><th>类型</th><th>目标</th><th>申请人</th><th>状态</th><th>明细数</th><th>操作</th></tr>
+    {% for order in outbounds %}
+    <tr>
+      <td>{{ order.outbound_no }}</td>
+      <td>{{ order.outbound_type }}</td>
+      <td>{{ order.target_name }}</td>
+      <td>{{ order.applicant }}</td>
+      <td>{{ order.status }}</td>
+      <td>{{ order.items|length }}</td>
+      <td><a href="/admin/warehouse/outbound/{{ order.id }}">详情/处理</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无出库单（药房在客户端「领用出库」提交申请）</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>药品总库库存（{{ drug_stocks|length }} 批）</h2>
+  <table>
+    <tr><th>ID</th><th>药品</th><th>批次</th><th>效期</th><th>数量</th></tr>
+    {% for stock in drug_stocks %}
+    <tr>
+      <td>{{ stock.id }}</td>
+      <td>{{ stock.drug_name }}</td>
+      <td>{{ stock.batch_no }}</td>
+      <td>{{ stock.expiry }}</td>
+      <td>{{ stock.quantity }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">总库暂无药品库存（先做入库单）</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>物资总库库存（{{ material_stocks|length }} 项）</h2>
+  <table>
+    <tr><th>ID</th><th>物资</th><th>库房</th><th>数量</th></tr>
+    {% for stock in material_stocks %}
+    <tr>
+      <td>{{ stock.id }}</td>
+      <td>{{ stock.item_name }}</td>
+      <td>{{ stock.warehouse }}</td>
+      <td>{{ stock.quantity }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">总库暂无物资库存</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

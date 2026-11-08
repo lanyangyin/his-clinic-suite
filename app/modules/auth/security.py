@@ -29,6 +29,9 @@ def get_current_user(
         )
 
     request.state.user = user
+    # 审计中间件在会话关闭后写日志，使用字符串避免 ORM 对象过期问题
+    request.state.user_name = user.username
+    request.state.user_role = user.role
     return user
 
 

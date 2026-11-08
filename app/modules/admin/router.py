@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
 from app.modules.auth.schemas import UserCreate
+from app.modules.materials.service import get_item as get_material_item
+from app.modules.materials.service import list_items as list_material_items
+from app.modules.materials.service import list_stocks as list_material_stocks
 from app.modules.auth.service import (
     ROLES,
     create_user,
@@ -47,6 +50,14 @@ from app.modules.staff.service import (
     create_doctor,
     list_departments,
     list_doctors,
+)
+from app.modules.warehouse.service import (
+    approve_outbound as warehouse_approve,
+    cancel_outbound as warehouse_cancel,
+    get_outbound as get_warehouse_outbound,
+    issue_outbound as warehouse_issue,
+    list_outbounds as list_warehouse_outbounds,
+    list_stocks as list_warehouse_stocks,
 )
 
 from .service import dashboard_stats
@@ -528,6 +539,99 @@ def insurance_catalog_sync(
         msg = f"同步失败：{e}"
     return RedirectResponse(
         f"/admin/insurance-catalog?msg={quote(msg)}", status_code=302
+    )
+
+
+# ---------- 库房（总库 + 出库单）----------
+@router.get("/warehouse", response_class=HTMLResponse)
+def warehouse_page(
+    request: Request, status: str | None = None, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    materials = [
+        stock for stock in list_material_stocks(db) if stock.warehouse == "总库"
+    ]
+    return templates.TemplateResponse(
+        request,
+        "warehouse.html",
+        _ctx(
+            request,
+            drug_stocks=list_warehouse_stocks(db),
+            material_stocks=materials,
+            outbounds=list_warehouse_outbounds(db, status, None),
+            status=status or "",
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.get("/warehouse/outbound/{order_id}", response_class=HTMLResponse)
+def warehouse_outbound_detail(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    order = get_warehouse_outbound(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="出库单不存在")
+    return templates.TemplateResponse(
+        request,
+        "warehouse_outbound.html",
+        _ctx(request, order=order, message=request.query_params.get("msg", "")),
+    )
+
+
+@router.post("/warehouse/outbound/{order_id}/approve")
+def warehouse_outbound_approve(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        warehouse_approve(db, order_id, approver=request.session.get("admin_user", "admin"))
+        msg = "已审核"
+    except ValueError as e:
+        msg = f"审核失败：{e}"
+    return RedirectResponse(
+        f"/admin/warehouse/outbound/{order_id}?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/warehouse/outbound/{order_id}/issue")
+def warehouse_outbound_issue(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        warehouse_issue(db, order_id, issuer=request.session.get("admin_user", "admin"))
+        msg = "已出库"
+    except ValueError as e:
+        msg = f"出库失败：{e}"
+    return RedirectResponse(
+        f"/admin/warehouse/outbound/{order_id}?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/warehouse/outbound/{order_id}/cancel")
+def warehouse_outbound_cancel(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        warehouse_cancel(db, order_id)
+        msg = "已取消"
+    except ValueError as e:
+        msg = f"取消失败：{e}"
+    return RedirectResponse(
+        f"/admin/warehouse/outbound/{order_id}?msg={quote(msg)}", status_code=302
     )
 
 

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}出库单 {{ order.outbound_no }} · HIS 管理台{% endblock %}
+{% block content %}
+<h2>出库单 {{ order.outbound_no }}</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+  <table>
+    <tr><th>类型</th><td>{{ order.outbound_type }}</td><th>状态</th><td>{{ order.status }}</td></tr>
+    <tr><th>目标</th><td>{{ order.target_name }}（{{ order.target_type }}）</td><th>申请人</th><td>{{ order.applicant }}</td></tr>
+    <tr><th>审核人</th><td>{{ order.approver or '—' }}</td><th>出库人</th><td>{{ order.issuer or '—' }}</td></tr>
+    <tr><th>备注</th><td colspan="3">{{ order.note or '—' }}</td></tr>
+  </table>
+
+  <h2>明细</h2>
+  <table>
+    <tr><th>ID</th><th>类型</th><th>名称</th><th>批号</th><th>效期</th><th>数量</th><th>单价</th><th>金额</th></tr>
+    {% for item in order.items %}
+    <tr>
+      <td>{{ item.id }}</td>
+      <td>{{ item.kind }}</td>
+      <td>{{ item.name }}</td>
+      <td>{{ item.batch_no or '—' }}</td>
+      <td>{{ item.expiry or '—' }}</td>
+      <td>{{ item.quantity }}</td>
+      <td>{{ '%.2f'|format(item.unit_price) }}</td>
+      <td>{{ '%.2f'|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% if order.status == 'submitted' %}
+  <form method="post" action="/admin/warehouse/outbound/{{ order.id }}/approve" style="margin-top:12px">
+    <button type="submit">审核通过</button>
+  </form>
+  {% endif %}
+  {% if order.status == 'approved' %}
+  <form method="post" action="/admin/warehouse/outbound/{{ order.id }}/issue" style="margin-top:12px">
+    <button type="submit">确认出库（扣总库、增药房/科室库存）</button>
+  </form>
+  {% endif %}
+  {% if order.status in ('submitted', 'approved') %}
+  <form method="post" action="/admin/warehouse/outbound/{{ order.id }}/cancel" style="margin-top:12px">
+    <button type="submit">取消出库单</button>
+  </form>
+  {% endif %}
+
+  <p><a href="/admin/warehouse">← 返回库房</a></p>
+</div>
+{% endblock %}
