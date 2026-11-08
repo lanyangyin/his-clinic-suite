@@ -1,6 +1,7 @@
 from datetime import date
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +24,21 @@ from app.modules.charges.service import create_item as create_charge_item
 from app.modules.charges.service import list_items as list_charge_items
 from app.modules.drug.schemas import DrugCreate
 from app.modules.drug.service import create_drug, list_drugs
+from app.modules.insurance_catalog.schemas import CatalogSyncRequest
+from app.modules.insurance_catalog.service import (
+    import_bytes as catalog_import_bytes,
+    list_versions as catalog_versions,
+    search as catalog_search,
+    sync_from_url as catalog_sync,
+)
+from app.modules.receiving.schemas import InboundCheckRequest
+from app.modules.receiving.service import (
+    cancel_order as inbound_cancel,
+    check_order as inbound_check,
+    get_order as get_inbound_order,
+    list_orders as list_inbound_orders,
+    stock_order as inbound_stock,
+)
 from app.modules.reports.service import department_revenue
 from app.modules.review.service import summary as review_summary
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
@@ -342,3 +358,176 @@ def reports_page(
             end_date=end_date.isoformat() if end_date else "",
         ),
     )
+
+
+# ---------- 入库单 ----------
+@router.get("/inbound", response_class=HTMLResponse)
+def inbound_page(
+    request: Request, status: str | None = None, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "inbound.html",
+        _ctx(
+            request,
+            orders=list_inbound_orders(db, status, None),
+            status=status or "",
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.get("/inbound/{order_id}", response_class=HTMLResponse)
+def inbound_detail(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    order = get_inbound_order(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="入库单不存在")
+    return templates.TemplateResponse(
+        request,
+        "inbound_detail.html",
+        _ctx(
+            request,
+            order=order,
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/inbound/{order_id}/check")
+async def inbound_check_submit(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    items = []
+    for key, value in form.items():
+        if not key.startswith("rejected_"):
+            continue
+        item_id = key.removeprefix("rejected_")
+        try:
+            quantity = int(value or 0)
+        except ValueError:
+            quantity = 0
+        if quantity > 0:
+            items.append(
+                {
+                    "item_id": int(item_id),
+                    "rejected_qty": quantity,
+                    "reject_reason": str(form.get(f"reason_{item_id}", "")),
+                }
+            )
+    try:
+        inbound_check(db, order_id, InboundCheckRequest(items=items), checked_by=request.session.get("admin_user", "admin"))
+    except ValueError as e:
+        return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote('验收完成')}", status_code=302)
+
+
+@router.post("/inbound/{order_id}/stock")
+def inbound_stock_submit(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        inbound_stock(db, order_id)
+    except ValueError as e:
+        return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote('入库完成')}", status_code=302)
+
+
+@router.post("/inbound/{order_id}/cancel")
+def inbound_cancel_submit(
+    request: Request, order_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        inbound_cancel(db, order_id)
+    except ValueError as e:
+        return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse(f"/admin/inbound/{order_id}?msg={quote('已取消')}", status_code=302)
+
+
+# ---------- 医保药品目录 ----------
+@router.get("/insurance-catalog", response_class=HTMLResponse)
+def insurance_catalog_page(
+    request: Request,
+    q: str | None = None,
+    category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "insurance_catalog.html",
+        _ctx(
+            request,
+            rows=catalog_search(db, q, category, 100, 0),
+            versions=catalog_versions(db, 10),
+            q=q or "",
+            category=category or "",
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/insurance-catalog/import")
+async def insurance_catalog_import(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    data = await file.read()
+    try:
+        result = catalog_import_bytes(
+            db,
+            data,
+            file_name=file.filename or "catalog.csv",
+            source="manual",
+            imported_by=request.session.get("admin_user", "admin"),
+        )
+        msg = f"导入 {result['status']}：版本 {result.get('version')}，新增 {result['inserted']}，更新 {result['updated']}"
+    except ValueError as e:
+        msg = f"导入失败：{e}"
+    return RedirectResponse(
+        f"/admin/insurance-catalog?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/insurance-catalog/sync")
+def insurance_catalog_sync(
+    request: Request,
+    url: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        result = catalog_sync(db, CatalogSyncRequest(url=url).url, imported_by=request.session.get("admin_user", "admin"))
+        msg = f"同步 {result['status']}：版本 {result.get('version')}，新增 {result['inserted']}，更新 {result['updated']}"
+    except ValueError as e:
+        msg = f"同步失败：{e}"
+    return RedirectResponse(
+        f"/admin/insurance-catalog?msg={quote(msg)}", status_code=302
+    )
+
+

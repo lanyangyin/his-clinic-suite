@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}入库单 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>入库单</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+  <form class="inline" method="get" action="/admin/inbound">
+    <label>状态
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>全部</option>
+        <option value="received" {% if status == 'received' %}selected{% endif %}>已收货</option>
+        <option value="checked" {% if status == 'checked' %}selected{% endif %}>已验收</option>
+        <option value="stocked" {% if status == 'stocked' %}selected{% endif %}>已入库</option>
+        <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
+      </select>
+    </label>
+    <button type="submit">筛选</button>
+  </form>
+  <table>
+    <tr><th>单号</th><th>类型</th><th>状态</th><th>供应商ID</th><th>收货人</th><th>明细数</th><th>操作</th></tr>
+    {% for order in orders %}
+    <tr>
+      <td>{{ order.order_no }}</td>
+      <td>{{ order.order_type }}</td>
+      <td>{{ order.status }}</td>
+      <td>{{ order.supplier_id or '—' }}</td>
+      <td>{{ order.received_by }}</td>
+      <td>{{ order.items|length }}</td>
+      <td><a href="/admin/inbound/{{ order.id }}">详情/处理</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无入库单（可在客户端药房工作站创建）</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

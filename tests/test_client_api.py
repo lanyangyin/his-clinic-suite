@@ -161,6 +161,27 @@ def test_treatment_pending_list():
         shutil.rmtree(work, ignore_errors=True)
 
 
+def test_inbound_and_catalog_methods():
+    session = FakeSession(
+        [
+            FakeResponse(200, [{"id": 1, "name": "演示供应商"}]),
+            FakeResponse(200, [{"id": 2, "name": "打印纸", "category": "office"}]),
+            FakeResponse(201, {"id": 3, "order_no": "IN20261108", "status": "received"}),
+            FakeResponse(200, [{"national_code": "XA01", "name": "阿莫西林"}]),
+        ]
+    )
+    client = ApiClient("http://x", "pharmacist", "pw", session=session)
+    client.list_suppliers()
+    client.list_material_items("office")
+    client.create_inbound_order({"order_type": "office", "items": []})
+    client.search_insurance_catalog(q="阿莫", category="乙")
+
+    assert session.calls[0][1] == "http://x/suppliers/"
+    assert session.calls[1][2]["params"] == {"category": "office"}
+    assert session.calls[2][1] == "http://x/inbound/orders"
+    assert session.calls[3][2]["params"] == {"limit": 50, "q": "阿莫", "category": "乙"}
+
+
 def test_local_override(monkeypatch):
     work = _work_dir()
     try:

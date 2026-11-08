@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}入库单 {{ order.order_no }} · HIS 管理台{% endblock %}
+{% block content %}
+<h2>入库单 {{ order.order_no }}</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+  <table>
+    <tr><th>类型</th><td>{{ order.order_type }}</td><th>状态</th><td>{{ order.status }}</td></tr>
+    <tr><th>供应商ID</th><td>{{ order.supplier_id or '—' }}</td><th>来源</th><td>{{ order.source }}</td></tr>
+    <tr><th>随货同行单</th><td>{{ order.delivery_no or '—' }}</td><th>发票号</th><td>{{ order.invoice_no or '—' }}</td></tr>
+    <tr><th>收货人</th><td>{{ order.received_by or '—' }}</td><th>验收人</th><td>{{ order.checked_by or '—' }}</td></tr>
+  </table>
+
+  <h2>明细</h2>
+  <table>
+    <tr><th>ID</th><th>类型</th><th>名称</th><th>批号</th><th>效期</th><th>数量</th><th>不合格</th><th>单价</th><th>金额</th></tr>
+    {% for item in order.items %}
+    <tr>
+      <td>{{ item.id }}</td>
+      <td>{{ item.kind }}</td>
+      <td>{{ item.name }}</td>
+      <td>{{ item.batch_no or '—' }}</td>
+      <td>{{ item.expiry or '—' }}</td>
+      <td>{{ item.quantity }}</td>
+      <td>{{ item.rejected_qty }}</td>
+      <td>{{ '%.2f'|format(item.unit_price) }}</td>
+      <td>{{ '%.2f'|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% if order.status == 'received' %}
+  <h2>验收</h2>
+  <form method="post" action="/admin/inbound/{{ order.id }}/check">
+    <table>
+      <tr><th>明细ID</th><th>名称</th><th>不合格数量</th><th>不合格原因</th></tr>
+      {% for item in order.items %}
+      <tr>
+        <td>{{ item.id }}</td>
+        <td>{{ item.name }}</td>
+        <td><input type="number" min="0" max="{{ item.quantity }}" name="rejected_{{ item.id }}" value="0" style="min-width:80px"></td>
+        <td><input type="text" name="reason_{{ item.id }}" placeholder="如包装破损" style="min-width:200px"></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <button type="submit">提交验收</button>
+  </form>
+  {% endif %}
+
+  {% if order.status == 'checked' %}
+  <form method="post" action="/admin/inbound/{{ order.id }}/stock" style="margin-top:12px">
+    <button type="submit">确认入库（写库存）</button>
+  </form>
+  {% endif %}
+
+  {% if order.status in ('received', 'checked') %}
+  <form method="post" action="/admin/inbound/{{ order.id }}/cancel" style="margin-top:12px">
+    <button type="submit">取消入库单</button>
+  </form>
+  {% endif %}
+
+  <p><a href="/admin/inbound">← 返回入库单列表</a></p>
+</div>
+{% endblock %}

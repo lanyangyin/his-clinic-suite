@@ -201,6 +201,52 @@ class ApiClient:
         params = {"drug_id": drug_id} if drug_id else {}
         return self._request("GET", "/pharmacy/stocks", params=params)
 
+    def list_suppliers(self) -> list:
+        return self._request("GET", "/suppliers/")
+
+    def list_material_items(self, category: str | None = None) -> list:
+        params = {"category": category} if category else {}
+        return self._request("GET", "/materials/items/", params=params)
+
+    # ---- 入库单（收货/验收/入库）----
+    def create_inbound_order(self, payload: dict) -> dict:
+        return self._request("POST", "/inbound/orders", json=payload)
+
+    def list_inbound_orders(
+        self, status: str | None = None, order_type: str | None = None
+    ) -> list:
+        params = {}
+        if status:
+            params["status"] = status
+        if order_type:
+            params["order_type"] = order_type
+        return self._request("GET", "/inbound/orders", params=params)
+
+    def get_inbound_order(self, order_id: int) -> dict:
+        return self._request("GET", f"/inbound/orders/{order_id}")
+
+    def check_inbound_order(self, order_id: int, items: list) -> dict:
+        return self._request(
+            "POST", f"/inbound/orders/{order_id}/check", json={"items": items}
+        )
+
+    def stock_inbound_order(self, order_id: int) -> dict:
+        return self._request("POST", f"/inbound/orders/{order_id}/stock")
+
+    def cancel_inbound_order(self, order_id: int) -> dict:
+        return self._request("POST", f"/inbound/orders/{order_id}/cancel")
+
+    # ---- 医保目录 ----
+    def search_insurance_catalog(
+        self, q: str | None = None, category: str | None = None, limit: int = 50
+    ) -> list:
+        params: dict = {"limit": limit}
+        if q:
+            params["q"] = q
+        if category:
+            params["category"] = category
+        return self._request("GET", "/insurance/catalog/search", params=params)
+
     def stock_in(self, payload: dict) -> dict:
         return self._request("POST", "/pharmacy/stock-in", json=payload)
 

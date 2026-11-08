@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}医保目录 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医保药品目录</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+
+  <form class="inline" method="get" action="/admin/insurance-catalog">
+    <label>关键词 <input type="text" name="q" value="{{ q }}" placeholder="名称/医保代码/厂家"></label>
+    <label>类别
+      <select name="category">
+        <option value="" {% if not category %}selected{% endif %}>全部</option>
+        <option value="甲" {% if category == '甲' %}selected{% endif %}>甲类</option>
+        <option value="乙" {% if category == '乙' %}selected{% endif %}>乙类</option>
+        <option value="丙" {% if category == '丙' %}selected{% endif %}>丙类/自费</option>
+      </select>
+    </label>
+    <button type="submit">检索</button>
+  </form>
+
+  <h2>导入 / 同步</h2>
+  <form class="inline" method="post" action="/admin/insurance-catalog/import" enctype="multipart/form-data">
+    <label>目录文件（CSV/XLSX） <input type="file" name="file" accept=".csv,.xlsx" required></label>
+    <button type="submit">上传导入</button>
+  </form>
+  <form class="inline" method="post" action="/admin/insurance-catalog/sync">
+    <label>更新地址（URL） <input type="text" name="url" placeholder="http://内网/医保目录.csv" style="min-width:320px"></label>
+    <button type="submit">从 URL 同步</button>
+  </form>
+
+  <h2>目录（{{ rows|length }} 条）</h2>
+  <table>
+    <tr><th>医保代码</th><th>名称</th><th>剂型</th><th>规格</th><th>厂家</th><th>类别</th><th>限定支付</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.national_code }}</td>
+      <td>{{ row.name }}</td>
+      <td>{{ row.dosage_form }}</td>
+      <td>{{ row.spec }}</td>
+      <td>{{ row.manufacturer }}</td>
+      <td>{{ row.category }}</td>
+      <td>{{ row.reimbursement_note }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无目录数据，请上传医保局提供的目录文件</td></tr>
+    {% endfor %}
+  </table>
+
+  <h2>导入版本</h2>
+  <table>
+    <tr><th>版本</th><th>来源</th><th>文件</th><th>行数</th><th>操作人</th><th>时间</th></tr>
+    {% for v in versions %}
+    <tr>
+      <td>{{ v.version }}</td>
+      <td>{{ v.source }}</td>
+      <td>{{ v.file_name }}</td>
+      <td>{{ v.row_count }}</td>
+      <td>{{ v.imported_by }}</td>
+      <td>{{ v.imported_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">暂无导入记录</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
