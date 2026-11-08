@@ -14,6 +14,7 @@ class MaterialItemCreate(BaseModel):
     category: str = Field(default="consumable", pattern="^(consumable|device|office|other)$")
     manufacturer: str = Field(default="", max_length=100)
     registration_no: str = Field(default="", max_length=60)
+    insurance_code: str = Field(default="", max_length=60)
 
 
 class MaterialItemResponse(MaterialItemCreate):

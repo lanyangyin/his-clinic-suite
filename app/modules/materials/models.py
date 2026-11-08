@@ -29,6 +29,10 @@ class MaterialItem(Base):
     registration_no: Mapped[str] = mapped_column(
         String(60), default="", server_default="", nullable=False
     )
+    # 医保耗材编码（与本地 code 分开，保留完整贯标码）
+    insurance_code: Mapped[str] = mapped_column(
+        String(60), default="", server_default="", nullable=False
+    )
 
 
 class MaterialStock(Base):

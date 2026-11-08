@@ -306,6 +306,21 @@ class ApiClient:
             "POST", f"/insurance/catalog/{national_code}/ensure-drug"
         )
 
+    def search_insurance_materials(
+        self, q: str | None = None, category: str | None = None, limit: int = 500
+    ) -> list:
+        params: dict = {"limit": limit}
+        if q:
+            params["q"] = q
+        if category:
+            params["category"] = category
+        return self._request("GET", "/insurance/materials/search", params=params)
+
+    def ensure_material_from_catalog(self, code: str) -> dict:
+        return self._request(
+            "POST", f"/insurance/materials/{code}/ensure-item"
+        )
+
     def trace_summary(self, drug_id: int | None = None, batch_no: str | None = None) -> dict:
         params = {}
         if drug_id:

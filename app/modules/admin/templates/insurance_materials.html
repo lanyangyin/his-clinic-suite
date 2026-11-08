@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}耗材目录 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医保医用耗材目录</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+
+  <p>
+    官方查询：<a href="https://code.nhsa.gov.cn" target="_blank">医保医用耗材分类与代码数据库</a>
+    （公开查询/动态维护）；批量导入请使用下方上传或 URL 同步（CSV/XLSX）。
+  </p>
+
+  <h2>导入 / 同步</h2>
+  <form class="inline" method="post" action="/admin/insurance-materials/import" enctype="multipart/form-data">
+    <label>耗材目录文件（CSV/XLSX） <input type="file" name="file" accept=".csv,.xlsx" required></label>
+    <button type="submit">上传导入</button>
+  </form>
+  <p>表头支持：医用耗材编码/耗材名称/规格/型号/生产厂家/单位/类别/耗材类型/注册证号/备注。</p>
+
+  <form class="inline" method="get" action="/admin/insurance-materials">
+    <label>关键词 <input type="text" name="q" value="{{ q }}" placeholder="名称/编码/厂家"></label>
+    <label>类别 <input type="text" name="category" value="{{ category }}" placeholder="如 耗材/器械"></label>
+    <button type="submit">检索</button>
+  </form>
+
+  <h2>目录（{{ rows|length }} 条）</h2>
+  <table>
+    <tr><th>耗材编码</th><th>名称</th><th>规格</th><th>型号</th><th>厂家</th><th>单位</th><th>类别</th><th>类型</th><th>注册证号</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.code }}</td>
+      <td>{{ row.name }}</td>
+      <td>{{ row.spec }}</td>
+      <td>{{ row.model }}</td>
+      <td>{{ row.manufacturer }}</td>
+      <td>{{ row.unit }}</td>
+      <td>{{ row.category }}</td>
+      <td>{{ row.material_type }}</td>
+      <td>{{ row.registration_no }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">暂无耗材目录，请上传医保局提供的耗材目录文件</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

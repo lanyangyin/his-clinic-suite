@@ -282,3 +282,17 @@ def test_ensure_drug_from_catalog_method():
     client.ensure_drug_from_catalog("DD001")
     assert session.calls[0][0] == "POST"
     assert session.calls[0][1] == "http://x/insurance/catalog/DD001/ensure-drug"
+
+def test_material_catalog_methods():
+    session = FakeSession(
+        [
+            FakeResponse(200, [{"code": "MATC001", "name": "注射器", "category": "耗材"}]),
+            FakeResponse(200, {"id": 7, "name": "注射器", "category": "consumable"}),
+        ]
+    )
+    client = ApiClient("http://x", "warehouse", "pw", session=session)
+    client.search_insurance_materials(q="注射", limit=20)
+    client.ensure_material_from_catalog("MATC001")
+    assert session.calls[0][1] == "http://x/insurance/materials/search"
+    assert session.calls[0][2]["params"]["q"] == "注射"
+    assert session.calls[1][1] == "http://x/insurance/materials/MATC001/ensure-item"

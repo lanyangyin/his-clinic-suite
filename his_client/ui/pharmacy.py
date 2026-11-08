@@ -56,6 +56,7 @@ class PharmacyWidget(QWidget):
         layout.addWidget(tabs)
         if role in ("warehouse", "admin"):
             self._load_drugs()  # 入库药品下拉默认加载医保目录
+            self._load_materials()  # 入库物资下拉默认加载医保耗材目录
 
     # ---------- 入库单 ----------
     def _build_inbound_tab(self) -> QWidget:
@@ -116,6 +117,10 @@ class PharmacyWidget(QWidget):
         items_layout.addLayout(drug_row)
 
         material_row = QHBoxLayout()
+        self.in_material_source = QComboBox()
+        self.in_material_source.addItem("医保耗材目录（默认）", "catalog")
+        self.in_material_source.addItem("本店物资", "local")
+        self.in_material_source.currentIndexChanged.connect(self._load_materials)
         self.in_material = QComboBox()
         load_materials = QPushButton("刷新物资")
         load_materials.clicked.connect(self._load_materials)
@@ -128,9 +133,9 @@ class PharmacyWidget(QWidget):
         self.in_warehouse.setText("总库")
         add_material = QPushButton("添加物资行")
         add_material.clicked.connect(self._add_material_item)
-        for w in (self.in_material, load_materials, self.in_m_qty, self.in_m_price, self.in_warehouse, add_material):
+        for w in (self.in_material_source, self.in_material, load_materials, self.in_m_qty, self.in_m_price, self.in_warehouse, add_material):
             material_row.addWidget(w)
-        items_layout.addWidget(QLabel("物资行：器械/耗材/办公 / 数量 / 单价 / 库房"))
+        items_layout.addWidget(QLabel("物资行：来源 / 器械/耗材/办公 / 数量 / 单价 / 库房"))
         items_layout.addLayout(material_row)
 
         self.pending_table = QTableWidget(0, 6)
@@ -256,6 +261,35 @@ class PharmacyWidget(QWidget):
         self.in_msg.setText(f"本店药品 {len(drugs)} 条")
 
     def _load_materials(self) -> None:
+        source = (
+            self.in_material_source.currentData()
+            if hasattr(self, "in_material_source")
+            else "local"
+        )
+        self.in_material.clear()
+        if source == "catalog":
+            try:
+                rows = self.api.search_insurance_materials(limit=500)
+            except ApiError as e:
+                self.in_msg.setText(f"加载耗材目录失败：{e.detail}")
+                return
+            if rows:
+                for row in rows:
+                    category = row.get("category") or row.get("material_type") or "—"
+                    spec = row.get("spec") or row.get("model") or ""
+                    self.in_material.addItem(
+                        f"{row['name']} {spec}【{category}】", row["code"]
+                    )
+                self.in_msg.setText(
+                    f"医保耗材目录 {len(rows)} 条（默认来源，选中后自动落地为本店物资）"
+                )
+                return
+            self.in_msg.setText(
+                "医保耗材目录为空：请先在管理台上传目录；已切换为本店物资"
+            )
+            self.in_material_source.setCurrentIndex(1)
+            return
+
         try:
             items = self.api.list_material_items()
         except ApiError as e:
@@ -266,6 +300,7 @@ class PharmacyWidget(QWidget):
             self.in_material.addItem(
                 f"{item['name']}（{item.get('category')}）", item["id"]
             )
+        self.in_msg.setText(f"本店物资 {len(items)} 条")
 
     def _add_drug_item(self) -> None:
         source = (
@@ -307,10 +342,25 @@ class PharmacyWidget(QWidget):
         self.in_msg.setText("已添加药品行，可继续添加或提交")
 
     def _add_material_item(self) -> None:
-        material_id = self.in_material.currentData()
-        if not material_id:
+        source = (
+            self.in_material_source.currentData()
+            if hasattr(self, "in_material_source")
+            else "local"
+        )
+        selected = self.in_material.currentData()
+        if not selected:
             self.in_msg.setText("请先刷新并选择物资")
             return
+        material_id = selected
+        if source == "catalog":
+            try:
+                item = self.api.ensure_material_from_catalog(str(selected))
+            except ApiError as e:
+                self.in_msg.setText(f"医保耗材落地失败（{e.status_code}）：{e.detail}")
+                return
+            material_id = item["id"]
+            if not self.in_m_price.text().strip() and item.get("price"):
+                self.in_m_price.setText(f"{item['price']:.2f}")
         price = self.in_m_price.text().strip()
         item = {
             "kind": "material",

@@ -63,6 +63,10 @@ from app.modules.insurance_inventory.interface_service import (
     masked as mask_secret,
     save_config as save_insurance_interface,
 )
+from app.modules.insurance_materials.service import (
+    import_bytes as material_catalog_import,
+    search as material_catalog_search,
+)
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
 from app.modules.staff.service import (
     create_department,
@@ -735,6 +739,56 @@ def insurance_inventory_detail(
         request,
         "insurance_inventory_detail.html",
         _ctx(request, upload=upload),
+    )
+
+
+# ---------- 医用耗材目录 ----------
+@router.get("/insurance-materials", response_class=HTMLResponse)
+def insurance_materials_page(
+    request: Request,
+    q: str | None = None,
+    category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "insurance_materials.html",
+        _ctx(
+            request,
+            rows=material_catalog_search(db, q, category, 100, 0),
+            q=q or "",
+            category=category or "",
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/insurance-materials/import")
+async def insurance_materials_import(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    data = await file.read()
+    try:
+        result = material_catalog_import(
+            db, data, file.filename or "materials.csv",
+            imported_by=request.session.get("admin_user", "admin"),
+        )
+        msg = (
+            f"耗材目录导入完成：共 {result['total']}，"
+            f"新增 {result['inserted']}，更新 {result['updated']}"
+        )
+    except ValueError as e:
+        msg = f"导入失败：{e}"
+    return RedirectResponse(
+        f"/admin/insurance-materials?msg={quote(msg)}", status_code=302
     )
 
 
