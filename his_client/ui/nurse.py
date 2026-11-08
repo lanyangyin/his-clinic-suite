@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.labels import zh
 
 
 class NurseWidget(QWidget):
@@ -76,7 +77,7 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.triage_msg.setText(f"分诊失败（{e.status_code}）：{e.detail}")
             return
-        self.triage_msg.setText(f"分诊成功：叫号单 {ticket['id']}（{ticket['status']}）")
+        self.triage_msg.setText(f"分诊成功：叫号单 {ticket['id']}（{zh('ticket_status', ticket['status'])}）")
         self._load_queue()
 
     def _load_queue(self) -> None:
@@ -91,7 +92,7 @@ class NurseWidget(QWidget):
             self.queue_table.setItem(
                 row, 1, QTableWidgetItem(str(ticket["registration_id"]))
             )
-            self.queue_table.setItem(row, 2, QTableWidgetItem(ticket["status"]))
+            self.queue_table.setItem(row, 2, QTableWidgetItem(zh('ticket_status', ticket["status"])))
         self.triage_msg.setText(f"当前队列 {len(tickets)} 人")
 
     def _call_ticket(self) -> None:
@@ -104,7 +105,7 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.triage_msg.setText(f"叫号失败（{e.status_code}）：{e.detail}")
             return
-        self.triage_msg.setText(f"已叫号：{ticket['id']}（{ticket['status']}）")
+        self.triage_msg.setText(f"已叫号：{ticket['id']}（{zh('ticket_status', ticket['status'])}）")
         self._load_queue()
 
     def _pass_ticket(self) -> None:
@@ -117,7 +118,7 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.triage_msg.setText(f"过号失败（{e.status_code}）：{e.detail}")
             return
-        self.triage_msg.setText(f"已过号：{ticket['id']}（{ticket['status']}）")
+        self.triage_msg.setText(f"已过号：{ticket['id']}（{zh('ticket_status', ticket['status'])}）")
         self._load_queue()
 
     # ---------- 治疗执行 ----------
@@ -160,7 +161,7 @@ class NurseWidget(QWidget):
             )
             self.treat_table.setItem(row, 2, QTableWidgetItem(order["item_name"]))
             self.treat_table.setItem(row, 3, QTableWidgetItem(str(order["quantity"])))
-            self.treat_table.setItem(row, 4, QTableWidgetItem(order["status"]))
+            self.treat_table.setItem(row, 4, QTableWidgetItem(zh('treatment_status', order["status"])))
         self.treat_msg.setText(f"待执行治疗单 {len(orders)} 条")
 
     def _execute_treatment(self) -> None:
@@ -178,3 +179,4 @@ class NurseWidget(QWidget):
             f"已执行：{order['item_name']}（执行人 {order.get('executed_by') or '—'}）"
         )
         self._load_pending_treatments()
+

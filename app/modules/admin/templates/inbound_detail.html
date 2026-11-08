@@ -5,7 +5,7 @@
 <div class="panel">
   {% if message %}<div class="ok">{{ message }}</div>{% endif %}
   <table>
-    <tr><th>类型</th><td>{{ order.order_type }}</td><th>状态</th><td>{{ order.status }}</td></tr>
+    <tr><th>类型</th><td>{{ order.order_type|zh('inbound_type') }}</td><th>状态</th><td>{{ order.status|zh('inbound_status') }}</td></tr>
     <tr><th>供应商ID</th><td>{{ order.supplier_id or '—' }}</td><th>来源</th><td>{{ order.source }}</td></tr>
     <tr><th>随货同行单</th><td>{{ order.delivery_no or '—' }}</td><th>发票号</th><td>{{ order.invoice_no or '—' }}</td></tr>
     <tr><th>收货人</th><td>{{ order.received_by or '—' }}</td><th>验收人</th><td>{{ order.checked_by or '—' }}</td></tr>
@@ -17,7 +17,7 @@
     {% for item in order.items %}
     <tr>
       <td>{{ item.id }}</td>
-      <td>{{ item.kind }}</td>
+      <td>{{ item.kind|zh('kind') }}</td>
       <td>{{ item.name }}</td>
       <td>{{ item.batch_no or '—' }}</td>
       <td>{{ item.expiry or '—' }}</td>

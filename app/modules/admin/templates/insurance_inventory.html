@@ -40,20 +40,21 @@
 
   <h2>上传历史（{{ uploads|length }}）</h2>
   <table>
-    <tr><th>上传单号</th><th>期间</th><th>条数</th><th>金额</th><th>状态</th><th>操作人</th><th>时间</th><th>操作</th></tr>
+    <tr><th>上传单号</th><th>期间</th><th>条数</th><th>金额</th><th>状态</th><th>通道</th><th>操作人</th><th>时间</th><th>操作</th></tr>
     {% for item in uploads %}
     <tr>
       <td>{{ item.upload_no }}</td>
       <td>{{ item.start_date }} ~ {{ item.end_date }}</td>
       <td>{{ item.record_count }}</td>
       <td>{{ '%.2f'|format(item.total_amount) }}</td>
-      <td>{{ item.status }}</td>
+      <td>{{ item.status|zh('upload_status') }}</td>
+      <td>{{ item.channel|zh('channel') }}</td>
       <td>{{ item.created_by }}</td>
       <td>{{ item.created_at.strftime('%m-%d %H:%M') }}</td>
       <td><a href="/admin/insurance-inventory/{{ item.id }}">详情</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="8">暂无上传记录</td></tr>
+    <tr><td colspan="9">暂无上传记录</td></tr>
     {% endfor %}
   </table>
 </div>

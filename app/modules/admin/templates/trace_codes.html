@@ -30,7 +30,7 @@
   <table>
     <tr><th>状态</th><th>库房</th><th>数量</th></tr>
     {% for item in summary["items"] %}
-    <tr><td>{{ item.status }}</td><td>{{ item.warehouse }}</td><td>{{ item.count }}</td></tr>
+    <tr><td>{{ item.status|zh('trace_status') }}</td><td>{{ item.warehouse }}</td><td>{{ item.count }}</td></tr>
     {% else %}
     <tr><td colspan="3">暂无追溯码</td></tr>
     {% endfor %}
@@ -45,8 +45,8 @@
       <td>{{ row.drug_id }}</td>
       <td>{{ row.batch_no }}</td>
       <td>{{ row.warehouse }}</td>
-      <td>{{ row.status }}</td>
-      <td>{{ row.ref_type }}{% if row.ref_id %}#{{ row.ref_id }}{% endif %}</td>
+      <td>{{ row.status|zh('trace_status') }}</td>
+      <td>{{ row.ref_type|zh('ref_type') }}{% if row.ref_id %}#{{ row.ref_id }}{% endif %}</td>
       <td>{{ row.patient_id or '—' }}</td>
       <td>{{ row.scanned_by or '—' }}</td>
       <td>{{ row.scanned_at.strftime('%m-%d %H:%M') }}</td>

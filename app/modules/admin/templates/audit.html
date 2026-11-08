@@ -13,10 +13,10 @@
     <tr>
       <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
       <td>{{ log.username }}</td>
-      <td>{{ log.role }}</td>
-      <td>{{ log.method }}</td>
+      <td>{{ log.role|zh('role') }}</td>
+      <td>{{ log.method|zh('http_method') }}</td>
       <td>{{ log.path }}</td>
-      <td>{{ log.status_code }}</td>
+      <td>{{ log.status_code|zh('http_status') }}</td>
     </tr>
     {% else %}
     <tr><td colspan="6">暂无日志</td></tr>

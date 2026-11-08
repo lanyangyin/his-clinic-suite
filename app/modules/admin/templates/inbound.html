@@ -21,8 +21,8 @@
     {% for order in orders %}
     <tr>
       <td>{{ order.order_no }}</td>
-      <td>{{ order.order_type }}</td>
-      <td>{{ order.status }}</td>
+      <td>{{ order.order_type|zh('inbound_type') }}</td>
+      <td>{{ order.status|zh('inbound_status') }}</td>
       <td>{{ order.supplier_id or '—' }}</td>
       <td>{{ order.received_by }}</td>
       <td>{{ order.items|length }}</td>

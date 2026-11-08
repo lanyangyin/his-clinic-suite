@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.labels import zh
 
 _RECORD_FIELDS = [
     ("chief_complaint", "主诉", 200),
@@ -85,7 +86,7 @@ class DoctorWidget(QWidget):
             self.reg_table.setItem(index, 0, QTableWidgetItem(str(reg["id"])))
             self.reg_table.setItem(index, 1, QTableWidgetItem(str(reg["patient_id"])))
             self.reg_table.setItem(index, 2, QTableWidgetItem(str(reg["doctor_id"])))
-            self.reg_table.setItem(index, 3, QTableWidgetItem(reg["status"]))
+            self.reg_table.setItem(index, 3, QTableWidgetItem(zh('registration_status', reg["status"])))
         self.reg_table.cellClicked.connect(
             lambda row, _col: self.reg_id.setValue(
                 int(self.reg_table.item(row, 0).text())
@@ -471,3 +472,4 @@ class DoctorWidget(QWidget):
             self.treat_msg.setText(f"开单失败（{e.status_code}）：{e.detail}")
             return
         self.treat_msg.setText(f"治疗单已开立：{order['item_name']}（{order['id']}，待护士执行）")
+

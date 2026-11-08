@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.labels import zh
 
 
 class CashierWidget(QWidget):
@@ -172,7 +173,7 @@ class CashierWidget(QWidget):
             self.reg_msg.setText(f"挂号失败（{e.status_code}）：{e.detail}")
             return
         self.reg_msg.setText(
-            f"挂号成功：挂号 ID {registration['id']}，状态 {registration['status']}"
+            f"挂号成功：挂号 ID {registration['id']}，状态 {zh('registration_status', registration['status'])}"
         )
 
     # ---------- 收费 / 退费 ----------
@@ -233,7 +234,7 @@ class CashierWidget(QWidget):
             self.charge_table.setItem(row, 1, QTableWidgetItem(charge["item_name"]))
             self.charge_table.setItem(row, 2, QTableWidgetItem(str(charge["quantity"])))
             self.charge_table.setItem(row, 3, QTableWidgetItem(f"{charge['amount']:.2f}"))
-            self.charge_table.setItem(row, 4, QTableWidgetItem(charge["status"]))
+            self.charge_table.setItem(row, 4, QTableWidgetItem(zh('charge_status', charge["status"])))
         self.charge_msg.setText(
             f"待收 {summary['total_pending']:.2f} 元；已收 {summary['total_paid']:.2f} 元"
         )
@@ -257,7 +258,7 @@ class CashierWidget(QWidget):
         except ApiError as e:
             self.refund_msg.setText(f"退费失败（{e.status_code}）：{e.detail}")
             return
-        self.refund_msg.setText(f"退费成功：单号 {payment['id']}，状态 {payment['status']}")
+        self.refund_msg.setText(f"退费成功：单号 {payment['id']}，状态 {zh('payment_status', payment['status'])}")
 
     # ---------- 打印 ----------
     def _build_print_tab(self) -> QWidget:
@@ -296,3 +297,4 @@ class CashierWidget(QWidget):
 
         layout.addStretch(1)
         return page
+

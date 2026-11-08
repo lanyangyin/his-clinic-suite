@@ -23,8 +23,8 @@
       <tr><th>AppSecret</th><td><input type="password" name="app_secret" value="" placeholder="{{ ('已配置：' ~ secret_mask ~ '（留空保持）') if secret_mask else '未配置（留空保持）' }}"></td></tr>
       <tr><th>签名方式</th><td>
         <select name="sign_type">
-          {% for value in ['NONE', 'HMAC-SHA256', 'SM2'] %}
-          <option value="{{ value }}" {% if config and config.sign_type == value %}selected{% endif %}>{{ value }}</option>
+          {% for value, text in [('NONE', '不签名'), ('HMAC-SHA256', 'HMAC-SHA256（密钥）'), ('SM2', 'SM2（国密）')] %}
+          <option value="{{ value }}" {% if config and config.sign_type == value %}selected{% endif %}>{{ text }}</option>
           {% endfor %}
         </select>
       </td></tr>

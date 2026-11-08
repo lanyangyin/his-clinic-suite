@@ -19,7 +19,7 @@
         <option value="out" {% if direction == 'out' %}selected{% endif %}>出库</option>
       </select>
     </label>
-    <label>单据类型 <input type="text" name="ref_type" value="{{ ref_type }}" placeholder="inbound/purchase/outbound/dispense"></label>
+    <label>单据类型 <input type="text" name="ref_type" value="{{ ref_type }}" placeholder="如 inbound/purchase/outbound（可留空）"></label>
     <button type="submit">筛选</button>
   </form>
 
@@ -37,7 +37,7 @@
       <td>{{ '%.2f'|format(m.unit_price) }}</td>
       <td>{{ '%.2f'|format(m.amount) }}</td>
       <td>{{ m.balance_after }}</td>
-      <td>{{ m.ref_type }}{% if m.ref_id %}#{{ m.ref_id }}{% endif %}</td>
+      <td>{{ m.ref_type|zh('ref_type') }}{% if m.ref_id %}#{{ m.ref_id }}{% endif %}</td>
       <td>{{ m.operator or '—' }}</td>
     </tr>
     {% else %}

@@ -178,7 +178,7 @@ def test_inventory_admin_page(client, auth):
     assert uploaded.status_code == 302
 
     page = client.get(f"/admin/insurance-inventory?start_date={today}&end_date={today}")
-    assert "success" in page.text
+    assert "成功" in page.text
 
     history = client.get("/insurance/inventory/uploads", headers=auth["admin"]).json()
     detail = client.get(f"/admin/insurance-inventory/{history[0]['id']}")

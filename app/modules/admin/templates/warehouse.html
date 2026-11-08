@@ -12,6 +12,7 @@
         <option value="" {% if not status %}selected{% endif %}>全部</option>
         <option value="submitted" {% if status == 'submitted' %}selected{% endif %}>已申请</option>
         <option value="approved" {% if status == 'approved' %}selected{% endif %}>已审核</option>
+        <option value="partially_issued" {% if status == 'partially_issued' %}selected{% endif %}>部分出库</option>
         <option value="issued" {% if status == 'issued' %}selected{% endif %}>已出库</option>
         <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>已取消</option>
       </select>
@@ -23,10 +24,10 @@
     {% for order in outbounds %}
     <tr>
       <td>{{ order.outbound_no }}</td>
-      <td>{{ order.outbound_type }}</td>
+      <td>{{ order.outbound_type|zh('outbound_type') }}</td>
       <td>{{ order.target_name }}</td>
       <td>{{ order.applicant }}</td>
-      <td>{{ order.status }}</td>
+      <td>{{ order.status|zh('outbound_status') }}</td>
       <td>{{ order.items|length }}</td>
       <td><a href="/admin/warehouse/outbound/{{ order.id }}">详情/处理</a></td>
     </tr>

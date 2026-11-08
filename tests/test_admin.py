@@ -335,7 +335,7 @@ def test_warehouse_admin_pages(client, auth):
     )
     assert partial.status_code == 302
     detail = client.get(f"/admin/warehouse/outbound/{order['id']}")
-    assert "partially_issued" in detail.text
+    assert "部分出库" in detail.text
 
     issued = client.post(
         f"/admin/warehouse/outbound/{order['id']}/issue", follow_redirects=False
@@ -343,7 +343,7 @@ def test_warehouse_admin_pages(client, auth):
     assert issued.status_code == 302
 
     detail = client.get(f"/admin/warehouse/outbound/{order['id']}")
-    assert "issued" in detail.text
+    assert "已出库" in detail.text
     stocks = client.get(f"/pharmacy/stocks?drug_id={drug['id']}").json()
     assert stocks[0]["quantity"] == 4
 

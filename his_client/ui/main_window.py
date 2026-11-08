@@ -5,6 +5,7 @@ from his_client import CLIENT_VERSION
 from his_client.api import ApiClient
 from his_client.ui.cashier import CashierWidget
 from his_client.ui.doctor import DoctorWidget
+from his_client.labels import zh
 from his_client.ui.nurse import NurseWidget
 from his_client.ui.pharmacy import PharmacyWidget
 
@@ -30,12 +31,12 @@ class MainWindow(QMainWindow):
         if role in ("nurse", "admin"):
             tabs.addTab(NurseWidget(api), "护士工作站")
         if tabs.count() == 0:
-            tabs.addTab(_placeholder(f"角色 {role} 暂无工作站"), "提示")
+            tabs.addTab(_placeholder(f"角色「{zh('role', role)}」暂无工作站"), "提示")
         self.setCentralWidget(tabs)
 
         name = user.get("display_name") or user.get("username")
         self.statusBar().showMessage(
-            f"服务器 {api.base_url} · 用户 {name}（{role}）· 客户端 v{CLIENT_VERSION}"
+            f"服务器 {api.base_url} · 用户 {name}（{zh('role', role)}）· 客户端 v{CLIENT_VERSION}"
         )
 
 

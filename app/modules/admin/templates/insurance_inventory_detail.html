@@ -4,7 +4,7 @@
 <h2>医保进销存上传 {{ upload.upload_no }}</h2>
 <div class="panel">
   <table>
-    <tr><th>期间</th><td>{{ upload.start_date }} ~ {{ upload.end_date }}</td><th>状态</th><td>{{ upload.status }}</td></tr>
+    <tr><th>期间</th><td>{{ upload.start_date }} ~ {{ upload.end_date }}</td><th>状态</th><td>{{ upload.status|zh('upload_status') }}</td><th>通道</th><td>{{ upload.channel|zh('channel') }}</td></tr>
     <tr><th>条数</th><td>{{ upload.record_count }}</td><th>金额</th><td>{{ '%.2f'|format(upload.total_amount) }}</td></tr>
     <tr><th>操作人</th><td>{{ upload.created_by }}</td><th>提交时间</th><td>{{ upload.submitted_at or '—' }}</td></tr>
   </table>

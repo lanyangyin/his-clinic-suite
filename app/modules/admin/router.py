@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
 from app.modules.auth.schemas import UserCreate
+from app.modules.labels import zh
 from app.modules.materials.service import get_item as get_material_item
 from app.modules.materials.service import list_items as list_material_items
 from app.modules.materials.service import list_stocks as list_material_stocks
@@ -92,6 +93,7 @@ router = APIRouter(prefix="/admin", tags=["admin-console"])
 templates = Jinja2Templates(directory=str(ADMIN_TEMPLATES_DIR))
 templates.env.globals["roles"] = sorted(ROLES)
 templates.env.globals["today"] = lambda: date.today().isoformat()
+templates.env.filters["zh"] = lambda value, group: zh(group, value)
 
 
 def _guard(request: Request, db: Session) -> RedirectResponse | None:

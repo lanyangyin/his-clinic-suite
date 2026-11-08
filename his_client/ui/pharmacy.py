@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.labels import zh
 
 ORDER_TYPES = [
     ("drug", "药品"),
@@ -415,7 +416,7 @@ class PharmacyWidget(QWidget):
             self.in_msg.setText(f"提交失败（{e.status_code}）：{e.detail}")
             return
         self.in_msg.setText(
-            f"入库单已创建：{order['order_no']}（{order['status']}），等待验收"
+            f"入库单已创建：{order['order_no']}（{zh('inbound_status', order['status'])}），等待验收"
         )
         self._clear_items()
         self._load_orders()
@@ -433,7 +434,7 @@ class PharmacyWidget(QWidget):
             values = [
                 order["order_no"],
                 dict(ORDER_TYPES).get(order["order_type"], order["order_type"]),
-                order["status"],
+                zh("inbound_status", order["status"]),
                 str(order.get("supplier_id") or "—"),
                 str(len(order.get("items") or [])),
             ]
@@ -467,7 +468,7 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.order_items_table.setItem(index, col, QTableWidgetItem(value))
         self.order_msg.setText(
-            f"当前入库单 {order['order_no']}（{order['status']}），明细 {len(items)} 行"
+            f"当前入库单 {order['order_no']}（{zh('inbound_status', order['status'])}），明细 {len(items)} 行"
         )
 
     def _check_all(self) -> None:
@@ -576,7 +577,7 @@ class PharmacyWidget(QWidget):
             self.disp_msg.setText(f"发药失败（{e.status_code}）：{e.detail}")
             return
         self.disp_msg.setText(
-            f"发药成功：记录 {record['id']}，就诊 {record['encounter_id']}（{record['status']}）"
+            f"发药成功：记录 {record['id']}，就诊 {record['encounter_id']}（{zh('dispense_status', record['status'])}）"
         )
         self.return_dispense_id.setValue(record["id"])
 
@@ -587,7 +588,7 @@ class PharmacyWidget(QWidget):
             self.return_msg.setText(f"退药失败（{e.status_code}）：{e.detail}")
             return
         self.return_msg.setText(
-            f"退药成功：记录 {record['id']}（{record['status']}），库存已回补"
+            f"退药成功：记录 {record['id']}（{zh('dispense_status', record['status'])}），库存已回补"
         )
 
     # ---------- 领用出库（向库房申请） ----------
@@ -772,7 +773,7 @@ class PharmacyWidget(QWidget):
             self.out_msg.setText(f"提交失败（{e.status_code}）：{e.detail}")
             return
         self.out_msg.setText(
-            f"领用申请已提交：{order['outbound_no']}（{order['status']}），等待库房审核"
+            f"领用申请已提交：{order['outbound_no']}（{zh('outbound_status', order['status'])}），等待库房审核"
         )
         self._clear_outbound_items()
         self._load_outbounds()
@@ -790,7 +791,7 @@ class PharmacyWidget(QWidget):
             values = [
                 order["outbound_no"],
                 order["target_name"],
-                order["status"],
+                zh("outbound_status", order["status"]),
                 str(len(order.get("items") or [])),
             ]
             for col, value in enumerate(values):
@@ -819,7 +820,7 @@ class PharmacyWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.outbound_items_table.setItem(index, col, QTableWidgetItem(value))
-        self.out_list_msg.setText(f"出库单 {order['outbound_no']}（{order['status']}）")
+        self.out_list_msg.setText(f"出库单 {order['outbound_no']}（{zh('outbound_status', order['status'])}）")
 
     # ---------- 出库处理（库房审核/出库） ----------
     def _build_outbound_handle_tab(self) -> QWidget:
@@ -884,7 +885,7 @@ class PharmacyWidget(QWidget):
             values = [
                 order["outbound_no"],
                 order["target_name"],
-                order["status"],
+                zh("outbound_status", order["status"]),
                 str(len(order.get("items") or [])),
             ]
             for col, value in enumerate(values):
@@ -913,7 +914,7 @@ class PharmacyWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.handle_items_table.setItem(index, col, QTableWidgetItem(value))
-        self.handle_msg.setText(f"出库单 {order['outbound_no']}（{order['status']}）")
+        self.handle_msg.setText(f"出库单 {order['outbound_no']}（{zh('outbound_status', order['status'])}）")
 
     def _approve_handle(self) -> None:
         if not self.handle_order:
@@ -936,7 +937,7 @@ class PharmacyWidget(QWidget):
         except ApiError as e:
             self.handle_msg.setText(f"出库失败（{e.status_code}）：{e.detail}")
             return
-        self.handle_msg.setText(f"出库完成：{order['outbound_no']}（{order['status']}）")
+        self.handle_msg.setText(f"出库完成：{order['outbound_no']}（{zh('outbound_status', order['status'])}）")
         self._load_handle_orders()
 
     def _issue_partial(self) -> None:
@@ -964,7 +965,7 @@ class PharmacyWidget(QWidget):
             self.handle_msg.setText(f"部分出库失败（{e.status_code}）：{e.detail}")
             return
         self.handle_msg.setText(
-            f"部分出库完成：{order['outbound_no']}（{order['status']}）"
+            f"部分出库完成：{order['outbound_no']}（{zh('outbound_status', order['status'])}）"
         )
         self._load_handle_orders()
 
@@ -1260,7 +1261,7 @@ class PharmacyWidget(QWidget):
                 str(item["drug_id"]),
                 item["batch_no"],
                 item["warehouse"],
-                item["status"],
+                zh('trace_status', item["status"]),
                 str(item.get("patient_id") or "—"),
             ]
             for col, value in enumerate(values):
@@ -1362,3 +1363,4 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.catalog_table.setItem(row, col, QTableWidgetItem(value))
         self.catalog_msg.setText(f"共 {len(rows)} 条目录记录")
+
