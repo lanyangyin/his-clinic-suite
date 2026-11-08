@@ -29,19 +29,27 @@ CATALOG_CATEGORIES = [("", "全部"), ("甲", "甲类"), ("乙", "乙类"), ("�
 
 
 class PharmacyWidget(QWidget):
-    def __init__(self, api: ApiClient, parent=None):
+    def __init__(self, api: ApiClient, role: str = "pharmacist", parent=None):
         super().__init__(parent)
         self.api = api
+        self.role = role
         self.pending_items: list[dict] = []
         self.outbound_items: list[dict] = []
         self.current_order: dict | None = None
+        self.handle_order: dict | None = None
 
         tabs = QTabWidget()
-        tabs.addTab(self._build_inbound_tab(), "入库单")
-        tabs.addTab(self._build_outbound_tab(), "领用出库")
-        tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
-        tabs.addTab(self._build_stock_tab(), "库存查询")
-        tabs.addTab(self._build_catalog_tab(), "医保目录")
+        # 库房：入库 / 出库审核 / 总库库存
+        if role in ("warehouse", "admin"):
+            tabs.addTab(self._build_inbound_tab(), "入库单")
+            tabs.addTab(self._build_outbound_handle_tab(), "出库处理")
+            tabs.addTab(self._build_warehouse_stock_tab(), "总库库存")
+        # 药房：领用申请 / 发药退药 / 药房库存 / 医保目录
+        if role in ("pharmacist", "admin"):
+            tabs.addTab(self._build_outbound_tab(), "领用出库")
+            tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
+            tabs.addTab(self._build_stock_tab(), "库存查询")
+            tabs.addTab(self._build_catalog_tab(), "医保目录")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
 
@@ -704,6 +712,186 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.outbound_items_table.setItem(index, col, QTableWidgetItem(value))
         self.out_list_msg.setText(f"出库单 {order['outbound_no']}（{order['status']}）")
+
+    # ---------- 出库处理（库房审核/出库） ----------
+    def _build_outbound_handle_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        row = QHBoxLayout()
+        self.handle_status_filter = QComboBox()
+        for value, label in [("", "全部"), ("submitted", "已申请"), ("approved", "已审核"), ("issued", "已出库"), ("cancelled", "已取消")]:
+            self.handle_status_filter.addItem(label, value)
+        refresh = QPushButton("刷新出库单")
+        refresh.clicked.connect(self._load_handle_orders)
+        row.addWidget(QLabel("状态"))
+        row.addWidget(self.handle_status_filter)
+        row.addWidget(refresh)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self.handle_table = QTableWidget(0, 4)
+        self.handle_table.setHorizontalHeaderLabels(["单号", "目标", "状态", "明细数"])
+        layout.addWidget(self.handle_table)
+
+        self.handle_items_table = QTableWidget(0, 4)
+        self.handle_items_table.setHorizontalHeaderLabels(["名称", "批号", "数量", "金额"])
+        layout.addWidget(self.handle_items_table)
+
+        buttons = QHBoxLayout()
+        approve = QPushButton("审核通过")
+        approve.clicked.connect(self._approve_handle)
+        issue = QPushButton("确认出库")
+        issue.clicked.connect(self._issue_handle)
+        cancel = QPushButton("取消出库单")
+        cancel.clicked.connect(self._cancel_handle)
+        buttons.addWidget(approve)
+        buttons.addWidget(issue)
+        buttons.addWidget(cancel)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
+
+        self.handle_msg = QLabel("")
+        self.handle_msg.setWordWrap(True)
+        layout.addWidget(self.handle_msg)
+        layout.addStretch(1)
+        return page
+
+    def _load_handle_orders(self) -> None:
+        try:
+            orders = self.api.list_outbound_orders(
+                status=self.handle_status_filter.currentData() or None
+            )
+        except ApiError as e:
+            self.handle_msg.setText(f"加载出库单失败：{e.detail}")
+            return
+        self.handle_table.setRowCount(len(orders))
+        for row, order in enumerate(orders):
+            values = [
+                order["outbound_no"],
+                order["target_name"],
+                order["status"],
+                str(len(order.get("items") or [])),
+            ]
+            for col, value in enumerate(values):
+                self.handle_table.setItem(row, col, QTableWidgetItem(value))
+        self.handle_table.cellClicked.connect(self._select_handle_order)
+        self.handle_msg.setText(f"共 {len(orders)} 张出库单")
+
+    def _select_handle_order(self, row: int, _col: int) -> None:
+        order_no = self.handle_table.item(row, 0).text()
+        try:
+            orders = self.api.list_outbound_orders()
+        except ApiError:
+            return
+        order = next((o for o in orders if o["outbound_no"] == order_no), None)
+        if not order:
+            return
+        self.handle_order = order
+        items = order.get("items") or []
+        self.handle_items_table.setRowCount(len(items))
+        for index, item in enumerate(items):
+            values = [
+                item["name"],
+                item.get("batch_no", ""),
+                str(item["quantity"]),
+                f"{item['amount']:.2f}",
+            ]
+            for col, value in enumerate(values):
+                self.handle_items_table.setItem(index, col, QTableWidgetItem(value))
+        self.handle_msg.setText(f"出库单 {order['outbound_no']}（{order['status']}）")
+
+    def _approve_handle(self) -> None:
+        if not self.handle_order:
+            self.handle_msg.setText("请先选择出库单")
+            return
+        try:
+            order = self.api.approve_outbound_order(self.handle_order["id"])
+        except ApiError as e:
+            self.handle_msg.setText(f"审核失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(f"已审核：{order['outbound_no']}")
+        self._load_handle_orders()
+
+    def _issue_handle(self) -> None:
+        if not self.handle_order:
+            self.handle_msg.setText("请先选择出库单")
+            return
+        try:
+            order = self.api.issue_outbound_order(self.handle_order["id"])
+        except ApiError as e:
+            self.handle_msg.setText(f"出库失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(f"已出库：{order['outbound_no']}")
+        self._load_handle_orders()
+
+    def _cancel_handle(self) -> None:
+        if not self.handle_order:
+            self.handle_msg.setText("请先选择出库单")
+            return
+        try:
+            order = self.api.cancel_outbound_order(self.handle_order["id"])
+        except ApiError as e:
+            self.handle_msg.setText(f"取消失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(f"已取消：{order['outbound_no']}")
+        self._load_handle_orders()
+
+    # ---------- 总库库存 ----------
+    def _build_warehouse_stock_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        row = QHBoxLayout()
+        refresh = QPushButton("刷新总库库存")
+        refresh.clicked.connect(self._load_warehouse_stocks)
+        row.addWidget(refresh)
+        row.addStretch(1)
+        layout.addLayout(row)
+
+        self.wh_drug_table = QTableWidget(0, 5)
+        self.wh_drug_table.setHorizontalHeaderLabels(["药品ID", "批次", "效期", "数量", "药品"])
+        layout.addWidget(self.wh_drug_table)
+        self.wh_material_table = QTableWidget(0, 4)
+        self.wh_material_table.setHorizontalHeaderLabels(["物资ID", "名称", "库房", "数量"])
+        layout.addWidget(self.wh_material_table)
+
+        self.wh_msg = QLabel("")
+        self.wh_msg.setWordWrap(True)
+        layout.addWidget(self.wh_msg)
+        return page
+
+    def _load_warehouse_stocks(self) -> None:
+        try:
+            drugs = self.api.list_warehouse_stocks()
+            materials = [
+                row for row in self.api.list_material_stocks() if row["warehouse"] == "总库"
+            ]
+        except ApiError as e:
+            self.wh_msg.setText(f"加载总库库存失败：{e.detail}")
+            return
+        self.wh_drug_table.setRowCount(len(drugs))
+        for row, stock in enumerate(drugs):
+            values = [
+                str(stock["drug_id"]),
+                stock["batch_no"],
+                stock["expiry"],
+                str(stock["quantity"]),
+                stock.get("drug_name") or "",
+            ]
+            for col, value in enumerate(values):
+                self.wh_drug_table.setItem(row, col, QTableWidgetItem(value))
+        self.wh_material_table.setRowCount(len(materials))
+        for row, stock in enumerate(materials):
+            values = [
+                str(stock["item_id"]),
+                stock.get("item_name") or "",
+                stock["warehouse"],
+                str(stock["quantity"]),
+            ]
+            for col, value in enumerate(values):
+                self.wh_material_table.setItem(row, col, QTableWidgetItem(value))
+        self.wh_msg.setText(f"药品批次 {len(drugs)}，物资 {len(materials)}")
 
     # ---------- 库存查询 ----------
     def _build_stock_tab(self) -> QWidget:

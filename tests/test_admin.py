@@ -197,7 +197,7 @@ def _make_inbound_order(client, auth):
                 }
             ],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     ).json()
     return order
 
@@ -253,10 +253,10 @@ def test_warehouse_admin_pages(client, auth):
                 }
             ],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     ).json()
-    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["pharmacist"])
-    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["pharmacist"])
+    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["warehouse"])
+    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["warehouse"])
 
     order = client.post(
         "/warehouse/outbound-orders",
@@ -324,3 +324,4 @@ def test_insurance_catalog_admin_page(client, auth):
     page = client.get("/admin/insurance-catalog")
     assert "管理台测试药" in page.text
     assert "V0001" in page.text
+

@@ -63,7 +63,7 @@ def get_stocks(drug_id: int | None = None, db: Session = Depends(get_db)):
 def transfer_stock(
     data: TransferCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    _: None = Depends(require_role("warehouse")),
 ):
     try:
         return transfer(db, data)
@@ -75,7 +75,7 @@ def transfer_stock(
 def check_stock(
     data: CheckCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("warehouse")),
 ):
     try:
         return check(db, data, user.username)
@@ -123,7 +123,7 @@ def get_outbound_one(order_id: int, db: Session = Depends(get_db)):
 def approve(
     order_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("warehouse")),
 ):
     """库房审核出库申请。"""
     try:
@@ -136,7 +136,7 @@ def approve(
 def issue(
     order_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("warehouse")),
 ):
     """库房出库：扣总库、增药房/科室库存。"""
     try:
@@ -149,7 +149,7 @@ def issue(
 def cancel(
     order_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    _: None = Depends(require_role("warehouse")),
 ):
     try:
         return cancel_outbound(db, order_id)

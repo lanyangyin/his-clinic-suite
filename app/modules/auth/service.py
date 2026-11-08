@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from .models import AuditLog, User
 from .schemas import UserCreate
 
-ROLES = {"admin", "doctor", "nurse", "cashier", "pharmacist", "lab", "radiology"}
+ROLES = {"admin", "doctor", "nurse", "cashier", "pharmacist", "warehouse", "lab", "radiology"}
 _ITERATIONS = 100_000
 
 

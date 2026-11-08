@@ -189,6 +189,10 @@ def test_outbound_methods():
             FakeResponse(201, {"id": 5, "outbound_no": "OUT20261108", "status": "submitted"}),
             FakeResponse(200, [{"id": 5, "status": "submitted"}]),
             FakeResponse(200, {"id": 5, "items": []}),
+            FakeResponse(200, [{"id": 9, "item_id": 1, "warehouse": "总库", "quantity": 3}]),
+            FakeResponse(200, {"id": 5, "status": "approved"}),
+            FakeResponse(200, {"id": 5, "status": "issued"}),
+            FakeResponse(200, {"id": 5, "status": "cancelled"}),
         ]
     )
     client = ApiClient("http://x", "pharmacist", "pw", session=session)
@@ -196,11 +200,19 @@ def test_outbound_methods():
     client.create_outbound_order({"items": []})
     client.list_outbound_orders("submitted")
     client.get_outbound_order(5)
+    client.list_material_stocks()
+    client.approve_outbound_order(5)
+    client.issue_outbound_order(5)
+    client.cancel_outbound_order(5)
 
     assert session.calls[0][1] == "http://x/warehouse/stocks"
     assert session.calls[1][1] == "http://x/warehouse/outbound-orders"
     assert session.calls[2][2]["params"] == {"status": "submitted"}
     assert session.calls[3][1] == "http://x/warehouse/outbound-orders/5"
+    assert session.calls[4][1] == "http://x/materials/stocks"
+    assert session.calls[5][1].endswith("/outbound-orders/5/approve")
+    assert session.calls[6][1].endswith("/outbound-orders/5/issue")
+    assert session.calls[7][1].endswith("/outbound-orders/5/cancel")
 
 
 def test_local_override(monkeypatch):

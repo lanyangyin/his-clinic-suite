@@ -21,7 +21,7 @@ router = APIRouter(prefix="/inbound", tags=["receiving"])
 def new_order(
     data: InboundOrderCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("warehouse")),
 ):
     """创建入库单（收货）：药品需批号/效期，器械需注册证。"""
     try:
@@ -52,7 +52,7 @@ def check(
     order_id: int,
     data: InboundCheckRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_role("pharmacist")),
+    user=Depends(require_role("warehouse")),
 ):
     """验收：登记不合格数量/原因。"""
     try:
@@ -65,7 +65,7 @@ def check(
 def stock(
     order_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    _: None = Depends(require_role("warehouse")),
 ):
     """入库：合格数量写入库存。"""
     try:
@@ -78,9 +78,10 @@ def stock(
 def cancel(
     order_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("pharmacist")),
+    _: None = Depends(require_role("warehouse")),
 ):
     try:
         return cancel_order(db, order_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+

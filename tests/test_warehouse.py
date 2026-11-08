@@ -43,7 +43,7 @@ def test_transfer_to_pharmacy(client, auth):
     r = client.post(
         "/warehouse/transfer",
         json={"drug_id": drug["id"], "batch_no": "W001", "quantity": 40},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 200
     body = r.json()
@@ -68,7 +68,7 @@ def test_transfer_merges_into_existing_pharmacy_batch(client, auth):
     r = client.post(
         "/warehouse/transfer",
         json={"drug_id": drug["id"], "batch_no": "W001", "quantity": 40},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     ).json()
     assert r["pharmacy_quantity"] == 50  # 10 + 40
 
@@ -79,7 +79,7 @@ def test_transfer_insufficient_warehouse_stock(client, auth):
     r = client.post(
         "/warehouse/transfer",
         json={"drug_id": drug["id"], "batch_no": "W001", "quantity": 100},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "药库库存不足"
@@ -93,7 +93,7 @@ def test_transfer_missing_batch(client, auth):
     r = client.post(
         "/warehouse/transfer",
         json={"drug_id": drug["id"], "batch_no": "NOPE", "quantity": 1},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "药库无该批次库存"
@@ -105,14 +105,14 @@ def test_check_adjusts_stock_with_diff(client, auth):
     r = client.post(
         "/warehouse/check",
         json={"drug_id": drug["id"], "batch_no": "W001", "actual_quantity": 97},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 200
     body = r.json()
     assert body["expected_quantity"] == 100
     assert body["actual_quantity"] == 97
     assert body["diff"] == -3
-    assert body["checked_by"] == "pharmacist"
+    assert body["checked_by"] == "warehouse"
     # 库存已按实际调整
     stocks = client.get("/warehouse/stocks").json()
     assert stocks[0]["quantity"] == 97
@@ -123,7 +123,7 @@ def test_check_missing_batch(client, auth):
     r = client.post(
         "/warehouse/check",
         json={"drug_id": drug["id"], "batch_no": "NOPE", "actual_quantity": 1},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "药库无该批次库存"
@@ -136,7 +136,7 @@ def test_check_history(client, auth):
         client.post(
             "/warehouse/check",
             json={"drug_id": drug["id"], "batch_no": "W001", "actual_quantity": actual},
-            headers=auth["pharmacist"],
+            headers=auth["warehouse"],
         )
     r = client.get(f"/warehouse/checks?drug_id={drug['id']}")
     assert r.status_code == 200
@@ -181,3 +181,4 @@ def test_role_protection(client, auth):
         json={"drug_id": drug["id"], "batch_no": "W001", "actual_quantity": 1},
     )
     assert r.status_code == 401
+

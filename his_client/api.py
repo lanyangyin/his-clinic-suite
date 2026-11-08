@@ -257,6 +257,19 @@ class ApiClient:
     def get_outbound_order(self, order_id: int) -> dict:
         return self._request("GET", f"/warehouse/outbound-orders/{order_id}")
 
+    def approve_outbound_order(self, order_id: int) -> dict:
+        return self._request("POST", f"/warehouse/outbound-orders/{order_id}/approve")
+
+    def issue_outbound_order(self, order_id: int) -> dict:
+        return self._request("POST", f"/warehouse/outbound-orders/{order_id}/issue")
+
+    def cancel_outbound_order(self, order_id: int) -> dict:
+        return self._request("POST", f"/warehouse/outbound-orders/{order_id}/cancel")
+
+    def list_material_stocks(self, item_id: int | None = None) -> list:
+        params = {"item_id": item_id} if item_id else {}
+        return self._request("GET", "/materials/stocks", params=params)
+
     # ---- 医保目录 ----
     def search_insurance_catalog(
         self, q: str | None = None, category: str | None = None, limit: int = 50

@@ -74,7 +74,8 @@ def _self_test() -> int:
     widgets = [
         CashierWidget(client),
         DoctorWidget(client),
-        PharmacyWidget(client),
+        PharmacyWidget(client, role="pharmacist"),
+        PharmacyWidget(client, role="warehouse"),
         NurseWidget(client),
     ]
     window = MainWindow(

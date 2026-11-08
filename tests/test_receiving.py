@@ -60,7 +60,7 @@ def make_order(client, auth, supplier, drug, device, rejected_note="包装破损
                 },
             ],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
 
 
@@ -80,13 +80,13 @@ def test_inbound_flow_stock_posted(client, auth):
     checked = client.post(
         f"/inbound/orders/{order['id']}/check",
         json={"items": [{"item_id": drug_item["id"], "rejected_qty": 2, "reject_reason": "包装破损"}]},
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert checked.status_code == 200
     assert checked.json()["status"] == "checked"
-    assert checked.json()["checked_by"] == "pharmacist"
+    assert checked.json()["checked_by"] == "warehouse"
 
-    stocked = client.post(f"/inbound/orders/{order['id']}/stock", headers=auth["pharmacist"])
+    stocked = client.post(f"/inbound/orders/{order['id']}/stock", headers=auth["warehouse"])
     assert stocked.status_code == 200
     assert stocked.json()["status"] == "stocked"
 
@@ -106,7 +106,7 @@ def test_inbound_drug_requires_batch_and_expiry(client, auth):
             "order_type": "drug",
             "items": [{"kind": "drug", "drug_id": drug["id"], "quantity": 1, "unit_price": 10}],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert bad.status_code == 400
     assert "批号" in bad.json()["detail"]
@@ -117,7 +117,7 @@ def test_inbound_drug_requires_batch_and_expiry(client, auth):
             "order_type": "drug",
             "items": [{"kind": "drug", "drug_id": drug["id"], "batch_no": "B1", "quantity": 1}],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert bad_expiry.status_code == 400
     assert "有效期" in bad_expiry.json()["detail"]
@@ -136,7 +136,7 @@ def test_inbound_device_requires_registration_no(client, auth):
             "order_type": "device",
             "items": [{"kind": "material", "material_id": device_without_license["id"], "quantity": 1}],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     )
     assert r.status_code == 400
     assert "注册证" in r.json()["detail"]
@@ -147,7 +147,7 @@ def test_inbound_state_machine_and_permissions(client, auth):
     order = make_order(client, auth, supplier, drug, device).json()
 
     # 未验收不能入库
-    early = client.post(f"/inbound/orders/{order['id']}/stock", headers=auth["pharmacist"])
+    early = client.post(f"/inbound/orders/{order['id']}/stock", headers=auth["warehouse"])
     assert early.status_code == 400
     assert "验收" in early.json()["detail"]
 
@@ -160,11 +160,11 @@ def test_inbound_state_machine_and_permissions(client, auth):
     assert denied.status_code == 403
 
     # 取消（未入库）
-    cancelled = client.post(f"/inbound/orders/{order['id']}/cancel", headers=auth["pharmacist"])
+    cancelled = client.post(f"/inbound/orders/{order['id']}/cancel", headers=auth["warehouse"])
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
 
-    again = client.post(f"/inbound/orders/{order['id']}/cancel", headers=auth["pharmacist"])
+    again = client.post(f"/inbound/orders/{order['id']}/cancel", headers=auth["warehouse"])
     assert again.status_code == 400
 
 
@@ -176,3 +176,46 @@ def test_inbound_list_and_details(client, auth):
     assert rows[0]["id"] == order["id"]
     assert client.get(f"/inbound/orders/{order['id']}").json()["delivery_no"] == "随货同行-001"
     assert client.get("/inbound/orders/999").status_code == 404
+
+
+def test_inbound_roles_split(client, auth):
+    """药房只能领用，入库/验收归库房。"""
+    supplier, drug, device, office = setup_master(client, auth)
+    denied = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "ROLE-B1",
+                    "expiry": "2027-12-31",
+                    "quantity": 1,
+                }
+            ],
+        },
+        headers=auth["pharmacist"],
+    )
+    assert denied.status_code == 403
+
+    # 库房可创建
+    allowed = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "ROLE-B1",
+                    "expiry": "2027-12-31",
+                    "quantity": 1,
+                }
+            ],
+        },
+        headers=auth["warehouse"],
+    )
+    assert allowed.status_code == 201
+
+

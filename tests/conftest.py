@@ -89,6 +89,7 @@ def auth(client):
         UserCreate(username="nurse", password="nurse123", role="nurse", display_name="李护士"),
         UserCreate(username="cashier", password="cashier123", role="cashier", display_name="收费员"),
         UserCreate(username="pharmacist", password="pharm123", role="pharmacist", display_name="药师"),
+        UserCreate(username="warehouse", password="warehouse123", role="warehouse", display_name="库房管理员"),
         UserCreate(username="lab", password="lab123", role="lab", display_name="检验技师"),
         UserCreate(username="radiology", password="rad123", role="radiology", display_name="影像技师"),
     ]
@@ -101,6 +102,7 @@ def auth(client):
         "nurse": basic_auth("nurse", "nurse123"),
         "cashier": basic_auth("cashier", "cashier123"),
         "pharmacist": basic_auth("pharmacist", "pharm123"),
+        "warehouse": basic_auth("warehouse", "warehouse123"),
         "lab": basic_auth("lab", "lab123"),
         "radiology": basic_auth("radiology", "rad123"),
     }

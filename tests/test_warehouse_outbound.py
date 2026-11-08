@@ -28,10 +28,10 @@ def setup_stock(client, auth, drug_qty=10, material_qty=5):
                 {"kind": "material", "material_id": material["id"], "quantity": material_qty},
             ],
         },
-        headers=auth["pharmacist"],
+        headers=auth["warehouse"],
     ).json()
-    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["pharmacist"])
-    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["pharmacist"])
+    client.post(f"/inbound/orders/{inbound['id']}/check", json={"items": []}, headers=auth["warehouse"])
+    client.post(f"/inbound/orders/{inbound['id']}/stock", headers=auth["warehouse"])
     return drug, material
 
 
@@ -70,14 +70,14 @@ def test_outbound_drug_flow(client, auth):
     assert order["applicant"] == "pharmacist"
 
     approved = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"]
     )
     assert approved.status_code == 200
     assert approved.json()["status"] == "approved"
-    assert approved.json()["approver"] == "pharmacist"
+    assert approved.json()["approver"] == "warehouse"
 
     issued = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"]
     )
     assert issued.status_code == 200
     assert issued.json()["status"] == "issued"
@@ -88,11 +88,11 @@ def test_outbound_drug_flow(client, auth):
     assert pharmacy[0]["quantity"] == 6
 
     again = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"]
     )
     assert again.status_code == 400
     cancel = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/cancel", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/cancel", headers=auth["warehouse"]
     )
     assert cancel.status_code == 400
 
@@ -109,8 +109,8 @@ def test_outbound_material_to_pharmacy(client, auth):
         },
         headers=auth["pharmacist"],
     ).json()
-    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["pharmacist"])
-    client.post(f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["pharmacist"])
+    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"])
+    client.post(f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"])
 
     total = client.get(f"/materials/stocks?item_id={material['id']}").json()
     by_warehouse = {row["warehouse"]: row["quantity"] for row in total}
@@ -121,8 +121,8 @@ def test_outbound_material_to_pharmacy(client, auth):
 def test_outbound_insufficient_stock(client, auth):
     drug, material = setup_stock(client, auth, drug_qty=3)
     order = make_outbound(client, auth, drug, quantity=10).json()
-    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["pharmacist"])
-    r = client.post(f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["pharmacist"])
+    client.post(f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"])
+    r = client.post(f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["warehouse"])
     assert r.status_code == 400
     assert "库存不足" in r.json()["detail"]
     # 抽查总库数量未变
@@ -140,12 +140,12 @@ def test_outbound_cancel_and_permissions(client, auth):
 
     order = make_outbound(client, auth, drug, 2).json()
     cancelled = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/cancel", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/cancel", headers=auth["warehouse"]
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
     approve = client.post(
-        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["pharmacist"]
+        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"]
     )
     assert approve.status_code == 400
 
@@ -159,3 +159,35 @@ def test_outbound_requires_batch(client, auth):
     )
     assert r.status_code == 400
     assert "批号" in r.json()["detail"]
+
+
+def test_outbound_roles_split(client, auth):
+    """药房申请、库房审核/出库：角色不能越权。"""
+    drug, material = setup_stock(client, auth)
+
+    # 药房不能审核/出库
+    order = make_outbound(client, auth, drug, 2).json()
+    denied_approve = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["pharmacist"]
+    )
+    assert denied_approve.status_code == 403
+    denied_issue = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/issue", headers=auth["pharmacist"]
+    )
+    assert denied_issue.status_code == 403
+
+    # 库房不能自己发起领用
+    denied_create = client.post(
+        "/warehouse/outbound-orders",
+        json={"items": [{"kind": "drug", "drug_id": drug["id"], "batch_no": "OUT-B1", "quantity": 1}]},
+        headers=auth["warehouse"],
+    )
+    assert denied_create.status_code == 403
+
+    # 库房可审核
+    approved = client.post(
+        f"/warehouse/outbound-orders/{order['id']}/approve", headers=auth["warehouse"]
+    )
+    assert approved.status_code == 200
+
+
