@@ -1,7 +1,5 @@
-"""医保进销存：从库存流水生成明细并上传（Mock 接收）。"""
+"""医保进销存：从库存流水生成明细并上传（Mock/真实接口）。"""
 import json
-import time
-import uuid
 from datetime import date, datetime, time as dt_time
 
 from sqlalchemy.orm import Session
@@ -9,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.modules.drug.models import Drug
 from app.modules.stock_ledger.models import StockMovement
 
+from .adapter import submit_inventory
 from .models import InsuranceInventoryUpload
 
 # 流水单据类型 → 医保进销存业务类型
@@ -92,14 +91,13 @@ def preview(db: Session, start_date: date, end_date: date) -> dict:
 
 
 def _submit_mock(payload: dict) -> dict:
-    """模拟医保进销存接口：真实环境替换为医保平台 HTTP/XML 调用。"""
-    time.sleep(0.01)
+    """兼容旧调用：Mock 接收（实际由 adapter 根据配置决定 Mock/HTTP）。"""
     if not payload.get("records"):
         return {"code": "1", "message": "无进销存明细", "receipt_no": ""}
     return {
         "code": "0",
-        "message": "医保进销存接收成功",
-        "receipt_no": f"MOCK{uuid.uuid4().hex[:12].upper()}",
+        "message": "医保进销存接收成功（Mock）",
+        "receipt_no": "MOCK-LOCAL",
         "received_count": len(payload["records"]),
     }
 
@@ -136,8 +134,9 @@ def create_upload(
     db.add(upload)
     db.flush()
 
-    response = _submit_mock(payload)
+    response = submit_inventory(db, payload)
     upload.response = json.dumps(response, ensure_ascii=False)
+    upload.channel = response.get("channel", "mock")
     upload.status = "success" if response.get("code") == "0" else "failed"
     db.commit()
     db.refresh(upload)

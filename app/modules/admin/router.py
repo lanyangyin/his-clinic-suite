@@ -57,6 +57,12 @@ from app.modules.insurance_inventory.service import (
     list_uploads as list_insurance_inventory_uploads,
     preview as insurance_inventory_preview,
 )
+from app.modules.insurance_inventory.interface_service import (
+    get_config as get_insurance_interface,
+    is_configured as insurance_interface_configured,
+    masked as mask_secret,
+    save_config as save_insurance_interface,
+)
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
 from app.modules.staff.service import (
     create_department,
@@ -729,6 +735,73 @@ def insurance_inventory_detail(
         request,
         "insurance_inventory_detail.html",
         _ctx(request, upload=upload),
+    )
+
+
+# ---------- 医保接口配置 ----------
+@router.get("/insurance-interface", response_class=HTMLResponse)
+def insurance_interface_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    config = get_insurance_interface(db)
+    return templates.TemplateResponse(
+        request,
+        "insurance_interface.html",
+        _ctx(
+            request,
+            config=config,
+            configured=insurance_interface_configured(config),
+            secret_mask=mask_secret(config.app_secret) if config else "",
+            private_mask=mask_secret(config.private_key) if config else "",
+            public_mask=mask_secret(config.public_key) if config else "",
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/insurance-interface")
+def insurance_interface_save(
+    request: Request,
+    enabled: str | None = Form(None),
+    base_url: str = Form(""),
+    upload_path: str = Form("/api/inventory/upload"),
+    org_code: str = Form(""),
+    org_name: str = Form(""),
+    app_id: str = Form(""),
+    app_secret: str = Form(""),
+    sign_type: str = Form("NONE"),
+    private_key: str = Form(""),
+    public_key: str = Form(""),
+    timeout: int = Form(30),
+    remark: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        save_insurance_interface(
+            db,
+            enabled=bool(enabled),
+            base_url=base_url,
+            upload_path=upload_path,
+            org_code=org_code,
+            org_name=org_name,
+            app_id=app_id,
+            app_secret=app_secret,
+            sign_type=sign_type,
+            private_key=private_key,
+            public_key=public_key,
+            timeout=timeout,
+            remark=remark,
+            updated_by=request.session.get("admin_user", "admin"),
+        )
+        msg = "医保接口配置已保存（字段留空=保持原值；未配置完整时上传走 Mock）"
+    except Exception as e:  # 配置保存失败不阻断页面
+        msg = f"保存失败：{e}"
+    return RedirectResponse(
+        f"/admin/insurance-interface?msg={quote(msg)}", status_code=302
     )
 
 

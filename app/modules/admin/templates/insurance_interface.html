@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}医保接口 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医保接口配置</h2>
+<div class="panel">
+  {% if message %}<div class="ok">{{ message }}</div>{% endif %}
+  <p>
+    当前状态：
+    {% if configured %}<strong>已配置（进销存上传走真实 HTTPS 接口）</strong>
+    {% else %}<strong>未配置（进销存上传走 Mock，可直接体验）</strong>{% endif %}
+    <br>
+    需要填写的内容可先留空，实际部署时再填；密钥/私钥留空表示保持原值。
+  </p>
+
+  <form method="post" action="/admin/insurance-interface">
+    <table>
+      <tr><th>启用真实接口</th><td><input type="checkbox" name="enabled" value="on" {% if config and config.enabled %}checked{% endif %}> 关闭时强制走 Mock</td></tr>
+      <tr><th>平台地址</th><td><input type="text" name="base_url" value="{{ config.base_url if config else '' }}" placeholder="https://mi.example.com（留空=Mock）" style="min-width:360px"></td></tr>
+      <tr><th>上传路径</th><td><input type="text" name="upload_path" value="{{ config.upload_path if config else '/api/inventory/upload' }}" style="min-width:260px"></td></tr>
+      <tr><th>机构编码</th><td><input type="text" name="org_code" value="{{ config.org_code if config else '' }}" placeholder="定点医疗机构/药店编码"></td></tr>
+      <tr><th>机构名称</th><td><input type="text" name="org_name" value="{{ config.org_name if config else '' }}"></td></tr>
+      <tr><th>AppID</th><td><input type="text" name="app_id" value="{{ config.app_id if config else '' }}"></td></tr>
+      <tr><th>AppSecret</th><td><input type="password" name="app_secret" value="" placeholder="{{ ('已配置：' ~ secret_mask ~ '（留空保持）') if secret_mask else '未配置（留空保持）' }}"></td></tr>
+      <tr><th>签名方式</th><td>
+        <select name="sign_type">
+          {% for value in ['NONE', 'HMAC-SHA256', 'SM2'] %}
+          <option value="{{ value }}" {% if config and config.sign_type == value %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </td></tr>
+      <tr><th>SM2 私钥</th><td><textarea name="private_key" rows="2" placeholder="{{ ('已配置：' ~ private_mask ~ '（留空保持）') if private_mask else '未配置（留空保持）' }}" style="width:100%"></textarea></td></tr>
+      <tr><th>SM2 公钥</th><td><textarea name="public_key" rows="2" placeholder="{{ ('已配置：' ~ public_mask ~ '（留空保持）') if public_mask else '未配置（留空保持）' }}" style="width:100%"></textarea></td></tr>
+      <tr><th>超时（秒）</th><td><input type="number" name="timeout" value="{{ config.timeout if config else 30 }}" min="1" max="120" style="width:100px"></td></tr>
+      <tr><th>备注</th><td><input type="text" name="remark" value="{{ config.remark if config else '' }}" style="min-width:360px"></td></tr>
+      <tr><th></th><td><button type="submit">保存配置</button></td></tr>
+    </table>
+  </form>
+
+  <p><a href="/admin/insurance-inventory">← 返回医保进销存</a></p>
+</div>
+{% endblock %}

@@ -83,6 +83,7 @@ def test_inventory_preview_and_upload(client, auth):
     assert upload.status_code == 200, upload.text
     record = upload.json()
     assert record["status"] == "success"
+    assert record["channel"] == "mock"
     assert record["record_count"] >= 3
     assert record["upload_no"].startswith("INV")
 

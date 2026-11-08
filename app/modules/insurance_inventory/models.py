@@ -24,6 +24,10 @@ class InsuranceInventoryUpload(Base):
     status: Mapped[str] = mapped_column(
         String(20), default="submitted", server_default="submitted", nullable=False
     )
+    # mock 模拟 / http 真实接口
+    channel: Mapped[str] = mapped_column(
+        String(20), default="mock", server_default="mock", nullable=False
+    )
     payload: Mapped[str] = mapped_column(
         Text, default="", server_default="", nullable=False
     )
