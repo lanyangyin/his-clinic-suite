@@ -60,6 +60,7 @@ import app.modules.traceability.models  # noqa: F401
 import app.modules.insurance_inventory.models  # noqa: F401
 import app.modules.insurance_inventory.interface_models  # noqa: F401
 import app.modules.insurance_materials.models  # noqa: F401
+import app.modules.payment_gateway.models  # noqa: F401
 
 target_metadata = app.database.Base.metadata
 

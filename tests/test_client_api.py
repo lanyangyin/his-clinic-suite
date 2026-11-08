@@ -58,7 +58,7 @@ def test_error_detail_propagated():
     method, url, kwargs = session.calls[0]
     assert method == "POST"
     assert url == "http://x/payments/"
-    assert kwargs["json"] == {"encounter_id": 3}
+    assert kwargs["json"] == {"encounter_id": 3, "channel": "cash"}
 
 
 def test_non_json_error_uses_reason():

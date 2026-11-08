@@ -63,6 +63,23 @@ LABELS: dict[str, dict[str, str]] = {
         "executed": "已执行",
         "cancelled": "已取消",
     },
+    "charge_type": {
+        "registration": "挂号费",
+        "consultation": "诊查费",
+        "drug": "药品费",
+        "lab": "检验费",
+        "imaging": "检查费",
+        "treatment": "治疗费",
+        "material": "材料费",
+        "other": "其他",
+    },
+    "payment_channel": {
+        "cash": "现金",
+        "wechat": "微信支付",
+        "alipay": "支付宝",
+        "pos": "POS 刷卡",
+        "insurance_card": "医保卡",
+    },
 }
 
 

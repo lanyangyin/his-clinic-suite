@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -196,6 +197,28 @@ class CashierWidget(QWidget):
         row.addWidget(pay_btn)
         box_layout.addLayout(row)
 
+        method_row = QHBoxLayout()
+        self.c_channel = QComboBox()
+        for label, value in [
+            ("现金", "cash"),
+            ("微信支付", "wechat"),
+            ("支付宝", "alipay"),
+            ("POS 刷卡", "pos"),
+            ("医保卡", "insurance_card"),
+        ]:
+            self.c_channel.addItem(label, value)
+        self.c_auth_code = QLineEdit()
+        self.c_auth_code.setPlaceholderText("付款码（微信/支付宝）")
+        self.c_card_no = QLineEdit()
+        self.c_card_no.setPlaceholderText("卡号/读卡返回值（POS/医保卡）")
+        method_row.addWidget(QLabel("支付方式"))
+        method_row.addWidget(self.c_channel)
+        method_row.addWidget(self.c_auth_code)
+        method_row.addWidget(self.c_card_no)
+        box_layout.addLayout(method_row)
+        self.c_channel.currentIndexChanged.connect(self._update_payment_inputs)
+        self._update_payment_inputs()
+
         self.charge_table = QTableWidget(0, 5)
         self.charge_table.setHorizontalHeaderLabels(["类型", "项目", "数量", "金额", "状态"])
         box_layout.addWidget(self.charge_table)
@@ -220,6 +243,11 @@ class CashierWidget(QWidget):
         layout.addStretch(1)
         return page
 
+    def _update_payment_inputs(self) -> None:
+        channel = self.c_channel.currentData() if hasattr(self, "c_channel") else "cash"
+        self.c_auth_code.setEnabled(channel in ("wechat", "alipay"))
+        self.c_card_no.setEnabled(channel in ("pos", "insurance_card"))
+
     def _load_charges(self) -> None:
         encounter_id = self.c_encounter_id.value()
         try:
@@ -230,7 +258,7 @@ class CashierWidget(QWidget):
             return
         self.charge_table.setRowCount(len(charges))
         for row, charge in enumerate(charges):
-            self.charge_table.setItem(row, 0, QTableWidgetItem(charge["charge_type"]))
+            self.charge_table.setItem(row, 0, QTableWidgetItem(zh('charge_type', charge["charge_type"])))
             self.charge_table.setItem(row, 1, QTableWidgetItem(charge["item_name"]))
             self.charge_table.setItem(row, 2, QTableWidgetItem(str(charge["quantity"])))
             self.charge_table.setItem(row, 3, QTableWidgetItem(f"{charge['amount']:.2f}"))
@@ -240,14 +268,22 @@ class CashierWidget(QWidget):
         )
 
     def _pay(self) -> None:
+        channel = self.c_channel.currentData()
         try:
-            payment = self.api.create_payment(self.c_encounter_id.value())
+            payment = self.api.create_payment(
+                self.c_encounter_id.value(),
+                channel=channel,
+                auth_code=self.c_auth_code.text().strip(),
+                card_no=self.c_card_no.text().strip(),
+            )
         except ApiError as e:
             self.charge_msg.setText(f"收费失败（{e.status_code}）：{e.detail}")
             return
         self.charge_msg.setText(
             f"收费成功：单号 {payment['id']}，金额 {payment['amount']:.2f} 元，"
-            f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}"
+            f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}，"
+            f"方式 {zh('payment_channel', payment.get('channel'))}"
+            + (f"，交易号 {payment['channel_trade_no']}" if payment.get("channel_trade_no") else "")
         )
         self.refund_payment_id.setValue(payment["id"])
         self._load_charges()

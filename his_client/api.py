@@ -371,8 +371,19 @@ class ApiClient:
     def get_charge_summary(self, encounter_id: int) -> dict:
         return self._request("GET", f"/charges/encounters/{encounter_id}/summary")
 
-    def create_payment(self, encounter_id: int) -> dict:
-        return self._request("POST", "/payments/", json={"encounter_id": encounter_id})
+    def create_payment(
+        self,
+        encounter_id: int,
+        channel: str = "cash",
+        auth_code: str = "",
+        card_no: str = "",
+    ) -> dict:
+        payload = {"encounter_id": encounter_id, "channel": channel}
+        if auth_code:
+            payload["auth_code"] = auth_code
+        if card_no:
+            payload["card_no"] = card_no
+        return self._request("POST", "/payments/", json=payload)
 
     def refund_payment(self, payment_id: int) -> dict:
         return self._request("POST", f"/payments/{payment_id}/refund")

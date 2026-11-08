@@ -12,6 +12,7 @@ from app.modules.encounter.service import (
     list_prescription_items,
 )
 from app.modules.insurance.adapter import InsuranceUnavailable, settle_payment
+from app.modules.payment_gateway.service import CHANNELS, charge as charge_payment, refund
 
 from .models import Payment
 from .schemas import PaymentCreate
@@ -50,10 +51,28 @@ def create_payment(db: Session, data: PaymentCreate) -> Payment:
     except InsuranceUnavailable:
         insurance_amount = 0.0
 
+    channel = data.channel or "cash"
+    if channel not in CHANNELS:
+        raise ValueError("未知支付通道")
+    self_pay = round(amount - insurance_amount, 2)
+    result = charge_payment(
+        db,
+        channel,
+        self_pay,
+        auth_code=data.auth_code,
+        card_no=data.card_no,
+        subject=f"门诊收费 就诊{data.encounter_id}",
+    )
+    if result["status"] != "success":
+        raise ValueError(f"支付失败：{result['message']}")
+
     payment = Payment(
         encounter_id=data.encounter_id,
         amount=amount,
         insurance_amount=insurance_amount,
+        channel=channel,
+        channel_trade_no=result.get("trade_no", ""),
+        channel_status=result.get("channel_status", "success"),
     )
     db.add(payment)
     for charge in charges:
@@ -108,6 +127,15 @@ def refund_payment(db: Session, payment_id: int) -> Payment:
 
     if get_active_dispense_by_encounter(db, payment.encounter_id):
         raise ValueError("该就诊已发药，不能退费")
+
+    refund_result = refund(
+        db,
+        payment.channel or "cash",
+        payment.channel_trade_no or "",
+        payment.self_pay_amount,
+    )
+    if refund_result["status"] != "success":
+        raise ValueError(f"退款失败：{refund_result['message']}")
 
     payment.status = "refunded"
     # 费用明细同步置为已退

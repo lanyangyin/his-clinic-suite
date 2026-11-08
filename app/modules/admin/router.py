@@ -68,6 +68,10 @@ from app.modules.insurance_materials.service import (
     import_bytes as material_catalog_import,
     search as material_catalog_search,
 )
+from app.modules.payment_gateway.service import (
+    channel_rows as payment_channel_rows,
+    save_config as save_payment_channel,
+)
 from app.modules.staff.schemas import DepartmentCreate, DoctorCreate
 from app.modules.staff.service import (
     create_department,
@@ -858,6 +862,62 @@ def insurance_interface_save(
         msg = f"保存失败：{e}"
     return RedirectResponse(
         f"/admin/insurance-interface?msg={quote(msg)}", status_code=302
+    )
+
+
+# ---------- 支付通道配置 ----------
+@router.get("/payment-channels", response_class=HTMLResponse)
+def payment_channels_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "payment_channels.html",
+        _ctx(
+            request,
+            rows=payment_channel_rows(db),
+            message=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/payment-channels")
+def payment_channels_save(
+    request: Request,
+    channel: str = Form(...),
+    enabled: str | None = Form(None),
+    gateway_url: str = Form(""),
+    merchant_id: str = Form(""),
+    app_id: str = Form(""),
+    api_secret: str = Form(""),
+    terminal_id: str = Form(""),
+    cert_path: str = Form(""),
+    remark: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        save_payment_channel(
+            db,
+            channel,
+            enabled=bool(enabled),
+            gateway_url=gateway_url,
+            merchant_id=merchant_id,
+            app_id=app_id,
+            api_secret=api_secret,
+            terminal_id=terminal_id,
+            cert_path=cert_path,
+            remark=remark,
+            updated_by=request.session.get("admin_user", "admin"),
+        )
+        msg = "支付通道配置已保存（密钥留空=保持原值；未配置完整时收费走模拟）"
+    except ValueError as e:
+        msg = f"保存失败：{e}"
+    return RedirectResponse(
+        f"/admin/payment-channels?msg={quote(msg)}", status_code=302
     )
 
 

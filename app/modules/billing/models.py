@@ -21,6 +21,17 @@ class Payment(Base):
     )
     # 发票票据号（收费时生成）
     invoice_no: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # cash / wechat / alipay / pos / insurance_card
+    channel: Mapped[str] = mapped_column(
+        String(20), default="cash", server_default="cash", nullable=False
+    )
+    channel_trade_no: Mapped[str] = mapped_column(
+        String(64), default="", server_default="", nullable=False
+    )
+    # success / mock
+    channel_status: Mapped[str] = mapped_column(
+        String(20), default="success", server_default="success", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )
