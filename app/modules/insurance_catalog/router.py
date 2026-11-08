@@ -13,10 +13,14 @@ from .schemas import (
 from .service import (
     get_by_code,
     import_bytes,
+    list_matches,
     list_versions,
+    match_all,
+    resolve_prescription_insurance,
     search,
     sync_from_url,
 )
+from app.modules.drug.service import get_drug
 
 router = APIRouter(prefix="/insurance/catalog", tags=["insurance-catalog"])
 
@@ -70,6 +74,47 @@ def sync_catalog(
         return sync_from_url(db, data.url, imported_by=user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/matches")
+def get_matches(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    """药品对码状态列表（matched/ambiguous/unmatched）。"""
+    return list_matches(db, status)
+
+
+@router.post("/match")
+def run_match(
+    only_unmatched: bool = True,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    """批量对码：按贯标码优先，其次名称+剂型+规格。"""
+    return match_all(db, only_unmatched=only_unmatched)
+
+
+@router.get("/resolve/{drug_id}")
+def resolve_drug_insurance(
+    drug_id: int,
+    db: Session = Depends(get_db),
+):
+    """查询单个药品的目录校验结果（类别/报销比例/提示）。"""
+    drug = get_drug(db, drug_id)
+    if not drug:
+        raise HTTPException(status_code=404, detail="药品不存在")
+    category, ratio, warning = resolve_prescription_insurance(db, drug)
+    return {
+        "drug_id": drug.id,
+        "name": drug.name,
+        "insurance_code": drug.insurance_code,
+        "insurance_match_status": drug.insurance_match_status,
+        "category": category,
+        "ratio": ratio,
+        "warning": warning,
+    }
 
 
 @router.get("/{national_code}", response_model=InsuranceDrugResponse)

@@ -18,4 +18,6 @@ class DrugCreate(BaseModel):
 
 class DrugResponse(DrugCreate):
     id: int
+    insurance_category: str = ""
+    insurance_match_status: str = "unmatched"
     model_config = ConfigDict(from_attributes=True)

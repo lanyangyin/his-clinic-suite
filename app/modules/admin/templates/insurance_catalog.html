@@ -28,6 +28,32 @@
     <button type="submit">从 URL 同步</button>
   </form>
 
+  <h2>药品对码（{{ matches|length }} 个药品）</h2>
+  <form class="inline" method="post" action="/admin/insurance-catalog/match">
+    <button type="submit">自动对码（按贯标码/名称+剂型+规格）</button>
+  </form>
+  <table>
+    <tr><th>药品</th><th>规格</th><th>剂型</th><th>医保代码</th><th>目录类别</th><th>状态</th><th>命中目录名称</th><th>报销比例</th></tr>
+    {% for m in matches %}
+    <tr>
+      <td>{{ m.name }}</td>
+      <td>{{ m.spec }}</td>
+      <td>{{ m.dosage_form }}</td>
+      <td>{{ m.insurance_code or '—' }}</td>
+      <td>{{ m.insurance_category or '—' }}</td>
+      <td>
+        {% if m.insurance_match_status == 'matched' %}已匹配
+        {% elif m.insurance_match_status == 'ambiguous' %}歧义
+        {% else %}未匹配{% endif %}
+      </td>
+      <td>{{ m.catalog_name or '—' }}</td>
+      <td>{{ '%.0f%%'|format(m.insurance_ratio * 100) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无药品</td></tr>
+    {% endfor %}
+  </table>
+
   <h2>目录（{{ rows|length }} 条）</h2>
   <table>
     <tr><th>医保代码</th><th>名称</th><th>剂型</th><th>规格</th><th>厂家</th><th>类别</th><th>限定支付</th></tr>

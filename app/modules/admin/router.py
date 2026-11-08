@@ -30,7 +30,9 @@ from app.modules.drug.service import create_drug, list_drugs
 from app.modules.insurance_catalog.schemas import CatalogSyncRequest
 from app.modules.insurance_catalog.service import (
     import_bytes as catalog_import_bytes,
+    list_matches as catalog_matches,
     list_versions as catalog_versions,
+    match_all as catalog_match_all,
     search as catalog_search,
     sync_from_url as catalog_sync,
 )
@@ -493,10 +495,26 @@ def insurance_catalog_page(
             request,
             rows=catalog_search(db, q, category, 100, 0),
             versions=catalog_versions(db, 10),
+            matches=catalog_matches(db),
             q=q or "",
             category=category or "",
             message=request.query_params.get("msg", ""),
         ),
+    )
+
+
+@router.post("/insurance-catalog/match")
+def insurance_catalog_match(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    stats = catalog_match_all(db, only_unmatched=True)
+    msg = (
+        f"对码完成：共 {stats['total']}，匹配 {stats['matched']}，"
+        f"歧义 {stats['ambiguous']}，未匹配 {stats['unmatched']}"
+    )
+    return RedirectResponse(
+        f"/admin/insurance-catalog?msg={quote(msg)}", status_code=302
     )
 
 

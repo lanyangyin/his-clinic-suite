@@ -23,6 +23,13 @@ class Drug(Base):
     insurance_code: Mapped[str] = mapped_column(
         String(40), default="", server_default="", nullable=False
     )
+    # 医保目录匹配：甲/乙/丙；matched/ambiguous/unmatched
+    insurance_category: Mapped[str] = mapped_column(
+        String(10), default="", server_default="", nullable=False
+    )
+    insurance_match_status: Mapped[str] = mapped_column(
+        String(20), default="unmatched", server_default="unmatched", nullable=False
+    )
     approval_no: Mapped[str] = mapped_column(
         String(60), default="", server_default="", nullable=False
     )

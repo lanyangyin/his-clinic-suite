@@ -15,6 +15,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from .models import InsuranceCatalogVersion, InsuranceDrug
+from app.modules.drug.models import Drug
 
 # 表头映射：兼容常见中英文列名
 _HEADER_MAP = {
@@ -293,3 +294,143 @@ def sync_from_url(
         source="auto",
         imported_by=imported_by,
     )
+
+# ---------- 药品与医保目录对码 ----------
+def _norm(text) -> str:
+    return "".join(str(text or "").split()).replace("（", "(").replace("）", ")").lower()
+
+
+def _candidates(db: Session, drug) -> list[InsuranceDrug]:
+    """按贯标码优先，其次名称+剂型+规格匹配候选。"""
+    if drug.insurance_code:
+        entry = (
+            db.query(InsuranceDrug)
+            .filter(InsuranceDrug.national_code == drug.insurance_code)
+            .first()
+        )
+        if entry:
+            return [entry]
+
+    if not drug.name:
+        return []
+    rows = db.query(InsuranceDrug).filter(InsuranceDrug.name == drug.name).all()
+    if not rows:
+        # 容错：忽略空格/全角字符差异
+        rows = [
+            row
+            for row in db.query(InsuranceDrug).all()
+            if _norm(row.name) == _norm(drug.name)
+        ]
+    candidates = []
+    for row in rows:
+        if drug.dosage_form and _norm(row.dosage_form) != _norm(drug.dosage_form):
+            continue
+        if drug.spec and _norm(row.spec) != _norm(drug.spec):
+            continue
+        candidates.append(row)
+    return candidates
+
+
+def analyze_drug(db: Session, drug) -> tuple[str, InsuranceDrug | None, list]:
+    """对单个药品做对码，返回 (matched/ambiguous/unmatched, 命中目录, 候选)。"""
+    candidates = _candidates(db, drug)
+    if len(candidates) == 1:
+        entry = candidates[0]
+        drug.insurance_match_status = "matched"
+        drug.insurance_category = (entry.category or "").rstrip("类")
+        if not drug.insurance_code:
+            drug.insurance_code = entry.national_code
+        return "matched", entry, candidates
+    if len(candidates) > 1:
+        drug.insurance_match_status = "ambiguous"
+        drug.insurance_category = ""
+        return "ambiguous", None, candidates
+    drug.insurance_match_status = "unmatched"
+    drug.insurance_category = ""
+    return "unmatched", None, []
+
+
+def match_all(db: Session, only_unmatched: bool = False) -> dict:
+    """批量对码：按贯标码/名称+剂型+规格匹配全部药品。"""
+    query = db.query(Drug)
+    if only_unmatched:
+        query = query.filter(Drug.insurance_match_status != "matched")
+    stats = {"total": 0, "matched": 0, "ambiguous": 0, "unmatched": 0}
+    for drug in query.order_by(Drug.id).all():
+        status, _entry, _candidates = analyze_drug(db, drug)
+        stats["total"] += 1
+        stats[status] += 1
+    db.commit()
+    return stats
+
+
+def list_matches(db: Session, status: str | None = None) -> list[dict]:
+    """药品对码状态列表（含命中目录名称）。"""
+    query = db.query(Drug)
+    if status:
+        query = query.filter(Drug.insurance_match_status == status)
+    cache: dict[str, InsuranceDrug] = {}
+    result = []
+    for drug in query.order_by(Drug.id).all():
+        entry = None
+        if drug.insurance_code:
+            if drug.insurance_code not in cache:
+                cache[drug.insurance_code] = (
+                    db.query(InsuranceDrug)
+                    .filter(InsuranceDrug.national_code == drug.insurance_code)
+                    .first()
+                )
+            entry = cache[drug.insurance_code]
+        result.append(
+            {
+                "drug_id": drug.id,
+                "name": drug.name,
+                "spec": drug.spec,
+                "dosage_form": drug.dosage_form,
+                "insurance_code": drug.insurance_code,
+                "insurance_category": drug.insurance_category,
+                "insurance_match_status": drug.insurance_match_status,
+                "insurance_ratio": drug.insurance_ratio,
+                "catalog_name": entry.name if entry else "",
+                "catalog_category": entry.category if entry else "",
+            }
+        )
+    return result
+
+
+def resolve_prescription_insurance(db: Session, drug) -> tuple[str, float, str | None]:
+    """处方/收费目录校验：返回 (类别, 报销比例快照, 提示)。
+
+    - 命中目录：甲类 100%，乙类按药品维护比例，丙类自费。
+    - 有医保代码但未匹配：按自费。
+    - 未对码药品：保留原有手工比例（兼容历史），不强制自费。
+    """
+    entry = None
+    if drug.insurance_code:
+        entry = (
+            db.query(InsuranceDrug)
+            .filter(InsuranceDrug.national_code == drug.insurance_code)
+            .first()
+        )
+    if entry is None:
+        candidates = _candidates(db, drug)
+        if len(candidates) == 1:
+            entry = candidates[0]
+
+    if entry is not None:
+        category = (entry.category or "").rstrip("类")
+        if category == "甲":
+            ratio = 1.0
+        elif category == "丙":
+            ratio = 0.0
+        else:
+            ratio = drug.insurance_ratio
+        if category == "丙":
+            warning = "医保目录：丙类（自费）"
+        else:
+            warning = f"医保目录：{category or '未标注'}类"
+        return category, ratio, warning
+
+    if drug.insurance_code:
+        return "", 0.0, "医保代码未匹配目录，按自费结算"
+    return "", drug.insurance_ratio, None

@@ -44,6 +44,10 @@ class PrescriptionItem(Base):
     )
     # 医保事前提醒结果（warn 时记录提醒内容，pass 为 NULL）
     insurance_warning: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 医保目录类别快照：甲/乙/丙（空=未对码）
+    insurance_category: Mapped[str] = mapped_column(
+        String(10), default="", server_default="", nullable=False
+    )
 
     # 字符串关系：由同一 registry 解析，不跨模块 import models
     drug = relationship("Drug")

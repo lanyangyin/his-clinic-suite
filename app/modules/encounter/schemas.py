@@ -36,6 +36,7 @@ class PrescriptionItemResponse(BaseModel):
     route: str
     days: int
     insurance_warning: str | None = None
+    insurance_category: str = ""
     model_config = ConfigDict(from_attributes=True)
 
 

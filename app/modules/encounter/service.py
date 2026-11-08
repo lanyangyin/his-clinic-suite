@@ -10,6 +10,7 @@ from app.modules.charges.service import (
     add_dict_fee,
 )
 from app.modules.drug.service import get_drug
+from app.modules.insurance_catalog.service import resolve_prescription_insurance
 from app.modules.insurance.adapter import (
     InsuranceForbiddenError,
     InsuranceUnavailable,
@@ -120,21 +121,30 @@ def add_prescription_item(
     if drug.antibiotic_level == 3:
         raise PrescriptionRuleError("特殊使用级抗菌药物需会诊审批，暂不允许开立")
 
+    # 医保目录校验：按贯标码/名称+剂型+规格确定甲乙丙类与报销比例
+    category, insurance_ratio, catalog_warning = resolve_prescription_insurance(db, drug)
+
     # 医保事前提醒：同步阻塞调用（禁止→拒开，提醒→记录，不可用→降级放行）
     try:
         review = check_prescription(
             diagnosis=encounter.diagnosis,
             drug_name=drug.name,
             quantity=data.quantity,
-            ratio=drug.insurance_ratio,
+            ratio=insurance_ratio,
         )
     except InsuranceUnavailable:
         warning = "医保服务不可用，已按自费放行"
     else:
         if review["result"] == "forbid":
-            raise InsuranceForbiddenError(review["message"])
-        warning = review["message"] if review["result"] == "warn" else None
+            if insurance_ratio <= 0 and catalog_warning:
+                # 目录内丙类/目录外（已对码）：允许自费开方，不拦截
+                warning = catalog_warning
+            else:
+                raise InsuranceForbiddenError(review["message"])
+        else:
+            warning = review["message"] if review["result"] == "warn" else None
 
+    warnings = [text for text in (catalog_warning, warning) if text]
     item = PrescriptionItem(
         encounter_id=encounter_id,
         drug_id=data.drug_id,
@@ -144,7 +154,8 @@ def add_prescription_item(
         frequency=data.frequency,
         route=data.route,
         days=data.days,
-        insurance_warning=warning,
+        insurance_warning="；".join(warnings) or None,
+        insurance_category=category,
     )
     db.add(item)
     db.flush()
@@ -159,7 +170,7 @@ def add_prescription_item(
         item_name=drug.name,
         quantity=data.quantity,
         unit_price=drug.base_price,
-        insurance_ratio=drug.insurance_ratio,
+        insurance_ratio=insurance_ratio,
         drug_id=drug.id,
     )
 

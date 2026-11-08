@@ -218,8 +218,8 @@ class DoctorWidget(QWidget):
         top.addWidget(load)
         layout.addLayout(top)
 
-        self.drug_table = QTableWidget(0, 5)
-        self.drug_table.setHorizontalHeaderLabels(["ID", "药品", "规格", "单价", "医保比例"])
+        self.drug_table = QTableWidget(0, 6)
+        self.drug_table.setHorizontalHeaderLabels(["ID", "药品", "规格", "单价", "医保比例", "医保类别"])
         layout.addWidget(self.drug_table)
 
         box = QGroupBox("开立处方")
@@ -270,6 +270,10 @@ class DoctorWidget(QWidget):
             self.drug_table.setItem(row, 2, QTableWidgetItem(drug.get("spec") or ""))
             self.drug_table.setItem(row, 3, QTableWidgetItem(f"{drug['base_price']:.2f}"))
             self.drug_table.setItem(row, 4, QTableWidgetItem(str(drug["insurance_ratio"])))
+            category = drug.get("insurance_category") or ""
+            status = drug.get("insurance_match_status") or "unmatched"
+            tag = f"{category}类" if category else ("歧义" if status == "ambiguous" else "未对码")
+            self.drug_table.setItem(row, 5, QTableWidgetItem(tag))
         self.drug_table.cellClicked.connect(
             lambda row, _col: self.rx_drug_id.setText(self.drug_table.item(row, 0).text())
         )
