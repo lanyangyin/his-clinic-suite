@@ -54,6 +54,8 @@ class PharmacyWidget(QWidget):
         tabs.addTab(self._build_trace_tab(), "追溯码")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
+        if role in ("warehouse", "admin"):
+            self._load_drugs()  # 入库药品下拉默认加载医保目录
 
     # ---------- 入库单 ----------
     def _build_inbound_tab(self) -> QWidget:
@@ -86,6 +88,10 @@ class PharmacyWidget(QWidget):
         items_layout = QVBoxLayout(items_box)
 
         drug_row = QHBoxLayout()
+        self.in_drug_source = QComboBox()
+        self.in_drug_source.addItem("医保目录（默认）", "catalog")
+        self.in_drug_source.addItem("本店药品", "local")
+        self.in_drug_source.currentIndexChanged.connect(self._load_drugs)
         self.in_drug = QComboBox()
         load_drugs = QPushButton("刷新药品")
         load_drugs.clicked.connect(self._load_drugs)
@@ -104,9 +110,9 @@ class PharmacyWidget(QWidget):
         self.in_location.setPlaceholderText("货位")
         add_drug = QPushButton("添加药品行")
         add_drug.clicked.connect(self._add_drug_item)
-        for w in (self.in_drug, load_drugs, self.in_batch, self.in_expiry, self.in_qty, self.in_price, self.in_storage, self.in_location, add_drug):
+        for w in (self.in_drug_source, self.in_drug, load_drugs, self.in_batch, self.in_expiry, self.in_qty, self.in_price, self.in_storage, self.in_location, add_drug):
             drug_row.addWidget(w)
-        items_layout.addWidget(QLabel("药品行：药品 / 批号 / 效期 / 数量 / 单价 / 储存 / 货位"))
+        items_layout.addWidget(QLabel("药品行：来源 / 药品 / 批号 / 效期 / 数量 / 单价 / 储存 / 货位"))
         items_layout.addLayout(drug_row)
 
         material_row = QHBoxLayout()
@@ -209,6 +215,36 @@ class PharmacyWidget(QWidget):
             self.in_supplier.addItem(supplier["name"], supplier["id"])
 
     def _load_drugs(self) -> None:
+        source = (
+            self.in_drug_source.currentData()
+            if hasattr(self, "in_drug_source")
+            else "local"
+        )
+        self.in_drug.clear()
+        if source == "catalog":
+            try:
+                rows = self.api.search_insurance_catalog(limit=500)
+            except ApiError as e:
+                self.in_msg.setText(f"加载医保目录失败：{e.detail}")
+                return
+            if rows:
+                for row in rows:
+                    category = row.get("category") or "—"
+                    spec = row.get("spec") or ""
+                    self.in_drug.addItem(
+                        f"{row['name']} {spec}【{category}类】",
+                        row["national_code"],
+                    )
+                self.in_msg.setText(
+                    f"医保目录 {len(rows)} 条（默认来源，选中后自动落地为本店药品）"
+                )
+                return
+            self.in_msg.setText(
+                "医保目录为空：请先在管理台上传/同步目录；已切换为本店药品"
+            )
+            self.in_drug_source.setCurrentIndex(1)
+            return
+
         try:
             drugs = self.api.list_drugs()
         except ApiError as e:
@@ -217,6 +253,7 @@ class PharmacyWidget(QWidget):
         self.in_drug.clear()
         for drug in drugs:
             self.in_drug.addItem(f"{drug['name']}（{drug['base_price']:.2f}）", drug["id"])
+        self.in_msg.setText(f"本店药品 {len(drugs)} 条")
 
     def _load_materials(self) -> None:
         try:
@@ -231,10 +268,25 @@ class PharmacyWidget(QWidget):
             )
 
     def _add_drug_item(self) -> None:
-        drug_id = self.in_drug.currentData()
-        if not drug_id:
+        source = (
+            self.in_drug_source.currentData()
+            if hasattr(self, "in_drug_source")
+            else "local"
+        )
+        selected = self.in_drug.currentData()
+        if not selected:
             self.in_msg.setText("请先刷新并选择药品")
             return
+        drug_id = selected
+        if source == "catalog":
+            try:
+                drug = self.api.ensure_drug_from_catalog(str(selected))
+            except ApiError as e:
+                self.in_msg.setText(f"医保目录药品落地失败（{e.status_code}）：{e.detail}")
+                return
+            drug_id = drug["id"]
+            if not self.in_price.text().strip() and drug.get("base_price"):
+                self.in_price.setText(f"{drug['base_price']:.2f}")
         price = self.in_price.text().strip()
         expiry = self.in_expiry.text().strip()
         if not expiry:

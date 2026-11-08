@@ -11,6 +11,7 @@ from .schemas import (
     InsuranceDrugResponse,
 )
 from .service import (
+    ensure_drug_from_catalog,
     get_by_code,
     import_bytes,
     list_matches,
@@ -21,6 +22,7 @@ from .service import (
     sync_from_url,
 )
 from app.modules.drug.service import get_drug
+from app.modules.drug.schemas import DrugResponse
 
 router = APIRouter(prefix="/insurance/catalog", tags=["insurance-catalog"])
 
@@ -115,6 +117,19 @@ def resolve_drug_insurance(
         "ratio": ratio,
         "warning": warning,
     }
+
+
+@router.post("/{national_code}/ensure-drug", response_model=DrugResponse)
+def ensure_drug(
+    national_code: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "warehouse")),
+):
+    """入库下拉用：把医保目录药品落地为本地药品（已存在则复用）。"""
+    try:
+        return ensure_drug_from_catalog(db, national_code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{national_code}", response_model=InsuranceDrugResponse)

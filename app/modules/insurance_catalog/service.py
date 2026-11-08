@@ -434,3 +434,38 @@ def resolve_prescription_insurance(db: Session, drug) -> tuple[str, float, str |
     if drug.insurance_code:
         return "", 0.0, "医保代码未匹配目录，按自费结算"
     return "", drug.insurance_ratio, None
+
+def ensure_drug_from_catalog(db: Session, national_code: str):
+    """从医保目录落地/复用本地药品（入库下拉默认目录用）。
+
+    - 已存在同医保代码的药品：直接返回；
+    - 不存在：用目录的名称/规格/剂型/厂家/单位/类别创建本地药品（价格 0，入库时填）。
+    """
+    entry = get_by_code(db, national_code)
+    if not entry:
+        raise ValueError("医保目录中无此药品")
+
+    drug = (
+        db.query(Drug)
+        .filter(Drug.insurance_code == entry.national_code)
+        .first()
+    )
+    if drug:
+        return drug
+
+    category = (entry.category or "").rstrip("类")
+    drug = Drug(
+        name=entry.name,
+        spec=entry.spec,
+        unit=entry.unit,
+        base_price=0.0,
+        insurance_code=entry.national_code,
+        insurance_category=category,
+        insurance_match_status="matched",
+        dosage_form=entry.dosage_form,
+        manufacturer=entry.manufacturer,
+    )
+    db.add(drug)
+    db.commit()
+    db.refresh(drug)
+    return drug

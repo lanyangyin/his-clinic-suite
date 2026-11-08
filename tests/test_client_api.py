@@ -275,3 +275,10 @@ def test_trace_methods():
     assert session.calls[1][2]["params"]["trace_code"] == "A"
     assert session.calls[2][1] == "http://x/trace/codes/summary"
     assert session.calls[2][2]["params"] == {"drug_id": 1}
+
+def test_ensure_drug_from_catalog_method():
+    session = FakeSession([FakeResponse(200, {"id": 9, "name": "目录药"})])
+    client = ApiClient("http://x", "warehouse", "pw", session=session)
+    client.ensure_drug_from_catalog("DD001")
+    assert session.calls[0][0] == "POST"
+    assert session.calls[0][1] == "http://x/insurance/catalog/DD001/ensure-drug"

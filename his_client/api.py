@@ -301,6 +301,11 @@ class ApiClient:
                 params[key] = value
         return self._request("GET", "/trace/codes", params=params)
 
+    def ensure_drug_from_catalog(self, national_code: str) -> dict:
+        return self._request(
+            "POST", f"/insurance/catalog/{national_code}/ensure-drug"
+        )
+
     def trace_summary(self, drug_id: int | None = None, batch_no: str | None = None) -> dict:
         params = {}
         if drug_id:
