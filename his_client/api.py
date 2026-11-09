@@ -137,6 +137,9 @@ class ApiClient:
     def get_patient_history(self, patient_id: int) -> dict:
         return self._request("GET", f"/patients/{patient_id}/history")
 
+    def patient_profile(self, patient_id: int) -> dict:
+        return self._request("GET", f"/patients/{patient_id}/profile")
+
     def create_medical_record(self, encounter_id: int, payload: dict) -> dict:
         return self._request(
             "POST", f"/encounters/{encounter_id}/medical-record", json=payload

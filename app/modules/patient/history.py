@@ -123,6 +123,7 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                         "amount": item.amount,
                         "insurance_amount": item.insurance_amount,
                         "self_pay_amount": item.self_pay_amount,
+                        "refunded_amount": item.refunded_amount,
                         "status": item.status,
                         "channel": item.channel,
                         "created_at": item.created_at,

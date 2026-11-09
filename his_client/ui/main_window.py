@@ -9,6 +9,7 @@ from his_client.labels import zh
 from his_client.ui.archive import ArchiveWidget
 from his_client.ui.lab import LabWidget
 from his_client.ui.nurse import NurseWidget
+from his_client.ui.patient360 import Patient360Widget
 from his_client.ui.tcm import TcmWidget
 from his_client.ui.pharmacy import PharmacyWidget
 
@@ -27,6 +28,8 @@ class MainWindow(QMainWindow):
             tabs.addTab(CashierWidget(api), "收费员工作站")
         if role in ("doctor", "admin"):
             tabs.addTab(DoctorWidget(api), "医生工作站")
+        if role in ("doctor", "admin"):
+            tabs.addTab(Patient360Widget(api), "患者 360")
         if role in ("pharmacist", "admin"):
             tabs.addTab(PharmacyWidget(api, role="pharmacist"), "药房工作站")
         if role in ("warehouse", "admin"):

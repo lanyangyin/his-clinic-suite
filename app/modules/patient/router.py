@@ -5,6 +5,7 @@ from app.modules.auth.security import require_role
 from .schemas import PatientCreate, PatientResponse
 from .service import create_patient, get_patient, list_patients
 from .history import get_patient_history
+from .profile import patient_profile
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -45,3 +46,14 @@ def get_history(
     if not history:
         raise HTTPException(status_code=404, detail="患者不存在")
     return history
+@router.get("/{patient_id}/profile")
+def get_profile(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor", "admin")),
+):
+    """患者 360：基本信息、就诊时间线、预约、病案、费用统计。"""
+    data = patient_profile(db, patient_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="患者不存在")
+    return data
