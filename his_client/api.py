@@ -495,6 +495,33 @@ class ApiClient:
             "POST", f"/surgery/cases/{case_id}/packages/{package_id}"
         )
 
+    # ---- 治疗室 ----
+    def list_treatment_rooms(self) -> list:
+        return self._request("GET", "/treatment-room/rooms")
+
+    def create_treatment_room(self, payload: dict) -> dict:
+        return self._request("POST", "/treatment-room/rooms", json=payload)
+
+    def list_treatment_room_cases(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/treatment-room/cases", params=params)
+
+    def create_treatment_room_case(self, payload: dict) -> dict:
+        return self._request("POST", "/treatment-room/cases", json=payload)
+
+    def start_treatment_room_case(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/treatment-room/cases/{case_id}/start", json=payload
+        )
+
+    def complete_treatment_room_case(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/treatment-room/cases/{case_id}/complete", json=payload
+        )
+
+    def cancel_treatment_room_case(self, case_id: int) -> dict:
+        return self._request("POST", f"/treatment-room/cases/{case_id}/cancel")
+
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)
