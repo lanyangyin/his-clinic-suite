@@ -350,6 +350,10 @@ class TreatmentRoomWidget(QWidget):
             self.template_form.addRow(field["label"], edit)
         if not self.procedure.text().strip():
             self.procedure.setText(definition["name"])
+        if definition.get("charge_item_id"):
+            self.charge_item_id.setValue(int(definition["charge_item_id"]))
+        if definition.get("price"):
+            self.price.setText(f"{float(definition['price']):.2f}")
 
 
     def _build_followup_tab(self) -> QWidget:

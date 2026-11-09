@@ -19,6 +19,7 @@ from .schemas import (
     RoomCreate,
     RoomResponse,
     StartRequest,
+    TemplateConfigUpdate,
     TreatmentTemplate,
 )
 from .service import (
@@ -36,6 +37,7 @@ from .service import (
     list_rooms,
     list_templates,
     report,
+    set_template_config,
     start_case,
 )
 
@@ -145,8 +147,25 @@ def material(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/templates", response_model=list[TreatmentTemplate])
-def templates(_: None = Depends(require_role("treatment"))):
-    return list_templates()
+def templates(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    return list_templates(db)
+
+
+@router.put("/templates/{template_code}")
+def configure_template(
+    template_code: str,
+    data: TemplateConfigUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        row = set_template_config(db, template_code, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"template_code": row.template_code, "configured": row.active}
 
 @router.get("/follow-ups", response_model=list[FollowUpResponse])
 def follow_ups(

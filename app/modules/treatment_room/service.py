@@ -8,11 +8,24 @@ from sqlalchemy.orm import Session
 from app.modules.charges.models import ChargeItem
 from app.modules.charges.service import add_charge
 from app.modules.encounter.service import get_encounter
+from app.modules.materials.models import MaterialItem, MaterialStock
 from app.modules.patient.models import Patient
 from app.modules.patient.service import get_patient
 
-from .models import TreatmentFollowUp, TreatmentRoom, TreatmentRoomCase
-from .schemas import CaseCreate, CompleteRequest, FollowUpCreate, RoomCreate, StartRequest
+from .models import (
+    TreatmentFollowUp,
+    TreatmentRoom,
+    TreatmentRoomCase,
+    TreatmentTemplateConfig,
+)
+from .schemas import (
+    CaseCreate,
+    CompleteRequest,
+    FollowUpCreate,
+    RoomCreate,
+    StartRequest,
+    TemplateConfigUpdate,
+)
 from .templates import TEMPLATES
 from app.modules.procedure_materials.models import ProcedureMaterial
 
@@ -31,8 +44,57 @@ def list_rooms(db: Session) -> list[TreatmentRoom]:
     return db.query(TreatmentRoom).order_by(TreatmentRoom.code).all()
 
 
-def list_templates() -> list[dict]:
-    return TEMPLATES
+def list_templates(db: Session) -> list[dict]:
+    configs = {
+        row.template_code: row
+        for row in db.query(TreatmentTemplateConfig).all()
+    }
+    rows = []
+    for template in TEMPLATES:
+        config = configs.get(template["code"])
+        charge_item = db.get(ChargeItem, config.charge_item_id) if config and config.charge_item_id else None
+        material = db.get(MaterialItem, config.material_id) if config and config.material_id else None
+        rows.append(
+            {
+                **template,
+                "configured": bool(config and config.active),
+                "charge_item_id": config.charge_item_id if config else None,
+                "charge_item_name": charge_item.name if charge_item else "",
+                "price": config.price if config else 0,
+                "material_id": config.material_id if config else None,
+                "material_name": material.name if material else "",
+                "material_quantity": config.material_quantity if config else 1,
+                "warehouse": config.warehouse if config else "总库",
+            }
+        )
+    return rows
+
+
+def set_template_config(db: Session, template_code: str, data: TemplateConfigUpdate) -> TreatmentTemplateConfig:
+    if template_code not in {row["code"] for row in TEMPLATES}:
+        raise ValueError("处置模板不存在")
+    if data.charge_item_id is not None and not db.get(ChargeItem, data.charge_item_id):
+        raise ValueError("收费项目不存在")
+    if data.material_id is not None and not db.get(MaterialItem, data.material_id):
+        raise ValueError("耗材不存在")
+    row = (
+        db.query(TreatmentTemplateConfig)
+        .filter(TreatmentTemplateConfig.template_code == template_code)
+        .first()
+    )
+    if not row:
+        row = TreatmentTemplateConfig(template_code=template_code)
+        db.add(row)
+    row.charge_item_id = data.charge_item_id
+    row.price = data.price
+    row.material_id = data.material_id
+    row.material_quantity = data.material_quantity
+    row.warehouse = data.warehouse
+    row.active = data.active
+    row.updated_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 def list_followups(db: Session, status: str | None = None, due_before: date | None = None) -> list[TreatmentFollowUp]:
@@ -155,10 +217,25 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
         raise ValueError("治疗室不存在")
     if data.template_code and data.template_code not in {row["code"] for row in TEMPLATES}:
         raise ValueError("处置模板不存在")
+    config = None
+    if data.template_code:
+        config = (
+            db.query(TreatmentTemplateConfig)
+            .filter(
+                TreatmentTemplateConfig.template_code == data.template_code,
+                TreatmentTemplateConfig.active.is_(True),
+            )
+            .first()
+        )
+    effective_charge_item = data.charge_item_id
+    if effective_charge_item is None and config is not None:
+        effective_charge_item = config.charge_item_id
     price = data.price
+    if price == 0 and config is not None:
+        price = config.price
     insurance_ratio = 0.0
-    if data.charge_item_id is not None:
-        item = db.get(ChargeItem, data.charge_item_id)
+    if effective_charge_item is not None:
+        item = db.get(ChargeItem, effective_charge_item)
         if not item:
             raise ValueError("收费项目不存在")
         price = price or item.price
@@ -174,7 +251,7 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
         template_data=json.dumps(data.template_data, ensure_ascii=False) if data.template_data else "",
         diagnosis=data.diagnosis,
         priority=data.priority,
-        charge_item_id=data.charge_item_id,
+        charge_item_id=effective_charge_item,
         price=price,
         requested_by=requested_by,
         note=data.note,
@@ -188,7 +265,7 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
             source_type="treatment_room",
             source_id=case.id,
             charge_type="treatment",
-            charge_item_id=data.charge_item_id,
+            charge_item_id=effective_charge_item,
             item_name=f"治疗室：{data.procedure_name}",
             quantity=1,
             unit_price=price,
@@ -243,6 +320,35 @@ def start_case(db: Session, case_id: int, data: StartRequest, operator: str = ""
         raise ValueError("该病例当前状态不可开始")
     if not data.consent:
         raise ValueError("请先完成知情同意")
+    config = None
+    if case.template_code:
+        config = (
+            db.query(TreatmentTemplateConfig)
+            .filter(
+                TreatmentTemplateConfig.template_code == case.template_code,
+                TreatmentTemplateConfig.active.is_(True),
+            )
+            .first()
+        )
+    if config and config.material_id and config.material_quantity > 0 and not case.kit_applied:
+        from app.modules.procedure_materials.service import consume_material
+
+        try:
+            consume_material(
+                db,
+                source_type="treatment_room",
+                source_id=case.id,
+                encounter_id=case.encounter_id,
+                material_id=config.material_id,
+                quantity=config.material_quantity,
+                warehouse=config.warehouse or "总库",
+                operator=operator,
+                commit=False,
+            )
+            case.kit_applied = True
+        except ValueError as e:
+            db.rollback()
+            raise ValueError(f"模板套餐耗材扣减失败：{e}")
     case.status = "in_progress"
     case.consent = True
     case.anesthesia = data.anesthesia

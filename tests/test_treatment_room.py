@@ -232,3 +232,83 @@ def test_treatment_report_admin_page(client, auth):
     assert page.status_code == 200
     assert "治疗室日报" in page.text
     assert "到期随访" in page.text
+
+
+def test_treatment_template_config_and_kit(client, auth):
+    patient, encounter, room, _, _ = _setup(client, auth)
+    material = client.post(
+        "/materials/items/",
+        json={"code": "KIT-1", "name": "包皮环切包", "unit": "个", "price": 30, "category": "consumable"},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        "/materials/stock-in",
+        json={"item_id": material["id"], "warehouse": "总库", "quantity": 5},
+        headers=auth["admin"],
+    )
+    item = client.post(
+        "/charges/items/",
+        json={"code": "CIRC", "name": "包皮环切术", "category": "treatment", "price": 200},
+        headers=auth["admin"],
+    ).json()
+    configured = client.put(
+        "/treatment-room/templates/circumcision",
+        json={
+            "charge_item_id": item["id"],
+            "price": 200,
+            "material_id": material["id"],
+            "material_quantity": 2,
+            "warehouse": "总库",
+            "active": True,
+        },
+        headers=auth["admin"],
+    )
+    assert configured.status_code == 200, configured.text
+
+    templates = client.get(
+        "/treatment-room/templates", headers=auth["treatment"]
+    ).json()
+    row = next(t for t in templates if t["code"] == "circumcision")
+    assert row["configured"] is True
+    assert row["charge_item_id"] == item["id"]
+    assert row["material_id"] == material["id"]
+
+    case = client.post(
+        "/treatment-room/cases",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "room_id": room["id"],
+            "procedure_name": "包皮环切",
+            "template_code": "circumcision",
+            "template_data": {"indication": "包皮过长"},
+        },
+        headers=auth["treatment"],
+    ).json()
+    assert case["price"] == 200.0
+    assert case["charge_item_id"] == item["id"]
+
+    started = client.post(
+        f"/treatment-room/cases/{case['id']}/start",
+        json={"consent": True, "anesthesia": "局麻"},
+        headers=auth["treatment"],
+    )
+    assert started.status_code == 200, started.text
+    assert started.json()["kit_applied"] is True
+    stock = client.get(
+        f"/materials/stocks?item_id={material['id']}", headers=auth["admin"]
+    ).json()
+    assert sum(r["quantity"] for r in stock if r["warehouse"] == "总库") == 3
+    charges = client.get(
+        f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]
+    ).json()
+    assert any("材料：" in row["item_name"] and row["amount"] == 60.0 for row in charges)
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/treatment-templates")
+    assert page.status_code == 200
+    assert "包皮环切" in page.text

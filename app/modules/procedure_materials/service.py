@@ -19,6 +19,7 @@ def consume_material(
     quantity: int,
     warehouse: str,
     operator: str = "",
+    commit: bool = True,
 ) -> ProcedureMaterial:
     material = get_material(db, material_id)
     if not material:
@@ -71,6 +72,9 @@ def consume_material(
             unit_price=material.price,
             insurance_ratio=0.0,
         )
-    db.commit()
-    db.refresh(row)
+    if commit:
+        db.commit()
+        db.refresh(row)
+    else:
+        db.flush()
     return row

@@ -60,8 +60,10 @@ class CaseResponse(BaseModel):
     diagnosis: str
     status: str
     priority: str
+    charge_item_id: int | None
     price: float
     consent: bool
+    kit_applied: bool
     anesthesia: str
     findings: str
     procedure_detail: str
@@ -81,6 +83,14 @@ class TreatmentTemplate(BaseModel):
     code: str
     name: str
     fields: list[dict]
+    configured: bool = False
+    charge_item_id: int | None = None
+    charge_item_name: str = ""
+    price: float = 0
+    material_id: int | None = None
+    material_name: str = ""
+    material_quantity: int = 1
+    warehouse: str = "总库"
 
 class FollowUpCreate(BaseModel):
     case_id: int | None = None
@@ -103,4 +113,25 @@ class FollowUpResponse(BaseModel):
     note: str
     created_at: datetime
     completed_at: datetime | None
+    model_config = ConfigDict(from_attributes=True)
+
+class TemplateConfigUpdate(BaseModel):
+    charge_item_id: int | None = None
+    price: float = Field(default=0, ge=0)
+    material_id: int | None = None
+    material_quantity: int = Field(default=1, ge=0, le=10000)
+    warehouse: str = Field(default="总库", max_length=30)
+    active: bool = True
+
+
+class TemplateConfigResponse(BaseModel):
+    template_code: str
+    charge_item_id: int | None
+    charge_item_name: str
+    price: float
+    material_id: int | None
+    material_name: str
+    material_quantity: int
+    warehouse: str
+    active: bool
     model_config = ConfigDict(from_attributes=True)

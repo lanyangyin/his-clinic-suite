@@ -145,8 +145,13 @@ from app.modules.insurance.workbench import workbench as insurance_workbench
 from app.modules.bi.executive import executive as executive_dashboard
 from app.modules.treatment_room.service import (
     list_followups as treatment_followups,
+    list_templates as treatment_templates,
     report as treatment_report,
+    set_template_config,
 )
+from app.modules.treatment_room.schemas import TemplateConfigUpdate
+from app.modules.charges.service import list_items as list_charge_items
+from app.modules.materials.service import list_items as list_materials
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2242,3 +2247,49 @@ def treatment_report_page(
             followups=treatment_followups(db, status="pending", due_before=day),
         ),
     )
+
+# ---------- 治疗室模板配置 ----------
+
+@router.get("/treatment-templates", response_class=HTMLResponse)
+def treatment_templates_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "treatment_templates.html",
+        _ctx(
+            request,
+            templates_list=treatment_templates(db),
+            charge_items=list_charge_items(db, "treatment"),
+            materials=list_materials(db),
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/treatment-templates/{template_code}")
+async def treatment_template_config(
+    request: Request, template_code: str, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        set_template_config(
+            db,
+            template_code,
+            TemplateConfigUpdate(
+                charge_item_id=int(form.get("charge_item_id")) if form.get("charge_item_id") else None,
+                price=float(form.get("price") or 0),
+                material_id=int(form.get("material_id")) if form.get("material_id") else None,
+                material_quantity=int(form.get("material_quantity") or 1),
+                warehouse=(form.get("warehouse") or "总库").strip(),
+                active=form.get("active") == "on",
+            ),
+        )
+        msg = "模板配置已保存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"保存失败：{e}"
+    return RedirectResponse(f"/admin/treatment-templates?msg={quote(msg)}", status_code=302)

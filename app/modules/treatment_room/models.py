@@ -39,6 +39,7 @@ class TreatmentRoomCase(Base):
     charge_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    kit_applied: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     anesthesia: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     findings: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     procedure_detail: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
@@ -89,3 +90,18 @@ class TreatmentFollowUp(Base):
     @property
     def patient_name(self) -> str:
         return self.patient.name if self.patient else ""
+
+class TreatmentTemplateConfig(Base):
+    """治疗室模板绑定：收费项目 + 一个套餐耗材。"""
+
+    __tablename__ = "treatment_template_configs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    template_code: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    charge_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    material_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    material_quantity: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
+    warehouse: Mapped[str] = mapped_column(String(30), default="总库", server_default="总库", nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
