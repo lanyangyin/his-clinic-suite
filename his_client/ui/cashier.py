@@ -341,11 +341,12 @@ class CashierWidget(QWidget):
                 self.refund_table.setItem(row, col, QTableWidgetItem(value))
         self.refund_charge_id = None
         insurance = payment.get("insurance_amount", 0) or 0
-        if insurance > 0:
+        insurance_only = insurance > 0 or payment.get("channel") == "insurance_card"
+        if insurance_only:
             self.refund_selected_btn.setEnabled(False)
             self.refund_rule.setText(
-                f"该收费医保支付 {insurance:.2f} 元：按医保规则只能整单全额退（点「全部退」），"
-                "不能按明细/数量部分退。"
+                f"该收费为医保支付/医保卡（医保支付 {insurance:.2f} 元）："
+                "按医保规则只能整单全额退（点「全部退」），不能按明细/数量部分退。"
             )
         else:
             self.refund_selected_btn.setEnabled(True)

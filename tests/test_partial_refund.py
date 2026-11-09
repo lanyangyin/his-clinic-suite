@@ -185,3 +185,32 @@ def test_insurance_payment_only_allows_full_refund(client, auth):
     assert body["status"] == "refunded"
     assert body["refunded_amount"] == 20.0
     assert body["refunded_insurance_amount"] == 14.0
+
+def test_insurance_card_channel_only_allows_full_refund(client, auth, monkeypatch):
+    allow_self_pay(monkeypatch)
+    drug = make_drug(client, auth, "医保卡药", 10.0)
+    encounter = make_encounter(client, auth, [(drug["id"], 2)])
+    payment = client.post(
+        "/payments/",
+        json={
+            "encounter_id": encounter["id"],
+            "channel": "insurance_card",
+            "card_no": "YB123456",
+        },
+        headers=auth["cashier"],
+    ).json()
+    assert payment["insurance_amount"] == 0.0
+    charge = client.get(
+        f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]
+    ).json()[0]
+    partial = client.post(
+        f"/payments/{payment['id']}/refund",
+        json={"items": [{"charge_id": charge["id"], "quantity": 1}]},
+        headers=auth["cashier"],
+    )
+    assert partial.status_code == 400
+    assert "医保收费只能全额退费" in partial.json()["detail"]
+
+    full = client.post(f"/payments/{payment['id']}/refund", headers=auth["cashier"])
+    assert full.status_code == 200
+    assert full.json()["status"] == "refunded"
