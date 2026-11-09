@@ -549,10 +549,20 @@ class ApiClient:
         params = {"status": status} if status else None
         return self._request("GET", "/treatment-room/follow-ups", params=params)
 
-    def complete_treatment_followup(self, followup_id: int) -> dict:
+    def complete_treatment_followup(self, followup_id: int, payload: dict | None = None) -> dict:
         return self._request(
-            "POST", f"/treatment-room/follow-ups/{followup_id}/complete"
+            "POST",
+            f"/treatment-room/follow-ups/{followup_id}/complete",
+            json=payload or {},
         )
+
+    def upload_followup_photo(self, followup_id: int, file_path: str) -> dict:
+        with open(file_path, "rb") as handle:
+            return self._request(
+                "POST",
+                f"/treatment-room/follow-ups/{followup_id}/photo",
+                files={"file": (file_path.split("\\")[-1].split("/")[-1], handle)},
+            )
 
     def cancel_treatment_followup(self, followup_id: int) -> dict:
         return self._request(

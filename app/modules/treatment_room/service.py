@@ -23,6 +23,7 @@ from .models import (
 from .schemas import (
     CaseCreate,
     CompleteRequest,
+    FollowUpComplete,
     FollowUpCreate,
     RoomCreate,
     StartRequest,
@@ -158,14 +159,34 @@ def create_followup(db: Session, data: FollowUpCreate) -> TreatmentFollowUp:
     return row
 
 
-def complete_followup(db: Session, followup_id: int) -> TreatmentFollowUp:
+def complete_followup(
+    db: Session,
+    followup_id: int,
+    data: FollowUpComplete | None = None,
+    operator: str = "",
+) -> TreatmentFollowUp:
     row = db.get(TreatmentFollowUp, followup_id)
     if not row:
         raise ValueError("随访任务不存在")
     if row.status != "pending":
         raise ValueError("该随访任务已结束")
+    data = data or FollowUpComplete()
     row.status = "completed"
     row.completed_at = datetime.now()
+    row.completed_by = operator
+    row.result_note = data.result_note
+    row.healing_score = data.healing_score
+    if data.next_due_date:
+        db.add(
+            TreatmentFollowUp(
+                case_id=row.case_id,
+                patient_id=row.patient_id,
+                encounter_id=row.encounter_id,
+                due_date=data.next_due_date,
+                purpose=data.next_purpose or "换药",
+                note=f"{row.purpose}后继续{data.next_purpose or '换药'}",
+            )
+        )
     db.commit()
     db.refresh(row)
     return row

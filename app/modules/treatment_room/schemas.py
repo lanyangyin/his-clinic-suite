@@ -112,6 +112,10 @@ class FollowUpResponse(BaseModel):
     purpose: str
     status: str
     note: str
+    result_note: str
+    healing_score: int | None
+    photo_path: str
+    completed_by: str
     created_at: datetime
     completed_at: datetime | None
     model_config = ConfigDict(from_attributes=True)
@@ -145,3 +149,10 @@ class TemplateMaterialUpdate(BaseModel):
 
 
 TemplateConfigUpdate.model_rebuild()
+
+class FollowUpComplete(BaseModel):
+    result_note: str = Field(default="", max_length=500)
+    healing_score: int | None = Field(default=None, ge=0, le=10)
+    next_due_date: date | None = None
+    next_purpose: str = Field(default="换药", max_length=50)
+

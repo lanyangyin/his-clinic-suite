@@ -1,7 +1,10 @@
 """治疗室工作站：清创/换药/小处置排队、知情同意、处置记录。"""
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDateEdit,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -374,6 +377,31 @@ class TreatmentRoomWidget(QWidget):
         self.followup_table = QTableWidget(0, 5)
         self.followup_table.setHorizontalHeaderLabels(["患者", "日期", "目的", "备注", "状态"])
         layout.addWidget(self.followup_table, 1)
+
+        result_box = QGroupBox("随访结果")
+        result_form = QFormLayout(result_box)
+        self.healing_score = QSpinBox()
+        self.healing_score.setRange(0, 10)
+        self.result_note = QLineEdit()
+        self.result_note.setPlaceholderText("创面情况、渗出、愈合")
+        self.photo_label = QLabel("未上传照片")
+        upload = QPushButton("上传创面照片")
+        upload.clicked.connect(self._upload_photo)
+        self.next_followup = QCheckBox("生成下次随访")
+        self.next_followup.setChecked(True)
+        self.next_date = QDateEdit()
+        self.next_date.setCalendarPopup(True)
+        self.next_date.setDate(QDate.currentDate().addDays(2))
+        self.next_purpose = QLineEdit("换药")
+        result_form.addRow("愈合评分", self.healing_score)
+        result_form.addRow("结果", self.result_note)
+        result_form.addRow("照片", self.photo_label)
+        result_form.addRow("", upload)
+        result_form.addRow("下次随访", self.next_followup)
+        result_form.addRow("下次日期", self.next_date)
+        result_form.addRow("下次目的", self.next_purpose)
+        layout.addWidget(result_box)
+        self.followup_photo_path = ""
         self.followup_msg = QLabel("")
         layout.addWidget(self.followup_msg)
         self._load_followups()
@@ -403,12 +431,43 @@ class TreatmentRoomWidget(QWidget):
         if not item:
             self.followup_msg.setText("请先选择随访任务")
             return
+        payload = {
+            "result_note": self.result_note.text().strip(),
+            "healing_score": self.healing_score.value() or None,
+            "next_purpose": self.next_purpose.text().strip() or "换药",
+        }
+        if self.next_followup.isChecked():
+            payload["next_due_date"] = self.next_date.date().toString("yyyy-MM-dd")
         try:
-            self.api.complete_treatment_followup(item["id"])
+            self.api.complete_treatment_followup(item["id"], payload)
         except ApiError as e:
             self.followup_msg.setText(f"操作失败（{e.status_code}）：{e.detail}")
             return
+        self.followup_msg.setText("随访已完成")
+        self.result_note.clear()
+        self.healing_score.setValue(0)
+        self.photo_label.setText("未上传照片")
+        self.followup_photo_path = ""
         self._load_followups()
+
+    def _upload_photo(self) -> None:
+        item = self._selected_followup()
+        if not item:
+            self.followup_msg.setText("请先选择随访任务")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择创面照片", "", "图片 (*.jpg *.jpeg *.png *.webp)"
+        )
+        if not path:
+            return
+        try:
+            result = self.api.upload_followup_photo(item["id"], path)
+        except (ApiError, OSError) as e:
+            self.followup_msg.setText(f"上传失败：{e}")
+            return
+        self.followup_photo_path = result.get("photo_path", "")
+        self.photo_label.setText(f"已上传：{self.followup_photo_path.split('/')[-1]}")
+        self.followup_msg.setText("照片已上传")
 
     def _cancel_followup(self) -> None:
         item = self._selected_followup()

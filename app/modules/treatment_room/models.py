@@ -83,6 +83,10 @@ class TreatmentFollowUp(Base):
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    result_note: Mapped[str] = mapped_column(String(500), default="", server_default="", nullable=False)
+    healing_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    photo_path: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
+    completed_by: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
 
     patient = relationship("Patient")
     case = relationship("TreatmentRoomCase")

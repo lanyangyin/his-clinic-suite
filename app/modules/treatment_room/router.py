@@ -1,6 +1,9 @@
 from datetime import date
+from pathlib import Path
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,11 +12,13 @@ from app.modules.procedure_materials.schemas import (
     ProcedureMaterialCreate,
     ProcedureMaterialResponse,
 )
+from .models import TreatmentFollowUp
 
 from .schemas import (
     CaseCreate,
     CaseResponse,
     CompleteRequest,
+    FollowUpComplete,
     FollowUpCreate,
     FollowUpResponse,
     RoomCreate,
@@ -192,13 +197,59 @@ def new_follow_up(
 @router.post("/follow-ups/{followup_id}/complete", response_model=FollowUpResponse)
 def finish_follow_up(
     followup_id: int,
+    data: FollowUpComplete | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("treatment")),
+):
+    try:
+        return complete_followup(db, followup_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+PHOTO_DIR = Path("data/followup_photos")
+
+
+@router.post("/follow-ups/{followup_id}/photo")
+async def upload_followup_photo(
+    followup_id: int,
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _: None = Depends(require_role("treatment")),
 ):
-    try:
-        return complete_followup(db, followup_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    row = db.get(TreatmentFollowUp, followup_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="随访任务不存在")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=400, detail="仅支持 jpg/png/webp")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="照片不能超过 10MB")
+    PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"{followup_id}_{uuid.uuid4().hex}{suffix}"
+    path = PHOTO_DIR / name
+    path.write_bytes(content)
+    row.photo_path = str(path).replace("\\", "/")
+    db.commit()
+    return {"photo_path": row.photo_path}
+
+
+@router.get("/follow-ups/{followup_id}/photo")
+def get_followup_photo(
+    followup_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    from app.modules.treatment_room.models import TreatmentFollowUp
+
+    row = db.get(TreatmentFollowUp, followup_id)
+    if not row or not row.photo_path:
+        raise HTTPException(status_code=404, detail="没有照片")
+    path = Path(row.photo_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="照片文件不存在")
+    return FileResponse(path)
 
 
 @router.post("/follow-ups/{followup_id}/cancel", response_model=FollowUpResponse)

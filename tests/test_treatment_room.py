@@ -395,3 +395,55 @@ def test_multi_material_kit_and_cancel_return(client, auth):
     ]
     assert touched
     assert all(row["status"] == "cancelled" for row in touched)
+
+
+def test_followup_result_and_photo(client, auth):
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    patient, encounter, _, _, _ = _setup(client, auth)
+    followup = client.post(
+        "/treatment-room/follow-ups",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "due_date": date.today().isoformat(),
+            "purpose": "换药",
+        },
+        headers=auth["treatment"],
+    ).json()
+
+    photo = client.post(
+        f"/treatment-room/follow-ups/{followup['id']}/photo",
+        files={"file": ("wound.jpg", b"fake-jpg", "image/jpeg")},
+        headers=auth["treatment"],
+    )
+    assert photo.status_code == 200, photo.text
+    photo_path = photo.json()["photo_path"]
+    assert client.get(
+        f"/treatment-room/follow-ups/{followup['id']}/photo", headers=auth["treatment"]
+    ).status_code == 200
+
+    next_day = (date.today() + timedelta(days=2)).isoformat()
+    done = client.post(
+        f"/treatment-room/follow-ups/{followup['id']}/complete",
+        json={
+            "result_note": "创面干燥，无渗出",
+            "healing_score": 8,
+            "next_due_date": next_day,
+            "next_purpose": "换药",
+        },
+        headers=auth["treatment"],
+    )
+    assert done.status_code == 200, done.text
+    body = done.json()
+    assert body["status"] == "completed"
+    assert body["healing_score"] == 8
+    assert body["result_note"] == "创面干燥，无渗出"
+    assert body["completed_by"] == "treatment"
+
+    pending = client.get(
+        "/treatment-room/follow-ups?status=pending", headers=auth["treatment"]
+    ).json()
+    assert any(row["due_date"] == next_day and row["patient_id"] == patient["id"] for row in pending)
+    Path(photo_path).unlink(missing_ok=True)
