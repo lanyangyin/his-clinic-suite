@@ -52,6 +52,46 @@ from app.modules.traceability.service import (
     list_codes as list_trace_codes,
     summary as trace_summary,
 )
+from app.modules.linen.schemas import (
+    CurtainCreate,
+    DistributionCreate,
+    LinenBatchCreate,
+    RecallCreate,
+)
+from app.modules.linen.service import (
+    create_batch as create_linen_batch,
+    create_curtain,
+    curtain_reminders,
+    distribute as distribute_linen,
+    list_batches as list_linen_batches,
+    list_curtains,
+    recall as recall_linen,
+    summary as linen_summary,
+)
+from app.modules.cssd.schemas import (
+    BatchCreate as CssdBatchCreate,
+    IssueRequest,
+    PackageCreate,
+    PackageRecallRequest,
+    RejectRequest,
+    ReleaseRequest,
+    SetCreate,
+    UseRequest,
+)
+from app.modules.cssd.service import (
+    create_batch as create_cssd_batch,
+    create_package,
+    create_set,
+    expiry_alerts as cssd_expiry_alerts,
+    issue_package,
+    list_batches as list_cssd_batches,
+    list_packages,
+    list_sets,
+    recall_package,
+    reject_batch,
+    release_batch,
+    use_package,
+)
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1031,3 +1071,327 @@ def warehouse_outbound_cancel(
     )
 
 
+
+# ---------- 被服洗涤（与器械灭菌分开） ----------
+
+def _form_float(form, key: str):
+    value = form.get(key)
+    return float(value) if value not in (None, "") else None
+
+
+def _form_int(form, key: str):
+    value = form.get(key)
+    return int(value) if value not in (None, "") else None
+
+
+@router.get("/linen", response_class=HTMLResponse)
+def linen_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    batches = list_linen_batches(db)
+    curtains = list_curtains(db)
+    reminders = curtain_reminders(db, 30)
+    return templates.TemplateResponse(
+        request,
+        "linen.html",
+        _ctx(
+            request,
+            batches=batches,
+            curtains=curtains,
+            reminders=reminders,
+            msg=request.query_params.get("msg", ""),
+            category_labels={"bedding": "床品", "uniform": "工作服", "curtain": "窗帘/隔帘", "other": "其他织物"},
+            soil_labels={"normal": "普通", "contaminated": "污染", "infectious": "感染性"},
+            linen_status={"completed": "已完成", "recalled": "已召回"},
+            event_labels={"remove": "拆下", "wash": "洗涤消毒", "reinstall": "安装"},
+        ),
+    )
+
+
+@router.post("/linen/batches")
+async def linen_batch_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        data = LinenBatchCreate(
+            batch_no=(form.get("batch_no") or "").strip() or None,
+            category=form.get("category") or "bedding",
+            item_name=(form.get("item_name") or "").strip(),
+            quantity=_form_int(form, "quantity") or 0,
+            unit=(form.get("unit") or "件").strip(),
+            source_department=(form.get("source_department") or "").strip(),
+            soil_level=form.get("soil_level") or "normal",
+            wash_method=form.get("wash_method") or "thermal",
+            temperature=_form_float(form, "temperature"),
+            duration_min=_form_int(form, "duration_min"),
+            detergent=(form.get("detergent") or "").strip(),
+            operator=(form.get("operator") or "").strip(),
+            note=(form.get("note") or "").strip(),
+        )
+        batch = create_linen_batch(db, data, request.session.get("admin_user", "admin"))
+        msg = f"已创建被服批次 {batch.batch_no}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/linen?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/linen/batches/{batch_id}/distribute")
+async def linen_distribute_submit(
+    request: Request, batch_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        distribute_linen(
+            db,
+            batch_id,
+            DistributionCreate(
+                department=(form.get("department") or "").strip(),
+                quantity=_form_int(form, "quantity") or 0,
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已发放"
+    except Exception as e:  # noqa: BLE001
+        msg = f"发放失败：{e}"
+    return RedirectResponse(f"/admin/linen?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/linen/batches/{batch_id}/recall")
+def linen_recall_submit(
+    request: Request, batch_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        recall_linen(db, batch_id, "批次召回", request.session.get("admin_user", "admin"))
+        msg = "已召回"
+    except Exception as e:  # noqa: BLE001
+        msg = f"召回失败：{e}"
+    return RedirectResponse(f"/admin/linen?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/linen/curtains")
+async def linen_curtain_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        due = (form.get("next_due") or "").strip()
+        create_curtain(
+            db,
+            CurtainCreate(
+                department=(form.get("department") or "").strip(),
+                room=(form.get("room") or "").strip(),
+                curtain_no=(form.get("curtain_no") or "").strip(),
+                event=form.get("event") or "wash",
+                method=(form.get("method") or "").strip(),
+                operator=(form.get("operator") or "").strip(),
+                next_due=date.fromisoformat(due) if due else None,
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = "已登记窗帘拆洗"
+    except Exception as e:  # noqa: BLE001
+        msg = f"登记失败：{e}"
+    return RedirectResponse(f"/admin/linen?msg={quote(msg)}", status_code=302)
+
+
+# ---------- 器械灭菌（CSSD） ----------
+
+@router.get("/cssd", response_class=HTMLResponse)
+def cssd_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "cssd.html",
+        _ctx(
+            request,
+            sets=list_sets(db),
+            batches=list_cssd_batches(db),
+            packages=list_packages(db),
+            alerts=cssd_expiry_alerts(db, 30),
+            msg=request.query_params.get("msg", ""),
+            method_labels={"steam": "高压蒸汽", "plasma": "低温等离子", "chemical": "化学浸泡"},
+            indicator_labels={"pending": "待判定", "pass": "合格", "fail": "不合格"},
+            release_labels={"pending": "待放行", "released": "已放行", "rejected": "不合格"},
+            package_status={"sterilized": "已灭菌", "issued": "已发放", "used": "已使用", "recalled": "已召回"},
+        ),
+    )
+
+
+@router.post("/cssd/sets")
+async def cssd_set_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        row = create_set(
+            db,
+            SetCreate(
+                code=(form.get("code") or "").strip(),
+                name=(form.get("name") or "").strip(),
+                department=(form.get("department") or "").strip(),
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = f"已创建器械包 {row.code}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/batches")
+async def cssd_batch_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        row = create_cssd_batch(
+            db,
+            CssdBatchCreate(
+                batch_no=(form.get("batch_no") or "").strip() or None,
+                sterilizer=(form.get("sterilizer") or "").strip(),
+                method=form.get("method") or "steam",
+                cycle=(form.get("cycle") or "").strip(),
+                temperature=_form_float(form, "temperature"),
+                pressure=_form_float(form, "pressure"),
+                duration_min=_form_int(form, "duration_min"),
+                operator=(form.get("operator") or "").strip(),
+                chemical_indicator=form.get("chemical_indicator") or "pending",
+                biological_indicator=form.get("biological_indicator") or "pending",
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = f"已创建灭菌批次 {row.batch_no}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/batches/{batch_id}/release")
+def cssd_release_submit(
+    request: Request, batch_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        release_batch(db, batch_id, request.session.get("admin_user", "admin"))
+        msg = "已放行"
+    except Exception as e:  # noqa: BLE001
+        msg = f"放行失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/batches/{batch_id}/reject")
+def cssd_reject_submit(
+    request: Request, batch_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        reject_batch(db, batch_id, "监测不合格", request.session.get("admin_user", "admin"))
+        msg = "已判定不合格并召回相关包"
+    except Exception as e:  # noqa: BLE001
+        msg = f"操作失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/packages")
+async def cssd_package_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        row = create_package(
+            db,
+            PackageCreate(
+                package_code=(form.get("package_code") or "").strip(),
+                set_id=_form_int(form, "set_id") or 0,
+                batch_id=_form_int(form, "batch_id") or 0,
+                expiry=date.fromisoformat((form.get("expiry") or "").strip()),
+                location=(form.get("location") or "无菌间").strip(),
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = f"已创建包码 {row.package_code}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/packages/{package_id}/issue")
+async def cssd_issue_submit(
+    request: Request, package_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        issue_package(
+            db,
+            package_id,
+            IssueRequest(department=(form.get("department") or "").strip()),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已发放"
+    except Exception as e:  # noqa: BLE001
+        msg = f"发放失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/packages/{package_id}/use")
+async def cssd_use_submit(
+    request: Request, package_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        use_package(
+            db,
+            package_id,
+            UseRequest(
+                department=(form.get("department") or "").strip(),
+                patient_id=_form_int(form, "patient_id"),
+                encounter_id=_form_int(form, "encounter_id"),
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已登记使用"
+    except Exception as e:  # noqa: BLE001
+        msg = f"使用登记失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/cssd/packages/{package_id}/recall")
+def cssd_recall_submit(
+    request: Request, package_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        recall_package(db, package_id, "单包召回", request.session.get("admin_user", "admin"))
+        msg = "已召回"
+    except Exception as e:  # noqa: BLE001
+        msg = f"召回失败：{e}"
+    return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)

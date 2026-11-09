@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}被服洗涤消毒 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>被服洗涤消毒（床品 / 工作服 / 窗帘）</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p class="hint" style="text-align:left">与「器械灭菌」完全分开：这里只登记织物洗涤、消毒参数、发放和召回，不产生无菌器械包码。</p>
+
+<div class="panel">
+  <h3>新建洗涤消毒批次</h3>
+  <form class="inline" method="post" action="/admin/linen/batches">
+    <label>批次号（空=自动）<input name="batch_no" placeholder="LIN..."></label>
+    <label>类别
+      <select name="category">
+        <option value="bedding">床品</option>
+        <option value="uniform">工作服</option>
+        <option value="curtain">窗帘/隔帘</option>
+        <option value="other">其他织物</option>
+      </select>
+    </label>
+    <label>物品<input name="item_name" required placeholder="如 床单被套"></label>
+    <label>数量<input name="quantity" type="number" min="1" value="10" required></label>
+    <label>单位<input name="unit" value="件"></label>
+    <label>来源科室<input name="source_department" placeholder="如 病房"></label>
+    <label>污染等级
+      <select name="soil_level">
+        <option value="normal">普通</option>
+        <option value="contaminated">污染</option>
+        <option value="infectious">感染性</option>
+      </select>
+    </label>
+    <label>洗涤方式
+      <select name="wash_method">
+        <option value="thermal">热力消毒</option>
+        <option value="chemical">化学消毒</option>
+      </select>
+    </label>
+    <label>温度℃<input name="temperature" type="number" step="0.1" placeholder="75"></label>
+    <label>时间(分钟)<input name="duration_min" type="number" placeholder="30"></label>
+    <label>消毒剂<input name="detergent" placeholder="如 含氯消毒液"></label>
+    <label>操作人<input name="operator" placeholder="洗衣房"></label>
+    <label>备注<input name="note"></label>
+    <button type="submit">保存批次</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3>洗涤批次 / 发放 / 召回</h3>
+  <table>
+    <tr><th>批次</th><th>类别</th><th>物品</th><th>数量</th><th>已发/剩余</th><th>污染</th><th>方式/参数</th><th>洗涤时间</th><th>状态</th><th>操作</th></tr>
+    {% for batch in batches %}
+    <tr>
+      <td>{{ batch.batch_no }}</td>
+      <td>{{ category_labels.get(batch.category, batch.category) }}</td>
+      <td>{{ batch.item_name }}</td>
+      <td>{{ batch.quantity }} {{ batch.unit }}</td>
+      <td>{{ batch.distributed_quantity }} / {{ batch.remaining_quantity }}</td>
+      <td>{{ soil_labels.get(batch.soil_level, batch.soil_level) }}</td>
+      <td>{% if batch.wash_method == 'thermal' %}热力{% else %}化学{% endif %}
+        {% if batch.temperature %}· {{ batch.temperature }}℃{% endif %}
+        {% if batch.duration_min %}· {{ batch.duration_min }}min{% endif %}
+      </td>
+      <td>{{ batch.washed_at.strftime('%Y-%m-%d %H:%M') if batch.washed_at else '' }}</td>
+      <td>{{ linen_status.get(batch.status, batch.status) }}</td>
+      <td>
+        {% if batch.status == 'completed' and batch.remaining_quantity > 0 %}
+        <form method="post" action="/admin/linen/batches/{{ batch.id }}/distribute" style="display:flex;gap:4px">
+          <input name="department" placeholder="发放科室" required style="min-width:80px">
+          <input name="quantity" type="number" min="1" value="1" style="min-width:60px">
+          <button type="submit">发放</button>
+        </form>
+        {% endif %}
+        {% if batch.status == 'completed' %}
+        <form method="post" action="/admin/linen/batches/{{ batch.id }}/recall" style="margin-top:4px">
+          <button type="submit" style="background:#b91c1c">召回</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10">暂无洗涤批次</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>窗帘 / 隔帘拆洗登记</h3>
+  <form class="inline" method="post" action="/admin/linen/curtains">
+    <label>科室<input name="department" required></label>
+    <label>房间/床位<input name="room"></label>
+    <label>窗帘编号<input name="curtain_no" required></label>
+    <label>动作
+      <select name="event">
+        <option value="remove">拆下</option>
+        <option value="wash">洗涤消毒</option>
+        <option value="reinstall">安装</option>
+      </select>
+    </label>
+    <label>方式<input name="method" placeholder="如 清洗消毒"></label>
+    <label>操作人<input name="operator"></label>
+    <label>下次到期<input name="next_due" type="date"></label>
+    <label>备注<input name="note"></label>
+    <button type="submit">登记</button>
+  </form>
+  {% if reminders %}
+  <div class="err">30 天内到期/已到期窗帘 {{ reminders|length }} 条，请安排拆洗。</div>
+  {% endif %}
+  <table>
+    <tr><th>科室</th><th>房间</th><th>编号</th><th>动作</th><th>时间</th><th>方式</th><th>操作人</th><th>下次到期</th></tr>
+    {% for row in curtains %}
+    <tr>
+      <td>{{ row.department }}</td><td>{{ row.room }}</td><td>{{ row.curtain_no }}</td>
+      <td>{{ event_labels.get(row.event, row.event) }}</td>
+      <td>{{ row.event_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ row.method }}</td><td>{{ row.operator }}</td>
+      <td>{{ row.next_due or '' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无窗帘记录</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}器械灭菌 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>器械灭菌（CSSD）</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p class="hint" style="text-align:left">与被服洗涤分开：这里管器械包、灭菌批次、监测放行、包码发放/使用/召回，不登记床单被服。</p>
+
+<div class="panel">
+  <h3>1. 器械包主数据</h3>
+  <form class="inline" method="post" action="/admin/cssd/sets">
+    <label>编码<input name="code" required placeholder="SET-001"></label>
+    <label>名称<input name="name" required placeholder="换药包"></label>
+    <label>所属科室<input name="department"></label>
+    <label>备注<input name="note"></label>
+    <button type="submit">新增器械包</button>
+  </form>
+  <table>
+    <tr><th>编码</th><th>名称</th><th>科室</th><th>备注</th></tr>
+    {% for row in sets %}
+    <tr><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.department }}</td><td>{{ row.note }}</td></tr>
+    {% else %}
+    <tr><td colspan="4">暂无器械包</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>2. 灭菌批次 / 监测放行</h3>
+  <form class="inline" method="post" action="/admin/cssd/batches">
+    <label>批次号（空=自动）<input name="batch_no"></label>
+    <label>灭菌器<input name="sterilizer" required placeholder="高压灭菌器 1"></label>
+    <label>方式
+      <select name="method">
+        <option value="steam">高压蒸汽</option>
+        <option value="plasma">低温等离子</option>
+        <option value="chemical">化学浸泡</option>
+      </select>
+    </label>
+    <label>程序<input name="cycle" placeholder="134℃ 4min"></label>
+    <label>温度℃<input name="temperature" type="number" step="0.1"></label>
+    <label>压力kPa<input name="pressure" type="number" step="0.1"></label>
+    <label>时间(min)<input name="duration_min" type="number"></label>
+    <label>操作人<input name="operator"></label>
+    <label>化学监测
+      <select name="chemical_indicator">
+        <option value="pending">待判定</option>
+        <option value="pass">合格</option>
+        <option value="fail">不合格</option>
+      </select>
+    </label>
+    <label>生物监测
+      <select name="biological_indicator">
+        <option value="pending">待判定</option>
+        <option value="pass">合格</option>
+        <option value="fail">不合格</option>
+      </select>
+    </label>
+    <label>备注<input name="note"></label>
+    <button type="submit">保存批次</button>
+  </form>
+  <table>
+    <tr><th>批次</th><th>灭菌器</th><th>方式</th><th>参数</th><th>化学</th><th>生物</th><th>放行</th><th>操作</th></tr>
+    {% for row in batches %}
+    <tr>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.sterilizer }}</td>
+      <td>{{ method_labels.get(row.method, row.method) }}</td>
+      <td>{{ row.cycle }}{% if row.temperature %} · {{ row.temperature }}℃{% endif %}{% if row.duration_min %} · {{ row.duration_min }}min{% endif %}</td>
+      <td>{{ indicator_labels.get(row.chemical_indicator, row.chemical_indicator) }}</td>
+      <td>{{ indicator_labels.get(row.biological_indicator, row.biological_indicator) }}</td>
+      <td>{{ release_labels.get(row.release_status, row.release_status) }}</td>
+      <td>
+        {% if row.release_status == 'pending' %}
+        <form method="post" action="/admin/cssd/batches/{{ row.id }}/release" style="display:inline">
+          <button type="submit">放行</button>
+        </form>
+        <form method="post" action="/admin/cssd/batches/{{ row.id }}/reject" style="display:inline">
+          <button type="submit" style="background:#b91c1c">不合格召回</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂灭菌批次</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>3. 包码 / 发放 / 使用 / 召回</h3>
+  <form class="inline" method="post" action="/admin/cssd/packages">
+    <label>包码<input name="package_code" required placeholder="PKG-001"></label>
+    <label>器械包
+      <select name="set_id" required>
+        {% for row in sets %}<option value="{{ row.id }}">{{ row.code }} {{ row.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>灭菌批次
+      <select name="batch_id" required>
+        {% for row in batches %}<option value="{{ row.id }}">{{ row.batch_no }}（{{ release_labels.get(row.release_status, row.release_status) }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>失效日期<input name="expiry" type="date" required></label>
+    <label>存放位置<input name="location" value="无菌间"></label>
+    <button type="submit">生成包码</button>
+  </form>
+
+  {% if alerts %}
+  <div class="err">30 天内到期/已过期包 {{ alerts|length }} 个，不能发放过期包。</div>
+  {% endif %}
+  <table>
+    <tr><th>包码</th><th>器械包</th><th>灭菌批次</th><th>灭菌时间</th><th>失效</th><th>状态</th><th>位置</th><th>发放</th><th>使用</th><th></th></tr>
+    {% for row in packages %}
+    <tr>
+      <td>{{ row.package_code }}</td>
+      <td>{{ row.set_name }}</td>
+      <td>{{ row.batch_no }}</td>
+      <td>{{ row.sterilized_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ row.expiry }}</td>
+      <td>{{ package_status.get(row.status, row.status) }}</td>
+      <td>{{ row.location }}</td>
+      <td>
+        {% if row.status == 'sterilized' %}
+        <form method="post" action="/admin/cssd/packages/{{ row.id }}/issue" style="display:flex;gap:4px">
+          <input name="department" placeholder="发放科室" required style="min-width:80px">
+          <button type="submit">发放</button>
+        </form>
+        {% endif %}
+      </td>
+      <td>
+        {% if row.status == 'issued' %}
+        <form method="post" action="/admin/cssd/packages/{{ row.id }}/use" style="display:flex;gap:4px">
+          <input name="department" placeholder="使用科室" required style="min-width:80px">
+          <input name="patient_id" type="number" placeholder="患者ID" style="min-width:70px">
+          <button type="submit">使用</button>
+        </form>
+        {% endif %}
+      </td>
+      <td>
+        {% if row.status in ('sterilized', 'issued') %}
+        <form method="post" action="/admin/cssd/packages/{{ row.id }}/recall">
+          <button type="submit" style="background:#b91c1c">召回</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10">暂无包码</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

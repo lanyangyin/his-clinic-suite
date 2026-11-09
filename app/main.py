@@ -46,6 +46,8 @@ from app.modules.receiving.router import router as receiving_router
 from app.modules.insurance_catalog.router import router as insurance_catalog_router
 from app.modules.stock_ledger.router import router as stock_ledger_router
 from app.modules.traceability.router import router as traceability_router
+from app.modules.linen.router import router as linen_router
+from app.modules.cssd.router import router as cssd_router
 from app.modules.insurance_inventory.router import router as insurance_inventory_router
 from app.modules.insurance_materials.router import router as insurance_materials_router
 from app.modules.reports.router import router as reports_router
@@ -203,6 +205,8 @@ app.include_router(receiving_router)
 app.include_router(insurance_catalog_router)
 app.include_router(stock_ledger_router)
 app.include_router(traceability_router)
+app.include_router(linen_router)
+app.include_router(cssd_router)
 app.include_router(insurance_inventory_router)
 app.include_router(insurance_materials_router)
 app.include_router(reports_router)
