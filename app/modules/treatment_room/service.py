@@ -278,6 +278,16 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
         raise ValueError("治疗室不存在")
     if data.template_code and data.template_code not in {row["code"] for row in TEMPLATES}:
         raise ValueError("处置模板不存在")
+    if data.template_code:
+        template = next(row for row in TEMPLATES if row["code"] == data.template_code)
+        missing = [
+            field["label"]
+            for field in template["fields"]
+            if field.get("required")
+            and not str(data.template_data.get(field["key"], "")).strip()
+        ]
+        if missing:
+            raise ValueError(f"请填写模板必填项：{'、'.join(missing)}")
     config = None
     if data.template_code:
         config = (

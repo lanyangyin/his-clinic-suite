@@ -281,7 +281,11 @@ def test_treatment_template_config_and_kit(client, auth):
             "room_id": room["id"],
             "procedure_name": "包皮环切",
             "template_code": "circumcision",
-            "template_data": {"indication": "包皮过长"},
+            "template_data": {
+                "indication": "包皮过长",
+                "technique": "环切缝合",
+                "anesthesia": "局麻",
+            },
         },
         headers=auth["treatment"],
     ).json()
@@ -357,6 +361,7 @@ def test_multi_material_kit_and_cancel_return(client, auth):
             "room_id": room["id"],
             "procedure_name": "小肿物切除",
             "template_code": "excision",
+            "template_data": {"site": "背部", "size": "1cm"},
         },
         headers=auth["treatment"],
     ).json()
@@ -447,3 +452,37 @@ def test_followup_result_and_photo(client, auth):
     ).json()
     assert any(row["due_date"] == next_day and row["patient_id"] == patient["id"] for row in pending)
     Path(photo_path).unlink(missing_ok=True)
+
+
+def test_treatment_template_required_fields(client, auth):
+    patient, encounter, room, _, _ = _setup(client, auth)
+    missing = client.post(
+        "/treatment-room/cases",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "room_id": room["id"],
+            "procedure_name": "包皮环切",
+            "template_code": "circumcision",
+            "template_data": {"indication": "包皮过长"},
+        },
+        headers=auth["treatment"],
+    )
+    assert missing.status_code == 400
+    assert "请填写模板必填项" in missing.json()["detail"]
+
+
+def test_treatment_report_excel_export(client, auth):
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    _setup(client, auth)
+    response = client.get(
+        "/treatment-room/report/export.xlsx", headers=auth["treatment"]
+    )
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert "日报概览" in workbook.sheetnames
+    assert "按模板" in workbook.sheetnames
+    assert "待随访" in workbook.sheetnames
+    assert workbook["日报概览"]["A2"].value == "日期"

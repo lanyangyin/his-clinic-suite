@@ -5,6 +5,7 @@
 <form class="inline" method="get" action="/admin/treatment-report">
   <label>日期<input type="date" name="report_date" value="{{ data.date }}"></label>
   <button type="submit">查询</button>
+  <a href="/treatment-room/report/export.xlsx?report_date={{ data.date }}"><button type="button">导出 Excel</button></a>
 </form>
 
 <div class="cards">

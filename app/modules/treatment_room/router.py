@@ -3,7 +3,7 @@ from pathlib import Path
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,6 +13,7 @@ from app.modules.procedure_materials.schemas import (
     ProcedureMaterialResponse,
 )
 from .models import TreatmentFollowUp
+from .export import report_workbook
 
 from .schemas import (
     CaseCreate,
@@ -271,3 +272,21 @@ def treatment_report(
     _: None = Depends(require_role("treatment")),
 ):
     return report(db, report_date)
+
+@router.get("/report/export.xlsx")
+def export_treatment_report(
+    report_date: date | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    day = report_date or date.today()
+    data = report(db, day)
+    followups = list_followups(db, status="pending", due_before=day)
+    stream = report_workbook(data, followups)
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="treatment_report_{day}.xlsx"'
+        },
+    )

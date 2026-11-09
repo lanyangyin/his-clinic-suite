@@ -191,6 +191,21 @@ class TreatmentRoomWidget(QWidget):
             self.room.addItem(f"{item['code']} {item['name']}", item["id"])
 
     def _create_case(self) -> None:
+        template_code = self.template.currentData()
+        if template_code:
+            definition = next(
+                (row for row in self.templates if row["code"] == template_code), None
+            )
+            if definition:
+                missing = [
+                    field["label"]
+                    for field in definition["fields"]
+                    if field.get("required")
+                    and not self.template_edits.get(field["key"], QLineEdit()).text().strip()
+                ]
+                if missing:
+                    self.queue_msg.setText(f"请填写必填项：{'、'.join(missing)}")
+                    return
         price_text = self.price.text().strip()
         payload = {
             "patient_id": self.patient_id.value(),
@@ -350,7 +365,8 @@ class TreatmentRoomWidget(QWidget):
         for field in definition["fields"]:
             edit = QLineEdit()
             self.template_edits[field["key"]] = edit
-            self.template_form.addRow(field["label"], edit)
+            label = field["label"] + (" *" if field.get("required") else "")
+            self.template_form.addRow(label, edit)
         if not self.procedure.text().strip():
             self.procedure.setText(definition["name"])
         if definition.get("charge_item_id"):
