@@ -385,7 +385,18 @@ class ApiClient:
             payload["card_no"] = card_no
         return self._request("POST", "/payments/", json=payload)
 
-    def refund_payment(self, payment_id: int) -> dict:
+    def refund_payment(
+        self, payment_id: int, items: list | None = None, reason: str = ""
+    ) -> dict:
+        payload: dict = {}
+        if items:
+            payload["items"] = items
+        if reason:
+            payload["reason"] = reason
+        if payload:
+            return self._request(
+                "POST", f"/payments/{payment_id}/refund", json=payload
+            )
         return self._request("POST", f"/payments/{payment_id}/refund")
 
     def get_payment(self, payment_id: int) -> dict:

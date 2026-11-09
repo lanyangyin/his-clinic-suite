@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PaymentCreate(BaseModel):
@@ -23,7 +23,22 @@ class PaymentResponse(BaseModel):
     channel: str = "cash"
     channel_trade_no: str = ""
     channel_status: str = "success"
+    refunded_amount: float = 0
+    refunded_insurance_amount: float = 0
+    refunded_self_pay_amount: float = 0
+    net_amount: float = 0
+    net_self_pay_amount: float = 0
     model_config = ConfigDict(from_attributes=True)
+
+
+class RefundItem(BaseModel):
+    charge_id: int
+    quantity: int = Field(gt=0)
+
+
+class RefundRequest(BaseModel):
+    items: list[RefundItem] = Field(min_length=1)
+    reason: str = Field(default="", max_length=200)
 
 
 class BillingSummary(BaseModel):

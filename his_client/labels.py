@@ -44,11 +44,16 @@ LABELS: dict[str, dict[str, str]] = {
         "cancelled": "已取消",
     },
     "encounter_status": {"open": "就诊中", "closed": "已结束"},
-    "payment_status": {"paid": "已收费", "refunded": "已退费"},
+    "payment_status": {
+        "paid": "已收费",
+        "partially_refunded": "部分退费",
+        "refunded": "已退费",
+    },
     "dispense_status": {"dispensed": "已发药", "returned": "已退药"},
     "charge_status": {
         "pending": "待收费",
         "paid": "已收费",
+        "partially_refunded": "部分退费",
         "refunded": "已退费",
     },
     "ticket_status": {

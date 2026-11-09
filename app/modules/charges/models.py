@@ -48,8 +48,12 @@ class EncounterCharge(Base):
     insurance_ratio: Mapped[float] = mapped_column(
         default=0.7, server_default="0.7", nullable=False
     )
-    # pending 待收 / paid 已收 / refunded 已退
-    status: Mapped[str] = mapped_column(String(10), default="pending", nullable=False)
+    # pending 待收 / paid 已收 / partially_refunded 部分退费 / refunded 已退
+    status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    # 已退数量（支持按颗/按项部分退费）
+    refunded_quantity: Mapped[int] = mapped_column(
+        default=0, server_default="0", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )

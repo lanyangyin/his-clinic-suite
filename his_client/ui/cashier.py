@@ -227,18 +227,43 @@ class CashierWidget(QWidget):
         box_layout.addWidget(self.charge_msg)
         layout.addWidget(box)
 
-        refund_box = QGroupBox("退费")
-        refund_layout = QHBoxLayout(refund_box)
+        refund_box = QGroupBox("按明细退费（可只退一种药/一颗药）")
+        refund_layout = QVBoxLayout(refund_box)
+        refund_top = QHBoxLayout()
         self.refund_payment_id = QSpinBox()
         self.refund_payment_id.setRange(1, 10_000_000)
-        refund_btn = QPushButton("退费")
-        refund_btn.clicked.connect(self._refund)
-        refund_layout.addWidget(QLabel("收费单 ID"))
-        refund_layout.addWidget(self.refund_payment_id)
-        refund_layout.addWidget(refund_btn)
+        load_refund = QPushButton("加载收费明细")
+        load_refund.clicked.connect(self._load_refund_charges)
+        refund_all = QPushButton("全部退")
+        refund_all.clicked.connect(self._refund_all)
+        refund_top.addWidget(QLabel("收费单 ID"))
+        refund_top.addWidget(self.refund_payment_id)
+        refund_top.addWidget(load_refund)
+        refund_top.addWidget(refund_all)
+        refund_layout.addLayout(refund_top)
+
+        refund_row = QHBoxLayout()
+        self.refund_qty = QSpinBox()
+        self.refund_qty.setRange(1, 10000)
+        refund_selected = QPushButton("退所选数量")
+        refund_selected.clicked.connect(self._refund_selected)
+        refund_row.addWidget(QLabel("本次退数量"))
+        refund_row.addWidget(self.refund_qty)
+        refund_row.addWidget(refund_selected)
+        refund_row.addStretch(1)
+        refund_layout.addLayout(refund_row)
+
+        self.refund_table = QTableWidget(0, 7)
+        self.refund_table.setHorizontalHeaderLabels(
+            ["明细 ID", "类型", "项目", "数量", "已退", "可退", "单价"]
+        )
+        self.refund_table.cellClicked.connect(self._select_refund_charge)
+        refund_layout.addWidget(self.refund_table)
+        self.refund_charge_id: int | None = None
         layout.addWidget(refund_box)
 
         self.refund_msg = QLabel("")
+        self.refund_msg.setWordWrap(True)
         layout.addWidget(self.refund_msg)
         layout.addStretch(1)
         return page
@@ -288,13 +313,78 @@ class CashierWidget(QWidget):
         self.refund_payment_id.setValue(payment["id"])
         self._load_charges()
 
-    def _refund(self) -> None:
+    def _load_refund_charges(self) -> None:
+        payment_id = self.refund_payment_id.value()
+        try:
+            payment = self.api.get_payment(payment_id)
+            charges = self.api.get_charges(payment["encounter_id"])
+        except ApiError as e:
+            self.refund_msg.setText(f"加载收费明细失败（{e.status_code}）：{e.detail}")
+            return
+        self.refund_table.setRowCount(len(charges))
+        for row, charge in enumerate(charges):
+            refunded = charge.get("refunded_quantity", 0)
+            values = [
+                str(charge["id"]),
+                zh("charge_type", charge["charge_type"]),
+                charge["item_name"],
+                str(charge["quantity"]),
+                str(refunded),
+                str(charge["quantity"] - refunded),
+                f"{charge['unit_price']:.2f}",
+            ]
+            for col, value in enumerate(values):
+                self.refund_table.setItem(row, col, QTableWidgetItem(value))
+        self.refund_charge_id = None
+        self.refund_msg.setText(
+            f"收费单 {payment['id']}，状态 {zh('payment_status', payment['status'])}，"
+            f"已退 {payment.get('refunded_amount', 0):.2f} 元"
+        )
+
+    def _select_refund_charge(self, row: int, _col: int) -> None:
+        item = self.refund_table.item(row, 0)
+        remaining = self.refund_table.item(row, 5)
+        if not item or not remaining:
+            return
+        self.refund_charge_id = int(item.text())
+        left = int(remaining.text())
+        self.refund_qty.setMaximum(max(left, 1))
+        self.refund_qty.setValue(1 if left > 0 else 1)
+
+    def _refund_selected(self) -> None:
+        if not self.refund_charge_id:
+            self.refund_msg.setText("请先在明细中选择要退的项目")
+            return
+        try:
+            payment = self.api.refund_payment(
+                self.refund_payment_id.value(),
+                items=[
+                    {
+                        "charge_id": self.refund_charge_id,
+                        "quantity": self.refund_qty.value(),
+                    }
+                ],
+            )
+        except ApiError as e:
+            self.refund_msg.setText(f"退费失败（{e.status_code}）：{e.detail}")
+            return
+        self.refund_msg.setText(
+            f"退费成功：单号 {payment['id']}，状态 {zh('payment_status', payment['status'])}，"
+            f"累计已退 {payment.get('refunded_amount', 0):.2f} 元"
+        )
+        self.refund_charge_id = None
+        self._load_refund_charges()
+
+    def _refund_all(self) -> None:
         try:
             payment = self.api.refund_payment(self.refund_payment_id.value())
         except ApiError as e:
             self.refund_msg.setText(f"退费失败（{e.status_code}）：{e.detail}")
             return
-        self.refund_msg.setText(f"退费成功：单号 {payment['id']}，状态 {zh('payment_status', payment['status'])}")
+        self.refund_msg.setText(
+            f"全部退费成功：单号 {payment['id']}，状态 {zh('payment_status', payment['status'])}"
+        )
+        self._load_refund_charges()
 
     # ---------- 打印 ----------
     def _build_print_tab(self) -> QWidget:

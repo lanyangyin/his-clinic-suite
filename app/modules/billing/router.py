@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.auth.security import require_role
 
-from .schemas import BillingSummary, PaymentCreate, PaymentResponse
+from .schemas import BillingSummary, PaymentCreate, PaymentResponse, RefundRequest
 from .service import create_payment, get_payment, get_summary, list_payments, refund_payment
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -39,11 +39,17 @@ def summary(db: Session = Depends(get_db)):
 @router.post("/{payment_id}/refund", response_model=PaymentResponse)
 def refund(
     payment_id: int,
+    data: RefundRequest | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier")),
+    user=Depends(require_role("cashier")),
 ):
     try:
-        return refund_payment(db, payment_id)
+        return refund_payment(
+            db,
+            payment_id,
+            items=data.items if data else None,
+            operator=user.username,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

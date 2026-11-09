@@ -14,7 +14,7 @@ from app.modules.encounter.service import (
 from app.modules.insurance.adapter import InsuranceUnavailable, settle_payment
 from app.modules.payment_gateway.service import CHANNELS, charge as charge_payment, refund
 
-from .models import Payment
+from .models import ChargeRefund, Payment
 from .schemas import PaymentCreate
 
 
@@ -113,64 +113,135 @@ def list_payments(
     return query.order_by(Payment.id.desc()).all()
 
 
-def refund_payment(db: Session, payment_id: int) -> Payment:
-    """退费：已支付且未发药的收费可以退，状态改为 refunded。"""
+def refund_payment(
+    db: Session, payment_id: int, items=None, operator: str = ""
+) -> Payment:
+    """退费：支持按费用明细/数量部分退费（可只退 1 颗药）。"""
     payment = get_payment(db, payment_id)
     if not payment:
         raise ValueError("收费记录不存在")
-
     if payment.status == "refunded":
         raise ValueError("该收费已退费")
 
     # 延迟导入避免循环依赖（pharmacy.service 也依赖 billing.service）
     from app.modules.pharmacy.service import get_active_dispense_by_encounter
 
-    if get_active_dispense_by_encounter(db, payment.encounter_id):
+    dispensed = bool(get_active_dispense_by_encounter(db, payment.encounter_id))
+    if dispensed and not items:
         raise ValueError("该就诊已发药，不能退费")
+    charges = {
+        charge.id: charge for charge in list_charges(db, payment.encounter_id)
+    }
 
-    refund_result = refund(
-        db,
-        payment.channel or "cash",
-        payment.channel_trade_no or "",
-        payment.self_pay_amount,
+    plan: list[tuple] = []
+    if items is None:
+        for charge in charges.values():
+            remaining = charge.quantity - charge.refunded_quantity
+            if remaining > 0 and charge.status in ("paid", "partially_refunded"):
+                plan.append((charge, remaining))
+    else:
+        requested: dict[int, int] = {}
+        for item in items:
+            charge_id = item.charge_id if hasattr(item, "charge_id") else item["charge_id"]
+            quantity = item.quantity if hasattr(item, "quantity") else item["quantity"]
+            requested[charge_id] = requested.get(charge_id, 0) + quantity
+        for charge_id, quantity in requested.items():
+            charge = charges.get(charge_id)
+            if not charge:
+                raise ValueError("费用明细不存在或不属于该收费")
+            remaining = charge.quantity - charge.refunded_quantity
+            if quantity > remaining:
+                raise ValueError(f"退款数量超过可退数量：{charge.item_name}")
+            if dispensed and charge.charge_type == "drug":
+                raise ValueError("该就诊已发药，请先退药后再退费")
+            plan.append((charge, quantity))
+
+    if not plan:
+        raise ValueError("没有可退费用")
+
+    total_amount = 0.0
+    total_insurance = 0.0
+    for charge, quantity in plan:
+        amount = round(charge.unit_price * quantity, 2)
+        total_amount += amount
+        total_insurance += round(amount * charge.insurance_ratio, 2)
+    total_amount = round(total_amount, 2)
+    total_insurance = round(total_insurance, 2)
+    total_self_pay = round(total_amount - total_insurance, 2)
+
+    if total_self_pay > 0:
+        refund_result = refund(
+            db,
+            payment.channel or "cash",
+            payment.channel_trade_no or "",
+            total_self_pay,
+        )
+        if refund_result["status"] != "success":
+            raise ValueError(f"退款失败：{refund_result['message']}")
+
+    refund_no = f"RF{datetime.now():%Y%m%d%H%M%S}{payment.id:04d}"
+    for charge, quantity in plan:
+        amount = round(charge.unit_price * quantity, 2)
+        insurance = round(amount * charge.insurance_ratio, 2)
+        charge.refunded_quantity += quantity
+        charge.status = (
+            "refunded"
+            if charge.refunded_quantity >= charge.quantity
+            else "partially_refunded"
+        )
+        db.add(
+            ChargeRefund(
+                payment_id=payment.id,
+                charge_id=charge.id,
+                quantity=quantity,
+                amount=amount,
+                insurance_amount=insurance,
+                self_pay_amount=round(amount - insurance, 2),
+                refund_no=refund_no,
+                channel=payment.channel or "cash",
+                channel_trade_no=payment.channel_trade_no or "",
+                operator=operator,
+            )
+        )
+
+    payment.refunded_amount = round(payment.refunded_amount + total_amount, 2)
+    payment.refunded_insurance_amount = round(
+        payment.refunded_insurance_amount + total_insurance, 2
     )
-    if refund_result["status"] != "success":
-        raise ValueError(f"退款失败：{refund_result['message']}")
-
-    payment.status = "refunded"
-    # 费用明细同步置为已退
-    for charge in list_charges(db, payment.encounter_id):
-        if charge.status == "paid":
-            charge.status = "refunded"
+    all_refunded = all(
+        charge.refunded_quantity >= charge.quantity for charge in charges.values()
+    )
+    payment.status = "refunded" if all_refunded else "partially_refunded"
     db.commit()
     db.refresh(payment)
     return payment
 
 
 def get_summary(db: Session) -> dict:
-    """对账汇总：按收费状态统计笔数和金额。"""
+    """对账汇总：按收费状态统计笔数和金额（部分退费按净额统计）。"""
+    paid_filter = Payment.status.in_(["paid", "partially_refunded"])
     paid_count = (
-        db.query(func.count(Payment.id)).filter(Payment.status == "paid").scalar() or 0
+        db.query(func.count(Payment.id)).filter(paid_filter).scalar() or 0
     )
     paid_total = (
-        db.query(func.sum(Payment.amount)).filter(Payment.status == "paid").scalar()
+        db.query(func.sum(Payment.amount - Payment.refunded_amount))
+        .filter(paid_filter)
+        .scalar()
         or 0.0
     )
+    refunded_filter = Payment.refunded_amount > 0
     refunded_count = (
-        db.query(func.count(Payment.id))
-        .filter(Payment.status == "refunded")
-        .scalar()
-        or 0
+        db.query(func.count(Payment.id)).filter(refunded_filter).scalar() or 0
     )
     refunded_total = (
-        db.query(func.sum(Payment.amount))
-        .filter(Payment.status == "refunded")
+        db.query(func.sum(Payment.refunded_amount))
+        .filter(refunded_filter)
         .scalar()
         or 0.0
     )
     return {
         "paid_count": paid_count,
-        "paid_total": paid_total,
+        "paid_total": round(paid_total, 2),
         "refunded_count": refunded_count,
-        "refunded_total": refunded_total,
+        "refunded_total": round(refunded_total, 2),
     }
