@@ -475,6 +475,16 @@ class ApiClient:
             json={"phase": phase, "checklist": checklist},
         )
 
+    def surgery_preop(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/surgery/cases/{case_id}/preop", json=payload
+        )
+
+    def surgery_anesthesia(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/surgery/cases/{case_id}/anesthesia", json=payload
+        )
+
     def start_surgery(self, case_id: int) -> dict:
         return self._request("POST", f"/surgery/cases/{case_id}/start")
 

@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QGroupBox,
@@ -109,6 +110,58 @@ class SurgeryWidget(QWidget):
         self.case_info = QLabel("未载入")
         self.case_info.setWordWrap(True)
         layout.addWidget(self.case_info)
+
+        preop_box = QGroupBox("术前访视 / 麻醉评估")
+        preop = QFormLayout(preop_box)
+        self.preop_anesthesiologist = QLineEdit()
+        self.preop_asa = QLineEdit()
+        self.preop_airway = QLineEdit()
+        self.preop_allergies = QLineEdit()
+        self.preop_comorbidities = QLineEdit()
+        self.preop_fasting = QLineEdit()
+        self.preop_consent = QCheckBox("知情同意已签署")
+        self.preop_assessment = QLineEdit()
+        self.preop_plan = QLineEdit()
+        preop_save = QPushButton("保存术前访视")
+        preop_save.clicked.connect(self._save_preop)
+        preop.addRow("麻醉医生", self.preop_anesthesiologist)
+        preop.addRow("ASA 分级", self.preop_asa)
+        preop.addRow("气道", self.preop_airway)
+        preop.addRow("过敏史", self.preop_allergies)
+        preop.addRow("合并症", self.preop_comorbidities)
+        preop.addRow("禁食", self.preop_fasting)
+        preop.addRow("知情同意", self.preop_consent)
+        preop.addRow("评估", self.preop_assessment)
+        preop.addRow("麻醉计划", self.preop_plan)
+        preop.addRow("", preop_save)
+        layout.addWidget(preop_box)
+
+        anesthesia_box = QGroupBox("麻醉记录")
+        anesthesia = QFormLayout(anesthesia_box)
+        self.anes_type = QLineEdit()
+        self.anes_doctor = QLineEdit()
+        self.anes_airway = QLineEdit()
+        self.anes_agents = QLineEdit()
+        self.anes_monitors = QLineEdit()
+        self.anes_vitals = QLineEdit()
+        self.anes_fluids = QSpinBox()
+        self.anes_fluids.setRange(0, 100000)
+        self.anes_blood = QSpinBox()
+        self.anes_blood.setRange(0, 100000)
+        self.anes_note = QLineEdit()
+        anes_save = QPushButton("保存麻醉记录")
+        anes_save.clicked.connect(self._save_anesthesia)
+        anesthesia.addRow("麻醉方式", self.anes_type)
+        anesthesia.addRow("麻醉医生", self.anes_doctor)
+        anesthesia.addRow("气道", self.anes_airway)
+        anesthesia.addRow("用药", self.anes_agents)
+        anesthesia.addRow("监测", self.anes_monitors)
+        anesthesia.addRow("生命体征", self.anes_vitals)
+        anesthesia.addRow("补液 ml", self.anes_fluids)
+        anesthesia.addRow("出血 ml", self.anes_blood)
+        anesthesia.addRow("备注", self.anes_note)
+        anesthesia.addRow("", anes_save)
+        layout.addWidget(anesthesia_box)
 
         safety_box = QGroupBox("安全核查")
         safety = QVBoxLayout(safety_box)
@@ -304,7 +357,71 @@ class SurgeryWidget(QWidget):
             f"状态 {case['status']} · 核查 {len(data['checks'])} · 记录 {len(data['records'])} · "
             f"清点 {len(data['counts'])} · 复苏 {len(data['recovery'])}"
         )
+        preop = data.get("preop") or {}
+        self.preop_anesthesiologist.setText(preop.get("anesthesiologist") or "")
+        self.preop_asa.setText(preop.get("asa_grade") or "")
+        self.preop_airway.setText(preop.get("airway") or "")
+        self.preop_allergies.setText(preop.get("allergies") or "")
+        self.preop_comorbidities.setText(preop.get("comorbidities") or "")
+        self.preop_fasting.setText(preop.get("fasting") or "")
+        self.preop_consent.setChecked(bool(preop.get("consent")))
+        self.preop_assessment.setText(preop.get("assessment") or "")
+        self.preop_plan.setText(preop.get("plan") or "")
+        anes = data.get("anesthesia") or {}
+        self.anes_type.setText(anes.get("anesthesia_type") or "")
+        self.anes_doctor.setText(anes.get("anesthesiologist") or "")
+        self.anes_airway.setText(anes.get("airway") or "")
+        self.anes_agents.setText(anes.get("agents") or "")
+        self.anes_monitors.setText(anes.get("monitors") or "")
+        self.anes_vitals.setText(anes.get("vitals") or "")
+        self.anes_fluids.setValue(anes.get("fluids_ml") or 0)
+        self.anes_blood.setValue(anes.get("blood_loss_ml") or 0)
+        self.anes_note.setText(anes.get("notes") or "")
         self.intra_msg.setText("手术已载入")
+
+    def _save_preop(self) -> None:
+        try:
+            self.api.surgery_preop(
+                self.case_id.value(),
+                {
+                    "anesthesiologist": self.preop_anesthesiologist.text().strip(),
+                    "asa_grade": self.preop_asa.text().strip(),
+                    "airway": self.preop_airway.text().strip(),
+                    "allergies": self.preop_allergies.text().strip(),
+                    "comorbidities": self.preop_comorbidities.text().strip(),
+                    "fasting": self.preop_fasting.text().strip(),
+                    "consent": self.preop_consent.isChecked(),
+                    "assessment": self.preop_assessment.text().strip(),
+                    "plan": self.preop_plan.text().strip(),
+                },
+            )
+        except ApiError as e:
+            self.intra_msg.setText(f"术前访视保存失败（{e.status_code}）：{e.detail}")
+            return
+        self.intra_msg.setText("术前访视已保存")
+        self._load_case()
+
+    def _save_anesthesia(self) -> None:
+        try:
+            self.api.surgery_anesthesia(
+                self.case_id.value(),
+                {
+                    "anesthesia_type": self.anes_type.text().strip(),
+                    "anesthesiologist": self.anes_doctor.text().strip(),
+                    "airway": self.anes_airway.text().strip(),
+                    "agents": self.anes_agents.text().strip(),
+                    "monitors": self.anes_monitors.text().strip(),
+                    "vitals": self.anes_vitals.text().strip(),
+                    "fluids_ml": self.anes_fluids.value(),
+                    "blood_loss_ml": self.anes_blood.value(),
+                    "notes": self.anes_note.text().strip(),
+                },
+            )
+        except ApiError as e:
+            self.intra_msg.setText(f"麻醉记录保存失败（{e.status_code}）：{e.detail}")
+            return
+        self.intra_msg.setText("麻醉记录已保存")
+        self._load_case()
 
     def _safety(self, phase: str) -> None:
         try:

@@ -29,18 +29,41 @@ def _setup(client, auth):
     return patient, room, case
 
 
+def _preop(client, auth, case_id):
+    return client.post(
+        f"/surgery/cases/{case_id}/preop",
+        json={
+            "anesthesiologist": "麻醉医生",
+            "asa_grade": "II",
+            "airway": "Mallampati I",
+            "allergies": "无",
+            "comorbidities": "高血压",
+            "fasting": "禁食 8 小时",
+            "consent": True,
+            "assessment": "心肺功能可耐受手术",
+            "plan": "全麻插管",
+            "risk": "low",
+        },
+        headers=auth["surgery"],
+    )
+
+
 def test_surgery_case_full_flow(client, auth):
     patient, room, case = _setup(client, auth)
     assert case["surgery_no"].startswith("SR")
     assert case["patient_name"] == "手术患者"
     assert case["status"] == "scheduled"
 
-    # 未做术前核查不能开始
+    # 未做术前访视不能开始
     blocked = client.post(
         f"/surgery/cases/{case['id']}/start", headers=auth["surgery"]
     )
     assert blocked.status_code == 400
-    assert "安全核查" in blocked.json()["detail"]
+    assert "术前访视" in blocked.json()["detail"]
+
+    preop = _preop(client, auth, case["id"])
+    assert preop.status_code == 201
+    assert preop.json()["consent"] is True
 
     sign_in = client.post(
         f"/surgery/cases/{case['id']}/safety",
@@ -60,6 +83,24 @@ def test_surgery_case_full_flow(client, auth):
     )
     assert started.status_code == 200
     assert started.json()["status"] == "in_progress"
+
+    anesthesia = client.post(
+        f"/surgery/cases/{case['id']}/anesthesia",
+        json={
+            "anesthesia_type": "全麻",
+            "anesthesiologist": "麻醉医生",
+            "airway": "气管插管",
+            "agents": "丙泊酚、瑞芬太尼",
+            "monitors": "ECG/SpO2/ETCO2",
+            "vitals": "BP 120/70，HR 70",
+            "fluids_ml": 500,
+            "blood_loss_ml": 20,
+            "urine_ml": 100,
+        },
+        headers=auth["surgery"],
+    )
+    assert anesthesia.status_code == 201
+    assert anesthesia.json()["agents"].startswith("丙泊酚")
 
     record = client.post(
         f"/surgery/cases/{case['id']}/record",
@@ -115,10 +156,13 @@ def test_surgery_case_full_flow(client, auth):
     assert len(detail["records"]) == 1
     assert len(detail["counts"]) == 1
     assert len(detail["recovery"]) == 1
+    assert detail["preop"]["asa_grade"] == "II"
+    assert detail["anesthesia"]["airway"] == "气管插管"
 
 
 def test_surgery_count_mismatch_blocks_completion(client, auth):
     _, _, case = _setup(client, auth)
+    _preop(client, auth, case["id"])
     client.post(
         f"/surgery/cases/{case['id']}/safety",
         json={"phase": "sign_in", "checklist": "ok"},

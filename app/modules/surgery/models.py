@@ -45,6 +45,8 @@ class SurgeryCase(Base):
     records: Mapped[list["SurgeryRecord"]] = relationship(back_populates="case")
     counts: Mapped[list["SurgeryInstrumentCount"]] = relationship(back_populates="case")
     recovery: Mapped[list["SurgeryRecovery"]] = relationship(back_populates="case")
+    preop: Mapped["SurgeryPreopAssessment | None"] = relationship(back_populates="case")
+    anesthesia: Mapped["AnesthesiaRecord | None"] = relationship(back_populates="case")
 
     @property
     def patient_name(self) -> str:
@@ -114,3 +116,53 @@ class SurgeryRecovery(Base):
     note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
 
     case: Mapped[SurgeryCase] = relationship(back_populates="recovery")
+
+class SurgeryPreopAssessment(Base):
+    """术前访视/麻醉评估：开始手术前必须完成。"""
+
+    __tablename__ = "surgery_preop_assessments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey("surgery_cases.id"), nullable=False, unique=True
+    )
+    anesthesiologist: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    asa_grade: Mapped[str] = mapped_column(String(5), default="", nullable=False)
+    airway: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    allergies: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    comorbidities: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    fasting: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    assessment: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    plan: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    risk: Mapped[str] = mapped_column(String(20), default="low", nullable=False)
+    assessed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    assessed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    case: Mapped[SurgeryCase] = relationship(back_populates="preop")
+
+
+class AnesthesiaRecord(Base):
+    __tablename__ = "anesthesia_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey("surgery_cases.id"), nullable=False, unique=True
+    )
+    anesthesia_type: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    anesthesiologist: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    airway: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    agents: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    monitors: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    vitals: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    fluids_ml: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    blood_loss_ml: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    urine_ml: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    complications: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    notes: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recorded_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    case: Mapped[SurgeryCase] = relationship(back_populates="anesthesia")

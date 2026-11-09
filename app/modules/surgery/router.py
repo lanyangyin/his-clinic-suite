@@ -9,10 +9,14 @@ from app.modules.procedure_materials.schemas import (
 )
 
 from .schemas import (
+    AnesthesiaCreate,
+    AnesthesiaResponse,
     CaseCreate,
     CaseResponse,
     CountCreate,
     CountResponse,
+    PreopCreate,
+    PreopResponse,
     RecordCreate,
     RecordResponse,
     RecoveryCreate,
@@ -36,6 +40,8 @@ from .service import (
     get_case,
     list_cases,
     list_rooms,
+    save_anesthesia,
+    save_preop,
     start_case,
 )
 
@@ -192,5 +198,30 @@ def material(
 ):
     try:
         return add_material(db, case_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/cases/{case_id}/preop", response_model=PreopResponse, status_code=201)
+def preop(
+    case_id: int,
+    data: PreopCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("surgery")),
+):
+    try:
+        return save_preop(db, case_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/cases/{case_id}/anesthesia", response_model=AnesthesiaResponse, status_code=201)
+def anesthesia(
+    case_id: int,
+    data: AnesthesiaCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("surgery")),
+):
+    try:
+        return save_anesthesia(db, case_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

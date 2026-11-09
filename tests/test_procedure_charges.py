@@ -89,6 +89,11 @@ def test_surgery_charge_and_material_deduction(client, auth):
     assert any("手术：" in row["item_name"] and row["amount"] == 300.0 for row in charges)
 
     client.post(
+        f"/surgery/cases/{case['id']}/preop",
+        json={"consent": True, "asa_grade": "II", "assessment": "可耐受手术"},
+        headers=auth["surgery"],
+    )
+    client.post(
         f"/surgery/cases/{case['id']}/safety",
         json={"phase": "sign_in", "checklist": "ok"},
         headers=auth["surgery"],

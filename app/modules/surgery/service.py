@@ -13,13 +13,17 @@ from .models import (
     OperatingRoom,
     SurgeryCase,
     SurgeryInstrumentCount,
+    SurgeryPreopAssessment,
+    AnesthesiaRecord,
     SurgeryRecord,
     SurgeryRecovery,
     SurgerySafetyCheck,
 )
 from .schemas import (
+    AnesthesiaCreate,
     CaseCreate,
     CountCreate,
+    PreopCreate,
     RecordCreate,
     RecoveryCreate,
     RoomCreate,
@@ -137,6 +141,8 @@ def detail(db: Session, case_id: int) -> dict | None:
         "records": case.records,
         "counts": case.counts,
         "recovery": case.recovery,
+        "preop": case.preop,
+        "anesthesia": case.anesthesia,
     }
 
 
@@ -171,6 +177,10 @@ def start_case(db: Session, case_id: int, operator: str = "") -> SurgeryCase:
         raise ValueError("手术不存在")
     if case.status != "scheduled":
         raise ValueError("该手术当前状态不可开始")
+    if not case.preop:
+        raise ValueError("请先完成术前访视/麻醉评估")
+    if not case.preop.consent:
+        raise ValueError("术前访视尚未完成知情同意")
     sign_in = (
         db.query(SurgerySafetyCheck)
         .filter(SurgerySafetyCheck.case_id == case_id, SurgerySafetyCheck.phase == "sign_in")
@@ -243,6 +253,8 @@ def complete_case(db: Session, case_id: int, operator: str = "") -> SurgeryCase:
         raise ValueError("术后器械清点不符，不能结束手术")
     case.status = "completed"
     case.completed_at = datetime.now()
+    if case.anesthesia:
+        case.anesthesia.ended_at = datetime.now()
     db.commit()
     db.refresh(case)
     return case
@@ -303,3 +315,49 @@ def add_material(db: Session, case_id: int, data, operator: str = ""):
         warehouse=data.warehouse,
         operator=operator,
     )
+
+def save_preop(db: Session, case_id: int, data: PreopCreate, operator: str = "") -> SurgeryPreopAssessment:
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    if case.status != "scheduled":
+        raise ValueError("只有已排班手术可以填写术前访视")
+    row = case.preop
+    if row:
+        for key, value in data.model_dump().items():
+            setattr(row, key, value)
+        row.assessed_by = operator
+        row.assessed_at = datetime.now()
+    else:
+        row = SurgeryPreopAssessment(
+            case_id=case.id, **data.model_dump(), assessed_by=operator
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def save_anesthesia(db: Session, case_id: int, data: AnesthesiaCreate, operator: str = "") -> AnesthesiaRecord:
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    if case.status not in ("in_progress", "completed"):
+        raise ValueError("手术未开始，不能写麻醉记录")
+    row = case.anesthesia
+    if row:
+        for key, value in data.model_dump().items():
+            setattr(row, key, value)
+        row.recorded_by = operator
+        row.recorded_at = datetime.now()
+    else:
+        row = AnesthesiaRecord(
+            case_id=case.id,
+            started_at=case.started_at or datetime.now(),
+            **data.model_dump(),
+            recorded_by=operator,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
