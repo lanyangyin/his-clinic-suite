@@ -105,3 +105,21 @@ class TreatmentTemplateConfig(Base):
     warehouse: Mapped[str] = mapped_column(String(30), default="总库", server_default="总库", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+class TreatmentTemplateMaterial(Base):
+    __tablename__ = "treatment_template_materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    config_id: Mapped[int] = mapped_column(
+        ForeignKey("treatment_template_configs.id"), nullable=False, index=True
+    )
+    material_id: Mapped[int] = mapped_column(ForeignKey("material_items.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
+    warehouse: Mapped[str] = mapped_column(String(30), default="总库", server_default="总库", nullable=False)
+
+    material = relationship("MaterialItem")
+
+
+TreatmentTemplateConfig.materials = relationship(
+    "TreatmentTemplateMaterial", cascade="all, delete-orphan"
+)

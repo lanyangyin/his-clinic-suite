@@ -5,10 +5,11 @@ import json
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.modules.charges.models import ChargeItem
+from app.modules.charges.models import ChargeItem, EncounterCharge
 from app.modules.charges.service import add_charge
 from app.modules.encounter.service import get_encounter
 from app.modules.materials.models import MaterialItem, MaterialStock
+from app.modules.stock_ledger.service import record_material
 from app.modules.patient.models import Patient
 from app.modules.patient.service import get_patient
 
@@ -17,6 +18,7 @@ from .models import (
     TreatmentRoom,
     TreatmentRoomCase,
     TreatmentTemplateConfig,
+    TreatmentTemplateMaterial,
 )
 from .schemas import (
     CaseCreate,
@@ -53,7 +55,18 @@ def list_templates(db: Session) -> list[dict]:
     for template in TEMPLATES:
         config = configs.get(template["code"])
         charge_item = db.get(ChargeItem, config.charge_item_id) if config and config.charge_item_id else None
-        material = db.get(MaterialItem, config.material_id) if config and config.material_id else None
+        kit = []
+        for line in (config.materials if config else []):
+            material = db.get(MaterialItem, line.material_id)
+            kit.append(
+                {
+                    "material_id": line.material_id,
+                    "material_name": material.name if material else "",
+                    "quantity": line.quantity,
+                    "warehouse": line.warehouse,
+                }
+            )
+        first = kit[0] if kit else {}
         rows.append(
             {
                 **template,
@@ -61,10 +74,11 @@ def list_templates(db: Session) -> list[dict]:
                 "charge_item_id": config.charge_item_id if config else None,
                 "charge_item_name": charge_item.name if charge_item else "",
                 "price": config.price if config else 0,
-                "material_id": config.material_id if config else None,
-                "material_name": material.name if material else "",
-                "material_quantity": config.material_quantity if config else 1,
-                "warehouse": config.warehouse if config else "总库",
+                "material_id": first.get("material_id"),
+                "material_name": first.get("material_name", ""),
+                "material_quantity": first.get("quantity", 1),
+                "warehouse": first.get("warehouse", "总库"),
+                "materials": kit,
             }
         )
     return rows
@@ -75,8 +89,19 @@ def set_template_config(db: Session, template_code: str, data: TemplateConfigUpd
         raise ValueError("处置模板不存在")
     if data.charge_item_id is not None and not db.get(ChargeItem, data.charge_item_id):
         raise ValueError("收费项目不存在")
-    if data.material_id is not None and not db.get(MaterialItem, data.material_id):
-        raise ValueError("耗材不存在")
+    lines = list(data.materials)
+    if not lines and data.material_id is not None:
+        lines = [
+            {
+                "material_id": data.material_id,
+                "quantity": data.material_quantity,
+                "warehouse": data.warehouse or "总库",
+            }
+        ]
+    for line in lines:
+        material_id = line.material_id if hasattr(line, "material_id") else line["material_id"]
+        if not db.get(MaterialItem, material_id):
+            raise ValueError(f"耗材不存在：{material_id}")
     row = (
         db.query(TreatmentTemplateConfig)
         .filter(TreatmentTemplateConfig.template_code == template_code)
@@ -85,13 +110,28 @@ def set_template_config(db: Session, template_code: str, data: TemplateConfigUpd
     if not row:
         row = TreatmentTemplateConfig(template_code=template_code)
         db.add(row)
+        db.flush()
     row.charge_item_id = data.charge_item_id
     row.price = data.price
-    row.material_id = data.material_id
-    row.material_quantity = data.material_quantity
-    row.warehouse = data.warehouse
+    row.material_id = None
+    row.material_quantity = 1
+    row.warehouse = "总库"
     row.active = data.active
     row.updated_at = datetime.now()
+    for old in list(row.materials):
+        db.delete(old)
+    for line in lines:
+        material_id = line.material_id if hasattr(line, "material_id") else line["material_id"]
+        quantity = line.quantity if hasattr(line, "quantity") else line["quantity"]
+        warehouse = line.warehouse if hasattr(line, "warehouse") else line["warehouse"]
+        db.add(
+            TreatmentTemplateMaterial(
+                config_id=row.id,
+                material_id=material_id,
+                quantity=quantity,
+                warehouse=warehouse or "总库",
+            )
+        )
     db.commit()
     db.refresh(row)
     return row
@@ -330,21 +370,22 @@ def start_case(db: Session, case_id: int, data: StartRequest, operator: str = ""
             )
             .first()
         )
-    if config and config.material_id and config.material_quantity > 0 and not case.kit_applied:
+    if config and config.materials and not case.kit_applied:
         from app.modules.procedure_materials.service import consume_material
 
         try:
-            consume_material(
-                db,
-                source_type="treatment_room",
-                source_id=case.id,
-                encounter_id=case.encounter_id,
-                material_id=config.material_id,
-                quantity=config.material_quantity,
-                warehouse=config.warehouse or "总库",
-                operator=operator,
-                commit=False,
-            )
+            for line in config.materials:
+                consume_material(
+                    db,
+                    source_type="treatment_room",
+                    source_id=case.id,
+                    encounter_id=case.encounter_id,
+                    material_id=line.material_id,
+                    quantity=line.quantity,
+                    warehouse=line.warehouse or "总库",
+                    operator=operator,
+                    commit=False,
+                )
             case.kit_applied = True
         except ValueError as e:
             db.rollback()
@@ -400,6 +441,70 @@ def cancel_case(db: Session, case_id: int, operator: str = "") -> TreatmentRoomC
         raise ValueError("治疗室病例不存在")
     if case.status in ("completed", "cancelled"):
         raise ValueError("该病例已结束")
+    used = (
+        db.query(ProcedureMaterial)
+        .filter(
+            ProcedureMaterial.source_type == "treatment_room",
+            ProcedureMaterial.source_id == case.id,
+            ProcedureMaterial.returned_at.is_(None),
+        )
+        .all()
+    )
+    charges = []
+    if case.encounter_id is not None:
+        charges = (
+            db.query(EncounterCharge)
+            .filter(
+                EncounterCharge.encounter_id == case.encounter_id,
+                EncounterCharge.status != "cancelled",
+                EncounterCharge.source_type.in_(("treatment_room", "procedure_material")),
+            )
+            .all()
+        )
+        charges = [
+            charge
+            for charge in charges
+            if (charge.source_type == "treatment_room" and charge.source_id == case.id)
+            or (
+                charge.source_type == "procedure_material"
+                and charge.source_id in {row.id for row in used}
+            )
+        ]
+        if any(charge.status == "paid" for charge in charges):
+            raise ValueError("该处置已收费，请先在收费处退费后再取消")
+    for row in used:
+        material = db.get(MaterialItem, row.material_id)
+        stock = (
+            db.query(MaterialStock)
+            .filter(
+                MaterialStock.item_id == row.material_id,
+                MaterialStock.warehouse == row.warehouse,
+            )
+            .first()
+        )
+        if stock is None:
+            stock = MaterialStock(
+                item_id=row.material_id, warehouse=row.warehouse, quantity=0
+            )
+            db.add(stock)
+        stock.quantity += row.quantity
+        if material is not None:
+            record_material(
+                db,
+                material,
+                warehouse=row.warehouse,
+                direction="in",
+                quantity=row.quantity,
+                unit_price=row.unit_price,
+                ref_type="treatment_room_cancel",
+                ref_id=row.id,
+                operator=operator,
+                note=f"取消处置退耗材：{case.case_no}",
+            )
+        row.returned_at = datetime.now()
+    for charge in charges:
+        charge.status = "cancelled"
+    case.kit_applied = False
     case.status = "cancelled"
     case.note = (case.note + "；" if case.note else "") + f"取消（{operator}）"
     db.commit()

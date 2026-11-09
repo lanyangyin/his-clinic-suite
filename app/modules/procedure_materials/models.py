@@ -27,6 +27,7 @@ class ProcedureMaterial(Base):
     amount: Mapped[float] = mapped_column(default=0.0, nullable=False)
     warehouse: Mapped[str] = mapped_column(String(30), default="总库", nullable=False)
     operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     material = relationship("MaterialItem")

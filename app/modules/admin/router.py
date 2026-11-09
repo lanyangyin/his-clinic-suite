@@ -2277,15 +2277,27 @@ async def treatment_template_config(
         return redirect
     form = await request.form()
     try:
+        material_ids = form.getlist("material_id")
+        quantities = form.getlist("material_quantity")
+        warehouses = form.getlist("warehouse")
+        materials = []
+        for index, material_id in enumerate(material_ids):
+            if not material_id:
+                continue
+            materials.append(
+                {
+                    "material_id": int(material_id),
+                    "quantity": int(quantities[index] or 1) if index < len(quantities) else 1,
+                    "warehouse": (warehouses[index] if index < len(warehouses) else "总库") or "总库",
+                }
+            )
         set_template_config(
             db,
             template_code,
             TemplateConfigUpdate(
                 charge_item_id=int(form.get("charge_item_id")) if form.get("charge_item_id") else None,
                 price=float(form.get("price") or 0),
-                material_id=int(form.get("material_id")) if form.get("material_id") else None,
-                material_quantity=int(form.get("material_quantity") or 1),
-                warehouse=(form.get("warehouse") or "总库").strip(),
+                materials=materials,
                 active=form.get("active") == "on",
             ),
         )

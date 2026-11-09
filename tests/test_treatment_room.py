@@ -312,3 +312,86 @@ def test_treatment_template_config_and_kit(client, auth):
     page = client.get("/admin/treatment-templates")
     assert page.status_code == 200
     assert "包皮环切" in page.text
+
+
+def test_multi_material_kit_and_cancel_return(client, auth):
+    patient, encounter, room, _, _ = _setup(client, auth)
+    materials = []
+    for code, name in (("KIT-A", "清创包"), ("KIT-B", "无菌敷料")):
+        item = client.post(
+            "/materials/items/",
+            json={"code": code, "name": name, "unit": "个", "price": 10, "category": "consumable"},
+            headers=auth["admin"],
+        ).json()
+        client.post(
+            "/materials/stock-in",
+            json={"item_id": item["id"], "warehouse": "总库", "quantity": 10},
+            headers=auth["admin"],
+        )
+        materials.append(item)
+    charge_item = client.post(
+        "/charges/items/",
+        json={"code": "EXC", "name": "小肿物切除", "category": "treatment", "price": 150},
+        headers=auth["admin"],
+    ).json()
+    configured = client.put(
+        "/treatment-room/templates/excision",
+        json={
+            "charge_item_id": charge_item["id"],
+            "price": 150,
+            "materials": [
+                {"material_id": materials[0]["id"], "quantity": 1, "warehouse": "总库"},
+                {"material_id": materials[1]["id"], "quantity": 2, "warehouse": "总库"},
+            ],
+            "active": True,
+        },
+        headers=auth["admin"],
+    )
+    assert configured.status_code == 200, configured.text
+
+    case = client.post(
+        "/treatment-room/cases",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "room_id": room["id"],
+            "procedure_name": "小肿物切除",
+            "template_code": "excision",
+        },
+        headers=auth["treatment"],
+    ).json()
+    assert case["price"] == 150
+
+    started = client.post(
+        f"/treatment-room/cases/{case['id']}/start",
+        json={"consent": True, "anesthesia": "局麻"},
+        headers=auth["treatment"],
+    )
+    assert started.status_code == 200, started.text
+    assert started.json()["kit_applied"] is True
+    for item, expected in zip(materials, (9, 8)):
+        stock = client.get(
+            f"/materials/stocks?item_id={item['id']}", headers=auth["admin"]
+        ).json()
+        assert sum(r["quantity"] for r in stock if r["warehouse"] == "总库") == expected
+
+    cancelled = client.post(
+        f"/treatment-room/cases/{case['id']}/cancel", headers=auth["treatment"]
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+    for item in materials:
+        stock = client.get(
+            f"/materials/stocks?item_id={item['id']}", headers=auth["admin"]
+        ).json()
+        assert sum(r["quantity"] for r in stock if r["warehouse"] == "总库") == 10
+    charges = client.get(
+        f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]
+    ).json()
+    touched = [
+        row
+        for row in charges
+        if row["item_name"] in ("治疗室：小肿物切除", "材料：清创包", "材料：无菌敷料")
+    ]
+    assert touched
+    assert all(row["status"] == "cancelled" for row in touched)

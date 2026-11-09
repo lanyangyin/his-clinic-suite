@@ -91,6 +91,7 @@ class TreatmentTemplate(BaseModel):
     material_name: str = ""
     material_quantity: int = 1
     warehouse: str = "总库"
+    materials: list[dict] = Field(default_factory=list)
 
 class FollowUpCreate(BaseModel):
     case_id: int | None = None
@@ -121,6 +122,7 @@ class TemplateConfigUpdate(BaseModel):
     material_id: int | None = None
     material_quantity: int = Field(default=1, ge=0, le=10000)
     warehouse: str = Field(default="总库", max_length=30)
+    materials: list["TemplateMaterialUpdate"] = Field(default_factory=list)
     active: bool = True
 
 
@@ -135,3 +137,11 @@ class TemplateConfigResponse(BaseModel):
     warehouse: str
     active: bool
     model_config = ConfigDict(from_attributes=True)
+
+class TemplateMaterialUpdate(BaseModel):
+    material_id: int
+    quantity: int = Field(default=1, ge=1, le=10000)
+    warehouse: str = Field(default="总库", max_length=30)
+
+
+TemplateConfigUpdate.model_rebuild()
