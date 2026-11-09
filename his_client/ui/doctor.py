@@ -291,10 +291,14 @@ class DoctorWidget(QWidget):
                 record = self.api.update_medical_record(encounter_id, payload)
                 action = "更新"
             except ApiError as e:
-                if e.status_code != 404:
+                # 新病历：服务端 404（历史版本返回 400 +「还没有病历」）时改为创建
+                if e.status_code == 404 or (
+                    e.status_code == 400 and "还没有病历" in (e.detail or "")
+                ):
+                    record = self.api.create_medical_record(encounter_id, payload)
+                    action = "创建"
+                else:
                     raise
-                record = self.api.create_medical_record(encounter_id, payload)
-                action = "创建"
         except ApiError as e:
             self.record_msg.setText(f"保存失败（{e.status_code}）：{e.detail}")
             return

@@ -334,6 +334,10 @@ class DemoWindow(QMainWindow):
             self.doctor.record_edits["treatment_advice"].setPlainText("抗感染，多饮水")
             self.click(record_tab, "保存 / 更新")
             self.click(record_tab, "签名锁定")
+            record = self.doctor_api.call(
+                "GET", f"/encounters/{self.encounter_id}/medical-record"
+            )
+            assert record.get("signed_by"), f"病历未签名：{record}"
             self.scene("✅ 接诊与病历签名完成")
 
             self.scene("⑤ 医生工作站：开方（阿莫西林 2 盒）+ 检验 + 治疗")

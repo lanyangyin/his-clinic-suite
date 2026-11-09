@@ -67,7 +67,7 @@ def list_items(encounter_id: int, db: Session = Depends(get_db)):
     return list_prescription_items(db, encounter_id)
 
 
-_NOT_FOUND = {"就诊记录不存在"}
+_NOT_FOUND = {"就诊记录不存在", "该就诊还没有病历"}
 
 
 @router.post(

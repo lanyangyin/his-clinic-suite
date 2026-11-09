@@ -135,7 +135,7 @@ def test_update_missing_record(client, auth):
         json={"treatment_advice": "x"},
         headers=auth["doctor"],
     )
-    assert r.status_code == 400
+    assert r.status_code == 404
     assert r.json()["detail"] == "该就诊还没有病历"
 
 
