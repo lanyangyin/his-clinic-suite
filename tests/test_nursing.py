@@ -1,152 +1,169 @@
-def setup_admission(client, auth):
-    """建患者/医生/病区/床位并入院，返回 admission。"""
+"""护士站输液/医嘱执行：同步、配药、开始、巡视、完成、跳过。"""
+
+
+def _setup(client, auth):
     patient = client.post(
-        "/patients/", json={"name": "张三", "id_number": "110101199001011234"},
+        "/patients/",
+        json={"name": "输液患者", "id_number": "110101199001019999"},
         headers=auth["cashier"],
     ).json()
-    department = client.post(
-        "/departments/", json={"name": "内科"}, headers=auth["admin"]
+    dept = client.post(
+        "/departments/", json={"name": "输液内科"}, headers=auth["admin"]
     ).json()
     doctor = client.post(
         "/doctors/",
-        json={"name": "王医生", "department_id": department["id"]},
+        json={"name": "输液医生", "department_id": dept["id"]},
         headers=auth["admin"],
     ).json()
-    ward = client.post("/wards/", json={"name": "内科病区"}, headers=auth["admin"]).json()
-    bed = client.post(
-        "/beds/", json={"ward_id": ward["id"], "code": "101"}, headers=auth["admin"]
-    ).json()
-    return client.post(
-        "/admissions/",
-        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "bed_id": bed["id"]},
+    reg = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
         headers=auth["cashier"],
     ).json()
-
-
-def test_record_vital_signs(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/vital-signs",
-        json={"temperature": 37.5, "pulse": 88, "respiration": 20, "systolic": 120, "diastolic": 80, "spo2": 98},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 201
-    body = r.json()
-    assert body["temperature"] == 37.5
-    assert body["spo2"] == 98
-    assert body["recorded_by"] == "nurse"
-
-
-def test_vital_signs_partial_record(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/vital-signs",
-        json={"temperature": 36.8},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 201
-    assert r.json()["pulse"] is None
-
-
-def test_vital_signs_all_empty_rejected(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/vital-signs",
-        json={},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 422
-
-
-def test_vital_signs_out_of_range_rejected(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/vital-signs",
-        json={"temperature": 50},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 422
-
-
-def test_list_vital_signs(client, auth):
-    admission = setup_admission(client, auth)
-    for temp in (36.5, 37.2, 38.0):
-        client.post(
-            f"/admissions/{admission['id']}/vital-signs",
-            json={"temperature": temp},
-            headers=auth["nurse"],
-        )
-    r = client.get(f"/admissions/{admission['id']}/vital-signs")
-    assert r.status_code == 200
-    assert [v["temperature"] for v in r.json()] == [36.5, 37.2, 38.0]
-
-
-def test_vital_signs_missing_admission(client, auth):
-    r = client.post(
-        "/admissions/999/vital-signs", json={"temperature": 36.5}, headers=auth["nurse"]
-    )
-    assert r.status_code == 400
-    assert r.json()["detail"] == "住院记录不存在"
-    assert client.get("/admissions/999/vital-signs").status_code == 404
-
-
-def test_create_nursing_note(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/nursing-notes",
-        json={"content": "患者诉头晕，已通知医生，嘱卧床休息。"},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 201
-    body = r.json()
-    assert body["recorded_by"] == "nurse"
-    assert "头晕" in body["content"]
-
-
-def test_nursing_note_empty_content_rejected(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/nursing-notes",
-        json={"content": ""},
-        headers=auth["nurse"],
-    )
-    assert r.status_code == 422
-
-
-def test_list_nursing_notes(client, auth):
-    admission = setup_admission(client, auth)
-    for text in ("记录一", "记录二"):
-        client.post(
-            f"/admissions/{admission['id']}/nursing-notes",
-            json={"content": text},
-            headers=auth["nurse"],
-        )
-    r = client.get(f"/admissions/{admission['id']}/nursing-notes")
-    assert r.status_code == 200
-    assert [n["content"] for n in r.json()] == ["记录一", "记录二"]
-
-
-def test_nursing_notes_missing_admission(client, auth):
-    r = client.post(
-        "/admissions/999/nursing-notes", json={"content": "x"}, headers=auth["nurse"]
-    )
-    assert r.status_code == 400
-    assert client.get("/admissions/999/nursing-notes").status_code == 404
-
-
-def test_role_protection(client, auth):
-    admission = setup_admission(client, auth)
-    r = client.post(
-        f"/admissions/{admission['id']}/vital-signs",
-        json={"temperature": 36.5},
+    encounter = client.post(
+        "/encounters/",
+        json={"registration_id": reg["id"], "diagnosis": "急性支气管炎"},
+        headers=auth["doctor"],
+    ).json()
+    drug = client.post(
+        "/drugs/",
+        json={"name": "输液用抗生素", "base_price": 30.0, "insurance_ratio": 0.8},
+        headers=auth["admin"],
+    ).json()
+    oral = client.post(
+        "/drugs/",
+        json={"name": "口服药", "base_price": 5.0},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={
+            "drug_id": drug["id"],
+            "quantity": 2,
+            "dosage": "1g",
+            "frequency": "qd",
+            "route": "静滴",
+            "days": 1,
+        },
         headers=auth["doctor"],
     )
-    assert r.status_code == 403
-    r = client.post(
-        f"/admissions/{admission['id']}/nursing-notes",
-        json={"content": "x"},
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={
+            "drug_id": oral["id"],
+            "quantity": 1,
+            "dosage": "1片",
+            "route": "口服",
+            "days": 3,
+        },
         headers=auth["doctor"],
     )
-    assert r.status_code == 403
-    r = client.post(f"/admissions/{admission['id']}/vital-signs", json={"temperature": 36.5})
-    assert r.status_code == 401
+    treat = client.post(
+        "/charges/items/",
+        json={
+            "code": "INFUSION",
+            "name": "静脉输液",
+            "category": "treatment",
+            "price": 15.0,
+            "insurance_ratio": 0.0,
+        },
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/treatments/encounters/{encounter['id']}",
+        json={"item_id": treat["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    return patient, encounter
+
+
+def test_nursing_sync_and_execution(client, auth):
+    patient, encounter = _setup(client, auth)
+    synced = client.post(
+        f"/nursing/encounters/{encounter['id']}/sync", headers=auth["nurse"]
+    )
+    assert synced.status_code == 200
+    orders = synced.json()
+    assert len(orders) == 2
+    names = {row["item_name"] for row in orders}
+    assert "输液用抗生素" in names
+    assert "口服药" not in names
+    assert any(row["order_type"] == "infusion" for row in orders)
+
+    again = client.post(
+        f"/nursing/encounters/{encounter['id']}/sync", headers=auth["nurse"]
+    ).json()
+    assert again == []
+
+    work = client.get(
+        "/nursing/orders",
+        params={"encounter_id": encounter["id"]},
+        headers=auth["nurse"],
+    ).json()
+    assert len(work) == 2
+    assert work[0]["patient_name"] == "输液患者"
+
+    infusion = next(row for row in orders if row["order_type"] == "infusion")
+    prepared = client.post(
+        f"/nursing/orders/{infusion['id']}/prepare",
+        json={
+            "solvent": "0.9%氯化钠 250ml",
+            "dose": "1g",
+            "batch_no": "B20261109",
+            "checked_by": "李护士",
+            "expires_minutes": 120,
+        },
+        headers=auth["nurse"],
+    )
+    assert prepared.status_code == 201
+    assert prepared.json()["solvent"] == "0.9%氯化钠 250ml"
+
+    started = client.post(
+        f"/nursing/orders/{infusion['id']}/start",
+        json={"seat_no": "输液-08", "rate_ml_h": 60},
+        headers=auth["nurse"],
+    )
+    assert started.status_code == 200
+    assert started.json()["status"] == "executing"
+    assert started.json()["seat_no"] == "输液-08"
+
+    observed = client.post(
+        f"/nursing/orders/{infusion['id']}/observe",
+        json={"rate_ml_h": 50, "note": "滴速调慢", "adverse_reaction": ""},
+        headers=auth["nurse"],
+    )
+    assert observed.status_code == 201
+    assert observed.json()["rate_ml_h"] == 50
+
+    completed = client.post(
+        f"/nursing/orders/{infusion['id']}/complete",
+        json={"note": "输完拔针", "adverse_reaction": ""},
+        headers=auth["nurse"],
+    )
+    assert completed.status_code == 200
+    assert completed.json()["status"] == "completed"
+    assert completed.json()["completed_at"] is not None
+
+    detail = client.get(
+        f"/nursing/orders/{infusion['id']}/detail", headers=auth["nurse"]
+    ).json()
+    assert len(detail["preparations"]) == 1
+    assert len(detail["observations"]) == 1
+
+    other = next(row for row in orders if row["id"] != infusion["id"])
+    skipped = client.post(
+        f"/nursing/orders/{other['id']}/skip",
+        json={"reason": "患者拒绝"},
+        headers=auth["nurse"],
+    )
+    assert skipped.status_code == 200
+    assert skipped.json()["status"] == "skipped"
+
+
+def test_nursing_role_protection(client, auth):
+    _, encounter = _setup(client, auth)
+    response = client.post(
+        f"/nursing/encounters/{encounter['id']}/sync", headers=auth["doctor"]
+    )
+    assert response.status_code == 403
+    assert client.get("/nursing/orders", headers=auth["cashier"]).status_code == 403

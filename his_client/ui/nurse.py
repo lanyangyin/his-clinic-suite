@@ -1,8 +1,11 @@
 """护士工作站：门诊分诊叫号、治疗执行。"""
 from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -23,6 +26,7 @@ class NurseWidget(QWidget):
         tabs = QTabWidget()
         tabs.addTab(self._build_triage_tab(), "分诊叫号")
         tabs.addTab(self._build_treatment_tab(), "治疗执行")
+        tabs.addTab(self._build_nursing_tab(), "输液执行")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
 
@@ -180,3 +184,249 @@ class NurseWidget(QWidget):
         )
         self._load_pending_treatments()
 
+
+    # ---------- 输液/医嘱执行 ----------
+    def _build_nursing_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        top = QHBoxLayout()
+        self.nurse_encounter_id = QSpinBox()
+        self.nurse_encounter_id.setRange(1, 10_000_000)
+        sync = QPushButton("同步医嘱")
+        sync.clicked.connect(self._sync_nursing)
+        refresh = QPushButton("刷新执行单")
+        refresh.clicked.connect(self._load_nursing)
+        self.nursing_filter = QComboBox()
+        for label, value in [
+            ("未完成", "pending,prepared,executing"),
+            ("待配药", "pending"),
+            ("已配药", "prepared"),
+            ("执行中", "executing"),
+            ("全部", None),
+        ]:
+            self.nursing_filter.addItem(label, value)
+        top.addWidget(QLabel("就诊 ID"))
+        top.addWidget(self.nurse_encounter_id)
+        top.addWidget(sync)
+        top.addWidget(refresh)
+        top.addWidget(self.nursing_filter)
+        layout.addLayout(top)
+
+        self.nursing_table = QTableWidget(0, 8)
+        self.nursing_table.setHorizontalHeaderLabels(
+            ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单"]
+        )
+        self.nursing_table.cellClicked.connect(self._select_nursing)
+        layout.addWidget(self.nursing_table, 1)
+
+        prep_box = QGroupBox("配药")
+        prep = QFormLayout(prep_box)
+        self.solvent = QLineEdit()
+        self.solvent.setPlaceholderText("如 0.9%氯化钠 250ml")
+        self.dose = QLineEdit()
+        self.dose.setPlaceholderText("如 1g")
+        self.batch_no = QLineEdit()
+        self.batch_no.setPlaceholderText("药品批号")
+        self.checked_by = QLineEdit()
+        self.checked_by.setPlaceholderText("核对人")
+        prep_btn = QPushButton("配药完成")
+        prep_btn.clicked.connect(self._prepare_nursing)
+        prep.addRow("溶媒", self.solvent)
+        prep.addRow("剂量", self.dose)
+        prep.addRow("批号", self.batch_no)
+        prep.addRow("核对人", self.checked_by)
+        prep.addRow("", prep_btn)
+        layout.addWidget(prep_box)
+
+        exec_box = QGroupBox("执行 / 巡视")
+        form = QFormLayout(exec_box)
+        row = QHBoxLayout()
+        self.seat_no = QLineEdit()
+        self.seat_no.setPlaceholderText("输液座位号")
+        self.rate = QLineEdit()
+        self.rate.setPlaceholderText("滴速 ml/h")
+        row.addWidget(QLabel("座位"))
+        row.addWidget(self.seat_no)
+        row.addWidget(QLabel("滴速"))
+        row.addWidget(self.rate)
+        self.nursing_note = QLineEdit()
+        self.nursing_note.setPlaceholderText("巡视/完成/跳过说明")
+        self.adverse = QLineEdit()
+        self.adverse.setPlaceholderText("不良反应，没有可留空")
+        form.addRow(row)
+        form.addRow("说明", self.nursing_note)
+        form.addRow("不良反应", self.adverse)
+        buttons = QHBoxLayout()
+        start = QPushButton("开始执行")
+        start.clicked.connect(self._start_nursing)
+        observe = QPushButton("巡视记录")
+        observe.clicked.connect(self._observe_nursing)
+        complete = QPushButton("完成")
+        complete.clicked.connect(self._complete_nursing)
+        skip = QPushButton("跳过")
+        skip.clicked.connect(self._skip_nursing)
+        buttons.addWidget(start)
+        buttons.addWidget(observe)
+        buttons.addWidget(complete)
+        buttons.addWidget(skip)
+        form.addRow(buttons)
+        layout.addWidget(exec_box)
+
+        self.nursing_msg = QLabel("")
+        self.nursing_msg.setWordWrap(True)
+        layout.addWidget(self.nursing_msg)
+        return page
+
+    def _sync_nursing(self) -> None:
+        try:
+            created = self.api.sync_nursing(self.nurse_encounter_id.value())
+        except ApiError as e:
+            self.nursing_msg.setText(f"同步失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText(f"已生成 {len(created)} 条新执行单")
+        self._load_nursing()
+
+    def _load_nursing(self) -> None:
+        try:
+            self.nursing_rows = self.api.list_nursing_orders(
+                self.nursing_filter.currentData()
+            )
+        except ApiError as e:
+            self.nursing_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_table.setRowCount(len(self.nursing_rows))
+        for row, order in enumerate(self.nursing_rows):
+            values = [
+                order.get("patient_name") or "",
+                order["item_name"],
+                {"infusion": "输液", "injection": "注射", "treatment": "治疗"}.get(
+                    order["order_type"], order["order_type"]
+                ),
+                f"{order.get('dosage') or ''} {order.get('route') or ''}".strip() or "—",
+                {
+                    "pending": "待配药",
+                    "prepared": "已配药",
+                    "executing": "执行中",
+                    "completed": "已完成",
+                    "skipped": "已跳过",
+                }.get(order["status"], order["status"]),
+                order.get("seat_no") or "—",
+                f"{order['rate_ml_h']:g}" if order.get("rate_ml_h") else "—",
+                str(order["id"]),
+            ]
+            for col, value in enumerate(values):
+                self.nursing_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.nursing_msg.setText(f"执行单 {len(self.nursing_rows)} 条")
+
+    def _select_nursing(self, row: int, _col: int) -> None:
+        if 0 <= row < len(self.nursing_rows):
+            self.current_nursing = self.nursing_rows[row]
+            self.nursing_msg.setText(
+                f"当前：{self.current_nursing['item_name']} · "
+                f"{self.current_nursing['status']}"
+            )
+
+    def _selected_nursing(self) -> dict | None:
+        order = getattr(self, "current_nursing", None)
+        if not order:
+            self.nursing_msg.setText("请先选择一条执行单")
+        return order
+
+    def _prepare_nursing(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        try:
+            self.api.prepare_nursing(
+                order["id"],
+                {
+                    "solvent": self.solvent.text().strip(),
+                    "dose": self.dose.text().strip(),
+                    "batch_no": self.batch_no.text().strip(),
+                    "checked_by": self.checked_by.text().strip(),
+                    "expires_minutes": 120,
+                },
+            )
+        except ApiError as e:
+            self.nursing_msg.setText(f"配药失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText("配药完成")
+        self._load_nursing()
+
+    def _rate_value(self) -> float | None:
+        text = self.rate.text().strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
+    def _start_nursing(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        try:
+            self.api.start_nursing(
+                order["id"],
+                {"seat_no": self.seat_no.text().strip(), "rate_ml_h": self._rate_value()},
+            )
+        except ApiError as e:
+            self.nursing_msg.setText(f"开始失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText("已开始执行")
+        self._load_nursing()
+
+    def _observe_nursing(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        try:
+            self.api.observe_nursing(
+                order["id"],
+                {
+                    "rate_ml_h": self._rate_value(),
+                    "note": self.nursing_note.text().strip(),
+                    "adverse_reaction": self.adverse.text().strip(),
+                },
+            )
+        except ApiError as e:
+            self.nursing_msg.setText(f"巡视失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText("巡视已记录")
+        self._load_nursing()
+
+    def _complete_nursing(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        try:
+            self.api.complete_nursing(
+                order["id"],
+                {
+                    "note": self.nursing_note.text().strip(),
+                    "adverse_reaction": self.adverse.text().strip(),
+                },
+            )
+        except ApiError as e:
+            self.nursing_msg.setText(f"完成失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText("执行完成")
+        self._load_nursing()
+
+    def _skip_nursing(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        reason = self.nursing_note.text().strip()
+        if not reason:
+            self.nursing_msg.setText("请在说明中填写跳过原因")
+            return
+        try:
+            self.api.skip_nursing(order["id"], reason)
+        except ApiError as e:
+            self.nursing_msg.setText(f"跳过失败（{e.status_code}）：{e.detail}")
+            return
+        self.nursing_msg.setText("已跳过")
+        self._load_nursing()

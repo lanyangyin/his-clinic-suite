@@ -233,6 +233,37 @@ class ApiClient:
     def destroy_archive(self, record_id: int, payload: dict) -> dict:
         return self._request("POST", f"/archive/records/{record_id}/destroy", json=payload)
 
+    # ---- 护士输液/医嘱执行 ----
+    def sync_nursing(self, encounter_id: int) -> list:
+        return self._request("POST", f"/nursing/encounters/{encounter_id}/sync")
+
+    def list_nursing_orders(
+        self, status: str | None = None, encounter_id: int | None = None
+    ) -> list:
+        params = {}
+        if status:
+            params["status"] = status
+        if encounter_id:
+            params["encounter_id"] = encounter_id
+        return self._request("GET", "/nursing/orders", params=params)
+
+    def prepare_nursing(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/nursing/orders/{order_id}/prepare", json=payload)
+
+    def start_nursing(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/nursing/orders/{order_id}/start", json=payload)
+
+    def observe_nursing(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/nursing/orders/{order_id}/observe", json=payload)
+
+    def complete_nursing(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/nursing/orders/{order_id}/complete", json=payload)
+
+    def skip_nursing(self, order_id: int, reason: str) -> dict:
+        return self._request(
+            "POST", f"/nursing/orders/{order_id}/skip", json={"reason": reason}
+        )
+
     def list_imaging_items(self) -> list:
         return self._request("GET", "/pacs/items/")
 
