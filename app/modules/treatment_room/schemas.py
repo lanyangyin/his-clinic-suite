@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -81,3 +81,26 @@ class TreatmentTemplate(BaseModel):
     code: str
     name: str
     fields: list[dict]
+
+class FollowUpCreate(BaseModel):
+    case_id: int | None = None
+    patient_id: int
+    encounter_id: int | None = None
+    due_date: date
+    purpose: str = Field(default="换药", max_length=50)
+    note: str = Field(default="", max_length=200)
+
+
+class FollowUpResponse(BaseModel):
+    id: int
+    case_id: int | None
+    patient_id: int
+    patient_name: str
+    encounter_id: int | None
+    due_date: date
+    purpose: str
+    status: str
+    note: str
+    created_at: datetime
+    completed_at: datetime | None
+    model_config = ConfigDict(from_attributes=True)

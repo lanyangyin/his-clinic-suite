@@ -1,7 +1,8 @@
 """治疗室：清创/换药/小处置的排队、知情同意、处置记录与计费。"""
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import json
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.modules.charges.models import ChargeItem
@@ -10,9 +11,10 @@ from app.modules.encounter.service import get_encounter
 from app.modules.patient.models import Patient
 from app.modules.patient.service import get_patient
 
-from .models import TreatmentRoom, TreatmentRoomCase
-from .schemas import CaseCreate, CompleteRequest, RoomCreate, StartRequest
+from .models import TreatmentFollowUp, TreatmentRoom, TreatmentRoomCase
+from .schemas import CaseCreate, CompleteRequest, FollowUpCreate, RoomCreate, StartRequest
 from .templates import TEMPLATES
+from app.modules.procedure_materials.models import ProcedureMaterial
 
 
 def create_room(db: Session, data: RoomCreate) -> TreatmentRoom:
@@ -31,6 +33,112 @@ def list_rooms(db: Session) -> list[TreatmentRoom]:
 
 def list_templates() -> list[dict]:
     return TEMPLATES
+
+
+def list_followups(db: Session, status: str | None = None, due_before: date | None = None) -> list[TreatmentFollowUp]:
+    query = db.query(TreatmentFollowUp)
+    if status:
+        query = query.filter(TreatmentFollowUp.status == status)
+    if due_before:
+        query = query.filter(TreatmentFollowUp.due_date <= due_before)
+    return query.order_by(TreatmentFollowUp.due_date, TreatmentFollowUp.id).all()
+
+
+def create_followup(db: Session, data: FollowUpCreate) -> TreatmentFollowUp:
+    if not get_patient(db, data.patient_id):
+        raise ValueError("患者不存在")
+    if data.case_id is not None and not get_case(db, data.case_id):
+        raise ValueError("治疗室病例不存在")
+    row = TreatmentFollowUp(**data.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def complete_followup(db: Session, followup_id: int) -> TreatmentFollowUp:
+    row = db.get(TreatmentFollowUp, followup_id)
+    if not row:
+        raise ValueError("随访任务不存在")
+    if row.status != "pending":
+        raise ValueError("该随访任务已结束")
+    row.status = "completed"
+    row.completed_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def cancel_followup(db: Session, followup_id: int) -> TreatmentFollowUp:
+    row = db.get(TreatmentFollowUp, followup_id)
+    if not row:
+        raise ValueError("随访任务不存在")
+    if row.status != "pending":
+        raise ValueError("该随访任务已结束")
+    row.status = "cancelled"
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+_FOLLOWUP_PLAN = {
+    "debridement": (3, "换药"),
+    "abscess": (2, "换药"),
+    "nail": (3, "换药"),
+    "burn": (2, "换药"),
+    "excision": (7, "拆线/复诊"),
+    "circumcision": (7, "复诊"),
+}
+
+
+def report(db: Session, report_date: date | None = None) -> dict:
+    day = report_date or date.today()
+    start = datetime.combine(day, datetime.min.time())
+    end = datetime.combine(day, datetime.max.time())
+    cases = (
+        db.query(TreatmentRoomCase)
+        .filter(TreatmentRoomCase.created_at >= start, TreatmentRoomCase.created_at <= end)
+        .all()
+    )
+    completed = [row for row in cases if row.status == "completed"]
+    material_amount = (
+        db.query(func.coalesce(func.sum(ProcedureMaterial.amount), 0))
+        .filter(
+            ProcedureMaterial.source_type == "treatment_room",
+            ProcedureMaterial.created_at >= start,
+            ProcedureMaterial.created_at <= end,
+        )
+        .scalar()
+        or 0
+    )
+    by_template: dict[str, int] = {}
+    by_room: dict[str, int] = {}
+    for row in completed:
+        key = row.template_code or "other"
+        by_template[key] = by_template.get(key, 0) + 1
+        room = row.room_name or "未指定"
+        by_room[room] = by_room.get(room, 0) + 1
+    followups = (
+        db.query(TreatmentFollowUp)
+        .filter(
+            TreatmentFollowUp.status == "pending",
+            TreatmentFollowUp.due_date <= day,
+        )
+        .count()
+    )
+    return {
+        "date": day,
+        "total": len(cases),
+        "completed": len(completed),
+        "waiting": sum(1 for row in cases if row.status == "waiting"),
+        "in_progress": sum(1 for row in cases if row.status == "in_progress"),
+        "cancelled": sum(1 for row in cases if row.status == "cancelled"),
+        "revenue": round(sum(row.price for row in completed), 2),
+        "material_amount": round(float(material_amount), 2),
+        "by_template": by_template,
+        "by_room": by_room,
+        "followups_due": followups,
+    }
 
 
 def _next_no(db: Session) -> str:
@@ -162,6 +270,19 @@ def complete_case(db: Session, case_id: int, data: CompleteRequest, operator: st
     case.note = data.note or case.note
     case.operator = operator or case.operator
     case.completed_at = datetime.now()
+    plan = _FOLLOWUP_PLAN.get(case.template_code)
+    if plan:
+        days, purpose = plan
+        db.add(
+            TreatmentFollowUp(
+                case_id=case.id,
+                patient_id=case.patient_id,
+                encounter_id=case.encounter_id,
+                due_date=(case.completed_at + timedelta(days=days)).date(),
+                purpose=purpose,
+                note=f"{case.procedure_name}后{purpose}",
+            )
+        )
     db.commit()
     db.refresh(case)
     return case

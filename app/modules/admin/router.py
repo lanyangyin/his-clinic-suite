@@ -143,6 +143,10 @@ from app.modules.tcm.service import (
 )
 from app.modules.insurance.workbench import workbench as insurance_workbench
 from app.modules.bi.executive import executive as executive_dashboard
+from app.modules.treatment_room.service import (
+    list_followups as treatment_followups,
+    report as treatment_report,
+)
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2211,4 +2215,30 @@ def executive_page(
         request,
         "executive.html",
         _ctx(request, data=data, trend_max=trend_max),
+    )
+
+# ---------- 治疗室日报 ----------
+
+@router.get("/treatment-report", response_class=HTMLResponse)
+def treatment_report_page(
+    request: Request,
+    report_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        day = date.fromisoformat(report_date) if report_date else date.today()
+    except ValueError:
+        day = date.today()
+    data = treatment_report(db, day)
+    return templates.TemplateResponse(
+        request,
+        "treatment_report.html",
+        _ctx(
+            request,
+            data=data,
+            followups=treatment_followups(db, status="pending", due_before=day),
+        ),
     )

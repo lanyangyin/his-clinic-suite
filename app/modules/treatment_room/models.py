@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date as date_type, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -63,3 +63,29 @@ class TreatmentRoomCase(Base):
     @property
     def room_name(self) -> str:
         return self.room.name if self.room else ""
+
+class TreatmentFollowUp(Base):
+    """换药/拆线/复诊随访任务。"""
+
+    __tablename__ = "treatment_follow_ups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    case_id: Mapped[int | None] = mapped_column(
+        ForeignKey("treatment_room_cases.id"), nullable=True, index=True
+    )
+    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    encounter_id: Mapped[int | None] = mapped_column(ForeignKey("encounters.id"), nullable=True)
+    due_date: Mapped[date_type] = mapped_column(Date, nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(50), default="换药", nullable=False)
+    # pending 待随访 / completed 已完成 / cancelled 已取消
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    patient = relationship("Patient")
+    case = relationship("TreatmentRoomCase")
+
+    @property
+    def patient_name(self) -> str:
+        return self.patient.name if self.patient else ""

@@ -545,6 +545,20 @@ class ApiClient:
             "POST", f"/treatment-room/cases/{case_id}/materials", json=payload
         )
 
+    def list_treatment_followups(self, status: str | None = "pending") -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/treatment-room/follow-ups", params=params)
+
+    def complete_treatment_followup(self, followup_id: int) -> dict:
+        return self._request(
+            "POST", f"/treatment-room/follow-ups/{followup_id}/complete"
+        )
+
+    def cancel_treatment_followup(self, followup_id: int) -> dict:
+        return self._request(
+            "POST", f"/treatment-room/follow-ups/{followup_id}/cancel"
+        )
+
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)

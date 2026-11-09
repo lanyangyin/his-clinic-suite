@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}治疗室日报 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>治疗室日报</h2>
+<form class="inline" method="get" action="/admin/treatment-report">
+  <label>日期<input type="date" name="report_date" value="{{ data.date }}"></label>
+  <button type="submit">查询</button>
+</form>
+
+<div class="cards">
+  <div class="card"><div class="num">{{ data.total }}</div><div class="label">当日处置</div></div>
+  <div class="card"><div class="num">{{ data.completed }}</div><div class="label">已完成</div></div>
+  <div class="card"><div class="num">{{ data.waiting }}</div><div class="label">候诊</div></div>
+  <div class="card"><div class="num">{{ data.in_progress }}</div><div class="label">处置中</div></div>
+  <div class="card"><div class="num">{{ data.cancelled }}</div><div class="label">已取消</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.revenue) }}</div><div class="label">处置收入</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.material_amount) }}</div><div class="label">材料费</div></div>
+  <div class="card"><div class="num" style="color:#b45309">{{ data.followups_due }}</div><div class="label">到期随访</div></div>
+</div>
+
+<div class="panel">
+  <h3>按模板</h3>
+  <table>
+    <tr><th>模板</th><th>已完成</th></tr>
+    {% for key, count in data.by_template.items() %}
+    <tr><td>{{ key }}</td><td>{{ count }}</td></tr>
+    {% else %}<tr><td colspan="2">当日无完成处置</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>按治疗室</h3>
+  <table>
+    <tr><th>治疗室</th><th>已完成</th></tr>
+    {% for key, count in data.by_room.items() %}
+    <tr><td>{{ key }}</td><td>{{ count }}</td></tr>
+    {% else %}<tr><td colspan="2">当日无完成处置</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>到期/逾期随访</h3>
+  <table>
+    <tr><th>患者</th><th>日期</th><th>目的</th><th>备注</th><th>状态</th></tr>
+    {% for row in followups %}
+    <tr>
+      <td>{{ row.patient_name }}</td><td>{{ row.due_date }}</td>
+      <td>{{ row.purpose }}</td><td>{{ row.note }}</td><td>{{ row.status }}</td>
+    </tr>
+    {% else %}<tr><td colspan="5">无待随访</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

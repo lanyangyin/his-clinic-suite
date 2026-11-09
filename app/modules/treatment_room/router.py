@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -12,6 +14,8 @@ from .schemas import (
     CaseCreate,
     CaseResponse,
     CompleteRequest,
+    FollowUpCreate,
+    FollowUpResponse,
     RoomCreate,
     RoomResponse,
     StartRequest,
@@ -20,13 +24,18 @@ from .schemas import (
 from .service import (
     add_material,
     cancel_case,
+    cancel_followup,
     complete_case,
+    complete_followup,
     create_case,
+    create_followup,
     create_room,
     get_case,
     list_cases,
+    list_followups,
     list_rooms,
     list_templates,
+    report,
     start_case,
 )
 
@@ -138,3 +147,57 @@ def material(
 @router.get("/templates", response_model=list[TreatmentTemplate])
 def templates(_: None = Depends(require_role("treatment"))):
     return list_templates()
+
+@router.get("/follow-ups", response_model=list[FollowUpResponse])
+def follow_ups(
+    status: str | None = None,
+    due_before: date | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    return list_followups(db, status, due_before)
+
+
+@router.post("/follow-ups", response_model=FollowUpResponse, status_code=201)
+def new_follow_up(
+    data: FollowUpCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    try:
+        return create_followup(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/follow-ups/{followup_id}/complete", response_model=FollowUpResponse)
+def finish_follow_up(
+    followup_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    try:
+        return complete_followup(db, followup_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/follow-ups/{followup_id}/cancel", response_model=FollowUpResponse)
+def drop_follow_up(
+    followup_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    try:
+        return cancel_followup(db, followup_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/report")
+def treatment_report(
+    report_date: date | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    return report(db, report_date)

@@ -29,6 +29,7 @@ class TreatmentRoomWidget(QWidget):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_queue_tab(), "治疗排队")
         self.tabs.addTab(self._build_handle_tab(), "处置记录")
+        self.tabs.addTab(self._build_followup_tab(), "换药随访")
         layout = QVBoxLayout(self)
         layout.addWidget(self.tabs)
 
@@ -349,4 +350,71 @@ class TreatmentRoomWidget(QWidget):
             self.template_form.addRow(field["label"], edit)
         if not self.procedure.text().strip():
             self.procedure.setText(definition["name"])
+
+
+    def _build_followup_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新待随访")
+        refresh.clicked.connect(self._load_followups)
+        complete = QPushButton("标记已随访")
+        complete.clicked.connect(self._complete_followup)
+        cancel = QPushButton("取消任务")
+        cancel.clicked.connect(self._cancel_followup)
+        top.addWidget(refresh)
+        top.addWidget(complete)
+        top.addWidget(cancel)
+        top.addStretch(1)
+        layout.addLayout(top)
+        self.followup_table = QTableWidget(0, 5)
+        self.followup_table.setHorizontalHeaderLabels(["患者", "日期", "目的", "备注", "状态"])
+        layout.addWidget(self.followup_table, 1)
+        self.followup_msg = QLabel("")
+        layout.addWidget(self.followup_msg)
+        self._load_followups()
+        return page
+
+    def _load_followups(self) -> None:
+        try:
+            self.followups = self.api.list_treatment_followups("pending")
+        except ApiError as e:
+            self.followup_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.followup_table.setRowCount(len(self.followups))
+        for row, item in enumerate(self.followups):
+            values = [item["patient_name"], str(item["due_date"]), item["purpose"], item["note"], item["status"]]
+            for col, value in enumerate(values):
+                self.followup_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.followup_msg.setText(f"待随访 {len(self.followups)} 条")
+
+    def _selected_followup(self):
+        row = self.followup_table.currentRow()
+        if 0 <= row < len(getattr(self, "followups", [])):
+            return self.followups[row]
+        return None
+
+    def _complete_followup(self) -> None:
+        item = self._selected_followup()
+        if not item:
+            self.followup_msg.setText("请先选择随访任务")
+            return
+        try:
+            self.api.complete_treatment_followup(item["id"])
+        except ApiError as e:
+            self.followup_msg.setText(f"操作失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_followups()
+
+    def _cancel_followup(self) -> None:
+        item = self._selected_followup()
+        if not item:
+            self.followup_msg.setText("请先选择随访任务")
+            return
+        try:
+            self.api.cancel_treatment_followup(item["id"])
+        except ApiError as e:
+            self.followup_msg.setText(f"操作失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_followups()
 

@@ -168,3 +168,67 @@ def test_treatment_room_templates(client, auth):
     )
     assert detail.status_code == 200
     assert detail.json()["template_code"] == "circumcision"
+
+
+def test_treatment_followup_and_daily_report(client, auth):
+    patient, encounter, room, _, _ = _setup(client, auth)
+    case = client.post(
+        "/treatment-room/cases",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "room_id": room["id"],
+            "procedure_name": "清创缝合",
+            "template_code": "debridement",
+            "template_data": {"site": "右手掌", "size": "3cm"},
+        },
+        headers=auth["treatment"],
+    ).json()
+    client.post(
+        f"/treatment-room/cases/{case['id']}/start",
+        json={"consent": True, "anesthesia": "局麻", "findings": "裂伤"},
+        headers=auth["treatment"],
+    )
+    client.post(
+        f"/treatment-room/cases/{case['id']}/complete",
+        json={"procedure_detail": "清创缝合 3 针", "sutures": "3-0 丝线 3 针"},
+        headers=auth["treatment"],
+    )
+
+    followups = client.get(
+        "/treatment-room/follow-ups", headers=auth["treatment"]
+    ).json()
+    assert any(row["case_id"] == case["id"] for row in followups)
+    fu = next(row for row in followups if row["case_id"] == case["id"])
+    assert fu["purpose"] == "换药"
+    assert fu["patient_name"] == "清创患者"
+
+    done = client.post(
+        f"/treatment-room/follow-ups/{fu['id']}/complete", headers=auth["treatment"]
+    )
+    assert done.status_code == 200
+    assert done.json()["status"] == "completed"
+
+    report = client.get(
+        f"/treatment-room/report?report_date={fu['due_date']}",
+        headers=auth["treatment"],
+    )
+    # 报告按处置创建日期统计，这里只验证结构和字段
+    assert report.status_code == 200
+    body = report.json()
+    assert "by_template" in body
+    assert "by_room" in body
+    assert "followups_due" in body
+
+
+def test_treatment_report_admin_page(client, auth):
+    _setup(client, auth)
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/treatment-report")
+    assert page.status_code == 200
+    assert "治疗室日报" in page.text
+    assert "到期随访" in page.text
