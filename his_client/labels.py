@@ -44,7 +44,16 @@ LABELS: dict[str, dict[str, str]] = {
         "cancelled": "已取消",
     },
     "encounter_status": {"open": "就诊中", "closed": "已结束"},
-    "lab_status": {"pending": "待报告", "reported": "已报告"},
+    "lab_status": {
+        "pending": "待采样",
+        "collected": "已采样",
+        "received": "已签收",
+        "testing": "检验中",
+        "reported": "已报告",
+        "reviewed": "已审核",
+        "rejected": "标本拒收",
+        "cancelled": "已取消",
+    },
     "payment_status": {
         "paid": "已收费",
         "partially_refunded": "部分退费",

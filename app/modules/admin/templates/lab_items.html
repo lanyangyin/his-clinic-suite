@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}检验项目 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>检验项目字典</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<div class="panel">
+  <form class="inline" method="post" action="/admin/lab-items">
+    <label>编码<input name="code" required placeholder="WBC"></label>
+    <label>名称<input name="name" required placeholder="白细胞计数"></label>
+    <label>价格<input name="price" type="number" step="0.01" value="0"></label>
+    <label>标本类型<input name="specimen_type" value="血液"></label>
+    <label>单位<input name="unit" placeholder="10^9/L"></label>
+    <label>参考下限<input name="reference_low" type="number" step="0.01"></label>
+    <label>参考上限<input name="reference_high" type="number" step="0.01"></label>
+    <label>方法<input name="method" placeholder="电阻抗法"></label>
+    <label>TAT(分钟)<input name="tat_minutes" type="number" value="60"></label>
+    <label>医保比例<input name="insurance_ratio" type="number" step="0.01" value="0.7"></label>
+    <button type="submit">新增项目</button>
+  </form>
+</div>
+<div class="panel">
+  <table>
+    <tr><th>编码</th><th>名称</th><th>价格</th><th>标本</th><th>单位</th><th>参考范围</th><th>方法</th><th>TAT</th><th>医保比例</th></tr>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.code }}</td><td>{{ item.name }}</td><td>{{ '%.2f'|format(item.price) }}</td>
+      <td>{{ item.specimen_type }}</td><td>{{ item.unit }}</td>
+      <td>
+        {% if item.reference_low is not none and item.reference_high is not none %}
+        {{ item.reference_low }} – {{ item.reference_high }}
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ item.method or '—' }}</td><td>{{ item.tat_minutes }} 分钟</td>
+      <td>{{ item.insurance_ratio }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">暂无检验项目</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

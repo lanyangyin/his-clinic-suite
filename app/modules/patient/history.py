@@ -81,6 +81,13 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                         "item_name": item.item_name,
                         "status": item.status,
                         "result": item.result,
+                        "result_value": item.result_value,
+                        "result_unit": item.result_unit,
+                        "reference_low": item.reference_low,
+                        "reference_high": item.reference_high,
+                        "abnormal_flag": item.abnormal_flag,
+                        "critical_flag": item.critical_flag,
+                        "report_no": item.report_no,
                         "requested_at": item.requested_at,
                         "reported_at": item.reported_at,
                     }

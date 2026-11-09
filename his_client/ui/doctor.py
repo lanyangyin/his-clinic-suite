@@ -373,7 +373,9 @@ class DoctorWidget(QWidget):
         detail.addTab(self.history_record, "病历")
         self.history_rx_table = self._history_table(["药品", "数量", "用法", "金额"])
         detail.addTab(self.history_rx_table, "处方")
-        self.history_lab_table = self._history_table(["项目", "状态", "结果", "报告时间"])
+        self.history_lab_table = self._history_table(
+            ["项目", "状态", "结果", "参考范围", "异常", "报告时间"]
+        )
         detail.addTab(self.history_lab_table, "检验")
         self.history_treat_table = self._history_table(["项目", "数量", "状态", "执行人"])
         detail.addTab(self.history_treat_table, "治疗")
@@ -499,7 +501,20 @@ class DoctorWidget(QWidget):
                 [
                     item["item_name"],
                     zh("lab_status", item["status"]),
-                    item["result"] or "—",
+                    (
+                        f"{item['result_value']:g} {item.get('result_unit') or ''}".strip()
+                        if item.get("result_value") is not None
+                        else item.get("result") or "—"
+                    ),
+                    (
+                        f"{item['reference_low']:g}–{item['reference_high']:g}"
+                        if item.get("reference_low") is not None
+                        and item.get("reference_high") is not None
+                        else "—"
+                    ),
+                    {"H": "↑ 偏高", "L": "↓ 偏低", "N": "正常"}.get(
+                        item.get("abnormal_flag") or "", "—"
+                    ),
                     str(item.get("reported_at") or "")[:16].replace("T", " "),
                 ]
                 for item in encounter["lab_requests"]

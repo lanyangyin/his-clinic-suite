@@ -48,3 +48,26 @@ def test_cssd_admin_page_creates_set(client, auth):
     assert "清创包" in page.text
     assert "器械灭菌" in page.text
     assert "被服洗涤" in page.text
+
+
+def test_lab_item_admin_page(client, auth):
+    _login_admin(client, auth)
+    created = client.post(
+        "/admin/lab-items",
+        data={
+            "code": "ADM-WBC",
+            "name": "管理台白细胞",
+            "price": "12",
+            "specimen_type": "血液",
+            "unit": "10^9/L",
+            "reference_low": "4",
+            "reference_high": "10",
+            "tat_minutes": "30",
+            "insurance_ratio": "0.8",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+    page = client.get("/admin/lab-items")
+    assert page.status_code == 200
+    assert "管理台白细胞" in page.text

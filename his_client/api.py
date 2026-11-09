@@ -170,6 +170,41 @@ class ApiClient:
     def list_lab_requests(self, encounter_id: int) -> list:
         return self._request("GET", f"/lab/encounters/{encounter_id}/lab-requests")
 
+    def lab_worklist(self, status: str | None = None, priority: str | None = None) -> list:
+        params = {}
+        if status:
+            params["status"] = status
+        if priority:
+            params["priority"] = priority
+        return self._request("GET", "/lab/worklist", params=params)
+
+    def collect_lab(self, request_id: int) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/collect", json={})
+
+    def receive_lab(self, request_id: int) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/receive")
+
+    def reject_lab(self, request_id: int, reason: str) -> dict:
+        return self._request(
+            "POST", f"/lab/requests/{request_id}/reject", json={"reason": reason}
+        )
+
+    def start_lab(self, request_id: int) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/start")
+
+    def report_lab(self, request_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/report", json=payload)
+
+    def review_lab(self, request_id: int) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/review")
+
+    def critical_lab(self, request_id: int, note: str, notified_to: str) -> dict:
+        return self._request(
+            "POST",
+            f"/lab/requests/{request_id}/critical",
+            json={"note": note, "notified_to": notified_to},
+        )
+
     def list_imaging_items(self) -> list:
         return self._request("GET", "/pacs/items/")
 

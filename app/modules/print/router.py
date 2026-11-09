@@ -9,6 +9,7 @@ from app.database import get_db
 from app.modules.billing.service import get_payment
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
+from app.modules.lis.service import get_request
 from app.modules.patient.service import get_patient
 from app.modules.registration.service import get_registration
 from app.modules.staff.service import get_doctor
@@ -203,3 +204,91 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db)):
         )
     data = {"payment": payment, "patient": patient, "lines": lines}
     return HTMLResponse(render_receipt(data))
+
+LAB_CSS = """
+    @page { size: A5; margin: 10mm; }
+    body { font-family: "Microsoft YaHei", "SimSun", sans-serif; font-size: 12px; color: #111; }
+    h2 { text-align: center; margin: 4px 0; font-size: 16px; }
+    .meta { display: flex; justify-content: space-between; margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #888; padding: 6px; font-size: 12px; }
+    th { background: #f2f2f2; }
+    .right { text-align: right; }
+    .flag { font-weight: bold; color: #b91c1c; }
+    .critical { border: 1px solid #b91c1c; color: #b91c1c; padding: 6px; margin-top: 8px; }
+    .sign { margin-top: 16px; display: flex; justify-content: space-between; }
+    @media print { .no-print { display: none; } }
+"""
+
+
+@router.get("/lab-report/{request_id}", response_class=HTMLResponse)
+def print_lab_report(request_id: int, db: Session = Depends(get_db)):
+    request = get_request(db, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="检验申请不存在")
+    encounter = get_encounter(db, request.encounter_id)
+    registration = get_registration(db, encounter.registration_id) if encounter else None
+    patient = get_patient(db, registration.patient_id) if registration else None
+    doctor = get_doctor(db, registration.doctor_id) if registration else None
+    meta = _clinic_meta()
+    flag_text = {"H": "↑ 偏高", "L": "↓ 偏低", "N": "正常", "": "—"}.get(
+        request.abnormal_flag, request.abnormal_flag
+    )
+    reference = "—"
+    if request.reference_low is not None and request.reference_high is not None:
+        reference = f"{request.reference_low:g} – {request.reference_high:g}"
+    critical = ""
+    if request.critical_flag:
+        critical = (
+            '<div class="critical">危急值：'
+            + escape(request.critical_note or "")
+            + "　已通知："
+            + escape(request.critical_notified_to or "未登记")
+            + "</div>"
+        )
+    status = {
+        "reported": "已报告（待审核）",
+        "reviewed": "已审核",
+        "pending": "待采样",
+        "collected": "已采样",
+        "received": "已签收",
+        "testing": "检验中",
+        "rejected": "标本拒收",
+    }.get(request.status, request.status)
+    return HTMLResponse(
+        f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>检验报告单</title><style>{LAB_CSS}</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])} · 检验报告单</h2>
+<div class="meta">
+  <span>患者：{escape(patient.name if patient else '—')}　
+        {escape(patient.id_number if patient else '')}</span>
+  <span>报告号：{escape(request.report_no or '—')}</span>
+</div>
+<div class="meta">
+  <span>就诊：{request.encounter_id}　诊断：{escape(encounter.diagnosis if encounter else '')}　
+        医生：{escape(doctor.name if doctor else '')}</span>
+  <span>标本号：{escape(request.specimen_no or '—')}　
+        标本：{escape(request.specimen_type)}</span>
+</div>
+<table>
+  <tr><th>项目</th><th>结果</th><th>单位</th><th>参考范围</th><th>异常</th></tr>
+  <tr>
+    <td>{escape(request.item_name)}</td>
+    <td>{escape(request.result_display or '—')}</td>
+    <td>{escape(request.result_unit or '')}</td>
+    <td>{escape(reference)}</td>
+    <td class="flag">{escape(flag_text)}</td>
+  </tr>
+</table>
+{critical}
+<div class="sign">
+  <span>检验者：{escape(request.testing_by or '—')}</span>
+  <span>审核者：{escape(request.reviewed_by or '—')}</span>
+  <span>状态：{escape(status)}</span>
+</div>
+<p class="right">报告时间：{request.reported_at.strftime('%Y-%m-%d %H:%M') if request.reported_at else '—'}</p>
+<p class="right">审核时间：{request.reviewed_at.strftime('%Y-%m-%d %H:%M') if request.reviewed_at else '—'}</p>
+<p class="center">本报告仅对送检标本负责，如有疑问请及时联系检验科。</p>
+</body></html>"""
+    )

@@ -92,6 +92,11 @@ from app.modules.cssd.service import (
     release_batch,
     use_package,
 )
+from app.modules.lis.schemas import LabItemCreate
+from app.modules.lis.service import (
+    create_item as create_lab_item,
+    list_items as list_lab_items,
+)
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1395,3 +1400,48 @@ def cssd_recall_submit(
     except Exception as e:  # noqa: BLE001
         msg = f"召回失败：{e}"
     return RedirectResponse(f"/admin/cssd?msg={quote(msg)}", status_code=302)
+
+# ---------- 检验项目字典 ----------
+
+@router.get("/lab-items", response_class=HTMLResponse)
+def lab_items_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "lab_items.html",
+        _ctx(
+            request,
+            items=list_lab_items(db),
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/lab-items")
+async def lab_item_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_lab_item(
+            db,
+            LabItemCreate(
+                code=(form.get("code") or "").strip(),
+                name=(form.get("name") or "").strip(),
+                price=float(form.get("price") or 0),
+                specimen_type=(form.get("specimen_type") or "血液").strip(),
+                unit=(form.get("unit") or "").strip(),
+                reference_low=_form_float(form, "reference_low"),
+                reference_high=_form_float(form, "reference_high"),
+                method=(form.get("method") or "").strip(),
+                tat_minutes=_form_int(form, "tat_minutes") or 60,
+                insurance_ratio=float(form.get("insurance_ratio") or 0.7),
+            ),
+        )
+        msg = "检验项目已创建"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/lab-items?msg={quote(msg)}", status_code=302)

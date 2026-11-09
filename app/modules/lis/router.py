@@ -5,20 +5,30 @@ from app.database import get_db
 from app.modules.auth.security import require_role
 
 from .schemas import (
+    CriticalRequest,
     LabItemCreate,
     LabItemResponse,
     LabReportRequest,
     LabRequestCreate,
     LabRequestResponse,
+    RejectRequest,
+    SpecimenActionRequest,
 )
 from .service import (
+    collect_request,
     create_item,
     create_request,
     get_item,
     get_request,
     list_items,
     list_requests,
+    receive_request,
+    register_critical,
+    reject_request,
     report_request,
+    review_request,
+    start_testing,
+    worklist,
 )
 
 router = APIRouter(prefix="/lab", tags=["lis"])
@@ -83,6 +93,98 @@ def get_request_one(request_id: int, db: Session = Depends(get_db)):
     return request
 
 
+@router.get("/worklist")
+def get_worklist(
+    status: str | None = None,
+    priority: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("lab")),
+):
+    """检验科工作列表（可按状态/加急筛选）。"""
+    return worklist(db, status, priority)
+
+
+@router.post("/requests/{request_id}/collect", response_model=LabRequestResponse)
+def collect(
+    request_id: int,
+    data: SpecimenActionRequest | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("nurse", "lab")),
+):
+    try:
+        return collect_request(db, request_id, data or SpecimenActionRequest(), user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post("/requests/{request_id}/receive", response_model=LabRequestResponse)
+def receive(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("lab")),
+):
+    try:
+        return receive_request(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post("/requests/{request_id}/reject", response_model=LabRequestResponse)
+def reject(
+    request_id: int,
+    data: RejectRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("lab")),
+):
+    try:
+        return reject_request(db, request_id, data, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post("/requests/{request_id}/start", response_model=LabRequestResponse)
+def start(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("lab")),
+):
+    try:
+        return start_testing(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post("/requests/{request_id}/review", response_model=LabRequestResponse)
+def review(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("lab")),
+):
+    try:
+        return review_request(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post("/requests/{request_id}/critical", response_model=LabRequestResponse)
+def critical(
+    request_id: int,
+    data: CriticalRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("lab")),
+):
+    try:
+        return register_critical(db, request_id, data, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
 @router.post("/requests/{request_id}/report", response_model=LabRequestResponse)
 def report(
     request_id: int,
@@ -91,7 +193,7 @@ def report(
     _: None = Depends(require_role("lab")),
 ):
     try:
-        return report_request(db, request_id, data.result)
+        return report_request(db, request_id, data)
     except ValueError as e:
         code = 404 if str(e) == "检验申请不存在" else 400
         raise HTTPException(status_code=code, detail=str(e))
