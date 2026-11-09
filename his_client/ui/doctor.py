@@ -35,17 +35,184 @@ class DoctorWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
-        tabs = QTabWidget()
-        tabs.addTab(self._build_register_tab(), "挂号")
-        tabs.addTab(self._build_reception_tab(), "接诊")
-        tabs.addTab(self._build_record_tab(), "病历")
-        tabs.addTab(self._build_history_tab(), "历史诊疗")
-        tabs.addTab(self._build_prescription_tab(), "开方")
-        tabs.addTab(PaymentPanel(api), "收费")
-        tabs.addTab(self._build_exam_tab(), "检验 / 检查")
-        tabs.addTab(self._build_treatment_tab(), "治疗")
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_workbench_tab(), "门诊工作台")
+        self.tabs.addTab(self._build_register_tab(), "挂号")
+        self.tabs.addTab(self._build_reception_tab(), "接诊")
+        self.tabs.addTab(self._build_record_tab(), "病历")
+        self.tabs.addTab(self._build_history_tab(), "历史诊疗")
+        self.tabs.addTab(self._build_prescription_tab(), "开方")
+        self.tabs.addTab(PaymentPanel(api), "收费")
+        self.tabs.addTab(self._build_exam_tab(), "检验 / 检查")
+        self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
-        layout.addWidget(tabs)
+        layout.addWidget(self.tabs)
+
+    # ---------- 门诊工作台 ----------
+    def _build_workbench_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        top.addWidget(QLabel("今日门诊队列（待接诊 + 今日已接诊）"))
+        refresh = QPushButton("刷新队列")
+        refresh.clicked.connect(self._load_workbench)
+        top.addWidget(refresh)
+        top.addStretch(1)
+        layout.addLayout(top)
+
+        self.wb_table = QTableWidget(0, 7)
+        self.wb_table.setHorizontalHeaderLabels(
+            ["挂号", "患者", "医生", "挂号状态", "就诊", "诊断", "待缴"]
+        )
+        self.wb_table.cellClicked.connect(self._select_workbench)
+        layout.addWidget(self.wb_table, 1)
+
+        self.wb_patient = QLabel("请选择患者")
+        self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
+        layout.addWidget(self.wb_patient)
+
+        row = QHBoxLayout()
+        self.wb_diagnosis = QLineEdit()
+        self.wb_diagnosis.setPlaceholderText("诊断，如 急性上呼吸道感染")
+        self.wb_start = QPushButton("开始接诊")
+        self.wb_start.clicked.connect(self._start_workbench)
+        row.addWidget(QLabel("诊断"))
+        row.addWidget(self.wb_diagnosis)
+        row.addWidget(self.wb_start)
+        layout.addLayout(row)
+
+        actions = QHBoxLayout()
+        for text, handler in [
+            ("写病历", self._wb_record),
+            ("开方", self._wb_prescribe),
+            ("开检验", self._wb_exam),
+            ("开治疗", self._wb_treat),
+            ("历史诊疗", self._wb_history),
+        ]:
+            button = QPushButton(text)
+            button.clicked.connect(handler)
+            actions.addWidget(button)
+        layout.addLayout(actions)
+
+        self.wb_summary = QLabel("")
+        self.wb_summary.setWordWrap(True)
+        layout.addWidget(self.wb_summary)
+        self.wb_fee_table = QTableWidget(0, 4)
+        self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
+        layout.addWidget(self.wb_fee_table, 1)
+        return page
+
+    def _load_workbench(self) -> None:
+        try:
+            self.workbench_rows = self.api.doctor_worklist()
+        except ApiError as e:
+            self.wb_summary.setText(f"加载队列失败（{e.status_code}）：{e.detail}")
+            return
+        self.wb_table.setRowCount(len(self.workbench_rows))
+        for row, item in enumerate(self.workbench_rows):
+            values = [
+                str(item["registration_id"]),
+                item["patient_name"],
+                item["doctor_name"],
+                zh("registration_status", item["registration_status"]),
+                str(item.get("encounter_id") or "—"),
+                item.get("diagnosis") or "—",
+                f"{item.get('pending_amount', 0):.2f}",
+            ]
+            for col, value in enumerate(values):
+                self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.wb_summary.setText(f"今日队列 {len(self.workbench_rows)} 人")
+
+    def _select_workbench(self, row: int, _col: int) -> None:
+        if not (0 <= row < len(self.workbench_rows)):
+            return
+        item = self.workbench_rows[row]
+        self.wb_current = item
+        self.wb_patient.setText(
+            f"{item['patient_name']} · 挂号 {item['registration_id']} · "
+            f"就诊 {item.get('encounter_id') or '未接诊'}"
+        )
+        self.wb_diagnosis.setText(item.get("diagnosis") or "")
+        self.wb_start.setEnabled(not item.get("encounter_id"))
+        if item.get("encounter_id"):
+            self._load_workbench_summary(item["encounter_id"])
+        else:
+            self.wb_fee_table.setRowCount(0)
+            self.wb_summary.setText("尚未接诊，填写诊断后点「开始接诊」")
+
+    def _load_workbench_summary(self, encounter_id: int) -> None:
+        try:
+            summary = self.api.encounter_summary(encounter_id)
+        except ApiError as e:
+            self.wb_summary.setText(f"加载就诊摘要失败（{e.status_code}）：{e.detail}")
+            return
+        self.wb_summary_data = summary
+        self.wb_summary.setText(
+            f"诊断：{summary['diagnosis'] or '—'}　状态："
+            f"{zh('encounter_status', summary['status'])}　"
+            f"病历：{'已签名' if summary['record_signed'] else '未签名'}　"
+            f"费用：{summary['total_amount']:.2f} 元（待缴 {summary['pending_amount']:.2f}）　"
+            f"处方 {summary['prescription_count']} / 检验 {summary['lab_count']} / 治疗 {summary['treatment_count']}"
+        )
+        charges = summary.get("charges") or []
+        self.wb_fee_table.setRowCount(len(charges))
+        for row, charge in enumerate(charges):
+            values = [
+                charge["item_name"],
+                str(charge["quantity"]),
+                f"{charge['amount']:.2f}",
+                zh("charge_status", charge["status"]),
+            ]
+            for col, value in enumerate(values):
+                self.wb_fee_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.reg_id.setValue(summary["registration_id"])
+        self.mr_encounter_id.setValue(encounter_id)
+        self.rx_encounter_id.setValue(encounter_id)
+        self.exam_encounter_id.setValue(encounter_id)
+        self.treat_encounter_id.setValue(encounter_id)
+
+    def _start_workbench(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item:
+            self.wb_summary.setText("请先选择患者")
+            return
+        try:
+            encounter = self.api.create_encounter(
+                item["registration_id"], self.wb_diagnosis.text().strip()
+            )
+        except ApiError as e:
+            self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_workbench()
+        for row, candidate in enumerate(self.workbench_rows):
+            if candidate["registration_id"] == item["registration_id"]:
+                self.wb_table.selectRow(row)
+                self._select_workbench(row, 0)
+                break
+        self.wb_summary.setText(f"接诊成功：就诊 ID {encounter['id']}")
+
+    def _switch_tab(self, text: str) -> None:
+        for index in range(self.tabs.count()):
+            if text in self.tabs.tabText(index):
+                self.tabs.setCurrentIndex(index)
+                return
+
+    def _wb_record(self) -> None:
+        self._switch_tab("病历")
+        if hasattr(self, "mr_encounter_id") and self.wb_current:
+            self._load_record()
+
+    def _wb_prescribe(self) -> None:
+        self._switch_tab("开方")
+
+    def _wb_exam(self) -> None:
+        self._switch_tab("检验")
+
+    def _wb_treat(self) -> None:
+        self._switch_tab("治疗")
+
+    def _wb_history(self) -> None:
+        self._switch_tab("历史诊疗")
 
     # ---------- 挂号（医生站现场挂号） ----------
     def _build_register_tab(self) -> QWidget:

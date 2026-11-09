@@ -323,3 +323,96 @@ def get_medical_record_quality(db: Session, encounter_id: int) -> dict:
         "passed": score >= 60,
         "missing_fields": missing,
     }
+
+def worklist(db: Session) -> list[dict]:
+    """医生门诊队列：待接诊 + 今日已接诊，带费用预览。"""
+    from datetime import date
+
+    from app.modules.charges.service import list_charges
+    from app.modules.patient.models import Patient
+    from app.modules.registration.models import Registration
+    from app.modules.staff.models import Doctor
+
+    rows = (
+        db.query(Registration, Patient, Doctor)
+        .join(Patient, Registration.patient_id == Patient.id)
+        .join(Doctor, Registration.doctor_id == Doctor.id)
+        .order_by(Registration.id.desc())
+        .all()
+    )
+    result = []
+    for registration, patient, doctor in rows:
+        encounter = (
+            db.query(Encounter)
+            .filter(Encounter.registration_id == registration.id)
+            .first()
+        )
+        if encounter is None and registration.status != "registered":
+            continue
+        if encounter is not None and encounter.created_at.date() != date.today():
+            continue
+        charges = list_charges(db, encounter.id) if encounter else []
+        total = round(sum(row.amount for row in charges), 2)
+        pending = round(sum(row.amount for row in charges if row.status == "pending"), 2)
+        result.append(
+            {
+                "registration_id": registration.id,
+                "patient_id": patient.id,
+                "patient_name": patient.name,
+                "doctor_id": doctor.id,
+                "doctor_name": doctor.name,
+                "registration_status": registration.status,
+                "encounter_id": encounter.id if encounter else None,
+                "encounter_status": encounter.status if encounter else "",
+                "diagnosis": encounter.diagnosis if encounter else "",
+                "total_amount": total,
+                "pending_amount": pending,
+            }
+        )
+    result.sort(key=lambda row: (row["encounter_id"] is not None, row["registration_id"]))
+    return result
+
+
+def encounter_summary(db: Session, encounter_id: int) -> dict | None:
+    from app.modules.charges.service import list_charges
+    from app.modules.lis.service import list_requests
+    from app.modules.patient.service import get_patient
+    from app.modules.registration.service import get_registration
+    from app.modules.staff.service import get_doctor
+    from app.modules.treatment.service import list_treatments
+
+    encounter = get_encounter(db, encounter_id)
+    if not encounter:
+        return None
+    registration = get_registration(db, encounter.registration_id)
+    patient = get_patient(db, registration.patient_id) if registration else None
+    doctor = get_doctor(db, registration.doctor_id) if registration else None
+    charges = list_charges(db, encounter.id)
+    record = get_medical_record(db, encounter.id)
+    return {
+        "encounter_id": encounter.id,
+        "registration_id": encounter.registration_id,
+        "patient_id": patient.id if patient else None,
+        "patient_name": patient.name if patient else "",
+        "doctor_name": doctor.name if doctor else "",
+        "diagnosis": encounter.diagnosis,
+        "status": encounter.status,
+        "record_signed": bool(record and record.signed_by),
+        "total_amount": round(sum(row.amount for row in charges), 2),
+        "pending_amount": round(
+            sum(row.amount for row in charges if row.status == "pending"), 2
+        ),
+        "charges": [
+            {
+                "id": row.id,
+                "item_name": row.item_name,
+                "quantity": row.quantity,
+                "amount": row.amount,
+                "status": row.status,
+            }
+            for row in charges
+        ],
+        "prescription_count": len(list_prescription_items(db, encounter.id)),
+        "lab_count": len(list_requests(db, encounter.id)),
+        "treatment_count": len(list_treatments(db, encounter.id)),
+    }

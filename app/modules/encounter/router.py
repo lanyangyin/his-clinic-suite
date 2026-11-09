@@ -28,6 +28,8 @@ from .service import (
     list_prescription_items,
     sign_medical_record,
     update_medical_record,
+    worklist,
+    encounter_summary,
 )
 
 router = APIRouter(prefix="/encounters", tags=["encounters"])
@@ -50,6 +52,15 @@ def get_all(patient_id: int | None = None, db: Session = Depends(get_db)):
     return list_encounters(db, patient_id)
 
 
+@router.get("/worklist")
+def get_worklist(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    """医生门诊工作台队列：待接诊 + 今日已接诊。"""
+    return worklist(db)
+
+
 @router.get("/{encounter_id}", response_model=EncounterResponse)
 def get_one(encounter_id: int, db: Session = Depends(get_db)):
     encounter = get_encounter(db, encounter_id)
@@ -65,6 +76,18 @@ def list_items(encounter_id: int, db: Session = Depends(get_db)):
     if not get_encounter(db, encounter_id):
         raise HTTPException(status_code=404, detail="就诊记录不存在")
     return list_prescription_items(db, encounter_id)
+
+
+@router.get("/{encounter_id}/summary")
+def get_summary(
+    encounter_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    data = encounter_summary(db, encounter_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="就诊记录不存在")
+    return data
 
 
 _NOT_FOUND = {"就诊记录不存在", "该就诊还没有病历"}

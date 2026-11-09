@@ -117,6 +117,12 @@ class ApiClient:
         params = {"patient_id": patient_id} if patient_id else {}
         return self._request("GET", "/encounters/", params=params)
 
+    def doctor_worklist(self) -> list:
+        return self._request("GET", "/encounters/worklist")
+
+    def encounter_summary(self, encounter_id: int) -> dict:
+        return self._request("GET", f"/encounters/{encounter_id}/summary")
+
     def create_encounter(self, registration_id: int, diagnosis: str = "") -> dict:
         return self._request(
             "POST",
