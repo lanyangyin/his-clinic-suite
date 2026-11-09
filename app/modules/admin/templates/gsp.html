@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}GSP · HIS 管理台{% endblock %}
+{% block content %}
+<h2>GSP 药品质量管理</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<div class="cards">
+  <div class="card"><div class="num" style="color:#b91c1c">{{ alerts.unqualified_acceptances }}</div><div class="label">不合格验收</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ alerts.abnormal_storage }}</div><div class="label">温湿度异常</div></div>
+  <div class="card"><div class="num" style="color:#b45309">{{ alerts.active_recalls }}</div><div class="label">进行中召回</div></div>
+  <div class="card"><div class="num" style="color:#b45309">{{ alerts.expiring_personnel }}</div><div class="label">资质到期</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ alerts.serious_adverse }}</div><div class="label">严重不良反应</div></div>
+</div>
+
+<div class="panel">
+  <h3>验收记录</h3>
+  <form class="inline" method="post" action="/admin/gsp/acceptances">
+    <label>供应商<input name="supplier_name" placeholder="供应商"></label>
+    <label>随货单号<input name="delivery_no"></label>
+    <label>运输温度<input name="transport_temp" type="number" step="0.1"></label>
+    <label>运输合格<input type="checkbox" name="transport_ok" checked></label>
+    <label>药品<input name="item_name" required placeholder="药品名称"></label>
+    <label>批号<input name="batch_no"></label>
+    <label>效期<input name="expiry" type="date"></label>
+    <label>数量<input name="quantity" type="number" min="0" value="1"></label>
+    <button type="submit">保存验收</button>
+  </form>
+  <table>
+    <tr><th>验收单</th><th>供应商</th><th>随货单</th><th>温度</th><th>结论</th><th>验收人</th><th>时间</th></tr>
+    {% for row in acceptances %}
+    <tr>
+      <td>{{ row.acceptance_no }}</td><td>{{ row.supplier_name or '—' }}</td><td>{{ row.delivery_no or '—' }}</td>
+      <td>{{ row.transport_temp if row.transport_temp is not none else '—' }}</td>
+      <td>{{ '合格' if row.result == 'qualified' else '不合格' }}</td>
+      <td>{{ row.accepted_by }}</td><td>{{ row.arrival_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}<tr><td colspan="7">暂无验收记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>温湿度 / 养护记录</h3>
+  <form class="inline" method="post" action="/admin/gsp/storage-logs">
+    <label>区域<input name="area" value="药房"></label>
+    <label>温度℃<input name="temperature" type="number" step="0.1"></label>
+    <label>湿度%<input name="humidity" type="number" step="0.1"></label>
+    <label>备注<input name="note" placeholder="如 每日上午记录"></label>
+    <button type="submit">记录</button>
+  </form>
+  <table>
+    <tr><th>区域</th><th>温度</th><th>湿度</th><th>结论</th><th>记录人</th><th>时间</th></tr>
+    {% for row in storage_logs %}
+    <tr>
+      <td>{{ row.area }}</td><td>{{ row.temperature if row.temperature is not none else '—' }}</td>
+      <td>{{ row.humidity if row.humidity is not none else '—' }}</td>
+      <td>{{ '正常' if row.result == 'normal' else '异常' }}</td>
+      <td>{{ row.operator }}</td><td>{{ row.recorded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}<tr><td colspan="6">暂无温湿度记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>不良反应</h3>
+  <form class="inline" method="post" action="/admin/gsp/adverse-reactions">
+    <label>患者<input name="patient_name" required></label>
+    <label>药品<input name="drug_name" required></label>
+    <label>批号<input name="batch_no"></label>
+    <label>反应<input name="reaction" required></label>
+    <label>严重程度
+      <select name="severity"><option value="mild">轻度</option><option value="moderate">中度</option><option value="severe">严重</option></select>
+    </label>
+    <button type="submit">报告</button>
+  </form>
+  <table>
+    <tr><th>患者</th><th>药品</th><th>批号</th><th>反应</th><th>严重程度</th><th>报告人</th><th>时间</th></tr>
+    {% for row in adverse %}
+    <tr><td>{{ row.patient_name }}</td><td>{{ row.drug_name }}</td><td>{{ row.batch_no or '—' }}</td>
+      <td>{{ row.reaction }}</td><td>{{ row.severity }}</td><td>{{ row.reported_by }}</td>
+      <td>{{ row.reported_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    {% else %}<tr><td colspan="7">暂无不良反应</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>召回</h3>
+  <form class="inline" method="post" action="/admin/gsp/recalls">
+    <label>药品<input name="drug_name" required></label>
+    <label>批号<input name="batch_no"></label>
+    <label>原因<input name="reason" required></label>
+    <label>级别<select name="level"><option value="1">1级</option><option value="2">2级</option><option value="3" selected>3级</option></select></label>
+    <button type="submit">启动召回</button>
+  </form>
+  <table>
+    <tr><th>召回单</th><th>药品</th><th>批号</th><th>原因</th><th>级别</th><th>状态</th><th>操作</th></tr>
+    {% for row in recalls %}
+    <tr><td>{{ row.recall_no }}</td><td>{{ row.drug_name }}</td><td>{{ row.batch_no or '—' }}</td>
+      <td>{{ row.reason }}</td><td>{{ row.level }}</td><td>{{ row.status }}</td>
+      <td>{% if row.status != 'completed' %}
+        <form method="post" action="/admin/gsp/recalls/{{ row.id }}/complete"><button type="submit">完成</button></form>
+      {% endif %}</td></tr>
+    {% else %}<tr><td colspan="7">暂无召回</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>人员资质</h3>
+  <form class="inline" method="post" action="/admin/gsp/personnel">
+    <label>姓名<input name="name" required></label>
+    <label>岗位<input name="role"></label>
+    <label>证书编号<input name="certificate_no"></label>
+    <label>有效期至<input name="valid_until" type="date"></label>
+    <button type="submit">保存</button>
+  </form>
+  <table>
+    <tr><th>姓名</th><th>岗位</th><th>证书</th><th>有效期</th><th>状态</th></tr>
+    {% for row in personnel %}
+    <tr><td>{{ row.name }}</td><td>{{ row.role }}</td><td>{{ row.certificate_no }}</td>
+      <td>{{ row.valid_until or '—' }}</td><td>{{ '有效' if row.status == 'active' else '已过期' }}</td></tr>
+    {% else %}<tr><td colspan="5">暂无人员资质</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

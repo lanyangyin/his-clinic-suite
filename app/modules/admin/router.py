@@ -142,6 +142,28 @@ from app.modules.tcm.service import (
     list_herbs,
 )
 from app.modules.insurance.workbench import workbench as insurance_workbench
+from app.modules.gsp.schemas import (
+    AcceptanceCreate,
+    AcceptanceItemCreate,
+    AdverseCreate,
+    PersonnelCreate,
+    RecallCreate,
+    StorageLogCreate,
+)
+from app.modules.gsp.service import (
+    alerts as gsp_alerts,
+    complete_recall,
+    create_acceptance,
+    create_adverse,
+    create_personnel,
+    create_recall,
+    create_storage_log,
+    list_acceptances,
+    list_adverse,
+    list_personnel,
+    list_recalls,
+    list_storage_logs,
+)
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1998,3 +2020,169 @@ def insurance_workbench_page(
             },
         ),
     )
+
+# ---------- GSP ----------
+
+@router.get("/gsp", response_class=HTMLResponse)
+def gsp_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "gsp.html",
+        _ctx(
+            request,
+            acceptances=list_acceptances(db),
+            storage_logs=list_storage_logs(db),
+            adverse=list_adverse(db),
+            recalls=list_recalls(db),
+            personnel=list_personnel(db),
+            alerts={key: len(value) for key, value in gsp_alerts(db).items()},
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/gsp/acceptances")
+async def gsp_acceptance_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_acceptance(
+            db,
+            AcceptanceCreate(
+                supplier_name=(form.get("supplier_name") or "").strip(),
+                delivery_no=(form.get("delivery_no") or "").strip(),
+                transport_temp=_form_float(form, "transport_temp"),
+                transport_ok=form.get("transport_ok") == "on",
+                items=[
+                    AcceptanceItemCreate(
+                        name=(form.get("item_name") or "").strip(),
+                        batch_no=(form.get("batch_no") or "").strip(),
+                        expiry=(
+                            date.fromisoformat(form.get("expiry"))
+                            if form.get("expiry")
+                            else None
+                        ),
+                        quantity=_form_int(form, "quantity") or 0,
+                    )
+                ],
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "验收记录已保存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"保存失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/gsp/storage-logs")
+async def gsp_storage_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_storage_log(
+            db,
+            StorageLogCreate(
+                area=(form.get("area") or "药房").strip(),
+                temperature=_form_float(form, "temperature"),
+                humidity=_form_float(form, "humidity"),
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "温湿度记录已保存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"保存失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/gsp/adverse-reactions")
+async def gsp_adverse_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_adverse(
+            db,
+            AdverseCreate(
+                patient_name=(form.get("patient_name") or "").strip(),
+                drug_name=(form.get("drug_name") or "").strip(),
+                batch_no=(form.get("batch_no") or "").strip(),
+                reaction=(form.get("reaction") or "").strip(),
+                severity=form.get("severity") or "mild",
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "不良反应已报告"
+    except Exception as e:  # noqa: BLE001
+        msg = f"报告失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/gsp/recalls")
+async def gsp_recall_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_recall(
+            db,
+            RecallCreate(
+                drug_name=(form.get("drug_name") or "").strip(),
+                batch_no=(form.get("batch_no") or "").strip(),
+                reason=(form.get("reason") or "").strip(),
+                level=form.get("level") or "3",
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "召回已启动"
+    except Exception as e:  # noqa: BLE001
+        msg = f"召回失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/gsp/recalls/{recall_id}/complete")
+def gsp_recall_complete(request: Request, recall_id: int, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        complete_recall(db, recall_id, request.session.get("admin_user", "admin"))
+        msg = "召回已完成"
+    except Exception as e:  # noqa: BLE001
+        msg = f"操作失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/gsp/personnel")
+async def gsp_personnel_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_personnel(
+            db,
+            PersonnelCreate(
+                name=(form.get("name") or "").strip(),
+                role=(form.get("role") or "").strip(),
+                certificate_no=(form.get("certificate_no") or "").strip(),
+                valid_until=(
+                    date.fromisoformat(form.get("valid_until"))
+                    if form.get("valid_until")
+                    else None
+                ),
+            ),
+        )
+        msg = "人员资质已保存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"保存失败：{e}"
+    return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)

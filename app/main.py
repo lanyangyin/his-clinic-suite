@@ -52,6 +52,7 @@ from app.modules.archive.router import router as archive_router
 from app.modules.nursing.router import router as nursing_router
 from app.modules.tcm.router import router as tcm_router
 from app.modules.insurance.router import router as insurance_router
+from app.modules.gsp.router import router as gsp_router
 from app.modules.insurance_inventory.router import router as insurance_inventory_router
 from app.modules.insurance_materials.router import router as insurance_materials_router
 from app.modules.reports.router import router as reports_router
@@ -215,6 +216,7 @@ app.include_router(archive_router)
 app.include_router(nursing_router)
 app.include_router(tcm_router)
 app.include_router(insurance_router)
+app.include_router(gsp_router)
 app.include_router(insurance_inventory_router)
 app.include_router(insurance_materials_router)
 app.include_router(reports_router)
