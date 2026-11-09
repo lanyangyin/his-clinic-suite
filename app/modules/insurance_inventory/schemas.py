@@ -43,6 +43,7 @@ class UploadResponse(BaseModel):
     start_date: date
     end_date: date
     record_count: int
+    skipped_count: int = 0
     total_amount: float
     status: str
     channel: str = "mock"

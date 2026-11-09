@@ -85,6 +85,7 @@ def test_inventory_preview_and_upload(client, auth):
     assert record["status"] == "success"
     assert record["channel"] == "mock"
     assert record["record_count"] >= 3
+    assert record["skipped_count"] == 0
     assert record["upload_no"].startswith("INV")
 
     history = client.get("/insurance/inventory/uploads", headers=auth["admin"]).json()
@@ -154,6 +155,14 @@ def test_inventory_unmatched_count(client, auth):
         headers=auth["admin"],
     ).json()
     assert preview["unmatched_count"] == 1
+
+    failed = client.post(
+        "/insurance/inventory/upload",
+        json={"start_date": today, "end_date": today},
+        headers=auth["admin"],
+    )
+    assert failed.status_code == 400
+    assert "已对码" in failed.json()["detail"]
 
 def test_inventory_admin_page(client, auth):
     drug, today = setup_movement(client, auth)

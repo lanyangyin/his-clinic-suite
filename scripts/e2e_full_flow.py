@@ -9,6 +9,7 @@
 """
 import base64
 import json
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +21,8 @@ import requests
 BASE = "http://127.0.0.1:8001"
 ROOT = Path(__file__).resolve().parent.parent
 STEPS: list[dict] = []
+STEP_DELAY = float(os.getenv("E2E_STEP_DELAY", "0"))
+VERBOSE = os.getenv("E2E_VERBOSE", "0") == "1"
 
 
 class FlowError(RuntimeError):
@@ -65,6 +68,8 @@ class Role:
             raise FlowError(
                 f"{self.name} {method} {path} -> {response.status_code}: {detail}"
             )
+        if STEP_DELAY:
+            time.sleep(STEP_DELAY)
         return response
 
     def json(self, method: str, path: str, expected=(200, 201), **kwargs):
@@ -98,6 +103,10 @@ def step(phase: str, role: str, action: str, detail: str = "") -> None:
     STEPS.append(
         {"phase": phase, "role": role, "action": action, "status": "OK", "detail": detail}
     )
+    if VERBOSE:
+        print(f"[{phase}] {role} · {action} · {detail}", flush=True)
+    if STEP_DELAY:
+        time.sleep(STEP_DELAY)
 
 
 def check(condition: bool, message: str) -> None:
@@ -190,6 +199,9 @@ def main() -> int:
         # 医保目录：丙类药（自费），用于验证目录对码与处方目录校验
         csv_text = (
             "国家医保药品代码,药品名称,剂型,规格,生产厂家,单位,医保类别\n"
+            f"FLA{suffix},全流程A药{suffix},胶囊,0.25g*24粒,演示药业,盒,乙\n"
+            f"FLB{suffix},全流程B药{suffix},片剂,0.2g*12片,演示药业,盒,乙\n"
+            f"FLD{suffix},近效期药{suffix},口服液,10ml,演示药业,盒,乙\n"
             f"FLOWC{suffix},全流程C药{suffix},片剂,0.5g*10片,演示药业,盒,丙\n"
         )
         admin.call(
@@ -304,6 +316,33 @@ def main() -> int:
         )
         step("1 库房入库", "库房", "近效期预警", f"近效期批次 {len(alerts['near_expiry'])} 个，含 D 药")
 
+        # 报损 + 盘点差异调整
+        scrap = warehouse.json(
+            "POST", "/warehouse/outbound-orders",
+            json={
+                "outbound_type": "scrap",
+                "target_type": "pharmacy",
+                "items": [{
+                    "kind": "drug", "drug_id": drug_d["id"],
+                    "batch_no": f"FLOW-D-{suffix}", "quantity": 1,
+                }],
+            },
+            phase="1 库房入库",
+        )
+        warehouse.call("POST", f"/warehouse/outbound-orders/{scrap['id']}/approve", phase="1 库房入库")
+        warehouse.call("POST", f"/warehouse/outbound-orders/{scrap['id']}/issue", phase="1 库房入库")
+        warehouse.call(
+            "POST", "/warehouse/check",
+            json={
+                "drug_id": drug_d["id"], "batch_no": f"FLOW-D-{suffix}",
+                "actual_quantity": 3,
+            },
+            phase="1 库房入库",
+        )
+        adjustments = warehouse.json("GET", "/warehouse/adjustments", phase="1 库房入库")
+        check(any(item["drug_id"] == drug_d["id"] for item in adjustments), "盘点调整单缺失")
+        step("1 库房入库", "库房", "报损 1 + 盘点差异调整", f"D 药 5→4→实盘3，调整单 {adjustments[0]['adjust_no']}")
+
         # 追溯码：入库扫码 4 个
         trace_codes = [f"TRC-{suffix}-{i}" for i in range(1, 5)]
         warehouse.call(
@@ -319,11 +358,36 @@ def main() -> int:
             json={"name": f"全流程患者{suffix}", "id_number": f"1101011992{suffix[-8:]}", "phone": "13800000000"},
             phase="2 门诊",
         )
-        registration = cashier.json(
-            "POST", "/registrations/",
-            json={"patient_id": patient["id"], "doctor_id": doctor_row["id"]},
+        schedule = admin.json(
+            "POST", "/schedules/",
+            json={
+                "doctor_id": doctor_row["id"],
+                "schedule_date": today,
+                "period": "morning",
+                "capacity": 5,
+            },
             phase="2 门诊",
         )
+        appointment = cashier.json(
+            "POST", "/appointments/",
+            json={
+                "patient_id": patient["id"],
+                "doctor_id": doctor_row["id"],
+                "schedule_id": schedule["id"],
+            },
+            phase="2 门诊",
+        )
+        checked = cashier.json(
+            "POST", f"/appointments/{appointment['id']}/check-in", phase="2 门诊"
+        )
+        check(checked["status"] == "checked_in", f"预约取号失败：{checked}")
+        registration = cashier.json(
+            "GET", f"/registrations/{checked['registration_id']}", phase="2 门诊"
+        )
+        check(registration["status"] == "registered", f"预约挂号状态异常：{registration}")
+        step("2 门诊", "管理员/收费员",
+            "排班→预约→取号（生成挂号）",
+            f"排班 {schedule['id']}，预约 {appointment['id']}，挂号 {registration['id']}")
         ticket = nurse.json(
             "POST", "/triage/tickets",
             json={"registration_id": registration["id"]},
@@ -372,6 +436,12 @@ def main() -> int:
             phase="2 门诊",
         )
         step("2 门诊", "医生", "开方/检验/治疗", f"处方3张，检验 {lab_request['id']}，治疗 {treatment['id']}")
+        doctor.expect_error(
+            "POST", f"/encounters/{encounter['id']}/prescriptions",
+            status=400, contains="已在处方",
+            json={"drug_id": drug_a["id"], "quantity": 1}, phase="2 门诊",
+        )
+        step("2 门诊", "医生", "重复开方拦截", "按预期失败：该药品已在处方中")
 
         # ================= 3. 并发：收费 + 多账号读取 =================
         barrier = threading.Barrier(6)
@@ -452,8 +522,14 @@ def main() -> int:
             phase="5 药房",
         )
         warehouse.call("POST", f"/warehouse/outbound-orders/{req_ac['id']}/approve", phase="5 药房")
+        item_a = req_ac["items"][0]["id"]
+        part = warehouse.json(
+            "POST", f"/warehouse/outbound-orders/{req_ac['id']}/issue",
+            json={"items": [{"item_id": item_a, "quantity": 2}]}, phase="5 药房",
+        )
+        check(part["status"] == "partially_issued", f"部分出库状态异常：{part}")
         warehouse.call("POST", f"/warehouse/outbound-orders/{req_ac['id']}/issue", phase="5 药房")
-        step("5 药房", "药师→库房", "A/C 药领用出库", f"申请单 {req_ac['id']} 已出库")
+        step("5 药房", "药师→库房", "A/C 药领用出库（先部分 2，再出剩余）", f"申请单 {req_ac['id']} 已全部出库")
 
         req_b = pharmacist.json(
             "POST", "/warehouse/outbound-orders",
@@ -552,6 +628,26 @@ def main() -> int:
             check(sum_stock(rows, "drug_id", drug["id"]) == expected, f"退药后{label}药库存应为 {expected}")
         step("5 药房", "药师", "退药+追溯码回库", "A4/B3/C2 回药房")
 
+        # 药房退库回总库（退库单）
+        ret = pharmacist.json(
+            "POST", "/warehouse/outbound-orders",
+            json={
+                "outbound_type": "return",
+                "target_type": "pharmacy",
+                "target_name": "药房",
+                "items": [{
+                    "kind": "drug", "drug_id": drug_a["id"],
+                    "batch_no": f"FLOW-A-{suffix}", "quantity": 1,
+                }],
+            },
+            phase="5 药房",
+        )
+        warehouse.call("POST", f"/warehouse/outbound-orders/{ret['id']}/approve", phase="5 药房")
+        warehouse.call("POST", f"/warehouse/outbound-orders/{ret['id']}/issue", phase="5 药房")
+        rows = pharmacist.json("GET", f"/pharmacy/stocks?drug_id={drug_a['id']}", phase="5 药房")
+        check(sum_stock(rows, "drug_id", drug_a["id"]) == 3, "退库后药房 A 药应为 3")
+        step("5 药房", "药师→库房", "药房退库 A 药 1 盒", f"退库单 {ret['id']}，药房 A 药 4→3")
+
         # 药房有药直接发药分支（POS 刷卡支付）
         patient3 = cashier.json(
             "POST", "/patients/",
@@ -581,14 +677,14 @@ def main() -> int:
         )
         check(dispense3["status"] == "dispensed", f"直接发药失败：{dispense3}")
         rows = pharmacist.json("GET", f"/pharmacy/stocks?drug_id={drug_a['id']}", phase="5 药房")
-        check(sum_stock(rows, "drug_id", drug_a["id"]) == 3, "直接发药后 A 药应为 3")
+        check(sum_stock(rows, "drug_id", drug_a["id"]) == 2, "直接发药后 A 药应为 2")
         pharmacist.json("POST", f"/pharmacy/dispense/{dispense3['id']}/return", phase="5 药房")
         rows = pharmacist.json("GET", f"/pharmacy/stocks?drug_id={drug_a['id']}", phase="5 药房")
-        check(sum_stock(rows, "drug_id", drug_a["id"]) == 4, "直接发药退回后 A 药应为 4")
+        check(sum_stock(rows, "drug_id", drug_a["id"]) == 3, "直接发药退回后 A 药应为 3")
         step(
             "5 药房", "收费员/医生/药师",
             "药房有药直接发药（POS）",
-            f"收费单 {pay3['id']}，发药单 {dispense3['id']}，A药 4→3→退回 4",
+            f"收费单 {pay3['id']}，发药单 {dispense3['id']}，A药 3→2→退回 3",
         )
 
         # ================= 6. 自费/医保退费 =================
@@ -620,12 +716,12 @@ def main() -> int:
         step("6 退费", "收费员", "整单全额退费", f"已退 {full['refunded_amount']:.2f} 元")
 
         # ================= 7. 对账/进销存 =================
-        expected_warehouse = {drug_a["id"]: 24, drug_b["id"]: 17, drug_c["id"]: 8, drug_d["id"]: 5}
+        expected_warehouse = {drug_a["id"]: 25, drug_b["id"]: 17, drug_c["id"]: 8, drug_d["id"]: 3}
         for drug_id, expected in expected_warehouse.items():
             rows = warehouse.json("GET", f"/warehouse/stocks?drug_id={drug_id}", phase="7 对账")
             actual = sum_stock(rows, "drug_id", drug_id)
             check(actual == expected, f"总库药品 {drug_id} 结存 {actual} != {expected}")
-        expected_pharmacy = {drug_a["id"]: 4, drug_b["id"]: 3, drug_c["id"]: 2}
+        expected_pharmacy = {drug_a["id"]: 3, drug_b["id"]: 3, drug_c["id"]: 2}
         for drug_id, expected in expected_pharmacy.items():
             rows = pharmacist.json("GET", f"/pharmacy/stocks?drug_id={drug_id}", phase="7 对账")
             actual = sum_stock(rows, "drug_id", drug_id)
@@ -653,8 +749,25 @@ def main() -> int:
         )
         check(upload["status"] == "success", f"医保进销存上传失败：{upload}")
         detail = admin.json("GET", f"/insurance/inventory/uploads/{upload['id']}", phase="7 对账")
+        payload = json.loads(detail["payload"])
         check(f"全流程A药{suffix}" in detail["payload"], "进销存报文缺少 A 药")
-        step("7 对账", "管理员", "医保进销存上传", f"{preview['record_count']} 条，{upload['upload_no']} 成功")
+        check(
+            all(row["insurance_code"] for row in payload["records"]),
+            "进销存报文不应包含未对码药品",
+        )
+        step(
+            "7 对账", "管理员", "医保进销存上传",
+            f"预览 {preview['record_count']} 条（未对码 {preview['unmatched_count']}），"
+            f"上传 {upload['record_count']} 条，跳过 {upload.get('skipped_count', 0)} 条，"
+            f"{upload['upload_no']} 成功",
+        )
+
+        admin.json(
+            "GET", f"/reports/departments/revenue?start_date={today}&end_date={today}",
+            phase="7 对账",
+        )
+        admin.json("GET", "/bi/overview", phase="7 对账")
+        step("7 对账", "管理员", "科室收入报表 / BI 概览", "均返回 200")
 
         # ================= 8. 汇总 =================
         summary = {
@@ -678,6 +791,7 @@ def main() -> int:
             "material_stocks": by_wh,
             "ledger_rows": len(ledger),
             "inventory_upload": upload["upload_no"],
+            "inventory_skipped": upload.get("skipped_count", 0),
         }
         write_report(summary)
         print("=" * 70)

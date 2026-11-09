@@ -27,3 +27,4 @@ build/
 .vscode/
 .DS_Store
 Thumbs.db
+docs/e2e_frames/

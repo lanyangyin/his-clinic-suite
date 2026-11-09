@@ -14,6 +14,7 @@
 
   {% if preview %}
   <h2>预览：{{ preview.record_count }} 条，金额 {{ '%.2f'|format(preview.total_amount) }}，未对码 {{ preview.unmatched_count }}</h2>
+  <p>上传时只提交已对码记录；未对码记录会被跳过并单独记录，请先完成医保对码。</p>
   <form method="post" action="/admin/insurance-inventory/upload">
     <input type="hidden" name="start_date" value="{{ start_date }}">
     <input type="hidden" name="end_date" value="{{ end_date }}">
@@ -40,12 +41,13 @@
 
   <h2>上传历史（{{ uploads|length }}）</h2>
   <table>
-    <tr><th>上传单号</th><th>期间</th><th>条数</th><th>金额</th><th>状态</th><th>通道</th><th>操作人</th><th>时间</th><th>操作</th></tr>
+    <tr><th>上传单号</th><th>期间</th><th>条数</th><th>未对码跳过</th><th>金额</th><th>状态</th><th>通道</th><th>操作人</th><th>时间</th><th>操作</th></tr>
     {% for item in uploads %}
     <tr>
       <td>{{ item.upload_no }}</td>
       <td>{{ item.start_date }} ~ {{ item.end_date }}</td>
       <td>{{ item.record_count }}</td>
+      <td>{{ item.skipped_count }}</td>
       <td>{{ '%.2f'|format(item.total_amount) }}</td>
       <td>{{ item.status|zh('upload_status') }}</td>
       <td>{{ item.channel|zh('channel') }}</td>
@@ -54,7 +56,7 @@
       <td><a href="/admin/insurance-inventory/{{ item.id }}">详情</a></td>
     </tr>
     {% else %}
-    <tr><td colspan="9">暂无上传记录</td></tr>
+    <tr><td colspan="10">暂无上传记录</td></tr>
     {% endfor %}
   </table>
 </div>

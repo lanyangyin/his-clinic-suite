@@ -17,6 +17,10 @@ class InsuranceInventoryUpload(Base):
     record_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
+    # 未对码（无医保代码）被跳过的条数
+    skipped_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     total_amount: Mapped[float] = mapped_column(
         Float, default=0.0, server_default="0", nullable=False
     )

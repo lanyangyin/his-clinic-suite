@@ -105,9 +105,11 @@ def _submit_mock(payload: dict) -> dict:
 def create_upload(
     db: Session, start_date: date, end_date: date, created_by: str = ""
 ) -> InsuranceInventoryUpload:
-    records = build_records(db, start_date, end_date)
+    all_records = build_records(db, start_date, end_date)
+    records = [row for row in all_records if row["insurance_code"]]
+    skipped_count = len(all_records) - len(records)
     if not records:
-        raise ValueError("该期间没有药品进销存记录")
+        raise ValueError("该期间没有已对码的药品进销存记录，请先完成医保对码")
 
     last = db.query(InsuranceInventoryUpload.id).order_by(
         InsuranceInventoryUpload.id.desc()
@@ -125,6 +127,7 @@ def create_upload(
         start_date=start_date,
         end_date=end_date,
         record_count=len(records),
+        skipped_count=skipped_count,
         total_amount=round(sum(row["amount"] for row in records), 2),
         status="submitted",
         payload=json.dumps(payload, ensure_ascii=False),
