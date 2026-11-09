@@ -12,6 +12,7 @@ LABELS: dict[str, dict[str, str]] = {
         "radiology": "影像技师",
         "archive": "病案管理员",
         "decoction": "煎药员",
+        "surgery": "手术室护士",
     },
     "kind": {"drug": "药品", "material": "物资"},
     "inbound_status": {

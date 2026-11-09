@@ -63,6 +63,9 @@ class InstrumentPackage(Base):
     # sterilized 已灭菌 / issued 已发放 / used 已使用 / recalled 已召回
     status: Mapped[str] = mapped_column(String(20), default="sterilized", nullable=False)
     location: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    surgery_case_id: Mapped[int | None] = mapped_column(
+        ForeignKey("surgery_cases.id"), nullable=True
+    )
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 

@@ -451,6 +451,50 @@ class ApiClient:
     def issue_decoction(self, order_id: int, payload: dict) -> dict:
         return self._request("POST", f"/tcm/decoction-orders/{order_id}/issue", json=payload)
 
+    # ---- 手术室 ----
+    def list_surgery_rooms(self) -> list:
+        return self._request("GET", "/surgery/rooms")
+
+    def create_surgery_room(self, payload: dict) -> dict:
+        return self._request("POST", "/surgery/rooms", json=payload)
+
+    def list_surgery_cases(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/surgery/cases", params=params)
+
+    def create_surgery_case(self, payload: dict) -> dict:
+        return self._request("POST", "/surgery/cases", json=payload)
+
+    def surgery_case_detail(self, case_id: int) -> dict:
+        return self._request("GET", f"/surgery/cases/{case_id}")
+
+    def surgery_safety(self, case_id: int, phase: str, checklist: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/surgery/cases/{case_id}/safety",
+            json={"phase": phase, "checklist": checklist},
+        )
+
+    def start_surgery(self, case_id: int) -> dict:
+        return self._request("POST", f"/surgery/cases/{case_id}/start")
+
+    def surgery_record(self, case_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/surgery/cases/{case_id}/record", json=payload)
+
+    def surgery_count(self, case_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/surgery/cases/{case_id}/counts", json=payload)
+
+    def complete_surgery(self, case_id: int) -> dict:
+        return self._request("POST", f"/surgery/cases/{case_id}/complete")
+
+    def surgery_recovery(self, case_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/surgery/cases/{case_id}/recovery", json=payload)
+
+    def attach_surgery_package(self, case_id: int, package_id: int) -> dict:
+        return self._request(
+            "POST", f"/surgery/cases/{case_id}/packages/{package_id}"
+        )
+
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)
