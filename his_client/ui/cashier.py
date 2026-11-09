@@ -245,13 +245,17 @@ class CashierWidget(QWidget):
         refund_row = QHBoxLayout()
         self.refund_qty = QSpinBox()
         self.refund_qty.setRange(1, 10000)
-        refund_selected = QPushButton("退所选数量")
-        refund_selected.clicked.connect(self._refund_selected)
+        self.refund_selected_btn = QPushButton("退所选数量")
+        self.refund_selected_btn.clicked.connect(self._refund_selected)
         refund_row.addWidget(QLabel("本次退数量"))
         refund_row.addWidget(self.refund_qty)
-        refund_row.addWidget(refund_selected)
+        refund_row.addWidget(self.refund_selected_btn)
         refund_row.addStretch(1)
         refund_layout.addLayout(refund_row)
+
+        self.refund_rule = QLabel("")
+        self.refund_rule.setWordWrap(True)
+        refund_layout.addWidget(self.refund_rule)
 
         self.refund_table = QTableWidget(0, 7)
         self.refund_table.setHorizontalHeaderLabels(
@@ -336,6 +340,16 @@ class CashierWidget(QWidget):
             for col, value in enumerate(values):
                 self.refund_table.setItem(row, col, QTableWidgetItem(value))
         self.refund_charge_id = None
+        insurance = payment.get("insurance_amount", 0) or 0
+        if insurance > 0:
+            self.refund_selected_btn.setEnabled(False)
+            self.refund_rule.setText(
+                f"该收费医保支付 {insurance:.2f} 元：按医保规则只能整单全额退（点「全部退」），"
+                "不能按明细/数量部分退。"
+            )
+        else:
+            self.refund_selected_btn.setEnabled(True)
+            self.refund_rule.setText("全自费收费：可选择明细并填写数量，只退其中一种药或一颗药。")
         self.refund_msg.setText(
             f"收费单 {payment['id']}，状态 {zh('payment_status', payment['status'])}，"
             f"已退 {payment.get('refunded_amount', 0):.2f} 元"
@@ -352,6 +366,9 @@ class CashierWidget(QWidget):
         self.refund_qty.setValue(1 if left > 0 else 1)
 
     def _refund_selected(self) -> None:
+        if not self.refund_selected_btn.isEnabled():
+            self.refund_msg.setText("该收费含医保支付，只能整单全额退")
+            return
         if not self.refund_charge_id:
             self.refund_msg.setText("请先在明细中选择要退的项目")
             return

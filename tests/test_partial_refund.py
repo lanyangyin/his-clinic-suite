@@ -33,13 +33,27 @@ def make_encounter(client, auth, items):
     return encounter
 
 
-def make_drug(client, auth, name, price):
+def make_drug(client, auth, name, price, ratio=0.0):
     return client.post(
-        "/drugs/", json={"name": name, "base_price": price}, headers=auth["admin"]
+        "/drugs/",
+        json={"name": name, "base_price": price, "insurance_ratio": ratio},
+        headers=auth["admin"],
     ).json()
 
 
-def test_partial_refund_one_pill(client, auth):
+def allow_self_pay(monkeypatch):
+    """医保服务降级，处方按自费放行（用于构造全自费收费）。"""
+    import app.modules.encounter.service as encounter_service
+    from app.modules.insurance.adapter import InsuranceUnavailable
+
+    def down(**kwargs):
+        raise InsuranceUnavailable("医保服务不可用")
+
+    monkeypatch.setattr(encounter_service, "check_prescription", down)
+
+
+def test_partial_refund_one_pill(client, auth, monkeypatch):
+    allow_self_pay(monkeypatch)
     drug_a = make_drug(client, auth, "A药", 10.0)
     drug_b = make_drug(client, auth, "B药", 5.0)
     encounter = make_encounter(client, auth, [(drug_a["id"], 2), (drug_b["id"], 1)])
@@ -63,8 +77,8 @@ def test_partial_refund_one_pill(client, auth):
     body = r.json()
     assert body["status"] == "partially_refunded"
     assert body["refunded_amount"] == 10.0
-    assert body["refunded_insurance_amount"] == 7.0
-    assert body["refunded_self_pay_amount"] == 3.0
+    assert body["refunded_insurance_amount"] == 0.0
+    assert body["refunded_self_pay_amount"] == 10.0
 
     charges = client.get(
         f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]
@@ -104,7 +118,8 @@ def test_partial_refund_one_pill(client, auth):
     assert again.json()["detail"] == "该收费已退费"
 
 
-def test_refund_drug_blocked_after_dispense(client, auth):
+def test_refund_drug_blocked_after_dispense(client, auth, monkeypatch):
+    allow_self_pay(monkeypatch)
     drug = make_drug(client, auth, "已发药", 10.0)
     client.post(
         "/pharmacy/stock-in",
@@ -142,3 +157,31 @@ def test_refund_drug_blocked_after_dispense(client, auth):
     )
     assert all_blocked.status_code == 400
     assert all_blocked.json()["detail"] == "该就诊已发药，不能退费"
+
+def test_insurance_payment_only_allows_full_refund(client, auth):
+    drug = make_drug(client, auth, "医保药", 10.0, ratio=0.7)
+    encounter = make_encounter(client, auth, [(drug["id"], 2)])
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    ).json()
+    assert payment["insurance_amount"] == 14.0
+    charge = client.get(
+        f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]
+    ).json()[0]
+
+    partial = client.post(
+        f"/payments/{payment['id']}/refund",
+        json={"items": [{"charge_id": charge["id"], "quantity": 1}]},
+        headers=auth["cashier"],
+    )
+    assert partial.status_code == 400
+    assert "医保收费只能全额退费" in partial.json()["detail"]
+
+    full = client.post(
+        f"/payments/{payment['id']}/refund", headers=auth["cashier"]
+    )
+    assert full.status_code == 200, full.text
+    body = full.json()
+    assert body["status"] == "refunded"
+    assert body["refunded_amount"] == 20.0
+    assert body["refunded_insurance_amount"] == 14.0

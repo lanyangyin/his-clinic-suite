@@ -122,6 +122,9 @@ def refund_payment(
         raise ValueError("收费记录不存在")
     if payment.status == "refunded":
         raise ValueError("该收费已退费")
+    # 医保支付只能整单全额退，不支持按明细/数量部分退
+    if items is not None and payment.insurance_amount > 0:
+        raise ValueError("医保收费只能全额退费，不能按明细/数量退")
 
     # 延迟导入避免循环依赖（pharmacy.service 也依赖 billing.service）
     from app.modules.pharmacy.service import get_active_dispense_by_encounter
