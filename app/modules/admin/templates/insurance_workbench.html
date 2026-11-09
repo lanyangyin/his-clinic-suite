@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}医保工作台 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>医保工作台</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<form class="inline" method="get" action="/admin/insurance-workbench">
+  <label>开始日期<input type="date" name="start_date" value="{{ data.start_date }}"></label>
+  <label>结束日期<input type="date" name="end_date" value="{{ data.end_date }}"></label>
+  <button type="submit">查询</button>
+</form>
+
+{% set m = data.matching %}
+<div class="cards">
+  <div class="card"><div class="num">{{ m.drugs.total }}</div><div class="label">药品总数</div></div>
+  <div class="card"><div class="num">{{ m.drugs.matched }}</div><div class="label">已对码药品</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ m.drugs.unmatched }}</div><div class="label">未对码药品</div></div>
+  <div class="card"><div class="num">{{ data.settlement.payment_count }}</div><div class="label">结算笔数</div></div>
+  <div class="card"><div class="num">{{ '%.2f'|format(data.settlement.total_amount) }}</div><div class="label">医疗费用总额</div></div>
+  <div class="card"><div class="num">{{ '%.2f'|format(data.settlement.insurance_amount) }}</div><div class="label">医保支付</div></div>
+  <div class="card"><div class="num">{{ '%.2f'|format(data.settlement.self_pay_amount) }}</div><div class="label">个人自费</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ data.risk_count }}</div><div class="label">合规风险</div></div>
+</div>
+
+<div class="panel">
+  <h3>医保对码统计</h3>
+  <table>
+    <tr><th>类别</th><th>甲类</th><th>乙类</th><th>丙类</th><th>无等级</th><th>未对码</th><th>合计</th></tr>
+    <tr>
+      <td>药品</td>
+      <td>{{ m.drugs.by_category['甲'] }}</td>
+      <td>{{ m.drugs.by_category['乙'] }}</td>
+      <td>{{ m.drugs.by_category['丙'] }}</td>
+      <td>{{ m.drugs.by_category['无等级'] }}</td>
+      <td>{{ m.drugs.by_category['未对码'] }}</td>
+      <td>{{ m.drugs.total }}</td>
+    </tr>
+    <tr>
+      <td>耗材</td><td colspan="4">已对码 {{ m.materials.matched }} / 未对码 {{ m.materials.unmatched }}</td><td colspan="2">{{ m.materials.total }}</td>
+    </tr>
+    <tr>
+      <td>收费项目</td><td colspan="4">未配置医保贯标字段</td><td>{{ m.charge_items.unmatched }}</td><td>{{ m.charge_items.total }}</td>
+    </tr>
+  </table>
+  <p class="hint" style="text-align:left">{{ data.price_limit_note }}</p>
+</div>
+
+<div class="panel">
+  <h3>结算统计（{{ data.start_date }} ~ {{ data.end_date }}）</h3>
+  <table>
+    <tr><th>笔数</th><th>总额</th><th>医保支付</th><th>自费</th><th>已退</th><th>支付方式</th></tr>
+    <tr>
+      <td>{{ data.settlement.payment_count }}</td>
+      <td>{{ '%.2f'|format(data.settlement.total_amount) }}</td>
+      <td>{{ '%.2f'|format(data.settlement.insurance_amount) }}</td>
+      <td>{{ '%.2f'|format(data.settlement.self_pay_amount) }}</td>
+      <td>{{ '%.2f'|format(data.settlement.refunded_amount) }}</td>
+      <td>
+        {% for key, count in data.settlement.by_channel.items() %}
+        {{ channel_labels.get(key, key) }} {{ count }}{% if not loop.last %}，{% endif %}
+        {% else %}—{% endfor %}
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>合规风险 / 事前事中提示</h3>
+  <table>
+    <tr><th>就诊</th><th>患者</th><th>诊断</th><th>药品</th><th>类别</th><th>原因</th><th>金额</th></tr>
+    {% for risk in data.risks %}
+    <tr>
+      <td>{{ risk.encounter_id }}</td><td>{{ risk.patient_name }}</td><td>{{ risk.diagnosis }}</td>
+      <td>{{ risk.drug_name }}</td><td>{{ risk.category }}</td><td>{{ risk.reason }}</td>
+      <td>{{ '%.2f'|format(risk.amount) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">该期间未发现未对码/丙类风险</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

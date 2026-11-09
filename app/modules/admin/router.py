@@ -141,6 +141,7 @@ from app.modules.tcm.service import (
     create_herb,
     list_herbs,
 )
+from app.modules.insurance.workbench import workbench as insurance_workbench
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1962,3 +1963,38 @@ async def tcm_herb_submit(request: Request, db: Session = Depends(get_db)):
     except Exception as e:  # noqa: BLE001
         msg = f"创建失败：{e}"
     return RedirectResponse(f"/admin/tcm-herbs?msg={quote(msg)}", status_code=302)
+
+# ---------- 医保工作台 ----------
+
+@router.get("/insurance-workbench", response_class=HTMLResponse)
+def insurance_workbench_page(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        start = date.fromisoformat(start_date) if start_date else None
+        end = date.fromisoformat(end_date) if end_date else None
+    except ValueError:
+        start, end = None, None
+    data = insurance_workbench(db, start, end)
+    return templates.TemplateResponse(
+        request,
+        "insurance_workbench.html",
+        _ctx(
+            request,
+            data=data,
+            msg=request.query_params.get("msg", ""),
+            channel_labels={
+                "cash": "现金",
+                "wechat": "微信",
+                "alipay": "支付宝",
+                "pos": "POS",
+                "insurance_card": "医保卡",
+            },
+        ),
+    )
