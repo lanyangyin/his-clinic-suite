@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}病案档案 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>病案档案</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p class="hint" style="text-align:left">从建档开始：建档 → 完整性检查/归档上架 → 借阅/归还 → 复印 → 封存/启封 → 销毁，全部留痕。</p>
+
+<div class="panel">
+  <h3>病案建档</h3>
+  <form class="inline" method="post" action="/admin/archive/records">
+    <label>患者 ID<input name="patient_id" type="number" required></label>
+    <label>就诊 ID（可选）<input name="encounter_id" type="number"></label>
+    <label>类型
+      <select name="record_type">
+        <option value="outpatient">门诊</option>
+        <option value="inpatient">住院</option>
+        <option value="emergency">急诊</option>
+      </select>
+    </label>
+    <label>备注<input name="note"></label>
+    <button type="submit">建档</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3>查询</h3>
+  <form class="inline" method="get" action="/admin/archive">
+    <label>病案号<input name="archive_no" value="{{ request.query_params.get('archive_no','') }}"></label>
+    <label>患者 ID<input name="patient_id" type="number" value="{{ request.query_params.get('patient_id','') }}"></label>
+    <label>状态
+      <select name="status">
+        <option value="">全部</option>
+        {% for key, label in archive_status.items() %}
+        <option value="{{ key }}" {% if request.query_params.get('status') == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">查询</button>
+  </form>
+</div>
+
+<div class="panel">
+  <h3>病案列表</h3>
+  <table>
+    <tr><th>病案号</th><th>患者</th><th>类型</th><th>页数</th><th>状态</th><th>位置</th><th>归档时间</th><th>操作</th></tr>
+    {% for record in records %}
+    <tr>
+      <td><a href="/admin/archive?record_id={{ record.id }}">{{ record.archive_no }}</a></td>
+      <td>{{ record.patient_name }}（{{ record.patient_id }}）</td>
+      <td>{{ record_types.get(record.record_type, record.record_type) }}</td>
+      <td>{{ record.page_count }}</td>
+      <td>{{ archive_status.get(record.status, record.status) }}</td>
+      <td>{{ record.storage_location or '—' }}</td>
+      <td>{{ record.archived_at.strftime('%Y-%m-%d %H:%M') if record.archived_at else '—' }}</td>
+      <td>
+        {% if record.status == 'draft' %}
+        <form method="post" action="/admin/archive/records/{{ record.id }}/archive" style="display:flex;gap:4px">
+          <input name="storage_location" placeholder="库位" required style="min-width:90px">
+          <input name="page_count" type="number" min="1" placeholder="页数" style="min-width:60px">
+          <select name="completeness"><option value="complete">完整</option><option value="incomplete">不完整</option></select>
+          <button type="submit">归档</button>
+        </form>
+        {% elif record.status == 'archived' %}
+        <form method="post" action="/admin/archive/records/{{ record.id }}/borrow" style="display:flex;gap:4px;margin-bottom:4px">
+          <input name="borrower" placeholder="借阅人" required style="min-width:70px">
+          <input name="department" placeholder="科室" style="min-width:60px">
+          <input name="due_days" type="number" value="7" style="min-width:50px">
+          <button type="submit">借阅</button>
+        </form>
+        <form method="post" action="/admin/archive/records/{{ record.id }}/copy" style="display:flex;gap:4px;margin-bottom:4px">
+          <input name="applicant" placeholder="申请人" required style="min-width:70px">
+          <input name="copies" type="number" value="1" style="min-width:50px">
+          <button type="submit">复印登记</button>
+        </form>
+        <form method="post" action="/admin/archive/records/{{ record.id }}/seal" style="display:flex;gap:4px;margin-bottom:4px">
+          <input name="reason" placeholder="封存原因" required style="min-width:100px">
+          <button type="submit" style="background:#b45309">封存</button>
+        </form>
+        <form method="post" action="/admin/archive/records/{{ record.id }}/destroy" style="display:flex;gap:4px">
+          <input name="reason" placeholder="销毁原因" required style="min-width:80px">
+          <input name="approved_by" placeholder="审批人" required style="min-width:60px">
+          <button type="submit" style="background:#b91c1c">销毁</button>
+        </form>
+        {% elif record.status == 'borrowed' and record.active_borrowing %}
+        <form method="post" action="/admin/archive/borrowings/{{ record.active_borrowing.id }}/return">
+          <button type="submit">归还</button>
+        </form>
+        {% elif record.status == 'sealed' %}
+        <form method="post" action="/admin/archive/records/{{ record.id }}/unseal" style="display:flex;gap:4px">
+          <input name="reason" placeholder="启封原因" required style="min-width:100px">
+          <button type="submit">启封</button>
+        </form>
+        {% else %}
+        —
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无病案</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>待完成复印</h3>
+  <table>
+    <tr><th>ID</th><th>病案</th><th>申请人</th><th>关系</th><th>用途</th><th>份数</th><th>完成</th></tr>
+    {% for row in pending_copies %}
+    <tr>
+      <td>{{ row.id }}</td><td>{{ row.record_id }}</td><td>{{ row.applicant }}</td>
+      <td>{{ row.relationship }}</td><td>{{ row.purpose }}</td><td>{{ row.copies }}</td>
+      <td>
+        <form method="post" action="/admin/archive/copies/{{ row.id }}/complete" style="display:flex;gap:4px">
+          <input name="fee" type="number" step="0.01" value="0" style="min-width:70px">
+          <button type="submit">完成收费</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无待完成复印</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if selected and detail %}
+<div class="panel">
+  <h3>病案 {{ selected.archive_no }} 的留痕</h3>
+  <p>借阅：{{ detail.borrowings|length }} 次；复印：{{ detail.copies|length }} 次；封存/启封：{{ detail.seals|length }} 次；销毁：{{ detail.destructions|length }} 次。</p>
+  <table>
+    <tr><th>类型</th><th>时间</th><th>经办/申请人</th><th>说明</th></tr>
+    {% for row in detail.borrowings %}
+    <tr><td>借阅</td><td>{{ row.borrowed_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.borrower }}</td><td>{{ row.department }} {{ row.purpose }}（{{ row.status }}）</td></tr>
+    {% endfor %}
+    {% for row in detail.copies %}
+    <tr><td>复印</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.applicant }}</td><td>{{ row.contents }} ×{{ row.copies }}（{{ row.status }}）</td></tr>
+    {% endfor %}
+    {% for row in detail.seals %}
+    <tr><td>{{ '封存' if row.action == 'seal' else '启封' }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.operator }}</td><td>{{ row.reason }}（见证：{{ row.witness }}）</td></tr>
+    {% endfor %}
+    {% for row in detail.destructions %}
+    <tr><td>销毁</td><td>{{ row.destroyed_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.operator }}</td><td>{{ row.reason }}（审批：{{ row.approved_by }}）</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

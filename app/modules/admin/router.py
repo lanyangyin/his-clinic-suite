@@ -97,6 +97,30 @@ from app.modules.lis.service import (
     create_item as create_lab_item,
     list_items as list_lab_items,
 )
+from app.modules.archive.schemas import (
+    ArchiveCompleteRequest,
+    ArchiveRecordCreate,
+    BorrowCreate,
+    CopyCompleteRequest,
+    CopyCreate,
+    DestroyCreate,
+    SealCreate,
+)
+from app.modules.archive.service import (
+    archive_record,
+    borrow_record,
+    complete_copy,
+    create_copy,
+    create_record as create_archive_record,
+    destroy_record,
+    history as archive_history,
+    list_records as list_archive_records,
+    return_borrowing,
+    seal_record,
+    unseal_record,
+)
+from app.modules.archive.models import ArchiveCopyRequest
+from app.modules.archive.service import get_record as get_archive_record
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1445,3 +1469,257 @@ async def lab_item_submit(request: Request, db: Session = Depends(get_db)):
     except Exception as e:  # noqa: BLE001
         msg = f"创建失败：{e}"
     return RedirectResponse(f"/admin/lab-items?msg={quote(msg)}", status_code=302)
+
+# ---------- 病案档案 ----------
+
+@router.get("/archive", response_class=HTMLResponse)
+def archive_page(
+    request: Request,
+    archive_no: str | None = None,
+    status: str | None = None,
+    patient_id: int | None = None,
+    record_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    records = list_archive_records(db, archive_no, patient_id, status)
+    pending_copies = (
+        db.query(ArchiveCopyRequest)
+        .filter(ArchiveCopyRequest.status == "pending")
+        .order_by(ArchiveCopyRequest.id.desc())
+        .all()
+    )
+    selected = get_archive_record(db, record_id) if record_id else None
+    detail = archive_history(db, record_id) if record_id else None
+    return templates.TemplateResponse(
+        request,
+        "archive.html",
+        _ctx(
+            request,
+            records=records,
+            pending_copies=pending_copies,
+            selected=selected,
+            detail=detail,
+            msg=request.query_params.get("msg", ""),
+            archive_status={
+                "draft": "已建档",
+                "archived": "已归档",
+                "borrowed": "已借出",
+                "sealed": "已封存",
+                "destroyed": "已销毁",
+            },
+            record_types={"outpatient": "门诊", "inpatient": "住院", "emergency": "急诊"},
+        ),
+    )
+
+
+@router.post("/archive/records")
+async def archive_record_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        record = create_archive_record(
+            db,
+            ArchiveRecordCreate(
+                patient_id=_form_int(form, "patient_id") or 0,
+                encounter_id=_form_int(form, "encounter_id"),
+                record_type=form.get("record_type") or "outpatient",
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = f"已建档 {record.archive_no}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"建档失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/archive")
+async def archive_record_confirm(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        archive_record(
+            db,
+            record_id,
+            ArchiveCompleteRequest(
+                storage_location=(form.get("storage_location") or "").strip(),
+                page_count=_form_int(form, "page_count") or 0,
+                completeness=form.get("completeness") or "complete",
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已归档上架"
+    except Exception as e:  # noqa: BLE001
+        msg = f"归档失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/borrow")
+async def archive_borrow_submit(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        borrow_record(
+            db,
+            record_id,
+            BorrowCreate(
+                borrower=(form.get("borrower") or "").strip(),
+                department=(form.get("department") or "").strip(),
+                purpose=(form.get("purpose") or "").strip(),
+                due_days=_form_int(form, "due_days") or 7,
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已借出"
+    except Exception as e:  # noqa: BLE001
+        msg = f"借阅失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/borrowings/{borrowing_id}/return")
+def archive_return_submit(
+    request: Request, borrowing_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        return_borrowing(db, borrowing_id, request.session.get("admin_user", "admin"))
+        msg = "已归还"
+    except Exception as e:  # noqa: BLE001
+        msg = f"归还失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/copy")
+async def archive_copy_submit(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_copy(
+            db,
+            record_id,
+            CopyCreate(
+                applicant=(form.get("applicant") or "").strip(),
+                id_number=(form.get("id_number") or "").strip(),
+                relationship=(form.get("relationship") or "本人").strip(),
+                purpose=(form.get("purpose") or "").strip(),
+                contents=(form.get("contents") or "").strip(),
+                copies=_form_int(form, "copies") or 1,
+            ),
+        )
+        msg = "复印申请已登记"
+    except Exception as e:  # noqa: BLE001
+        msg = f"复印登记失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/copies/{copy_id}/complete")
+async def archive_copy_complete(
+    request: Request, copy_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        complete_copy(
+            db,
+            copy_id,
+            CopyCompleteRequest(fee=float(form.get("fee") or 0)),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "复印已完成"
+    except Exception as e:  # noqa: BLE001
+        msg = f"复印完成失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/seal")
+async def archive_seal_submit(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        seal_record(
+            db,
+            record_id,
+            SealCreate(
+                reason=(form.get("reason") or "").strip(),
+                witness=(form.get("witness") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已封存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"封存失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/unseal")
+async def archive_unseal_submit(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        unseal_record(
+            db,
+            record_id,
+            SealCreate(
+                reason=(form.get("reason") or "").strip(),
+                witness=(form.get("witness") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已启封"
+    except Exception as e:  # noqa: BLE001
+        msg = f"启封失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/archive/records/{record_id}/destroy")
+async def archive_destroy_submit(
+    request: Request, record_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        destroy_record(
+            db,
+            record_id,
+            DestroyCreate(
+                reason=(form.get("reason") or "").strip(),
+                approved_by=(form.get("approved_by") or "").strip(),
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已销毁"
+    except Exception as e:  # noqa: BLE001
+        msg = f"销毁失败：{e}"
+    return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)

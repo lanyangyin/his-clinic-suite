@@ -205,6 +205,34 @@ class ApiClient:
             json={"note": note, "notified_to": notified_to},
         )
 
+    # ---- 病案档案 ----
+    def list_archive_records(self, **params) -> list:
+        return self._request("GET", "/archive/records", params=params)
+
+    def create_archive_record(self, payload: dict) -> dict:
+        return self._request("POST", "/archive/records", json=payload)
+
+    def archive_record(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/archive", json=payload)
+
+    def borrow_archive(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/borrow", json=payload)
+
+    def return_archive(self, borrowing_id: int) -> dict:
+        return self._request("POST", f"/archive/borrowings/{borrowing_id}/return")
+
+    def copy_archive(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/copy", json=payload)
+
+    def seal_archive(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/seal", json=payload)
+
+    def unseal_archive(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/unseal", json=payload)
+
+    def destroy_archive(self, record_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/archive/records/{record_id}/destroy", json=payload)
+
     def list_imaging_items(self) -> list:
         return self._request("GET", "/pacs/items/")
 

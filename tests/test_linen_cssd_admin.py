@@ -71,3 +71,22 @@ def test_lab_item_admin_page(client, auth):
     page = client.get("/admin/lab-items")
     assert page.status_code == 200
     assert "管理台白细胞" in page.text
+
+
+def test_archive_admin_page_creates_record(client, auth):
+    patient = client.post(
+        "/patients/",
+        json={"name": "管理台档案患者", "id_number": "110101197001019999"},
+        headers=auth["cashier"],
+    ).json()
+    _login_admin(client, auth)
+    created = client.post(
+        "/admin/archive/records",
+        data={"patient_id": patient["id"], "record_type": "outpatient", "note": "管理台建档"},
+        follow_redirects=False,
+    )
+    assert created.status_code in (302, 303)
+    page = client.get("/admin/archive")
+    assert page.status_code == 200
+    assert "管理台档案患者" in page.text
+    assert "病案档案" in page.text
