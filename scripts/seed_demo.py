@@ -41,6 +41,7 @@ def seed(db) -> None:
         UserCreate(username="lab", password="lab123", role="lab", display_name="检验技师"),
         UserCreate(username="radiology", password="rad123", role="radiology", display_name="影像技师"),
         UserCreate(username="archive", password="archive123", role="archive", display_name="病案管理员"),
+        UserCreate(username="decoction", password="decoction123", role="decoction", display_name="煎药员"),
     ]
     for data in demo_users:
         if get_user_by_username(db, data.username):

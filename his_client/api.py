@@ -401,6 +401,47 @@ class ApiClient:
             "POST", f"/warehouse/purchase-requests/{request_id}/receive", json=payload
         )
 
+    # ---- 中药 / 煎药 ----
+    def list_tcm_herbs(self) -> list:
+        return self._request("GET", "/tcm/herbs")
+
+    def create_tcm_prescription(self, encounter_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/tcm/encounters/{encounter_id}/prescriptions", json=payload
+        )
+
+    def list_tcm_prescriptions(
+        self, status: str | None = None, encounter_id: int | None = None
+    ) -> list:
+        params = {}
+        if status:
+            params["status"] = status
+        if encounter_id:
+            params["encounter_id"] = encounter_id
+        return self._request("GET", "/tcm/prescriptions", params=params)
+
+    def review_tcm(self, prescription_id: int) -> dict:
+        return self._request("POST", f"/tcm/prescriptions/{prescription_id}/review")
+
+    def dispense_tcm(self, prescription_id: int) -> dict:
+        return self._request("POST", f"/tcm/prescriptions/{prescription_id}/dispense")
+
+    def list_decoctions(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/tcm/decoction-orders", params=params)
+
+    def soak_decoction(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/tcm/decoction-orders/{order_id}/soak", json=payload)
+
+    def decoct_decoction(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/tcm/decoction-orders/{order_id}/decoct", json=payload)
+
+    def package_decoction(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/tcm/decoction-orders/{order_id}/package", json=payload)
+
+    def issue_decoction(self, order_id: int, payload: dict) -> dict:
+        return self._request("POST", f"/tcm/decoction-orders/{order_id}/issue", json=payload)
+
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)

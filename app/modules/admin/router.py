@@ -136,6 +136,11 @@ from app.modules.warehouse.service import (
     reject_purchase_request,
 )
 from app.modules.supplier.service import list_suppliers
+from app.modules.tcm.schemas import HerbCreate
+from app.modules.tcm.service import (
+    create_herb,
+    list_herbs,
+)
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1914,3 +1919,46 @@ async def purchase_request_receive(
     return RedirectResponse(
         f"/admin/purchase-requests/{request_id}?msg={quote(msg)}", status_code=302
     )
+
+# ---------- 中药饮片目录 ----------
+
+@router.get("/tcm-herbs", response_class=HTMLResponse)
+def tcm_herbs_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "tcm_herbs.html",
+        _ctx(
+            request,
+            herbs=list_herbs(db, active_only=False),
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/tcm-herbs")
+async def tcm_herb_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_herb(
+            db,
+            HerbCreate(
+                code=(form.get("code") or "").strip(),
+                name=(form.get("name") or "").strip(),
+                spec=(form.get("spec") or "").strip(),
+                unit=(form.get("unit") or "g").strip(),
+                price_per_g=float(form.get("price_per_g") or 0),
+                insurance_code=(form.get("insurance_code") or "").strip(),
+                toxicity=form.get("toxicity") or "none",
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = "饮片已创建"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/tcm-herbs?msg={quote(msg)}", status_code=302)

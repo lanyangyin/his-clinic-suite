@@ -9,6 +9,7 @@ from his_client.labels import zh
 from his_client.ui.archive import ArchiveWidget
 from his_client.ui.lab import LabWidget
 from his_client.ui.nurse import NurseWidget
+from his_client.ui.tcm import TcmWidget
 from his_client.ui.pharmacy import PharmacyWidget
 
 
@@ -36,6 +37,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(LabWidget(api), "检验工作站")
         if role in ("archive", "admin"):
             tabs.addTab(ArchiveWidget(api), "病案档案工作站")
+        if role == "doctor":
+            tabs.addTab(TcmWidget(api, role="doctor"), "中药处方")
+        if role == "pharmacist":
+            tabs.addTab(TcmWidget(api, role="pharmacist"), "中药房 / 煎药室")
+        if role == "decoction":
+            tabs.addTab(TcmWidget(api, role="decoction"), "煎药室")
+        if role == "admin":
+            tabs.addTab(TcmWidget(api, role="admin"), "中药 / 煎药")
         if tabs.count() == 0:
             tabs.addTab(_placeholder(f"角色「{zh('role', role)}」暂无工作站"), "提示")
         self.setCentralWidget(tabs)

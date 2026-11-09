@@ -11,6 +11,7 @@ LABELS: dict[str, dict[str, str]] = {
         "lab": "检验技师",
         "radiology": "影像技师",
         "archive": "病案管理员",
+        "decoction": "煎药员",
     },
     "kind": {"drug": "药品", "material": "物资"},
     "inbound_status": {

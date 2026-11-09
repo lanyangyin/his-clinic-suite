@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}中药饮片 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>中药饮片目录</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<div class="panel">
+  <form class="inline" method="post" action="/admin/tcm-herbs">
+    <label>编码<input name="code" required placeholder="TCM-GC"></label>
+    <label>名称<input name="name" required placeholder="桂枝"></label>
+    <label>规格<input name="spec" placeholder="饮片"></label>
+    <label>单位<input name="unit" value="g"></label>
+    <label>元/克<input name="price_per_g" type="number" step="0.001" value="0.1"></label>
+    <label>医保编码<input name="insurance_code"></label>
+    <label>毒性
+      <select name="toxicity">
+        <option value="none">普通</option>
+        <option value="toxic">毒性</option>
+        <option value="precious">贵重</option>
+      </select>
+    </label>
+    <label>备注<input name="note"></label>
+    <button type="submit">新增饮片</button>
+  </form>
+</div>
+<div class="panel">
+  <table>
+    <tr><th>编码</th><th>名称</th><th>规格</th><th>单位</th><th>元/克</th><th>医保编码</th><th>毒性</th><th>状态</th></tr>
+    {% for herb in herbs %}
+    <tr>
+      <td>{{ herb.code }}</td><td>{{ herb.name }}</td><td>{{ herb.spec or '—' }}</td>
+      <td>{{ herb.unit }}</td><td>{{ '%.3f'|format(herb.price_per_g) }}</td>
+      <td>{{ herb.insurance_code or '—' }}</td><td>{{ herb.toxicity }}</td>
+      <td>{{ '启用' if herb.active else '停用' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无饮片</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
