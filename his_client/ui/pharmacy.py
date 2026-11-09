@@ -860,11 +860,14 @@ class PharmacyWidget(QWidget):
         issue.clicked.connect(self._issue_handle)
         cancel = QPushButton("取消出库单")
         cancel.clicked.connect(self._cancel_handle)
+        purchase = QPushButton("缺货生成采购申请")
+        purchase.clicked.connect(self._create_purchase_request)
         buttons.addWidget(self.partial_qty)
         buttons.addWidget(partial)
         buttons.addWidget(approve)
         buttons.addWidget(issue)
         buttons.addWidget(cancel)
+        buttons.addWidget(purchase)
         buttons.addStretch(1)
         layout.addLayout(buttons)
 
@@ -1366,3 +1369,17 @@ class PharmacyWidget(QWidget):
                 self.catalog_table.setItem(row, col, QTableWidgetItem(value))
         self.catalog_msg.setText(f"共 {len(rows)} 条目录记录")
 
+
+    def _create_purchase_request(self) -> None:
+        order = getattr(self, "handle_order", None)
+        if not order:
+            self.handle_msg.setText("请先选择出库单")
+            return
+        try:
+            request = self.api.create_purchase_request_from_outbound(order["id"])
+        except ApiError as e:
+            self.handle_msg.setText(f"生成采购申请失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(
+            f"已生成采购申请 {request['request_no']}（{request['status']}），等待机构审核"
+        )

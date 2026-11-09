@@ -13,11 +13,22 @@ from .models import (
     OutboundItem,
     OutboundOrder,
     PurchaseRecord,
+    PurchaseRequest,
+    PurchaseRequestItem,
     StockAdjustment,
     WarehouseCheck,
     WarehouseStock,
 )
-from .schemas import CheckCreate, OutboundOrderCreate, PurchaseCreate, TransferCreate
+from .schemas import (
+    CheckCreate,
+    OutboundOrderCreate,
+    PurchaseCreate,
+    PurchaseOrderRequest,
+    PurchaseReceiveRequest,
+    PurchaseRejectRequest,
+    PurchaseRequestCreate,
+    TransferCreate,
+)
 
 
 def receive_stock(
@@ -739,3 +750,294 @@ def list_purchases(
         query = query.filter(PurchaseRecord.supplier_id == supplier_id)
     return query.order_by(PurchaseRecord.id.desc()).all()
 
+
+# ---------- 采购申请（缺货补货） ----------
+
+def _next_purchase_request_no(db: Session) -> str:
+    last = db.query(PurchaseRequest.id).order_by(PurchaseRequest.id.desc()).first()
+    return f"PR{datetime.now():%Y%m%d}{(last[0] if last else 0) + 1:04d}"
+
+
+def _stock_available(db: Session, item) -> int:
+    if item.kind == "drug" and item.drug_id:
+        query = db.query(WarehouseStock).filter(WarehouseStock.drug_id == item.drug_id)
+        if item.batch_no:
+            query = query.filter(WarehouseStock.batch_no == item.batch_no)
+        return sum(row.quantity for row in query.all())
+    if item.kind == "material" and item.material_id:
+        return sum(
+            row.quantity
+            for row in db.query(MaterialStock)
+            .filter(
+                MaterialStock.item_id == item.material_id,
+                MaterialStock.warehouse == "总库",
+            )
+            .all()
+        )
+    return 0
+
+
+def create_purchase_request(
+    db: Session, data: PurchaseRequestCreate, requester: str = ""
+) -> PurchaseRequest:
+    if data.supplier_id is not None and not get_supplier(db, data.supplier_id):
+        raise ValueError("供应商不存在")
+    request = PurchaseRequest(
+        request_no=_next_purchase_request_no(db),
+        source_type="manual",
+        department=data.department,
+        requester=requester,
+        supplier_id=data.supplier_id,
+        note=data.note,
+    )
+    db.add(request)
+    db.flush()
+    total = 0.0
+    for entry in data.items:
+        if entry.kind == "drug":
+            drug = get_drug(db, entry.drug_id or 0)
+            if not drug:
+                raise ValueError("药品不存在")
+            name, spec, unit, price = drug.name, "", "", entry.estimated_unit_price or drug.base_price
+        else:
+            material = get_material_item(db, entry.material_id or 0)
+            if not material:
+                raise ValueError("物资不存在")
+            name, spec, unit, price = (
+                material.name,
+                material.spec,
+                material.unit,
+                entry.estimated_unit_price or material.price,
+            )
+        amount = round(price * entry.quantity, 2)
+        total += amount
+        db.add(
+            PurchaseRequestItem(
+                request_id=request.id,
+                kind=entry.kind,
+                drug_id=entry.drug_id,
+                material_id=entry.material_id,
+                name=name,
+                spec=spec,
+                unit=unit,
+                quantity=entry.quantity,
+                estimated_unit_price=price,
+                amount=amount,
+                batch_no=entry.batch_no,
+                expiry=entry.expiry,
+            )
+        )
+    request.total_amount = round(total, 2)
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def create_purchase_request_from_outbound(
+    db: Session, order_id: int, requester: str = ""
+) -> PurchaseRequest:
+    """出库申请缺货时，生成关联采购申请；不把出库单改成采购单。"""
+    order = get_outbound(db, order_id)
+    if not order:
+        raise ValueError("出库单不存在")
+    if order.status in ("issued", "cancelled"):
+        raise ValueError("该出库单已出库/已取消，不能生成采购申请")
+    existing = (
+        db.query(PurchaseRequest)
+        .filter(
+            PurchaseRequest.source_type == "outbound",
+            PurchaseRequest.source_id == order.id,
+            PurchaseRequest.status.notin_(("rejected", "cancelled", "received")),
+        )
+        .first()
+    )
+    if existing:
+        return existing
+    items = []
+    for item in order.items:
+        remaining = item.quantity - item.issued_quantity
+        available = _stock_available(db, item)
+        shortage = remaining - available
+        if shortage <= 0:
+            continue
+        price = item.unit_price
+        if not price and item.drug_id:
+            drug = get_drug(db, item.drug_id)
+            price = drug.base_price if drug else 0
+        if not price and item.material_id:
+            material = get_material_item(db, item.material_id)
+            price = material.price if material else 0
+        items.append(
+            {
+                "kind": item.kind,
+                "drug_id": item.drug_id,
+                "material_id": item.material_id,
+                "name": item.name,
+                "spec": item.spec,
+                "unit": item.unit,
+                "quantity": shortage,
+                "price": price,
+                "batch_no": item.batch_no,
+                "expiry": item.expiry,
+            }
+        )
+    if not items:
+        raise ValueError("该出库单没有缺货，不需要采购申请")
+    request = PurchaseRequest(
+        request_no=_next_purchase_request_no(db),
+        source_type="outbound",
+        source_id=order.id,
+        department=order.target_name,
+        requester=requester,
+        note=f"出库单 {order.outbound_no} 缺货补货",
+    )
+    db.add(request)
+    db.flush()
+    total = 0.0
+    for item in items:
+        amount = round(item["price"] * item["quantity"], 2)
+        total += amount
+        db.add(
+            PurchaseRequestItem(
+                request_id=request.id,
+                kind=item["kind"],
+                drug_id=item["drug_id"],
+                material_id=item["material_id"],
+                name=item["name"],
+                spec=item["spec"],
+                unit=item["unit"],
+                quantity=item["quantity"],
+                estimated_unit_price=item["price"],
+                amount=amount,
+                batch_no=item["batch_no"],
+                expiry=item["expiry"],
+            )
+        )
+    request.total_amount = round(total, 2)
+    order.purchase_request_id = request.id
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def list_purchase_requests(
+    db: Session, status: str | None = None
+) -> list[PurchaseRequest]:
+    query = db.query(PurchaseRequest)
+    if status:
+        query = query.filter(PurchaseRequest.status == status)
+    return query.order_by(PurchaseRequest.id.desc()).all()
+
+
+def get_purchase_request(db: Session, request_id: int) -> PurchaseRequest | None:
+    return db.get(PurchaseRequest, request_id)
+
+
+def approve_purchase_request(
+    db: Session, request_id: int, approver: str
+) -> PurchaseRequest:
+    """机构审核：库房发起，机构管理员批准后才能下单/采购。"""
+    request = get_purchase_request(db, request_id)
+    if not request:
+        raise ValueError("采购申请不存在")
+    if request.status != "submitted":
+        raise ValueError("只有待审核采购申请可以批准")
+    request.status = "approved"
+    request.approver = approver
+    request.approved_at = datetime.now()
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def reject_purchase_request(
+    db: Session, request_id: int, data: PurchaseRejectRequest, approver: str
+) -> PurchaseRequest:
+    request = get_purchase_request(db, request_id)
+    if not request:
+        raise ValueError("采购申请不存在")
+    if request.status != "submitted":
+        raise ValueError("只有待审核采购申请可以驳回")
+    request.status = "rejected"
+    request.approver = approver
+    request.rejected_reason = data.reason
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def order_purchase_request(
+    db: Session, request_id: int, data: PurchaseOrderRequest
+) -> PurchaseRequest:
+    request = get_purchase_request(db, request_id)
+    if not request:
+        raise ValueError("采购申请不存在")
+    if request.status != "approved":
+        raise ValueError("采购申请未批准，不能下单")
+    if data.supplier_id is not None and not get_supplier(db, data.supplier_id):
+        raise ValueError("供应商不存在")
+    request.status = "ordered"
+    request.supplier_id = data.supplier_id or request.supplier_id
+    request.ordered_at = datetime.now()
+    request.note = data.note or request.note
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def receive_purchase_request(
+    db: Session, request_id: int, data: PurchaseReceiveRequest, operator: str = ""
+) -> PurchaseRequest:
+    """采购到货入库；支持部分到货，剩余继续待到货。"""
+    request = get_purchase_request(db, request_id)
+    if not request:
+        raise ValueError("采购申请不存在")
+    if request.status not in ("approved", "ordered", "partially_received"):
+        raise ValueError("采购申请未批准/已结束，不能入库")
+    if data.supplier_id is not None and not get_supplier(db, data.supplier_id):
+        raise ValueError("供应商不存在")
+    for entry in data.items:
+        item = next((row for row in request.items if row.id == entry.item_id), None)
+        if not item:
+            raise ValueError("采购明细不存在")
+        remaining = item.quantity - item.received_quantity
+        if entry.quantity > remaining:
+            raise ValueError(f"到货数量超过未到货数量：{item.name}")
+        if item.kind == "drug":
+            if not entry.batch_no or not entry.expiry:
+                raise ValueError(f"药品到货必须填写批号和效期：{item.name}")
+            purchase(
+                db,
+                PurchaseCreate(
+                    drug_id=item.drug_id,
+                    batch_no=entry.batch_no,
+                    expiry=entry.expiry,
+                    quantity=entry.quantity,
+                    supplier_id=data.supplier_id or request.supplier_id,
+                ),
+                purchased_by=operator,
+            )
+        else:
+            from app.modules.materials.schemas import StockInCreate
+            from app.modules.materials.service import stock_in
+
+            stock_in(
+                db,
+                StockInCreate(
+                    item_id=item.material_id,
+                    warehouse="总库",
+                    quantity=entry.quantity,
+                ),
+            )
+        item.received_quantity += entry.quantity
+    if request.supplier_id is None:
+        request.supplier_id = data.supplier_id
+    if all(row.received_quantity >= row.quantity for row in request.items):
+        request.status = "received"
+        request.received_at = datetime.now()
+    else:
+        request.status = "partially_received"
+    request.note = data.note or request.note
+    db.commit()
+    db.refresh(request)
+    return request

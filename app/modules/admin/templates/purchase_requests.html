@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}采购申请 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>采购申请（机构审核）</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p class="hint" style="text-align:left">出库申请缺货时由库房生成采购申请，不把出库单改成采购单；采购申请需机构审核后才能下单、到货入库。</p>
+<form class="inline" method="get" action="/admin/purchase-requests">
+  <label>状态
+    <select name="status">
+      <option value="">全部</option>
+      {% for key, label in status_labels.items() %}
+      <option value="{{ key }}" {% if request.query_params.get('status') == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit">查询</button>
+</form>
+<div class="panel">
+  <table>
+    <tr><th>申请号</th><th>来源</th><th>申请科室</th><th>金额</th><th>状态</th><th>申请人</th><th>审核人</th><th>时间</th></tr>
+    {% for row in requests %}
+    <tr>
+      <td><a href="/admin/purchase-requests/{{ row.id }}">{{ row.request_no }}</a></td>
+      <td>{% if row.source_type == 'outbound' %}出库缺货{% else %}手工补货{% endif %}</td>
+      <td>{{ row.department }}</td>
+      <td>{{ '%.2f'|format(row.total_amount) }}</td>
+      <td>{{ status_labels.get(row.status, row.status) }}</td>
+      <td>{{ row.requester }}</td>
+      <td>{{ row.approver or '—' }}</td>
+      <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无采购申请</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

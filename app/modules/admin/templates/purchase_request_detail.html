@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}采购申请 {{ row.request_no }} · HIS 管理台{% endblock %}
+{% block content %}
+<h2>采购申请 {{ row.request_no }} <span style="font-size:14px;color:#6b7280">{{ status_labels.get(row.status, row.status) }}</span></h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p><a href="/admin/purchase-requests">← 返回采购申请</a></p>
+<div class="panel">
+  <p>来源：{% if row.source_type == 'outbound' %}出库单 {{ row.source_id }} 缺货{% else %}手工补货{% endif %}　
+     申请：{{ row.requester }}　审核：{{ row.approver or '—' }}　金额：{{ '%.2f'|format(row.total_amount) }}</p>
+  <p>备注：{{ row.note or '—' }}</p>
+  {% if row.rejected_reason %}<div class="err">驳回原因：{{ row.rejected_reason }}</div>{% endif %}
+  {% if row.status == 'submitted' %}
+  <form method="post" action="/admin/purchase-requests/{{ row.id }}/approve" style="display:inline">
+    <button type="submit">机构审核通过</button>
+  </form>
+  <form method="post" action="/admin/purchase-requests/{{ row.id }}/reject" style="display:inline">
+    <input name="reason" placeholder="驳回原因" required>
+    <button type="submit" style="background:#b91c1c">驳回</button>
+  </form>
+  {% elif row.status == 'approved' %}
+  <form method="post" action="/admin/purchase-requests/{{ row.id }}/order" style="display:inline-flex;gap:6px">
+    <select name="supplier_id">
+      <option value="">选择供应商</option>
+      {% for s in suppliers %}<option value="{{ s.id }}" {% if row.supplier_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+    <button type="submit">确认下单</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h3>采购明细</h3>
+  <table>
+    <tr><th>名称</th><th>规格</th><th>数量</th><th>已到货</th><th>估价</th><th>金额</th></tr>
+    {% for item in row.items %}
+    <tr>
+      <td>{{ item.name }}</td><td>{{ item.spec or '—' }}</td><td>{{ item.quantity }} {{ item.unit }}</td>
+      <td>{{ item.received_quantity }}</td><td>{{ '%.2f'|format(item.estimated_unit_price) }}</td>
+      <td>{{ '%.2f'|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if row.status in ('approved', 'ordered', 'partially_received') %}
+<div class="panel">
+  <h3>到货入库</h3>
+  <form method="post" action="/admin/purchase-requests/{{ row.id }}/receive">
+    <table>
+      <tr><th>名称</th><th>未到货</th><th>本次数量</th><th>批号</th><th>效期</th></tr>
+      {% for item in row.items %}
+      {% set remaining = item.quantity - item.received_quantity %}
+      {% if remaining > 0 %}
+      <tr>
+        <td>{{ item.name }}</td><td>{{ remaining }}</td>
+        <td><input name="qty_{{ item.id }}" type="number" min="1" max="{{ remaining }}" value="{{ remaining }}" style="min-width:70px"></td>
+        <td><input name="batch_{{ item.id }}" placeholder="批号" value="{{ item.batch_no }}" style="min-width:100px"></td>
+        <td><input name="expiry_{{ item.id }}" type="date" style="min-width:120px"></td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    <input type="hidden" name="supplier_id" value="{{ row.supplier_id or '' }}">
+    <p><button type="submit">确认到货入库</button></p>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

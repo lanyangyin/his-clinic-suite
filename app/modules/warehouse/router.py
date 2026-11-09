@@ -12,6 +12,11 @@ from .schemas import (
     OutboundOrderCreate,
     OutboundOrderResponse,
     PurchaseCreate,
+    PurchaseOrderRequest,
+    PurchaseReceiveRequest,
+    PurchaseRejectRequest,
+    PurchaseRequestCreate,
+    PurchaseRequestResponse,
     PurchaseRecordResponse,
     StockAdjustmentResponse,
     TransferCreate,
@@ -20,18 +25,26 @@ from .schemas import (
 )
 from .service import (
     approve_outbound,
+    approve_purchase_request,
     cancel_outbound,
     check,
     create_outbound,
+    create_purchase_request,
+    create_purchase_request_from_outbound,
     expiry_alerts,
     get_outbound,
+    get_purchase_request,
     issue_outbound,
     list_adjustments,
     list_checks,
     list_outbounds,
+    list_purchase_requests,
     list_purchases,
     list_stocks,
+    order_purchase_request,
     purchase,
+    receive_purchase_request,
+    reject_purchase_request,
     transfer,
 )
 
@@ -192,5 +205,106 @@ def cancel(
 ):
     try:
         return cancel_outbound(db, order_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ---------- 采购申请 ----------
+
+@router.post("/purchase-requests", response_model=PurchaseRequestResponse, status_code=201)
+def new_purchase_request(
+    data: PurchaseRequestCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("warehouse")),
+):
+    try:
+        return create_purchase_request(db, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/purchase-requests", response_model=list[PurchaseRequestResponse])
+def purchase_requests(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse")),
+):
+    return list_purchase_requests(db, status)
+
+
+@router.get("/purchase-requests/{request_id}", response_model=PurchaseRequestResponse)
+def purchase_request_detail(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse")),
+):
+    request = get_purchase_request(db, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="采购申请不存在")
+    return request
+
+
+@router.post(
+    "/outbound-orders/{order_id}/purchase-request",
+    response_model=PurchaseRequestResponse,
+    status_code=201,
+)
+def purchase_request_from_outbound(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("warehouse")),
+):
+    try:
+        return create_purchase_request_from_outbound(db, order_id, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/purchase-requests/{request_id}/approve", response_model=PurchaseRequestResponse)
+def approve_purchase_request_route(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    try:
+        return approve_purchase_request(db, request_id, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/purchase-requests/{request_id}/reject", response_model=PurchaseRequestResponse)
+def reject_purchase_request_route(
+    request_id: int,
+    data: PurchaseRejectRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    try:
+        return reject_purchase_request(db, request_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/purchase-requests/{request_id}/order", response_model=PurchaseRequestResponse)
+def order_purchase_request_route(
+    request_id: int,
+    data: PurchaseOrderRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse")),
+):
+    try:
+        return order_purchase_request(db, request_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/purchase-requests/{request_id}/receive", response_model=PurchaseRequestResponse)
+def receive_purchase_request_route(
+    request_id: int,
+    data: PurchaseReceiveRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("warehouse")),
+):
+    try:
+        return receive_purchase_request(db, request_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

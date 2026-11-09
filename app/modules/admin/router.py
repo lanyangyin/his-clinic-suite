@@ -121,6 +121,21 @@ from app.modules.archive.service import (
 )
 from app.modules.archive.models import ArchiveCopyRequest
 from app.modules.archive.service import get_record as get_archive_record
+from app.modules.warehouse.schemas import (
+    PurchaseOrderRequest,
+    PurchaseReceiveItem,
+    PurchaseReceiveRequest,
+    PurchaseRejectRequest,
+)
+from app.modules.warehouse.service import (
+    approve_purchase_request,
+    get_purchase_request,
+    list_purchase_requests,
+    order_purchase_request,
+    receive_purchase_request,
+    reject_purchase_request,
+)
+from app.modules.supplier.service import list_suppliers
 from app.modules.insurance_inventory.service import (
     create_upload as insurance_inventory_upload,
     get_upload as get_insurance_inventory_upload,
@@ -1723,3 +1738,179 @@ async def archive_destroy_submit(
     except Exception as e:  # noqa: BLE001
         msg = f"销毁失败：{e}"
     return RedirectResponse(f"/admin/archive?msg={quote(msg)}", status_code=302)
+
+# ---------- 采购申请（机构审核） ----------
+
+@router.get("/purchase-requests", response_class=HTMLResponse)
+def purchase_requests_page(
+    request: Request,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "purchase_requests.html",
+        _ctx(
+            request,
+            requests=list_purchase_requests(db, status),
+            suppliers=list_suppliers(db),
+            msg=request.query_params.get("msg", ""),
+            status_labels={
+                "submitted": "待审核",
+                "approved": "已批准",
+                "ordered": "已下单",
+                "partially_received": "部分到货",
+                "received": "已入库",
+                "rejected": "已驳回",
+                "cancelled": "已取消",
+            },
+        ),
+    )
+
+
+@router.get("/purchase-requests/{request_id}", response_class=HTMLResponse)
+def purchase_request_detail_page(
+    request: Request, request_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    row = get_purchase_request(db, request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="采购申请不存在")
+    return templates.TemplateResponse(
+        request,
+        "purchase_request_detail.html",
+        _ctx(
+            request,
+            row=row,
+            suppliers=list_suppliers(db),
+            msg=request.query_params.get("msg", ""),
+            status_labels={
+                "submitted": "待审核",
+                "approved": "已批准",
+                "ordered": "已下单",
+                "partially_received": "部分到货",
+                "received": "已入库",
+                "rejected": "已驳回",
+            },
+        ),
+    )
+
+
+@router.post("/purchase-requests/{request_id}/approve")
+def purchase_request_approve(
+    request: Request, request_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        approve_purchase_request(
+            db, request_id, request.session.get("admin_user", "admin")
+        )
+        msg = "已批准"
+    except Exception as e:  # noqa: BLE001
+        msg = f"批准失败：{e}"
+    return RedirectResponse(
+        f"/admin/purchase-requests/{request_id}?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/purchase-requests/{request_id}/reject")
+async def purchase_request_reject(
+    request: Request, request_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        reject_purchase_request(
+            db,
+            request_id,
+            PurchaseRejectRequest(reason=(form.get("reason") or "").strip()),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已驳回"
+    except Exception as e:  # noqa: BLE001
+        msg = f"驳回失败：{e}"
+    return RedirectResponse(
+        f"/admin/purchase-requests/{request_id}?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/purchase-requests/{request_id}/order")
+async def purchase_request_order(
+    request: Request, request_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        order_purchase_request(
+            db,
+            request_id,
+            PurchaseOrderRequest(
+                supplier_id=_form_int(form, "supplier_id"),
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = "已下单"
+    except Exception as e:  # noqa: BLE001
+        msg = f"下单失败：{e}"
+    return RedirectResponse(
+        f"/admin/purchase-requests/{request_id}?msg={quote(msg)}", status_code=302
+    )
+
+
+@router.post("/purchase-requests/{request_id}/receive")
+async def purchase_request_receive(
+    request: Request, request_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    row = get_purchase_request(db, request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="采购申请不存在")
+    form = await request.form()
+    items = []
+    for item in row.items:
+        qty = _form_int(form, f"qty_{item.id}")
+        if not qty:
+            continue
+        items.append(
+            PurchaseReceiveItem(
+                item_id=item.id,
+                quantity=qty,
+                batch_no=(form.get(f"batch_{item.id}") or "").strip(),
+                expiry=(
+                    date.fromisoformat(form.get(f"expiry_{item.id}"))
+                    if form.get(f"expiry_{item.id}")
+                    else None
+                ),
+                unit_price=_form_float(form, f"price_{item.id}"),
+            )
+        )
+    try:
+        receive_purchase_request(
+            db,
+            request_id,
+            PurchaseReceiveRequest(
+                supplier_id=_form_int(form, "supplier_id"),
+                items=items,
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = "已到货入库"
+    except Exception as e:  # noqa: BLE001
+        msg = f"入库失败：{e}"
+    return RedirectResponse(
+        f"/admin/purchase-requests/{request_id}?msg={quote(msg)}", status_code=302
+    )

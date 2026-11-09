@@ -370,6 +370,37 @@ class ApiClient:
     def cancel_outbound_order(self, order_id: int) -> dict:
         return self._request("POST", f"/warehouse/outbound-orders/{order_id}/cancel")
 
+    def create_purchase_request_from_outbound(self, order_id: int) -> dict:
+        return self._request(
+            "POST", f"/warehouse/outbound-orders/{order_id}/purchase-request"
+        )
+
+    def list_purchase_requests(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/warehouse/purchase-requests", params=params)
+
+    def approve_purchase_request(self, request_id: int) -> dict:
+        return self._request(
+            "POST", f"/warehouse/purchase-requests/{request_id}/approve"
+        )
+
+    def reject_purchase_request(self, request_id: int, reason: str) -> dict:
+        return self._request(
+            "POST",
+            f"/warehouse/purchase-requests/{request_id}/reject",
+            json={"reason": reason},
+        )
+
+    def order_purchase_request(self, request_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/warehouse/purchase-requests/{request_id}/order", json=payload
+        )
+
+    def receive_purchase_request(self, request_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/warehouse/purchase-requests/{request_id}/receive", json=payload
+        )
+
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
         return self._request("GET", "/materials/stocks", params=params)

@@ -120,6 +120,7 @@ class OutboundOrderResponse(BaseModel):
     created_at: datetime
     approved_at: datetime | None
     issued_at: datetime | None
+    purchase_request_id: int | None = None
     items: list[OutboundItemResponse]
     model_config = ConfigDict(from_attributes=True)
 
@@ -169,3 +170,83 @@ class ExpiryAlertResponse(BaseModel):
     days: int
     expired: list[ExpiryAlertItem]
     near_expiry: list[ExpiryAlertItem]
+
+# ---------- 采购申请 ----------
+class PurchaseRequestItemCreate(BaseModel):
+    kind: str = Field(default="drug", pattern="^(drug|material)$")
+    drug_id: int | None = None
+    material_id: int | None = None
+    quantity: int = Field(gt=0)
+    estimated_unit_price: float = Field(default=0, ge=0)
+    batch_no: str = Field(default="", max_length=30)
+    expiry: date | None = None
+
+
+class PurchaseRequestCreate(BaseModel):
+    department: str = Field(default="库房", max_length=50)
+    supplier_id: int | None = None
+    note: str = Field(default="", max_length=200)
+    items: list[PurchaseRequestItemCreate] = Field(min_length=1)
+
+
+class PurchaseRejectRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class PurchaseOrderRequest(BaseModel):
+    supplier_id: int | None = None
+    note: str = Field(default="", max_length=200)
+
+
+class PurchaseReceiveItem(BaseModel):
+    item_id: int
+    quantity: int = Field(gt=0)
+    batch_no: str = Field(default="", max_length=30)
+    expiry: date | None = None
+    unit_price: float | None = Field(default=None, ge=0)
+
+
+class PurchaseReceiveRequest(BaseModel):
+    supplier_id: int | None = None
+    items: list[PurchaseReceiveItem] = Field(min_length=1)
+    note: str = Field(default="", max_length=200)
+
+
+class PurchaseRequestItemResponse(BaseModel):
+    id: int
+    request_id: int
+    kind: str
+    drug_id: int | None
+    material_id: int | None
+    name: str
+    spec: str
+    unit: str
+    quantity: int
+    received_quantity: int
+    estimated_unit_price: float
+    amount: float
+    batch_no: str
+    expiry: date | None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PurchaseRequestResponse(BaseModel):
+    id: int
+    request_no: str
+    source_type: str
+    source_id: int | None
+    department: str
+    status: str
+    total_amount: float
+    requester: str
+    approver: str
+    approved_at: datetime | None
+    rejected_reason: str | None
+    supplier_id: int | None
+    ordered_at: datetime | None
+    received_at: datetime | None
+    note: str
+    created_at: datetime
+    items: list[PurchaseRequestItemResponse]
+    model_config = ConfigDict(from_attributes=True)

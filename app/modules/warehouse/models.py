@@ -111,6 +111,9 @@ class OutboundOrder(Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     issued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    purchase_request_id: Mapped[int | None] = mapped_column(
+        ForeignKey("purchase_requests.id"), nullable=True
+    )
 
     items: Mapped[list["OutboundItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
@@ -199,3 +202,70 @@ class StockAdjustment(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )
+
+class PurchaseRequest(Base):
+    """采购申请：库房缺货/补货时发起，需机构审核。"""
+
+    __tablename__ = "purchase_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    request_no: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    # outbound 出库缺货 / manual 手工补货 / min_stock 低库存
+    source_type: Mapped[str] = mapped_column(
+        String(20), default="manual", server_default="manual", nullable=False
+    )
+    source_id: Mapped[int | None] = mapped_column(nullable=True)
+    department: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    # submitted 待审核 / approved 已批准 / ordered 已下单 / partially_received 部分到货
+    # received 已入库 / rejected 已驳回 / cancelled 已取消
+    status: Mapped[str] = mapped_column(
+        String(20), default="submitted", server_default="submitted", nullable=False
+    )
+    total_amount: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+    requester: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    approver: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rejected_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    supplier_id: Mapped[int | None] = mapped_column(
+        ForeignKey("suppliers.id"), nullable=True
+    )
+    ordered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    items: Mapped[list["PurchaseRequestItem"]] = relationship(
+        back_populates="request", cascade="all, delete-orphan"
+    )
+
+
+class PurchaseRequestItem(Base):
+    __tablename__ = "purchase_request_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_requests.id"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(10), default="drug", nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_items.id"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    spec: Mapped[str] = mapped_column(String(60), default="", nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    received_quantity: Mapped[int] = mapped_column(
+        default=0, server_default="0", nullable=False
+    )
+    estimated_unit_price: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+    amount: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    batch_no: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    request: Mapped[PurchaseRequest] = relationship(back_populates="items")
