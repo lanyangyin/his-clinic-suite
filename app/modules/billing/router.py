@@ -14,7 +14,7 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 def pay(
     data: PaymentCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier")),
+    _: None = Depends(require_role("cashier", "doctor", "pharmacist")),
 ):
     try:
         return create_payment(db, data)

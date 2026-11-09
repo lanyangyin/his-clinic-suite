@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import time
 
 import app.modules.payment_gateway.service as gateway
 
@@ -17,7 +18,11 @@ class FakeResponse:
 
 def make_encounter_with_charge(client, auth):
     patient = client.post(
-        "/patients/", json={"name": "支付测试患者", "id_number": "110101199003011234"},
+        "/patients/",
+        json={
+            "name": "支付测试患者",
+            "id_number": "110101" + str(int(time.time() * 1000))[-12:],
+        },
         headers=auth["cashier"],
     ).json()
     department = client.post(
@@ -225,3 +230,30 @@ def test_payment_channel_requires_admin(client, auth):
     )
     assert resp.status_code == 302
     assert "/admin/login" in resp.headers.get("location", "")
+def test_doctor_and_pharmacist_can_pay(client, auth):
+    doctor_encounter = make_encounter_with_charge(client, auth)
+    doctor_payment = client.post(
+        "/payments/",
+        json={"encounter_id": doctor_encounter, "channel": "cash"},
+        headers=auth["doctor"],
+    )
+    assert doctor_payment.status_code == 201, doctor_payment.text
+    assert doctor_payment.json()["channel"] == "cash"
+
+    pharmacist_encounter = make_encounter_with_charge(client, auth)
+    pharmacist_payment = client.post(
+        "/payments/",
+        json={"encounter_id": pharmacist_encounter, "channel": "pos", "card_no": "CARD001"},
+        headers=auth["pharmacist"],
+    )
+    assert pharmacist_payment.status_code == 201, pharmacist_payment.text
+    assert pharmacist_payment.json()["channel"] == "pos"
+
+    nurse_encounter = make_encounter_with_charge(client, auth)
+    denied = client.post(
+        "/payments/",
+        json={"encounter_id": nurse_encounter, "channel": "cash"},
+        headers=auth["nurse"],
+    )
+    assert denied.status_code == 403
+    assert "cashier/doctor/pharmacist" in denied.json()["detail"]

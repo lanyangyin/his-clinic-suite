@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.payment import PaymentPanel
 
 _RECORD_FIELDS = [
     ("chief_complaint", "主诉", 200),
@@ -37,6 +38,7 @@ class DoctorWidget(QWidget):
         tabs.addTab(self._build_reception_tab(), "接诊")
         tabs.addTab(self._build_record_tab(), "病历")
         tabs.addTab(self._build_prescription_tab(), "开方")
+        tabs.addTab(PaymentPanel(api), "收费")
         tabs.addTab(self._build_exam_tab(), "检验 / 检查")
         tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)

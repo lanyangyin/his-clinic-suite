@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.payment import PaymentPanel
 
 ORDER_TYPES = [
     ("drug", "药品"),
@@ -49,6 +50,7 @@ class PharmacyWidget(QWidget):
         if role in ("pharmacist", "admin"):
             tabs.addTab(self._build_outbound_tab(), "领用出库")
             tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
+            tabs.addTab(PaymentPanel(api), "收费")
             tabs.addTab(self._build_stock_tab(), "库存查询")
             tabs.addTab(self._build_catalog_tab(), "医保目录")
         tabs.addTab(self._build_expiry_tab(), "效期预警")
