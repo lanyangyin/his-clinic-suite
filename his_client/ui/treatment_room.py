@@ -220,6 +220,14 @@ class TreatmentRoomWidget(QWidget):
             f"{case['case_no']} · {case['patient_name']} · {case['procedure_name']} · "
             f"状态 {case['status']} · 费用 {case['price']:.2f}"
         )
+        self.consent.setChecked(bool(case.get("consent")))
+        self.anesthesia.setText(case.get("anesthesia") or "")
+        self.findings.setText(case.get("findings") or "")
+        self.procedure_detail.setText(case.get("procedure_detail") or "")
+        self.sutures.setText(case.get("sutures") or "")
+        self.dressing.setText(case.get("dressing") or "")
+        self.materials.setText(case.get("materials") or "")
+        self.complications.setText(case.get("complications") or "")
         self.handle_msg.setText("已载入")
 
     def _start(self) -> None:
