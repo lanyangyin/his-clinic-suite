@@ -47,7 +47,6 @@ def executive_workbook(data: dict) -> BytesIO:
         ["检验申请", kpi["lab_requests"], "项"],
         ["完成手术", kpi["surgeries"], "台"],
         ["治疗室处置", kpi["treatments"], "例"],
-        ["在院患者", kpi["admissions_active"], "人"],
     ]
     _sheet(wb, "运营概览", ["指标", "数值", "单位"], overview_rows, [24, 20, 10])
 

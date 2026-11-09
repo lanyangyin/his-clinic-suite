@@ -24,6 +24,8 @@ class TreatmentRoomWidget(QWidget):
         super().__init__(parent)
         self.api = api
         self.cases: list[dict] = []
+        self.templates: list[dict] = []
+        self.template_edits: dict[str, QLineEdit] = {}
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_queue_tab(), "治疗排队")
         self.tabs.addTab(self._build_handle_tab(), "处置记录")
@@ -52,6 +54,8 @@ class TreatmentRoomWidget(QWidget):
         self.encounter_id.setRange(0, 10_000_000)
         self.encounter_id.setSpecialValueText("不关联就诊")
         self.room = QComboBox()
+        self.template = QComboBox()
+        self.template.currentIndexChanged.connect(self._on_template_changed)
         self.procedure = QLineEdit()
         self.diagnosis = QLineEdit()
         self.priority = QComboBox()
@@ -67,6 +71,7 @@ class TreatmentRoomWidget(QWidget):
         form.addRow("患者 ID", self.patient_id)
         form.addRow("就诊 ID", self.encounter_id)
         form.addRow("治疗室", self.room)
+        form.addRow("处置模板", self.template)
         form.addRow("处置名称", self.procedure)
         form.addRow("诊断", self.diagnosis)
         form.addRow("优先级", self.priority)
@@ -74,6 +79,10 @@ class TreatmentRoomWidget(QWidget):
         form.addRow("费用", self.price)
         form.addRow("", create)
         layout.addWidget(case_box)
+
+        template_box = QGroupBox("模板记录项")
+        self.template_form = QFormLayout(template_box)
+        layout.addWidget(template_box)
 
         refresh = QPushButton("刷新排队")
         refresh.clicked.connect(self._load_cases)
@@ -87,6 +96,7 @@ class TreatmentRoomWidget(QWidget):
         self.queue_msg = QLabel("")
         layout.addWidget(self.queue_msg)
         self._load_rooms()
+        self._load_templates()
         return page
 
     def _build_handle_tab(self) -> QWidget:
@@ -183,6 +193,12 @@ class TreatmentRoomWidget(QWidget):
             "encounter_id": self.encounter_id.value() or None,
             "room_id": self.room.currentData(),
             "procedure_name": self.procedure.text().strip(),
+            "template_code": self.template.currentData() or "",
+            "template_data": {
+                key: edit.text().strip()
+                for key, edit in self.template_edits.items()
+                if edit.text().strip()
+            },
             "diagnosis": self.diagnosis.text().strip(),
             "priority": self.priority.currentData(),
             "charge_item_id": self.charge_item_id.value() or None,
@@ -233,7 +249,7 @@ class TreatmentRoomWidget(QWidget):
             return
         self.case_info.setText(
             f"{case['case_no']} · {case['patient_name']} · {case['procedure_name']} · "
-            f"状态 {case['status']} · 费用 {case['price']:.2f}"
+            f"状态 {case['status']} · 费用 {case['price']:.2f} · 模板 {case.get('template_code') or '—'}"
         )
         self.consent.setChecked(bool(case.get("consent")))
         self.anesthesia.setText(case.get("anesthesia") or "")
@@ -303,3 +319,34 @@ class TreatmentRoomWidget(QWidget):
             self.handle_msg.setText(f"耗材扣减失败（{e.status_code}）：{e.detail}")
             return
         self.handle_msg.setText(f"已扣耗材 {row['name']} ×{row['quantity']}，材料费 {row['amount']:.2f}")
+
+    def _load_templates(self) -> None:
+        try:
+            self.templates = self.api.treatment_room_templates()
+        except ApiError as e:
+            self.queue_msg.setText(f"加载模板失败（{e.status_code}）：{e.detail}")
+            return
+        self.template.clear()
+        self.template.addItem("不使用模板", "")
+        for row in self.templates:
+            self.template.addItem(row["name"], row["code"])
+        self._on_template_changed()
+
+    def _on_template_changed(self) -> None:
+        while self.template_form.count():
+            item = self.template_form.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self.template_edits = {}
+        code = self.template.currentData()
+        definition = next((row for row in self.templates if row["code"] == code), None)
+        if not definition:
+            return
+        for field in definition["fields"]:
+            edit = QLineEdit()
+            self.template_edits[field["key"]] = edit
+            self.template_form.addRow(field["label"], edit)
+        if not self.procedure.text().strip():
+            self.procedure.setText(definition["name"])
+

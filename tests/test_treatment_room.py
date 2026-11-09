@@ -127,3 +127,44 @@ def test_treatment_room_cancel_and_permissions(client, auth):
         client.get("/treatment-room/cases", headers=auth["cashier"]).status_code
         == 403
     )
+
+
+def test_treatment_room_templates(client, auth):
+    templates = client.get(
+        "/treatment-room/templates", headers=auth["treatment"]
+    )
+    assert templates.status_code == 200
+    rows = templates.json()
+    codes = {row["code"] for row in rows}
+    assert "debridement" in codes
+    assert "circumcision" in codes
+    assert "burn" in codes
+
+    patient, encounter, room, _, _ = _setup(client, auth)
+    case = client.post(
+        "/treatment-room/cases",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "room_id": room["id"],
+            "procedure_name": "包皮环切",
+            "template_code": "circumcision",
+            "template_data": {
+                "indication": "包皮过长",
+                "technique": "环切缝合",
+                "anesthesia": "局麻",
+                "suture": "可吸收线",
+            },
+        },
+        headers=auth["treatment"],
+    )
+    assert case.status_code == 201, case.text
+    body = case.json()
+    assert body["template_code"] == "circumcision"
+    assert "包皮过长" in body["template_data"]
+
+    detail = client.get(
+        f"/treatment-room/cases/{body['id']}", headers=auth["treatment"]
+    )
+    assert detail.status_code == 200
+    assert detail.json()["template_code"] == "circumcision"

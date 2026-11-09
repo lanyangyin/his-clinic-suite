@@ -514,6 +514,9 @@ class ApiClient:
     def list_treatment_rooms(self) -> list:
         return self._request("GET", "/treatment-room/rooms")
 
+    def treatment_room_templates(self) -> list:
+        return self._request("GET", "/treatment-room/templates")
+
     def create_treatment_room(self, payload: dict) -> dict:
         return self._request("POST", "/treatment-room/rooms", json=payload)
 

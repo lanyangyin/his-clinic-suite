@@ -1,5 +1,6 @@
 """治疗室：清创/换药/小处置的排队、知情同意、处置记录与计费。"""
 from datetime import datetime
+import json
 
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.modules.patient.service import get_patient
 
 from .models import TreatmentRoom, TreatmentRoomCase
 from .schemas import CaseCreate, CompleteRequest, RoomCreate, StartRequest
+from .templates import TEMPLATES
 
 
 def create_room(db: Session, data: RoomCreate) -> TreatmentRoom:
@@ -27,6 +29,10 @@ def list_rooms(db: Session) -> list[TreatmentRoom]:
     return db.query(TreatmentRoom).order_by(TreatmentRoom.code).all()
 
 
+def list_templates() -> list[dict]:
+    return TEMPLATES
+
+
 def _next_no(db: Session) -> str:
     last = db.query(TreatmentRoomCase.id).order_by(TreatmentRoomCase.id.desc()).first()
     return f"TR{datetime.now():%Y%m%d}{(last[0] if last else 0) + 1:04d}"
@@ -39,6 +45,8 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
         raise ValueError("就诊记录不存在")
     if data.room_id is not None and not db.get(TreatmentRoom, data.room_id):
         raise ValueError("治疗室不存在")
+    if data.template_code and data.template_code not in {row["code"] for row in TEMPLATES}:
+        raise ValueError("处置模板不存在")
     price = data.price
     insurance_ratio = 0.0
     if data.charge_item_id is not None:
@@ -54,6 +62,8 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
         room_id=data.room_id,
         treatment_order_id=data.treatment_order_id,
         procedure_name=data.procedure_name,
+        template_code=data.template_code,
+        template_data=json.dumps(data.template_data, ensure_ascii=False) if data.template_data else "",
         diagnosis=data.diagnosis,
         priority=data.priority,
         charge_item_id=data.charge_item_id,
@@ -98,6 +108,8 @@ def list_cases(db: Session, status: str | None = None) -> list[dict]:
             "room_id": case.room_id,
             "room_name": case.room_name,
             "procedure_name": case.procedure_name,
+            "template_code": case.template_code,
+            "template_data": case.template_data,
             "diagnosis": case.diagnosis,
             "status": case.status,
             "priority": case.priority,

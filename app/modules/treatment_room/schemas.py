@@ -21,6 +21,8 @@ class CaseCreate(BaseModel):
     room_id: int | None = None
     treatment_order_id: int | None = None
     procedure_name: str = Field(min_length=1, max_length=100)
+    template_code: str = Field(default="", max_length=30)
+    template_data: dict[str, str] = Field(default_factory=dict)
     diagnosis: str = Field(default="", max_length=200)
     priority: str = Field(default="routine", pattern="^(routine|urgent)$")
     charge_item_id: int | None = None
@@ -53,6 +55,8 @@ class CaseResponse(BaseModel):
     room_id: int | None
     room_name: str
     procedure_name: str
+    template_code: str
+    template_data: str
     diagnosis: str
     status: str
     priority: str
@@ -72,3 +76,8 @@ class CaseResponse(BaseModel):
     note: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class TreatmentTemplate(BaseModel):
+    code: str
+    name: str
+    fields: list[dict]

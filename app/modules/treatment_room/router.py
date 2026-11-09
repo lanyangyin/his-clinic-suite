@@ -15,6 +15,7 @@ from .schemas import (
     RoomCreate,
     RoomResponse,
     StartRequest,
+    TreatmentTemplate,
 )
 from .service import (
     add_material,
@@ -25,6 +26,7 @@ from .service import (
     get_case,
     list_cases,
     list_rooms,
+    list_templates,
     start_case,
 )
 
@@ -132,3 +134,7 @@ def material(
         return add_material(db, case_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/templates", response_model=list[TreatmentTemplate])
+def templates(_: None = Depends(require_role("treatment"))):
+    return list_templates()

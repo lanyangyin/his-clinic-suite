@@ -26,6 +26,12 @@ class TreatmentRoomCase(Base):
     room_id: Mapped[int | None] = mapped_column(ForeignKey("treatment_rooms.id"), nullable=True)
     treatment_order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     procedure_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    template_code: Mapped[str] = mapped_column(
+        String(30), default="", server_default="", nullable=False
+    )
+    template_data: Mapped[str] = mapped_column(
+        String(2000), default="", server_default="", nullable=False
+    )
     diagnosis: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     # waiting 候诊 / in_progress 处置中 / completed 已完成 / cancelled 已取消
     status: Mapped[str] = mapped_column(String(20), default="waiting", nullable=False)

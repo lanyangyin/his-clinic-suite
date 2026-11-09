@@ -18,7 +18,6 @@ from app.modules.surgery.models import SurgeryCase
 from app.modules.treatment_room.models import TreatmentRoomCase
 from app.modules.warehouse.models import PurchaseRequest, WarehouseStock
 from app.modules.drug.models import Drug
-from app.modules.inpatient.models import Admission
 
 
 def resolve_range(start_date: date | None, end_date: date | None) -> tuple[date, date]:
@@ -236,9 +235,6 @@ def executive(db: Session, start_date: date | None = None, end_date: date | None
     )
     gsp = gsp_alerts(db)
     risks = compliance_risks(db, start, end, limit=200)
-    admissions = (
-        db.query(func.count(Admission.id)).filter(Admission.status == "in").scalar() or 0
-    )
     paid_count = len(payments)
     return {
         "start_date": start,
@@ -258,7 +254,6 @@ def executive(db: Session, start_date: date | None = None, end_date: date | None
             "lab_requests": lab_count,
             "surgeries": surgery_count,
             "treatments": treatment_count,
-            "admissions_active": admissions,
         },
         "trend": _daily_trend(db, start, end),
         "departments": department_revenue(db, start, end),

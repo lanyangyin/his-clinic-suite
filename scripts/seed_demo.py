@@ -42,7 +42,6 @@ def seed(db) -> None:
         UserCreate(username="radiology", password="rad123", role="radiology", display_name="影像技师"),
         UserCreate(username="archive", password="archive123", role="archive", display_name="病案管理员"),
         UserCreate(username="decoction", password="decoction123", role="decoction", display_name="煎药员"),
-        UserCreate(username="surgery", password="surgery123", role="surgery", display_name="手术室护士"),
         UserCreate(username="treatment", password="treatment123", role="treatment", display_name="治疗室护士"),
     ]
     for data in demo_users:
