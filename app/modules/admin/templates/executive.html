@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}院长驾驶舱 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>院长驾驶舱</h2>
+<form class="inline" method="get" action="/admin/executive">
+  <label>开始日期<input type="date" name="start_date" value="{{ data.start_date }}"></label>
+  <label>结束日期<input type="date" name="end_date" value="{{ data.end_date }}"></label>
+  <button type="submit">查询</button>
+</form>
+
+{% set k = data.kpi %}
+<div class="cards">
+  <div class="card"><div class="num">{{ k.visits }}</div><div class="label">门诊人次</div></div>
+  <div class="card"><div class="num">{{ k.paid_count }}</div><div class="label">收费笔数</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(k.revenue) }}</div><div class="label">医疗收入</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(k.insurance) }}</div><div class="label">医保支付</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(k.avg_cost) }}</div><div class="label">次均费用</div></div>
+  <div class="card"><div class="num">{{ k.drug_ratio }}%</div><div class="label">药占比</div></div>
+  <div class="card"><div class="num">{{ k.prescriptions }}</div><div class="label">处方条目</div></div>
+  <div class="card"><div class="num">{{ k.surgeries }}</div><div class="label">完成手术</div></div>
+  <div class="card"><div class="num">{{ k.treatments }}</div><div class="label">治疗室处置</div></div>
+  <div class="card"><div class="num">{{ k.admissions_active }}</div><div class="label">在院患者</div></div>
+</div>
+
+<div class="panel">
+  <h3>收入趋势</h3>
+  <table>
+    <tr><th>日期</th><th>门诊人次</th><th>收费笔数</th><th>收入</th><th style="width:45%">趋势</th></tr>
+    {% for row in data.trend %}
+    <tr>
+      <td>{{ row.date }}</td><td>{{ row.visits }}</td><td>{{ row.paid_count }}</td>
+      <td>{{ '%.2f'|format(row.paid_amount) }}</td>
+      <td><div style="background:#dbeafe;height:12px;border-radius:6px;width:{{ (row.paid_amount / trend_max * 100)|round(1) }}%"></div></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>科室收入</h3>
+  <table>
+    <tr><th>科室</th><th>就诊人次</th><th>已收</th><th>挂号</th><th>诊疗</th><th>药品</th><th>检验</th><th>检查</th><th>治疗</th></tr>
+    {% for row in data.departments %}
+    <tr>
+      <td>{{ row.department_name }}</td><td>{{ row.encounter_count }}</td>
+      <td>{{ '%.2f'|format(row.paid_amount) }}</td>
+      <td>{{ '%.2f'|format(row.registration_amount) }}</td>
+      <td>{{ '%.2f'|format(row.consultation_amount) }}</td>
+      <td>{{ '%.2f'|format(row.drug_amount) }}</td>
+      <td>{{ '%.2f'|format(row.lab_amount) }}</td>
+      <td>{{ '%.2f'|format(row.imaging_amount) }}</td>
+      <td>{{ '%.2f'|format(row.treatment_amount) }}</td>
+    </tr>
+    {% else %}<tr><td colspan="9">该期间无科室收入</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>医生工作量</h3>
+  <table>
+    <tr><th>医生</th><th>接诊人次</th></tr>
+    {% for row in data.doctors %}
+    <tr><td>{{ row.doctor_name }}</td><td>{{ row.visits }}</td></tr>
+    {% else %}<tr><td colspan="2">该期间无接诊</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>药品销售 Top 10</h3>
+  <table>
+    <tr><th>药品</th><th>数量</th><th>金额</th></tr>
+    {% for row in data.top_drugs %}
+    <tr><td>{{ row.drug_name }}</td><td>{{ row.quantity }}</td><td>{{ '%.2f'|format(row.amount) }}</td></tr>
+    {% else %}<tr><td colspan="3">该期间无处方</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>支付方式</h3>
+  <table>
+    <tr><th>渠道</th><th>笔数</th><th>金额</th></tr>
+    {% for row in data.channels %}
+    <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ '%.2f'|format(row.amount) }}</td></tr>
+    {% else %}<tr><td colspan="3">该期间无收费</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>库存与风险</h3>
+  <table>
+    <tr><th>项目</th><th>数量</th></tr>
+    <tr><td>待处理采购申请</td><td>{{ data.risks.purchase_pending }}</td></tr>
+    <tr><td>医保合规风险</td><td>{{ data.risks.insurance_risks }}</td></tr>
+    <tr><td>GSP 不合格验收</td><td>{{ data.risks.gsp_unqualified }}</td></tr>
+    <tr><td>GSP 温湿度异常</td><td>{{ data.risks.gsp_storage }}</td></tr>
+    <tr><td>进行中召回</td><td>{{ data.risks.gsp_recalls }}</td></tr>
+  </table>
+</div>
+
+<div class="panel">
+  <h3>库存预警（≤10）</h3>
+  <table>
+    <tr><th>类型</th><th>名称</th><th>库存</th></tr>
+    {% for row in data.inventory_alerts %}
+    <tr><td>{{ row.kind }}</td><td>{{ row.name }}</td><td>{{ row.quantity }}</td></tr>
+    {% else %}<tr><td colspan="3">无低库存</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

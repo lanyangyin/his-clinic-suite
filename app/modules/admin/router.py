@@ -142,6 +142,7 @@ from app.modules.tcm.service import (
     list_herbs,
 )
 from app.modules.insurance.workbench import workbench as insurance_workbench
+from app.modules.bi.executive import executive as executive_dashboard
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2186,3 +2187,28 @@ async def gsp_personnel_submit(request: Request, db: Session = Depends(get_db)):
     except Exception as e:  # noqa: BLE001
         msg = f"保存失败：{e}"
     return RedirectResponse(f"/admin/gsp?msg={quote(msg)}", status_code=302)
+
+# ---------- 院长驾驶舱 ----------
+
+@router.get("/executive", response_class=HTMLResponse)
+def executive_page(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        start = date.fromisoformat(start_date) if start_date else None
+        end = date.fromisoformat(end_date) if end_date else None
+    except ValueError:
+        start, end = None, None
+    data = executive_dashboard(db, start, end)
+    trend_max = max([row["paid_amount"] for row in data["trend"]] or [1]) or 1
+    return templates.TemplateResponse(
+        request,
+        "executive.html",
+        _ctx(request, data=data, trend_max=trend_max),
+    )

@@ -28,6 +28,7 @@ from app.modules.supplier.router import router as supplier_router
 from app.modules.pathway.router import router as pathway_router
 from app.modules.finance.router import router as finance_router
 from app.modules.bi.router import router as bi_router
+from app.modules.bi.executive_router import router as bi_executive_router
 from app.modules.performance.router import router as performance_router
 from app.modules.hr.router import router as hr_router
 from app.modules.integration.router import router as integration_router
@@ -195,6 +196,7 @@ app.include_router(supplier_router)
 app.include_router(pathway_router)
 app.include_router(finance_router)
 app.include_router(bi_router)
+app.include_router(bi_executive_router)
 app.include_router(performance_router)
 app.include_router(hr_router)
 app.include_router(integration_router)
