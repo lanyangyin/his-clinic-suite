@@ -4,6 +4,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.modules.encounter.service import get_encounter
+from app.modules.charges.models import ChargeItem
+from app.modules.charges.service import add_charge
 from app.modules.patient.models import Patient
 from app.modules.patient.service import get_patient
 
@@ -51,6 +53,14 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
         raise ValueError("就诊记录不存在")
     if data.room_id is not None and not db.get(OperatingRoom, data.room_id):
         raise ValueError("手术间不存在")
+    price = data.price
+    insurance_ratio = 0.0
+    if data.charge_item_id is not None:
+        item = db.get(ChargeItem, data.charge_item_id)
+        if not item:
+            raise ValueError("收费项目不存在")
+        price = price or item.price
+        insurance_ratio = item.insurance_ratio
     row = SurgeryCase(
         surgery_no=_next_no(db),
         patient_id=data.patient_id,
@@ -61,10 +71,26 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
         surgeon=data.surgeon,
         anesthesia_type=data.anesthesia_type,
         scheduled_at=data.scheduled_at or datetime.now(),
+        charge_item_id=data.charge_item_id,
+        price=price,
         notes=data.notes,
         created_by=created_by,
     )
     db.add(row)
+    db.flush()
+    if data.encounter_id is not None and price > 0:
+        add_charge(
+            db,
+            encounter_id=data.encounter_id,
+            source_type="surgery_case",
+            source_id=row.id,
+            charge_type="treatment",
+            charge_item_id=data.charge_item_id,
+            item_name=f"手术：{data.procedure_name}",
+            quantity=1,
+            unit_price=price,
+            insurance_ratio=insurance_ratio,
+        )
     db.commit()
     db.refresh(row)
     return row
@@ -257,3 +283,23 @@ def attach_package(db: Session, case_id: int, package_id: int, operator: str = "
     package.status = "used"
     db.commit()
     return {"case_id": case.id, "package_id": package.id, "package_code": package.package_code}
+
+
+def add_material(db: Session, case_id: int, data, operator: str = ""):
+    from app.modules.procedure_materials.service import consume_material
+
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    if case.status not in ("in_progress", "completed"):
+        raise ValueError("只有手术中/已完成的手术可以登记耗材")
+    return consume_material(
+        db,
+        source_type="surgery",
+        source_id=case.id,
+        encounter_id=case.encounter_id,
+        material_id=data.material_id,
+        quantity=data.quantity,
+        warehouse=data.warehouse,
+        operator=operator,
+    )

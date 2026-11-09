@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.modules.auth.security import require_role
+from app.modules.procedure_materials.schemas import (
+    ProcedureMaterialCreate,
+    ProcedureMaterialResponse,
+)
 
 from .schemas import (
     CaseCreate,
@@ -13,6 +17,7 @@ from .schemas import (
     StartRequest,
 )
 from .service import (
+    add_material,
     cancel_case,
     complete_case,
     create_case,
@@ -113,5 +118,17 @@ def cancel(
 ):
     try:
         return cancel_case(db, case_id, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/cases/{case_id}/materials", response_model=ProcedureMaterialResponse, status_code=201)
+def material(
+    case_id: int,
+    data: ProcedureMaterialCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("treatment")),
+):
+    try:
+        return add_material(db, case_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

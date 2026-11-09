@@ -58,6 +58,11 @@ class SurgeryWidget(QWidget):
         self.sc_time = QLineEdit()
         self.sc_time.setPlaceholderText("YYYY-MM-DDTHH:MM:SS")
         self.sc_time.setText((datetime.now() + timedelta(days=1)).strftime("%Y-%m-%dT09:00:00"))
+        self.sc_charge_item = QSpinBox()
+        self.sc_charge_item.setRange(0, 10_000_000)
+        self.sc_charge_item.setSpecialValueText("不关联收费项目")
+        self.sc_price = QLineEdit()
+        self.sc_price.setPlaceholderText("空=收费项目价")
         create = QPushButton("创建手术")
         create.clicked.connect(self._create_case)
         form.addRow("患者 ID", self.sc_patient)
@@ -67,6 +72,8 @@ class SurgeryWidget(QWidget):
         form.addRow("术者", self.sc_surgeon)
         form.addRow("麻醉", self.sc_anesthesia)
         form.addRow("计划时间", self.sc_time)
+        form.addRow("收费项目 ID", self.sc_charge_item)
+        form.addRow("手术费", self.sc_price)
         form.addRow("", create)
         layout.addWidget(case_box)
 
@@ -168,6 +175,23 @@ class SurgeryWidget(QWidget):
         package_row.addWidget(self.package_id)
         package_row.addWidget(attach)
         layout.addLayout(package_row)
+
+        material_row = QHBoxLayout()
+        self.material_id = QSpinBox()
+        self.material_id.setRange(1, 10_000_000)
+        self.material_qty = QSpinBox()
+        self.material_qty.setRange(1, 10000)
+        self.material_warehouse = QLineEdit("总库")
+        material_add = QPushButton("扣耗材")
+        material_add.clicked.connect(self._add_material)
+        material_row.addWidget(QLabel("耗材 ID"))
+        material_row.addWidget(self.material_id)
+        material_row.addWidget(QLabel("数量"))
+        material_row.addWidget(self.material_qty)
+        material_row.addWidget(QLabel("库房"))
+        material_row.addWidget(self.material_warehouse)
+        material_row.addWidget(material_add)
+        layout.addLayout(material_row)
         self.intra_msg = QLabel("")
         self.intra_msg.setWordWrap(True)
         layout.addWidget(self.intra_msg)
@@ -227,6 +251,8 @@ class SurgeryWidget(QWidget):
             "surgeon": self.sc_surgeon.text().strip(),
             "anesthesia_type": self.sc_anesthesia.text().strip(),
             "scheduled_at": self.sc_time.text().strip(),
+            "charge_item_id": self.sc_charge_item.value() or None,
+            "price": float(self.sc_price.text()) if self.sc_price.text().strip() else 0,
         }
         try:
             case = self.api.create_surgery_case(payload)
@@ -366,3 +392,18 @@ class SurgeryWidget(QWidget):
             self.recovery_msg.setText(f"复苏登记失败（{e.status_code}）：{e.detail}")
             return
         self.recovery_msg.setText(f"复苏已登记，评分 {row['score']}")
+
+    def _add_material(self) -> None:
+        try:
+            row = self.api.surgery_material(
+                self.case_id.value(),
+                {
+                    "material_id": self.material_id.value(),
+                    "quantity": self.material_qty.value(),
+                    "warehouse": self.material_warehouse.text().strip() or "总库",
+                },
+            )
+        except ApiError as e:
+            self.intra_msg.setText(f"耗材扣减失败（{e.status_code}）：{e.detail}")
+            return
+        self.intra_msg.setText(f"已扣耗材 {row['name']} ×{row['quantity']}，材料费 {row['amount']:.2f}")

@@ -166,3 +166,23 @@ def cancel_case(db: Session, case_id: int, operator: str = "") -> TreatmentRoomC
     db.commit()
     db.refresh(case)
     return case
+
+
+def add_material(db: Session, case_id: int, data, operator: str = ""):
+    from app.modules.procedure_materials.service import consume_material
+
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("治疗室病例不存在")
+    if case.status not in ("in_progress", "completed"):
+        raise ValueError("只有处置中/已完成的病例可以登记耗材")
+    return consume_material(
+        db,
+        source_type="treatment_room",
+        source_id=case.id,
+        encounter_id=case.encounter_id,
+        material_id=data.material_id,
+        quantity=data.quantity,
+        warehouse=data.warehouse,
+        operator=operator,
+    )

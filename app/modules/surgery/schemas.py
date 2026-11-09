@@ -24,6 +24,8 @@ class CaseCreate(BaseModel):
     surgeon: str = Field(default="", max_length=50)
     anesthesia_type: str = Field(default="", max_length=30)
     scheduled_at: datetime | None = None
+    charge_item_id: int | None = None
+    price: float = Field(default=0, ge=0)
     notes: str = Field(default="", max_length=200)
 
 
@@ -41,6 +43,7 @@ class CaseResponse(BaseModel):
     scheduled_at: datetime
     status: str
     notes: str
+    price: float
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None

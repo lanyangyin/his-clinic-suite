@@ -29,6 +29,8 @@ class SurgeryCase(Base):
     surgeon: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     anesthesia_type: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    charge_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     # scheduled 已排班 / in_progress 手术中 / completed 已完成 / cancelled 已取消
     status: Mapped[str] = mapped_column(String(20), default="scheduled", nullable=False)
     notes: Mapped[str] = mapped_column(String(200), default="", nullable=False)

@@ -55,6 +55,7 @@ from app.modules.insurance.router import router as insurance_router
 from app.modules.gsp.router import router as gsp_router
 from app.modules.surgery.router import router as surgery_router
 from app.modules.treatment_room.router import router as treatment_room_router
+from app.modules.procedure_materials import models as procedure_material_models  # noqa: F401
 from app.modules.insurance_inventory.router import router as insurance_inventory_router
 from app.modules.insurance_materials.router import router as insurance_materials_router
 from app.modules.reports.router import router as reports_router

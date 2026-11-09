@@ -136,6 +136,21 @@ class TreatmentRoomWidget(QWidget):
         complete_form.addRow("并发症", self.complications)
         complete_form.addRow(complete, cancel)
         layout.addWidget(complete_box)
+
+        material_box = QGroupBox("耗材扣减")
+        material_form = QFormLayout(material_box)
+        self.material_id = QSpinBox()
+        self.material_id.setRange(1, 10_000_000)
+        self.material_qty = QSpinBox()
+        self.material_qty.setRange(1, 10000)
+        self.material_warehouse = QLineEdit("总库")
+        material_add = QPushButton("扣减耗材")
+        material_add.clicked.connect(self._add_material)
+        material_form.addRow("耗材 ID", self.material_id)
+        material_form.addRow("数量", self.material_qty)
+        material_form.addRow("库房", self.material_warehouse)
+        material_form.addRow("", material_add)
+        layout.addWidget(material_box)
         self.handle_msg = QLabel("")
         layout.addWidget(self.handle_msg)
         return page
@@ -273,3 +288,18 @@ class TreatmentRoomWidget(QWidget):
             return
         self.handle_msg.setText("已取消")
         self._load_case()
+
+    def _add_material(self) -> None:
+        try:
+            row = self.api.treatment_room_material(
+                self.case_id.value(),
+                {
+                    "material_id": self.material_id.value(),
+                    "quantity": self.material_qty.value(),
+                    "warehouse": self.material_warehouse.text().strip() or "总库",
+                },
+            )
+        except ApiError as e:
+            self.handle_msg.setText(f"耗材扣减失败（{e.status_code}）：{e.detail}")
+            return
+        self.handle_msg.setText(f"已扣耗材 {row['name']} ×{row['quantity']}，材料费 {row['amount']:.2f}")

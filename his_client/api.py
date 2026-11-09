@@ -495,6 +495,11 @@ class ApiClient:
             "POST", f"/surgery/cases/{case_id}/packages/{package_id}"
         )
 
+    def surgery_material(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/surgery/cases/{case_id}/materials", json=payload
+        )
+
     # ---- 治疗室 ----
     def list_treatment_rooms(self) -> list:
         return self._request("GET", "/treatment-room/rooms")
@@ -521,6 +526,11 @@ class ApiClient:
 
     def cancel_treatment_room_case(self, case_id: int) -> dict:
         return self._request("POST", f"/treatment-room/cases/{case_id}/cancel")
+
+    def treatment_room_material(self, case_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/treatment-room/cases/{case_id}/materials", json=payload
+        )
 
     def list_material_stocks(self, item_id: int | None = None) -> list:
         params = {"item_id": item_id} if item_id else {}
