@@ -28,3 +28,4 @@ build/
 .DS_Store
 Thumbs.db
 docs/e2e_frames/
+docs/ui_demo_frames/
