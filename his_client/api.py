@@ -128,6 +128,9 @@ class ApiClient:
     def get_medical_record(self, encounter_id: int) -> dict:
         return self._request("GET", f"/encounters/{encounter_id}/medical-record")
 
+    def get_patient_history(self, patient_id: int) -> dict:
+        return self._request("GET", f"/patients/{patient_id}/history")
+
     def create_medical_record(self, encounter_id: int, payload: dict) -> dict:
         return self._request(
             "POST", f"/encounters/{encounter_id}/medical-record", json=payload
@@ -192,6 +195,9 @@ class ApiClient:
 
     def list_pending_treatments(self) -> list:
         return self._request("GET", "/treatments/", params={"status": "pending"})
+
+    def list_treatments(self, encounter_id: int) -> list:
+        return self._request("GET", f"/treatments/encounters/{encounter_id}")
 
     def execute_treatment(self, order_id: int) -> dict:
         return self._request("POST", f"/treatments/{order_id}/execute")

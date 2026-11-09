@@ -1,4 +1,5 @@
 """医生工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
@@ -8,6 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -37,6 +39,7 @@ class DoctorWidget(QWidget):
         tabs.addTab(self._build_register_tab(), "挂号")
         tabs.addTab(self._build_reception_tab(), "接诊")
         tabs.addTab(self._build_record_tab(), "病历")
+        tabs.addTab(self._build_history_tab(), "历史诊疗")
         tabs.addTab(self._build_prescription_tab(), "开方")
         tabs.addTab(PaymentPanel(api), "收费")
         tabs.addTab(self._build_exam_tab(), "检验 / 检查")
@@ -322,6 +325,230 @@ class DoctorWidget(QWidget):
         self.record_msg.setText(
             f"质控得分 {quality['score']}（{'通过' if quality['passed'] else '不通过'}），缺项：{missing}"
         )
+
+    # ---------- 历史诊疗 ----------
+    def _build_history_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+
+        row = QHBoxLayout()
+        self.history_name = QLineEdit()
+        self.history_name.setPlaceholderText("患者姓名（可空）")
+        self.history_id_number = QLineEdit()
+        self.history_id_number.setPlaceholderText("身份证号（可空）")
+        search = QPushButton("查询患者")
+        search.clicked.connect(self._search_history_patients)
+        row.addWidget(QLabel("姓名"))
+        row.addWidget(self.history_name)
+        row.addWidget(QLabel("身份证号"))
+        row.addWidget(self.history_id_number)
+        row.addWidget(search)
+        layout.addLayout(row)
+
+        self.history_patient_table = QTableWidget(0, 3)
+        self.history_patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号"])
+        self.history_patient_table.setMaximumHeight(130)
+        self.history_patient_table.cellClicked.connect(self._select_history_patient)
+        layout.addWidget(self.history_patient_table)
+
+        self.history_patient_label = QLabel("请选择患者查看历史诊疗")
+        self.history_patient_label.setStyleSheet("font-weight:bold;color:#0f172a")
+        layout.addWidget(self.history_patient_label)
+        self.history_msg = QLabel("")
+        self.history_msg.setWordWrap(True)
+        layout.addWidget(self.history_msg)
+
+        splitter = QSplitter(Qt.Vertical)
+        self.history_enc_table = QTableWidget(0, 5)
+        self.history_enc_table.setHorizontalHeaderLabels(
+            ["就诊 ID", "就诊时间", "诊断", "医生", "状态"]
+        )
+        self.history_enc_table.cellClicked.connect(self._history_select)
+        splitter.addWidget(self.history_enc_table)
+
+        detail = QTabWidget()
+        self.history_detail_tabs = detail
+        self.history_record = QTextEdit()
+        self.history_record.setReadOnly(True)
+        detail.addTab(self.history_record, "病历")
+        self.history_rx_table = self._history_table(["药品", "数量", "用法", "金额"])
+        detail.addTab(self.history_rx_table, "处方")
+        self.history_lab_table = self._history_table(["项目", "状态", "结果", "报告时间"])
+        detail.addTab(self.history_lab_table, "检验")
+        self.history_treat_table = self._history_table(["项目", "数量", "状态", "执行人"])
+        detail.addTab(self.history_treat_table, "治疗")
+        self.history_charge_table = self._history_table(
+            ["项目", "数量", "金额", "状态"]
+        )
+        detail.addTab(self.history_charge_table, "收费")
+        self.history_pay_table = self._history_table(
+            ["支付单", "金额", "医保", "自费", "状态"]
+        )
+        detail.addTab(self.history_pay_table, "支付")
+        splitter.addWidget(detail)
+        splitter.setSizes([150, 420])
+        layout.addWidget(splitter, 1)
+        return page
+
+    @staticmethod
+    def _history_table(headers: list[str]) -> QTableWidget:
+        table = QTableWidget(0, len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        return table
+
+    def _search_history_patients(self) -> None:
+        try:
+            patients = self.api.list_patients(
+                name=self.history_name.text().strip() or None,
+                id_number=self.history_id_number.text().strip() or None,
+            )
+        except ApiError as e:
+            self.history_msg.setText(f"查询失败（{e.status_code}）：{e.detail}")
+            return
+        self.history_patient_table.setRowCount(len(patients))
+        for row, patient in enumerate(patients):
+            values = [str(patient["id"]), patient["name"], patient.get("id_number", "")]
+            for col, value in enumerate(values):
+                self.history_patient_table.setItem(row, col, QTableWidgetItem(value))
+        self.history_msg.setText(f"共 {len(patients)} 位患者，点击选择查看历史")
+
+    def _select_history_patient(self, row: int, _col: int) -> None:
+        item = self.history_patient_table.item(row, 0)
+        if item:
+            self._load_history(int(item.text()))
+
+    def _load_history(self, patient_id: int) -> None:
+        try:
+            data = self.api.get_patient_history(patient_id)
+        except ApiError as e:
+            self.history_msg.setText(f"加载历史失败（{e.status_code}）：{e.detail}")
+            return
+        self.history_data = data
+        patient = data["patient"]
+        self.history_patient_label.setText(
+            f"患者：{patient['name']}（ID {patient['id']}）  "
+            f"历史就诊 {len(data['encounters'])} 次"
+        )
+        self.history_msg.setText("点击就诊行查看该次病历、处方、检验、治疗、收费")
+        table = self.history_enc_table
+        table.setRowCount(len(data["encounters"]))
+        for row, encounter in enumerate(data["encounters"]):
+            values = [
+                str(encounter["id"]),
+                str(encounter["visited_at"])[:16].replace("T", " "),
+                encounter["diagnosis"],
+                encounter["doctor_name"],
+                zh("encounter_status", encounter["status"]),
+            ]
+            for col, value in enumerate(values):
+                table.setItem(row, col, QTableWidgetItem(value))
+        if data["encounters"]:
+            table.selectRow(0)
+            self._render_history(data["encounters"][0])
+        else:
+            self.history_record.setPlainText("该患者暂无就诊记录")
+            for widget in (
+                self.history_rx_table,
+                self.history_lab_table,
+                self.history_treat_table,
+                self.history_charge_table,
+                self.history_pay_table,
+            ):
+                widget.setRowCount(0)
+
+    def _history_select(self, row: int, _col: int) -> None:
+        encounters = getattr(self, "history_data", {}).get("encounters", [])
+        if 0 <= row < len(encounters):
+            self._render_history(encounters[row])
+
+    def _render_history(self, encounter: dict) -> None:
+        record = encounter.get("medical_record")
+        if record:
+            self.history_record.setPlainText(
+                "\n".join(
+                    [
+                        f"主诉：{record.get('chief_complaint') or '—'}",
+                        f"现病史：{record.get('present_illness') or '—'}",
+                        f"既往史：{record.get('past_history') or '—'}",
+                        f"体格检查：{record.get('physical_exam') or '—'}",
+                        f"处理意见：{record.get('treatment_advice') or '—'}",
+                        f"签名：{record.get('signed_by') or '未签名'}"
+                        f"（{str(record.get('signed_at') or '')[:16]}）",
+                    ]
+                )
+            )
+        else:
+            self.history_record.setPlainText("本次就诊暂无病历")
+
+        self._fill_history_table(
+            self.history_rx_table,
+            [
+                [
+                    item["drug_name"],
+                    str(item["quantity"]),
+                    f"{item['dosage']} {item['frequency']} {item['route']}".strip()
+                    or "—",
+                    f"{item['amount']:.2f}",
+                ]
+                for item in encounter["prescriptions"]
+            ],
+        )
+        self._fill_history_table(
+            self.history_lab_table,
+            [
+                [
+                    item["item_name"],
+                    zh("lab_status", item["status"]),
+                    item["result"] or "—",
+                    str(item.get("reported_at") or "")[:16].replace("T", " "),
+                ]
+                for item in encounter["lab_requests"]
+            ],
+        )
+        self._fill_history_table(
+            self.history_treat_table,
+            [
+                [
+                    item["item_name"],
+                    str(item["quantity"]),
+                    zh("treatment_status", item["status"]),
+                    item.get("executed_by") or "—",
+                ]
+                for item in encounter["treatments"]
+            ],
+        )
+        self._fill_history_table(
+            self.history_charge_table,
+            [
+                [
+                    item["item_name"],
+                    str(item["quantity"]),
+                    f"{item['amount']:.2f}",
+                    zh("charge_status", item["status"]),
+                ]
+                for item in encounter["charges"]
+            ],
+        )
+        self._fill_history_table(
+            self.history_pay_table,
+            [
+                [
+                    str(item["id"]),
+                    f"{item['amount']:.2f}",
+                    f"{item['insurance_amount']:.2f}",
+                    f"{item['self_pay_amount']:.2f}",
+                    zh("payment_status", item["status"]),
+                ]
+                for item in encounter["payments"]
+            ],
+        )
+
+    @staticmethod
+    def _fill_history_table(table: QTableWidget, rows: list[list[str]]) -> None:
+        table.setRowCount(len(rows))
+        for row_index, values in enumerate(rows):
+            for col, value in enumerate(values):
+                table.setItem(row_index, col, QTableWidgetItem(str(value)))
 
     # ---------- 开方 ----------
     def _build_prescription_tab(self) -> QWidget:

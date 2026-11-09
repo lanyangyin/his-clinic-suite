@@ -44,6 +44,7 @@ LABELS: dict[str, dict[str, str]] = {
         "cancelled": "已取消",
     },
     "encounter_status": {"open": "就诊中", "closed": "已结束"},
+    "lab_status": {"pending": "待报告", "reported": "已报告"},
     "payment_status": {
         "paid": "已收费",
         "partially_refunded": "部分退费",
@@ -66,6 +67,7 @@ LABELS: dict[str, dict[str, str]] = {
     "treatment_status": {
         "pending": "待执行",
         "executed": "已执行",
+        "done": "已执行",
         "cancelled": "已取消",
     },
     "charge_type": {
