@@ -6,6 +6,7 @@
   <label>开始日期<input type="date" name="start_date" value="{{ data.start_date }}"></label>
   <label>结束日期<input type="date" name="end_date" value="{{ data.end_date }}"></label>
   <button type="submit">查询</button>
+  <a href="/bi/executive/export.xlsx?start_date={{ data.start_date }}&end_date={{ data.end_date }}"><button type="button">导出 Excel</button></a>
 </form>
 
 {% set k = data.kpi %}

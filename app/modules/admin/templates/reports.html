@@ -7,6 +7,7 @@
     <label>开始日期 <input type="date" name="start_date" value="{{ start_date }}"></label>
     <label>结束日期 <input type="date" name="end_date" value="{{ end_date }}"></label>
     <button type="submit">查询</button>
+    <a href="/reports/departments/revenue/export.xlsx?start_date={{ start_date }}&end_date={{ end_date }}"><button type="button">导出 Excel</button></a>
   </form>
 
   <h2>科室收入</h2>
