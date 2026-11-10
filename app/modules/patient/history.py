@@ -50,6 +50,7 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                 "id": encounter.id,
                 "registration_id": encounter.registration_id,
                 "diagnosis": encounter.diagnosis,
+                "diagnosis_code": encounter.diagnosis_code,
                 "status": encounter.status,
                 "visited_at": encounter.created_at,
                 "doctor_id": registration.doctor_id,

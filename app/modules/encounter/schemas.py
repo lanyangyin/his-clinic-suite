@@ -6,12 +6,18 @@ from pydantic import BaseModel, ConfigDict, Field
 class EncounterCreate(BaseModel):
     registration_id: int
     diagnosis: str = ""
+    diagnosis_code: str = ""
 
 
 class EncounterResponse(EncounterCreate):
     id: int
     status: str
     model_config = ConfigDict(from_attributes=True)
+
+
+class DiagnosisUpdate(BaseModel):
+    diagnosis_code: str = ""
+    diagnosis: str = ""
 
 
 class PrescriptionItemCreate(BaseModel):

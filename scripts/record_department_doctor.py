@@ -155,13 +155,16 @@ class DoctorDemo(QMainWindow):
             self.scene("异常路径被拦截；现在选中本次患者")
             target = -1
             for row in range(self.widget.wb_table.rowCount()):
-                if self.widget.wb_table.item(row, 1).text() == self.patient["name"]:
+                if self.patient["name"] in self.widget.wb_table.item(row, 1).text():
                     target = row
                     break
             assert target >= 0, "工作台队列没有本次患者"
             self.widget.wb_table.selectRow(target)
             self.widget._select_workbench(target, 0)
             self.scene("填写诊断并开始接诊")
+            code_index = self.widget.wb_diagnosis_code.findData("J06.9")
+            if code_index >= 0:
+                self.widget.wb_diagnosis_code.setCurrentIndex(code_index)
             self.widget.wb_diagnosis.setText("急性上呼吸道感染")
             self.click(work, "开始接诊")
             encounters = self.doctor_api.call(

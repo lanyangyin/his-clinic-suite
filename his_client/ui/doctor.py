@@ -48,6 +48,7 @@ class DoctorWidget(QWidget):
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
         layout.addWidget(self.tabs)
+        self._load_diagnoses()
 
     # ---------- 门诊工作台 ----------
     def _build_workbench_tab(self) -> QWidget:
@@ -73,11 +74,15 @@ class DoctorWidget(QWidget):
         layout.addWidget(self.wb_patient)
 
         row = QHBoxLayout()
+        self.wb_diagnosis_code = QComboBox()
+        self.wb_diagnosis_code.addItem("诊断编码（可选）", "")
+        self.wb_diagnosis_code.currentIndexChanged.connect(self._diagnosis_selected)
         self.wb_diagnosis = QLineEdit()
         self.wb_diagnosis.setPlaceholderText("诊断，如 急性上呼吸道感染")
         self.wb_start = QPushButton("开始接诊")
         self.wb_start.clicked.connect(self._start_workbench)
         row.addWidget(QLabel("诊断"))
+        row.addWidget(self.wb_diagnosis_code)
         row.addWidget(self.wb_diagnosis)
         row.addWidget(self.wb_start)
         layout.addLayout(row)
@@ -103,6 +108,37 @@ class DoctorWidget(QWidget):
         layout.addWidget(self.wb_fee_table, 1)
         return page
 
+    def _load_diagnoses(self) -> None:
+        try:
+            rows = self.api.list_diagnoses()
+        except ApiError:
+            return
+        for combo in (
+            getattr(self, "wb_diagnosis_code", None),
+            getattr(self, "rec_diagnosis_code", None),
+        ):
+            if combo is None:
+                continue
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("诊断编码（可选）", "")
+            for row in rows:
+                combo.addItem(f"{row['code']} {row['name']}", row["code"])
+            combo.blockSignals(False)
+
+    def _diagnosis_selected(self, _index: int) -> None:
+        combo = self.sender()
+        code = combo.currentData() if combo else ""
+        text = combo.currentText() if combo else ""
+        name = text.split(" ", 1)[1] if " " in text else ""
+        target = (
+            self.wb_diagnosis
+            if combo is getattr(self, "wb_diagnosis_code", None)
+            else getattr(self, "rec_diagnosis", None)
+        )
+        if code and target is not None:
+            target.setText(name)
+
     def _load_workbench(self) -> None:
         try:
             self.workbench_rows = self.api.doctor_worklist()
@@ -122,7 +158,10 @@ class DoctorWidget(QWidget):
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 str(item.get("encounter_id") or "—"),
-                item.get("diagnosis") or "—",
+                (
+                    f"{item.get('diagnosis_code')} {item.get('diagnosis')}".strip()
+                    or "—"
+                ),
                 f"{item.get('pending_amount', 0):.2f}",
             ]
             for col, value in enumerate(values):
@@ -151,6 +190,11 @@ class DoctorWidget(QWidget):
         else:
             self.wb_patient.setStyleSheet("")
         self.wb_diagnosis.setText(item.get("diagnosis") or "")
+        code_index = self.wb_diagnosis_code.findData(item.get("diagnosis_code") or "")
+        if code_index >= 0:
+            self.wb_diagnosis_code.blockSignals(True)
+            self.wb_diagnosis_code.setCurrentIndex(code_index)
+            self.wb_diagnosis_code.blockSignals(False)
         self.wb_start.setEnabled(not item.get("encounter_id"))
         if item.get("encounter_id"):
             self._load_workbench_summary(item["encounter_id"])
@@ -166,7 +210,7 @@ class DoctorWidget(QWidget):
             return
         self.wb_summary_data = summary
         self.wb_summary.setText(
-            f"诊断：{summary['diagnosis'] or '—'}　状态："
+            f"诊断：{summary.get('diagnosis_code') or ''} {summary['diagnosis'] or '—'}　状态："
             f"{zh('encounter_status', summary['status'])}　"
             f"病历：{'已签名' if summary['record_signed'] else '未签名'}　"
             f"费用：{summary['total_amount']:.2f} 元（待缴 {summary['pending_amount']:.2f}）　"
@@ -196,7 +240,9 @@ class DoctorWidget(QWidget):
             return
         try:
             encounter = self.api.create_encounter(
-                item["registration_id"], self.wb_diagnosis.text().strip()
+                item["registration_id"],
+                self.wb_diagnosis.text().strip(),
+                self.wb_diagnosis_code.currentData() or "",
             )
         except ApiError as e:
             self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
@@ -363,11 +409,15 @@ class DoctorWidget(QWidget):
         form = QFormLayout(box)
         self.reg_id = QSpinBox()
         self.reg_id.setRange(1, 10_000_000)
+        self.rec_diagnosis_code = QComboBox()
+        self.rec_diagnosis_code.addItem("诊断编码（可选）", "")
+        self.rec_diagnosis_code.currentIndexChanged.connect(self._diagnosis_selected)
         self.diagnosis = QLineEdit()
         self.diagnosis.setPlaceholderText("诊断，如：上呼吸道感染")
         start = QPushButton("开始接诊")
         start.clicked.connect(self._start_encounter)
         form.addRow("挂号 ID", self.reg_id)
+        form.addRow("诊断编码", self.rec_diagnosis_code)
         form.addRow("诊断", self.diagnosis)
         form.addRow("", start)
         layout.addWidget(box)
@@ -399,7 +449,9 @@ class DoctorWidget(QWidget):
     def _start_encounter(self) -> None:
         try:
             encounter = self.api.create_encounter(
-                self.reg_id.value(), self.diagnosis.text().strip()
+                self.reg_id.value(),
+                self.diagnosis.text().strip(),
+                self.rec_diagnosis_code.currentData() or "",
             )
         except ApiError as e:
             self.reception_msg.setText(f"接诊失败（{e.status_code}）：{e.detail}")
@@ -623,7 +675,7 @@ class DoctorWidget(QWidget):
             values = [
                 str(encounter["id"]),
                 str(encounter["visited_at"])[:16].replace("T", " "),
-                encounter["diagnosis"],
+                f"{encounter.get('diagnosis_code') or ''} {encounter['diagnosis']}".strip(),
                 encounter["doctor_name"],
                 zh("encounter_status", encounter["status"]),
             ]

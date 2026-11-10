@@ -14,6 +14,9 @@ class Encounter(Base):
         ForeignKey("registrations.id"), unique=True, nullable=False, index=True
     )
     diagnosis: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    diagnosis_code: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False

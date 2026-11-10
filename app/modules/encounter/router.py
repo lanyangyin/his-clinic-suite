@@ -6,6 +6,7 @@ from app.modules.auth.security import require_role
 from app.modules.insurance.adapter import InsuranceForbiddenError
 
 from .schemas import (
+    DiagnosisUpdate,
     EncounterCreate,
     EncounterResponse,
     MedicalRecordCreate,
@@ -27,6 +28,7 @@ from .service import (
     list_encounters,
     list_prescription_items,
     sign_medical_record,
+    update_diagnosis,
     update_medical_record,
     worklist,
     encounter_summary,
@@ -44,7 +46,8 @@ def create(
     try:
         return create_encounter(db, data)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        code = 400 if "诊断编码" in str(e) else 404
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.get("/", response_model=list[EncounterResponse])
@@ -59,6 +62,23 @@ def get_worklist(
 ):
     """医生门诊工作台队列：待接诊 + 今日已接诊。"""
     return worklist(db)
+
+
+@router.put("/{encounter_id}/diagnosis", response_model=EncounterResponse)
+def set_diagnosis(
+    encounter_id: int,
+    data: DiagnosisUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    try:
+        return update_diagnosis(
+            db, encounter_id, data.diagnosis_code, data.diagnosis
+        )
+    except EncounterClosedError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{encounter_id}", response_model=EncounterResponse)

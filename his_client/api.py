@@ -152,11 +152,33 @@ class ApiClient:
     def encounter_summary(self, encounter_id: int) -> dict:
         return self._request("GET", f"/encounters/{encounter_id}/summary")
 
-    def create_encounter(self, registration_id: int, diagnosis: str = "") -> dict:
+    def create_encounter(
+        self, registration_id: int, diagnosis: str = "", diagnosis_code: str = ""
+    ) -> dict:
         return self._request(
             "POST",
             "/encounters/",
-            json={"registration_id": registration_id, "diagnosis": diagnosis},
+            json={
+                "registration_id": registration_id,
+                "diagnosis": diagnosis,
+                "diagnosis_code": diagnosis_code,
+            },
+        )
+
+    def update_encounter_diagnosis(
+        self, encounter_id: int, diagnosis_code: str, diagnosis: str = ""
+    ) -> dict:
+        return self._request(
+            "PUT",
+            f"/encounters/{encounter_id}/diagnosis",
+            json={"diagnosis_code": diagnosis_code, "diagnosis": diagnosis},
+        )
+
+    def list_diagnoses(self) -> list:
+        return self._request(
+            "GET",
+            "/dict/diagnosis_icd10/entries",
+            params={"active_only": "true"},
         )
 
     # ---- 病历 ----

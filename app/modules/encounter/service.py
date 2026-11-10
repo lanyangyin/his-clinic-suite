@@ -42,6 +42,24 @@ class PrescriptionRuleError(ValueError):
     """合理用药规则拦截（重复用药/抗菌药物分级）。"""
 
 
+def _resolve_diagnosis(db: Session, code: str, name: str) -> tuple[str, str]:
+    """校验 ICD-10 编码；只填名称时尝试精确匹配常用字典。"""
+    from app.modules.dict.service import get_entry, list_entries
+
+    code = (code or "").strip()
+    name = (name or "").strip()
+    if code:
+        entry = get_entry(db, "diagnosis_icd10", code)
+        if not entry or not entry.active:
+            raise ValueError(f"诊断编码不存在或已停用：{code}")
+        return code, name or entry.name
+    if name:
+        for entry in list_entries(db, "diagnosis_icd10", active_only=True):
+            if entry.name == name:
+                return entry.code, name
+    return "", name
+
+
 def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
     """接诊：挂号存在且未就诊时创建就诊记录，并把挂号置为 visited。
 
@@ -62,6 +80,10 @@ def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
     encounter = Encounter(
         registration_id=data.registration_id,
         diagnosis=data.diagnosis,
+        diagnosis_code=data.diagnosis_code,
+    )
+    encounter.diagnosis_code, encounter.diagnosis = _resolve_diagnosis(
+        db, data.diagnosis_code, data.diagnosis
     )
     db.add(encounter)
     mark_registration_visited(db, registration)
@@ -84,6 +106,22 @@ def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
         source_id=encounter.id,
     )
 
+    db.commit()
+    db.refresh(encounter)
+    return encounter
+
+
+def update_diagnosis(
+    db: Session, encounter_id: int, diagnosis_code: str, diagnosis: str
+) -> Encounter:
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise EncounterClosedError("就诊已收费，不能再修改诊断")
+    code, name = _resolve_diagnosis(db, diagnosis_code, diagnosis)
+    encounter.diagnosis_code = code
+    encounter.diagnosis = name
     db.commit()
     db.refresh(encounter)
     return encounter
@@ -407,6 +445,7 @@ def worklist(db: Session) -> list[dict]:
                 "encounter_id": encounter.id if encounter else None,
                 "encounter_status": encounter.status if encounter else "",
                 "diagnosis": encounter.diagnosis if encounter else "",
+                "diagnosis_code": encounter.diagnosis_code if encounter else "",
                 "total_amount": total,
                 "pending_amount": pending,
             }
@@ -438,6 +477,7 @@ def encounter_summary(db: Session, encounter_id: int) -> dict | None:
         "patient_name": patient.name if patient else "",
         "doctor_name": doctor.name if doctor else "",
         "diagnosis": encounter.diagnosis,
+        "diagnosis_code": encounter.diagnosis_code,
         "status": encounter.status,
         "record_signed": bool(record and record.signed_by),
         "total_amount": round(sum(row.amount for row in charges), 2),
