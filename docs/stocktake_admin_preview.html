@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>盘点单 ST202611100005 · HIS 管理台</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e3e8f0;--text:#1f2937;--muted:#6b7280;--brand:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+header{background:#111827;color:#fff;display:flex;align-items:center;gap:18px;padding:10px 20px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:#d1d5db;text-decoration:none;padding:4px 8px;border-radius:6px}
+nav a:hover{background:#374151;color:#fff}
+.who{margin-left:auto;color:#9ca3af}
+.who a{color:#93c5fd}
+main{padding:20px;max-width:1200px;margin:0 auto}
+h2{font-size:18px;margin:0 0 14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card .num{font-size:24px;font-weight:700;color:var(--brand)}
+.card .label{color:var(--muted);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr:hover td{background:#f9fafb}
+form.inline{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px;min-width:120px}
+button{padding:8px 14px;border:0;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer;font-size:14px}
+button:hover{background:#1d4ed8}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#111827}
+.login-card{background:#fff;border-radius:12px;padding:28px;width:340px}
+.login-card h1{font-size:18px;margin:0 0 18px;text-align:center}
+.login-card label{margin-bottom:10px}
+.login-card button{width:100%;margin-top:8px}
+.hint{color:var(--muted);font-size:12px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HIS 门诊部管理台</h1>
+  <nav>
+    <a href="/admin">仪表盘</a>
+    <a href="/admin/executive">院长驾驶舱</a>
+    <a href="/admin/treatment-report">治疗室日报</a>
+    <a href="/admin/treatment-reconciliation">治疗室对账</a>
+    <a href="/admin/cashier-daily">收费日结</a>
+    <a href="/admin/invoice-batches">发票号段</a>
+    <a href="/admin/invoice-usage">发票明细</a>
+    <a href="/admin/treatment-templates">治疗室模板</a>
+    <a href="/admin/master/departments">科室</a>
+    <a href="/admin/master/doctors">医生</a>
+    <a href="/admin/master/drugs">药品</a>
+    <a href="/admin/master/charge-items">收费项目</a>
+    <a href="/admin/lab-items">检验项目</a>
+    <a href="/admin/tcm-herbs">中药饮片</a>
+    <a href="/admin/archive">病案档案</a>
+    <a href="/admin/inbound">入库</a>
+    <a href="/admin/purchase-requests">采购申请</a>
+    <a href="/admin/warehouse">库房</a>
+    <a href="/admin/stock-ledger">库存流水</a>
+    <a href="/admin/stocktakes">盘点</a>
+    <a href="/admin/expiry-alerts">效期预警</a>
+    <a href="/admin/insurance-catalog">医保目录</a>
+    <a href="/admin/insurance-workbench">医保工作台</a>
+    <a href="/admin/gsp">GSP</a>
+    <a href="/admin/insurance-materials">耗材目录</a>
+    <a href="/admin/insurance-inventory">医保进销存</a>
+    <a href="/admin/insurance-interface">医保接口</a>
+    <a href="/admin/linen">被服洗涤</a>
+    <a href="/admin/cssd">器械灭菌</a>
+    <a href="/admin/trace-codes">追溯码</a>
+    <a href="/admin/payment-channels">支付配置</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/reports">报表</a>
+    <a href="/download/client">客户端下载</a>
+    <a href="/docs" target="_blank">API 文档</a>
+  </nav>
+  <div class="who">管理员 · <a href="/admin/logout">退出</a></div>
+</header>
+<main>
+
+
+
+<style>
+@media print {
+  header, form, .no-print { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .panel { border: 0; padding: 0; }
+}
+</style>
+<h2>盘点单 ST202611100005</h2>
+
+<p>盘点页面验证1110145049 · 药品 · 总库 · 状态 已完成</p>
+<form method="post" action="/admin/stocktakes/5/counts">
+  <div class="panel">
+    <table>
+      <tr><th>名称</th><th>规格</th><th>批号</th><th>账面</th><th>实盘</th><th>差异</th></tr>
+      
+      <tr>
+        <td>两级库存药142943</td><td></td><td>WH-142943</td>
+        <td>6</td>
+        <td>
+          
+          6
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135658</td><td></td><td>FLOW-A-1109135658</td>
+        <td>28</td>
+        <td>
+          
+          28
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135711</td><td></td><td>FLOW-A-1109135711</td>
+        <td>24</td>
+        <td>
+          
+          24
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135726</td><td></td><td>FLOW-A-1109135726</td>
+        <td>24</td>
+        <td>
+          
+          24
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135750</td><td></td><td>FLOW-A-1109135750</td>
+        <td>24</td>
+        <td>
+          
+          24
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135810</td><td></td><td>FLOW-A-1109135810</td>
+        <td>24</td>
+        <td>
+          
+          24
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109135845</td><td></td><td>FLOW-A-1109135845</td>
+        <td>24</td>
+        <td>
+          
+          24
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109140903</td><td></td><td>FLOW-A-1109140903</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109140947</td><td></td><td>FLOW-A-1109140947</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109141117</td><td></td><td>FLOW-A-1109141117</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109141356</td><td></td><td>FLOW-A-1109141356</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109141416</td><td></td><td>FLOW-A-1109141416</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1109141514</td><td></td><td>FLOW-A-1109141514</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程A药1110143028</td><td></td><td>FLOW-A-1110143028</td>
+        <td>25</td>
+        <td>
+          
+          25
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109135750</td><td></td><td>FLOW-B-1109135750</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109135810</td><td></td><td>FLOW-B-1109135810</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109135845</td><td></td><td>FLOW-B-1109135845</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109140903</td><td></td><td>FLOW-B-1109140903</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109140947</td><td></td><td>FLOW-B-1109140947</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109141117</td><td></td><td>FLOW-B-1109141117</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109141356</td><td></td><td>FLOW-B-1109141356</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109141416</td><td></td><td>FLOW-B-1109141416</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1109141514</td><td></td><td>FLOW-B-1109141514</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程B药1110143028</td><td></td><td>FLOW-B-1110143028</td>
+        <td>17</td>
+        <td>
+          
+          17
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135658</td><td>0.5g*10片</td><td>FLOW-C-1109135658</td>
+        <td>10</td>
+        <td>
+          
+          10
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135711</td><td>0.5g*10片</td><td>FLOW-C-1109135711</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135726</td><td>0.5g*10片</td><td>FLOW-C-1109135726</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135750</td><td>0.5g*10片</td><td>FLOW-C-1109135750</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135810</td><td>0.5g*10片</td><td>FLOW-C-1109135810</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109135845</td><td>0.5g*10片</td><td>FLOW-C-1109135845</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109140903</td><td>0.5g*10片</td><td>FLOW-C-1109140903</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109140947</td><td>0.5g*10片</td><td>FLOW-C-1109140947</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109141117</td><td>0.5g*10片</td><td>FLOW-C-1109141117</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109141356</td><td>0.5g*10片</td><td>FLOW-C-1109141356</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109141416</td><td>0.5g*10片</td><td>FLOW-C-1109141416</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1109141514</td><td>0.5g*10片</td><td>FLOW-C-1109141514</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>全流程C药1110143028</td><td>0.5g*10片</td><td>FLOW-C-1110143028</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>头孢克肟胶囊</td><td></td><td>LED-45186</td>
+        <td>7</td>
+        <td>
+          
+          7
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>头孢克肟胶囊</td><td></td><td>SUP-B001</td>
+        <td>80</td>
+        <td>
+          
+          80
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>头孢克肟胶囊</td><td></td><td>W-2026-11</td>
+        <td>107</td>
+        <td>
+          
+          107
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>效期验证药46516</td><td></td><td>FAR-46516</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>效期验证药46516</td><td></td><td>FEFO-LATE-46516</td>
+        <td>6</td>
+        <td>
+          
+          6
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>效期验证药46516</td><td></td><td>OLD-46516</td>
+        <td>2</td>
+        <td>
+          
+          2
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109143028</td><td></td><td>UIDEMO-1109143028</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109144102</td><td></td><td>UIDEMO-1109144102</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109145843</td><td></td><td>UIDEMO-1109145843</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109155713</td><td></td><td>WINDEMO-1109155713</td>
+        <td>10</td>
+        <td>
+          
+          10
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109155847</td><td></td><td>WINDEMO-1109155847</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1109160137</td><td></td><td>WINDEMO-1109160137</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1110142439</td><td></td><td>WINDEMO-1110142439</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1110143115</td><td></td><td>WINDEMO-1110143115</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1110143513</td><td></td><td>WINDEMO-1110143513</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1110143756</td><td></td><td>WINDEMO-1110143756</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>演示阿莫西林1110144352</td><td></td><td>WINDEMO-1110144352</td>
+        <td>8</td>
+        <td>
+          
+          8
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>盘点页面药1110000000</td><td></td><td>STPAGE-1110000000</td>
+        <td>20</td>
+        <td>
+          
+          20
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>盘点页面药1110144958</td><td></td><td>STPAGE-1110144958</td>
+        <td>10</td>
+        <td>
+          
+          10
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>盘点页面药1110145018</td><td></td><td>STPAGE-1110145018</td>
+        <td>9</td>
+        <td>
+          
+          9
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>盘点页面药1110145049</td><td></td><td>STPAGE-1110145049</td>
+        <td>10</td>
+        <td>
+          
+          9
+          
+        </td>
+        <td>-1</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135658</td><td></td><td>FLOW-D-1109135658</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135711</td><td></td><td>FLOW-D-1109135711</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135726</td><td></td><td>FLOW-D-1109135726</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135750</td><td></td><td>FLOW-D-1109135750</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135810</td><td></td><td>FLOW-D-1109135810</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109135845</td><td></td><td>FLOW-D-1109135845</td>
+        <td>5</td>
+        <td>
+          
+          5
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109140903</td><td></td><td>FLOW-D-1109140903</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109140947</td><td></td><td>FLOW-D-1109140947</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109141117</td><td></td><td>FLOW-D-1109141117</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109141356</td><td></td><td>FLOW-D-1109141356</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109141416</td><td></td><td>FLOW-D-1109141416</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1109141514</td><td></td><td>FLOW-D-1109141514</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>近效期药1110143028</td><td></td><td>FLOW-D-1110143028</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+      <tr>
+        <td>追溯验证药51701</td><td></td><td>TRC-51701</td>
+        <td>3</td>
+        <td>
+          
+          3
+          
+        </td>
+        <td>0</td>
+      </tr>
+      
+    </table>
+  </div>
+  
+  </form>
+  
+  <button type="button" class="no-print" onclick="window.print()">打印盘点单</button>
+<div class="panel" style="display:flex;justify-content:space-between;margin-top:40px">
+  <div>盘点人：__________</div><div>复核人：__________</div><div>日期：2026-11-10</div>
+</div>
+
+</main>
+
+</body>
+</html>

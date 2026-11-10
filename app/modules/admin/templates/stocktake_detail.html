@@ -10,7 +10,7 @@
 </style>
 <h2>盘点单 {{ take.take_no }}</h2>
 {% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
-<p>{{ take.title }} · {{ '药品' if take.kind == 'drug' else '耗材' }} · {{ take.warehouse }} · 状态 {{ take.status }}</p>
+<p>{{ take.title }} · {{ '药品' if take.kind == 'drug' else '耗材' }} · {{ take.warehouse }} · 状态 {{ {'counting':'盘点中','completed':'已完成','cancelled':'已取消'}.get(take.status, take.status) }}</p>
 <form method="post" action="/admin/stocktakes/{{ take.id }}/counts">
   <div class="panel">
     <table>
@@ -43,7 +43,7 @@
   {% else %}
   </form>
   {% endif %}
-  <button type="button" onclick="window.print()">打印盘点单</button>
+  <button type="button" class="no-print" onclick="window.print()">打印盘点单</button>
 <div class="panel" style="display:flex;justify-content:space-between;margin-top:40px">
   <div>盘点人：__________</div><div>复核人：__________</div><div>日期：{{ take.created_at.strftime('%Y-%m-%d') }}</div>
 </div>
