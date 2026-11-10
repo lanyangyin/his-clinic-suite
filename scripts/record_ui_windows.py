@@ -503,6 +503,7 @@ class DemoController:
         )
         assert payments and payments[0]["status"] == "paid"
         assert abs(payments[0]["amount"] - 185.0) < 0.01, payments[0]
+        self.payment_id = payments[0]["id"]
         self.scene(f"✅ 收费完成：{payments[0]['amount']:.2f} 元")
 
         self.scene("⑨ 治疗室窗口：知情同意 → 开始 → 完成处置", self.treatment)
@@ -608,7 +609,22 @@ class DemoController:
         assert all(row["encounter_id"] != self.encounter_id for row in remaining)
         self.scene("✅ 取药码核对、发药、退药完成")
 
-        self.scene("⑭ 收费员窗口：开班与日结", self.cashier)
+        self.scene("⑭ 收费员窗口：发票作废 → 整单退费", self.cashier)
+        print_tab = self.switch_inner(self.cashier, "打印")
+        self.cashier.pr_payment_id.setValue(self.payment_id)
+        self.cashier.void_reason.setText("演示：发票作废重打")
+        self.click(print_tab, "作废发票")
+        invoice = self.cashier_api.call("GET", f"/payments/{self.payment_id}")
+        assert invoice["invoice_status"] == "void", invoice
+        charge_tab = self.switch_inner(self.cashier, "收费")
+        self.cashier.refund_payment_id.setValue(self.payment_id)
+        self.click(charge_tab, "加载收费明细")
+        self.click(charge_tab, "全部退")
+        refunded = self.cashier_api.call("GET", f"/payments/{self.payment_id}")
+        assert refunded["status"] == "refunded", refunded
+        self.scene("✅ 发票已作废，收费已整单退费")
+
+        self.scene("⑮ 收费员窗口：开班与日结", self.cashier)
         shift_tab = self.switch_inner(self.cashier, "交班")
         daily = self.cashier_api.call("GET", "/cashier/daily")
         if not any(row.get("status") == "open" for row in daily["shifts"]):
@@ -618,7 +634,7 @@ class DemoController:
         assert daily["shifts"], "交班记录未生成"
         self.scene("✅ 收费员开班，日结可见交班记录")
 
-        self.scene("⑮ 检验科窗口：采样 → 签收 → 检验 → 报告 → 审核", self.lab)
+        self.scene("⑯ 检验科窗口：采样 → 签收 → 检验 → 报告 → 审核", self.lab)
         lab_tab = self.switch_inner(self.lab, "检验工作台")
         lab_id = self.select_lab_row()
         self.click(lab_tab, "采样")
@@ -637,7 +653,7 @@ class DemoController:
         assert self.lab.reviewed_table.rowCount() >= 1
         self.scene("✅ 检验采样、签收、报告、审核完成")
 
-        self.scene("演示完成：挂号 → 医生 → 治疗室 → 收费 → 库房 → 药房 → 交班 → 检验")
+        self.scene("演示完成：挂号 → 医生 → 治疗室 → 收费 → 发票/退费 → 库房 → 药房 → 交班 → 检验")
         self.tile_windows()
         self.wait(2.5)
         self.capture_timer.stop()
