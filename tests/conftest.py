@@ -1,6 +1,10 @@
 import base64
+import os
 import tempfile
 from pathlib import Path
+
+# 测试环境默认开启医保，覆盖生产 config.ini 的关闭开关（必须在导入 app 前设置）
+os.environ["HIS_INSURANCE_ENABLED"] = "1"
 
 import pytest
 from fastapi.testclient import TestClient

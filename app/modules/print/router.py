@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app import settings
 from app.modules.billing.service import get_payment
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.charges.service import list_charges
@@ -163,7 +164,7 @@ def render_receipt(data: dict) -> str:
 </table>
 <div class="divider"></div>
 <p class="right big">应收：{payment.amount:.2f} 元</p>
-<p class="right">医保支付：{payment.insurance_amount:.2f} 元</p>
+{f'<p class="right">医保支付：{payment.insurance_amount:.2f} 元</p>' if settings.INSURANCE_ENABLED else ''}
 <p class="right">自费：{payment.self_pay_amount:.2f} 元</p>
 {f'<p class="right">累计已退：{payment.refunded_amount:.2f} 元</p>' if payment.refunded_amount else ''}
 <p class="right">实收（扣除退款）：{payment.net_amount:.2f} 元</p>

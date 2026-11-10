@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import settings
 from app.modules.charges.service import list_charges, list_pending_charges
 from app.modules.encounter.service import (
     close_encounter,
@@ -58,24 +59,29 @@ def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Pa
 
     amount = round(sum(c.amount for c in charges), 2)
 
-    # 医保结算：按费用明细逐条计算（服务不可用降级为全额自费）
-    lines = [
-        {
-            "drug_name": c.item_name,
-            "total": c.amount,
-            "ratio": c.insurance_ratio,
-        }
-        for c in charges
-    ]
-    try:
-        settle = settle_payment(lines=lines)
-        insurance_amount = settle["insurance_amount"]
-    except InsuranceUnavailable:
-        insurance_amount = 0.0
-
     channel = data.channel or "cash"
     if channel not in CHANNELS:
         raise ValueError("未知支付通道")
+    if channel == "insurance_card" and not settings.INSURANCE_ENABLED:
+        raise ValueError("医保功能未启用，不能使用医保卡支付")
+
+    # 医保结算：仅在医保开启时按明细比例计算；关闭时全自费
+    insurance_amount = 0.0
+    if settings.INSURANCE_ENABLED:
+        lines = [
+            {
+                "drug_name": c.item_name,
+                "total": c.amount,
+                "ratio": c.insurance_ratio,
+            }
+            for c in charges
+        ]
+        try:
+            settle = settle_payment(lines=lines)
+            insurance_amount = settle["insurance_amount"]
+        except InsuranceUnavailable:
+            insurance_amount = 0.0
+
     self_pay = round(amount - insurance_amount, 2)
     result = charge_payment(
         db,

@@ -181,7 +181,35 @@ class DirectorDemo(QMainWindow):
                 ],
             },
         )
-        return record, request, purchase
+        record2 = self.archive_api.call(
+            "POST", "/archive/records",
+            json={"patient_id": patient["id"], "encounter_id": enc["id"]},
+        )
+        self.archive_api.call(
+            "POST", f"/archive/records/{record2['id']}/archive",
+            json={"storage_location": "E-03", "page_count": 5, "completeness": "complete"},
+        )
+        request2 = self.archive_api.call(
+            "POST", f"/archive/records/{record2['id']}/destruction-requests",
+            json={"reason": "重复病案", "note": "院长驳回演示"},
+        )
+        purchase2 = self.warehouse_api.call(
+            "POST", "/warehouse/purchase-requests",
+            json={
+                "department": "库房",
+                "supplier_id": supplier["id"],
+                "note": "院长驳回演示",
+                "items": [
+                    {
+                        "kind": "drug",
+                        "drug_id": drug["id"],
+                        "quantity": 20,
+                        "estimated_unit_price": 9.5,
+                    }
+                ],
+            },
+        )
+        return record, request, purchase, request2, purchase2
 
     def run(self):
         try:
@@ -193,12 +221,17 @@ class DirectorDemo(QMainWindow):
             self.archive_window.show()
             self.caption.show()
             self.wait(1.5)
-            record, archive_request, purchase = self.setup()
+            record, archive_request, purchase, archive_request2, purchase2 = self.setup()
             self.scene("院长审批工作站：先看待审批病案销毁", self.director_window)
             self.director_view._load_archives()
             self.director_view._load_purchases()
             assert self.director_view.archive_table.rowCount() >= 1
-            self.director_view.archive_table.selectRow(0)
+            target = next(
+                index
+                for index, item in enumerate(self.director_view.archive_rows)
+                if item["id"] == archive_request["id"]
+            )
+            self.director_view.archive_table.selectRow(target)
             self.director_view.archive_note.setText("同意，按清册执行")
             self.click(self.director_view, "批准销毁")
             approved = self.archive_api.call("GET", "/archive/destruction-requests", params={"status": "approved"})
@@ -226,13 +259,48 @@ class DirectorDemo(QMainWindow):
             self.click(self.archive_view, "执行已批准销毁")
             final = self.archive_api.call("GET", f"/archive/records/{record['id']}")
             assert final["status"] == "destroyed", final
-            self.scene("院长审批演示完成：病案销毁批准+执行，采购批准")
+            self.scene("再演示驳回：病案销毁材料不齐", self.director_window)
+            self.director_view.findChild(QTabWidget).setCurrentIndex(0)
+            self.wait(1.0)
+            self.director_view._load_archives()
+            target = next(
+                index
+                for index, item in enumerate(self.director_view.archive_rows)
+                if item["id"] == archive_request2["id"]
+            )
+            self.director_view.archive_table.selectRow(target)
+            self.director_view.archive_note.setText("材料不齐，驳回")
+            self.click(self.director_view, "驳回")
+            rejected = self.archive_api.call(
+                "GET", "/archive/destruction-requests", params={"status": "rejected"}
+            )
+            assert any(row["id"] == archive_request2["id"] for row in rejected)
+            self.scene("病案销毁已驳回；再驳回采购申请", self.director_window)
+            self.director_view.findChild(QTabWidget).setCurrentIndex(1)
+            self.wait(1.0)
+            self.director_view._load_purchases()
+            target = next(
+                index
+                for index, item in enumerate(self.director_view.purchase_rows)
+                if item["id"] == purchase2["id"]
+            )
+            self.director_view.purchase_table.selectRow(target)
+            self.director_view.purchase_note.setText("预算不足，驳回")
+            self.click(self.director_view, "驳回")
+            rejected_purchase = self.warehouse_api.call(
+                "GET", f"/warehouse/purchase-requests/{purchase2['id']}"
+            )
+            assert rejected_purchase["status"] == "rejected"
+            self.scene("院长审批演示完成：批准/驳回、病案双人执行")
             self.wait(3.0)
             self.timer.stop()
             self.capture()
             self.success = True
         except Exception as exc:  # noqa: BLE001
             print(f"演示失败：{exc}", flush=True)
+            import traceback
+
+            traceback.print_exc()
             self.caption.set_text(f"演示中断：{exc}")
             self.capture()
             self.timer.stop()

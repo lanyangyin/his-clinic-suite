@@ -49,6 +49,12 @@ SECRET_KEY = (
     or _ini.get("server", "secret_key", fallback="his-dev-secret-change-me-0123456789")
 )
 
+# 医保总开关：默认关闭（未接入医保的门诊）。测试通过 HIS_INSURANCE_ENABLED=1 打开。
+INSURANCE_ENABLED = (
+    os.environ.get("HIS_INSURANCE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "insurance", fallback=False)
+)
+
 # 数据库：默认程序目录下 his.db（绝对路径，与 CWD 无关）
 _DEFAULT_DB_PATH = BASE_DIR / "his.db"
 DATABASE_URL = (
