@@ -38,6 +38,7 @@ from his_client.ui.cashier import CashierWidget  # noqa: E402
 from his_client.ui.doctor import DoctorWidget  # noqa: E402
 from his_client.ui.nurse import NurseWidget  # noqa: E402
 from his_client.ui.pharmacy import PharmacyWidget  # noqa: E402
+from his_client.ui.treatment_room import TreatmentRoomWidget  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "ui_window_frames"
@@ -108,12 +109,16 @@ class DemoController:
         self.pharmacy = PharmacyWidget(
             ApiClient(BASE, "pharmacist", "pharm123"), role="pharmacist"
         )
+        self.treatment = TreatmentRoomWidget(
+            ApiClient(BASE, "treatment", "treatment123")
+        )
         self.windows = {
             self.warehouse: RoleWindow("库房工作站 · warehouse", self.warehouse),
             self.cashier: RoleWindow("收费员工作站 · cashier", self.cashier),
             self.nurse: RoleWindow("护士工作站 · nurse", self.nurse),
             self.doctor: RoleWindow("医生工作站 · doctor", self.doctor),
             self.pharmacy: RoleWindow("药房工作站 · pharmacist", self.pharmacy),
+            self.treatment: RoleWindow("治疗室工作站 · treatment", self.treatment),
         }
         self.caption = CaptionBar()
         self.screen = QApplication.primaryScreen()
@@ -136,7 +141,7 @@ class DemoController:
         height = self.geo.height() // 2
         positions = [
             (0, 0), (width, 0), (width * 2, 0),
-            (0, height), (width, height),
+            (0, height), (width, height), (width * 2, height),
         ]
         for window, (x, y) in zip(self.windows.values(), positions):
             window.showNormal()
@@ -265,6 +270,25 @@ class DemoController:
                 "category": "treatment",
                 "price": 30.0,
                 "insurance_ratio": 0.0,
+            },
+        )
+        self.wound_item = self.admin.call(
+            "POST", "/charges/items/",
+            json={
+                "code": f"WDEMO-WOUND-{self.suffix}",
+                "name": f"清创缝合{self.suffix}",
+                "category": "treatment",
+                "price": 80.0,
+                "insurance_ratio": 0.0,
+            },
+        )
+        self.admin.call(
+            "PUT", "/treatment-room/templates/debridement",
+            json={
+                "charge_item_id": self.wound_item["id"],
+                "price": 80.0,
+                "materials": [],
+                "active": True,
             },
         )
 
@@ -443,7 +467,30 @@ class DemoController:
         self.click(treat_tab, "开治疗单")
         self.scene("✅ 处方、检验、治疗已开立")
 
-        self.scene("⑦ 收费员窗口：收费", self.cashier)
+        self.scene("⑦ 治疗室窗口：登记清创缝合处置", self.treatment)
+        queue_tab = self.switch_inner(self.treatment, "治疗排队")
+        self.treatment.patient_id.setValue(self.patient_id)
+        self.treatment.encounter_id.setValue(self.encounter_id)
+        self.set_combo(self.treatment.template, "清创缝合")
+        self.treatment.procedure.setText("清创缝合")
+        self.treatment.diagnosis.setText("右手掌裂伤")
+        self.treatment.template_edits["site"].setText("右手掌")
+        self.treatment.template_edits["size"].setText("3cm")
+        self.click(queue_tab, "创建处置")
+        treatment_cases = self.admin.call(
+            "GET", "/treatment-room/cases", params={"status": "waiting"}
+        )
+        treatment_case = next(
+            row for row in treatment_cases if row["encounter_id"] == self.encounter_id
+        )
+        for row in range(self.treatment.table.rowCount()):
+            if self.treatment.table.item(row, 0).text() == treatment_case["case_no"]:
+                self.treatment.table.selectRow(row)
+                self.treatment._select_case(row, 0)
+                break
+        self.scene("✅ 已登记治疗室清创处置（费用进入本次就诊）")
+
+        self.scene("⑧ 收费员窗口：收费", self.cashier)
         charge_tab = self.switch_inner(self.cashier, "收费")
         self.cashier.c_encounter_id.setValue(self.encounter_id)
         self.click(charge_tab, "查询费用")
@@ -454,7 +501,27 @@ class DemoController:
         assert payments and payments[0]["status"] == "paid"
         self.scene(f"✅ 收费完成：{payments[0]['amount']:.2f} 元")
 
-        self.scene("⑧ 库房窗口：药品收货入库", self.warehouse)
+        self.scene("⑨ 治疗室窗口：知情同意 → 开始 → 完成处置", self.treatment)
+        handle_tab = self.switch_inner(self.treatment, "处置记录")
+        self.treatment.consent.setChecked(True)
+        self.treatment.anesthesia.setText("利多卡因局麻")
+        self.treatment.findings.setText("右手掌 3cm 裂伤")
+        self.click(handle_tab, "开始")
+        self.treatment.procedure_detail.setText("清创后 3-0 丝线缝合 3 针")
+        self.treatment.sutures.setText("3-0 丝线 3 针")
+        self.treatment.dressing.setText("无菌敷料包扎")
+        self.click(handle_tab, "完成")
+        case_detail = self.admin.call(
+            "GET", f"/treatment-room/cases/{treatment_case['id']}"
+        )
+        assert case_detail["status"] == "completed", case_detail
+        followups = self.admin.call(
+            "GET", "/treatment-room/follow-ups", params={"status": "pending"}
+        )
+        assert any(row["case_id"] == treatment_case["id"] for row in followups)
+        self.scene("✅ 处置完成，自动生成换药随访")
+
+        self.scene("⑩ 库房窗口：药品收货入库", self.warehouse)
         inbound_tab = self.switch_inner(self.warehouse, "入库单")
         self.set_combo(self.warehouse.in_type, "药品")
         self.click(inbound_tab, "刷新供应商")
@@ -514,14 +581,40 @@ class DemoController:
         assert sum(row["quantity"] for row in stock) == 2
         self.scene("✅ 出库完成，药房库存 2 盒")
 
-        self.scene("⑪ 药房窗口：发药 → 退药", self.pharmacy)
+        self.scene("⑪ 药房窗口：取药码核对 → 叫号 → 签字发药", self.pharmacy)
         disp_tab = self.switch_inner(self.pharmacy, "发药")
-        self.pharmacy.disp_encounter_id.setValue(self.encounter_id)
-        self.click(disp_tab, "发药")
+        self.pharmacy._load_worklist()
+        target_index = next(
+            (
+                index
+                for index, row in enumerate(self.pharmacy.worklist)
+                if row["encounter_id"] == self.encounter_id
+            ),
+            -1,
+        )
+        assert target_index >= 0, "待发药队列没有本次就诊"
+        self.pharmacy.worklist_table.selectRow(target_index)
+        self.pharmacy._select_worklist(target_index, 0)
+        self.click(disp_tab, "核对取药码")
+        self.pharmacy.receiver_name.setText("演示患者本人")
+        self.click(disp_tab, "叫号")
+        self.click(disp_tab, "核对发药")
         self.click(disp_tab, "退药（库存回补）")
-        self.scene("✅ 发药/退药完成")
+        remaining = self.pharmacist_api.call("GET", "/pharmacy/worklist")
+        assert all(row["encounter_id"] != self.encounter_id for row in remaining)
+        self.scene("✅ 取药码核对、发药、退药完成")
 
-        self.scene("演示完成：医生站挂号 → 历史诊疗 → 接诊开方 → 收费 → 入库 → 领用 → 发药/退药")
+        self.scene("⑫ 收费员窗口：开班与日结", self.cashier)
+        shift_tab = self.switch_inner(self.cashier, "交班")
+        daily = self.cashier_api.call("GET", "/cashier/daily")
+        if not any(row.get("status") == "open" for row in daily["shifts"]):
+            self.cashier.opening_float.setValue(100)
+            self.click(shift_tab, "开班")
+            daily = self.cashier_api.call("GET", "/cashier/daily")
+        assert daily["shifts"], "交班记录未生成"
+        self.scene("✅ 收费员开班，日结可见交班记录")
+
+        self.scene("演示完成：挂号 → 医生 → 治疗室 → 收费 → 库房 → 药房 → 交班")
         self.tile_windows()
         self.wait(2.5)
         self.capture_timer.stop()
