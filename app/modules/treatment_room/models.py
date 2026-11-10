@@ -39,6 +39,19 @@ class TreatmentRoomCase(Base):
     charge_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    consent_version: Mapped[str] = mapped_column(
+        String(20), default="v1", server_default="v1", nullable=False
+    )
+    consent_signer: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    consent_relation: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
+    consent_signature_path: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    consent_signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     kit_applied: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     anesthesia: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     findings: Mapped[str] = mapped_column(String(500), default="", nullable=False)

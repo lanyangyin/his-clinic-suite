@@ -32,6 +32,10 @@ class CaseCreate(BaseModel):
 
 class StartRequest(BaseModel):
     consent: bool
+    consent_version: str = Field(default="v1", max_length=20)
+    consent_signer: str = Field(default="", max_length=50)
+    consent_relation: str = Field(default="", max_length=20)
+    consent_signature_path: str = Field(default="", max_length=200)
     anesthesia: str = Field(default="", max_length=100)
     findings: str = Field(default="", max_length=500)
 
@@ -63,6 +67,11 @@ class CaseResponse(BaseModel):
     charge_item_id: int | None
     price: float
     consent: bool
+    consent_version: str
+    consent_signer: str
+    consent_relation: str
+    consent_signature_path: str
+    consent_signed_at: datetime | None
     kit_applied: bool
     anesthesia: str
     findings: str

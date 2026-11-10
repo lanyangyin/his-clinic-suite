@@ -137,7 +137,7 @@ def test_treatment_room_charge_and_material_deduction(client, auth):
     ).json()
     client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻", "findings": "裂伤"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "局麻", "findings": "裂伤"},
         headers=auth["treatment"],
     )
     used = client.post(
@@ -152,3 +152,4 @@ def test_treatment_room_charge_and_material_deduction(client, auth):
     ).json()
     assert any("治疗室：" in row["item_name"] for row in charges)
     assert any("材料：" in row["item_name"] and row["amount"] == 15.0 for row in charges)
+

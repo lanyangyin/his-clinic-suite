@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import uuid
 
@@ -50,6 +50,7 @@ from .service import (
 )
 
 router = APIRouter(prefix="/treatment-room", tags=["treatment-room"])
+CONSENT_DIR = Path("data/treatment_consents")
 
 
 @router.post("/rooms", response_model=RoomResponse, status_code=201)
@@ -105,9 +106,40 @@ def case_detail(
     return case
 
 
-@router.post("/cases/{case_id}/start", response_model=CaseResponse)
-def start(
+@router.post("/cases/{case_id}/consent-signature")
+async def upload_consent_signature(
     case_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _ = Depends(require_role("treatment")),
+):
+    case = get_case(db, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="治疗室病例不存在")
+    if case.status != "waiting":
+        raise HTTPException(status_code=400, detail="仅候诊病例可上传知情同意签名")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".jpg", ".jpeg", ".png"}:
+        raise HTTPException(status_code=400, detail="仅支持 jpg/png 签名图片")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="签名图片不能超过 5MB")
+    CONSENT_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"consent_{case_id}_{uuid.uuid4().hex}{suffix}"
+    path = CONSENT_DIR / name
+    path.write_bytes(content)
+    case.consent_signature_path = str(path).replace("\\", "/")
+    case.consent_signed_at = datetime.now()
+    db.commit()
+    return {
+        "case_id": case.id,
+        "signature_path": case.consent_signature_path,
+        "signed_at": case.consent_signed_at,
+    }
+
+
+@router.post("/cases/{case_id}/start", response_model=CaseResponse)
+def start(    case_id: int,
     data: StartRequest,
     db: Session = Depends(get_db),
     user=Depends(require_role("treatment")),

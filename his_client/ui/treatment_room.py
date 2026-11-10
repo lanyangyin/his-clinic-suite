@@ -122,14 +122,30 @@ class TreatmentRoomWidget(QWidget):
         self.case_info.setWordWrap(True)
         layout.addWidget(self.case_info)
 
-        start_box = QGroupBox("开始处置")
+        start_box = QGroupBox("开始处置 / 知情同意")
         start_form = QFormLayout(start_box)
         self.consent = QCheckBox("已签署知情同意")
+        self.consent_signer = QLineEdit()
+        self.consent_signer.setPlaceholderText("签署人姓名")
+        self.consent_relation = QLineEdit("本人")
+        self.consent_relation.setPlaceholderText("与患者关系")
+        self.consent_signature_path = QLineEdit()
+        self.consent_signature_path.setReadOnly(True)
+        self.consent_signature_path.setPlaceholderText("签名图片（服务端保存）")
+        self.consent_signature_local = ""
+        pick_signature = QPushButton("选择签名图片")
+        pick_signature.clicked.connect(self._pick_consent_signature)
+        signature_row = QHBoxLayout()
+        signature_row.addWidget(self.consent_signature_path)
+        signature_row.addWidget(pick_signature)
         self.anesthesia = QLineEdit()
         self.findings = QLineEdit()
         start = QPushButton("开始")
         start.clicked.connect(self._start)
         start_form.addRow("知情同意", self.consent)
+        start_form.addRow("签署人", self.consent_signer)
+        start_form.addRow("关系", self.consent_relation)
+        start_form.addRow("签名", signature_row)
         start_form.addRow("麻醉", self.anesthesia)
         start_form.addRow("术中所见", self.findings)
         start_form.addRow("", start)
@@ -290,6 +306,10 @@ class TreatmentRoomWidget(QWidget):
             else:
                 self.case_info.setStyleSheet("")
         self.consent.setChecked(bool(case.get("consent")))
+        self.consent_signer.setText(case.get("consent_signer") or "")
+        self.consent_relation.setText(case.get("consent_relation") or "本人")
+        self.consent_signature_path.setText(case.get("consent_signature_path") or "")
+        self.consent_signature_local = ""
         self.anesthesia.setText(case.get("anesthesia") or "")
         self.findings.setText(case.get("findings") or "")
         self.procedure_detail.setText(case.get("procedure_detail") or "")
@@ -299,12 +319,46 @@ class TreatmentRoomWidget(QWidget):
         self.complications.setText(case.get("complications") or "")
         self.handle_msg.setText("已载入")
 
+    def _pick_consent_signature(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择知情同意签名图片", "", "图片 (*.png *.jpg *.jpeg)"
+        )
+        if path:
+            self.consent_signature_local = path
+            self.consent_signature_path.setText(path)
+
     def _start(self) -> None:
+        if not self.consent.isChecked():
+            self.handle_msg.setText("请先完成知情同意")
+            return
+        signer = self.consent_signer.text().strip()
+        if not signer:
+            self.handle_msg.setText("请填写知情同意签署人")
+            return
+        signature_path = self.consent_signature_path.text().strip()
+        if not signature_path:
+            self.handle_msg.setText("请选择知情同意签名图片")
+            return
+        if self.consent_signature_local:
+            try:
+                uploaded = self.api.upload_treatment_consent(
+                    self.case_id.value(), self.consent_signature_local
+                )
+            except ApiError as e:
+                self.handle_msg.setText(f"签名上传失败（{e.status_code}）：{e.detail}")
+                return
+            signature_path = uploaded["signature_path"]
+            self.consent_signature_path.setText(signature_path)
+            self.consent_signature_local = ""
         try:
             self.api.start_treatment_room_case(
                 self.case_id.value(),
                 {
-                    "consent": self.consent.isChecked(),
+                    "consent": True,
+                    "consent_signer": signer,
+                    "consent_relation": self.consent_relation.text().strip() or "本人",
+                    "consent_signature_path": signature_path,
+                    "consent_version": "v1",
                     "anesthesia": self.anesthesia.text().strip(),
                     "findings": self.findings.text().strip(),
                 },

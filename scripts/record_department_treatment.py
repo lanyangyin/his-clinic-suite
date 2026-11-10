@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt, QTimer
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QScrollArea, QTabWidget
 
@@ -27,6 +27,7 @@ BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "treatment"
 VIDEO_DIR = ROOT / "docs" / "科室独立演示"
 VIDEO = VIDEO_DIR / "04_治疗室.mp4"
+CONSENT = ROOT / "docs" / "dept_preview" / "consent_demo.png"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
@@ -114,6 +115,14 @@ class TreatmentDemo(QMainWindow):
         self.frames.append(path)
 
     def setup(self):
+        CONSENT.parent.mkdir(parents=True, exist_ok=True)
+        pix = QPixmap(360, 120)
+        pix.fill(Qt.white)
+        painter = QPainter(pix)
+        painter.setPen(QPen(QColor("#111827"), 2))
+        painter.drawText(30, 65, "Consent Signature")
+        painter.end()
+        pix.save(str(CONSENT))
         dept = self.admin.call("POST", "/departments/", json={"name": f"治疗演示科{self.suffix}"})
         self.doc = self.admin.call(
             "POST", "/doctors/", json={"name": f"治疗演示医生{self.suffix}", "department_id": dept["id"]}
@@ -197,6 +206,10 @@ class TreatmentDemo(QMainWindow):
             self.scroll.verticalScrollBar().setValue(0)
             self.scene("知情同意后开始处置，自动扣套餐耗材", handle)
             self.widget.consent.setChecked(True)
+            self.widget.consent_signer.setText(self.patient["name"])
+            self.widget.consent_relation.setText("本人")
+            self.widget.consent_signature_local = str(CONSENT)
+            self.widget.consent_signature_path.setText(str(CONSENT))
             self.widget.anesthesia.setText("利多卡因局麻")
             self.widget.findings.setText("右手掌 3cm 裂伤")
             self.click(handle, "开始")

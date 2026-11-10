@@ -597,6 +597,14 @@ class ApiClient:
             "POST", f"/treatment-room/cases/{case_id}/start", json=payload
         )
 
+    def upload_treatment_consent(self, case_id: int, file_path: str) -> dict:
+        with open(file_path, "rb") as handle:
+            return self._request(
+                "POST",
+                f"/treatment-room/cases/{case_id}/consent-signature",
+                files={"file": (file_path.split("\\")[-1].split("/")[-1], handle)},
+            )
+
     def complete_treatment_room_case(self, case_id: int, payload: dict) -> dict:
         return self._request(
             "POST", f"/treatment-room/cases/{case_id}/complete", json=payload

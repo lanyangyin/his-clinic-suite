@@ -79,7 +79,7 @@ def test_treatment_room_full_flow(client, auth):
 
     started = client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "利多卡因局麻", "findings": "掌侧 3cm 裂伤"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "利多卡因局麻", "findings": "掌侧 3cm 裂伤"},
         headers=auth["treatment"],
     )
     assert started.status_code == 200
@@ -186,7 +186,7 @@ def test_treatment_followup_and_daily_report(client, auth):
     ).json()
     client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻", "findings": "裂伤"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "局麻", "findings": "裂伤"},
         headers=auth["treatment"],
     )
     client.post(
@@ -294,7 +294,7 @@ def test_treatment_template_config_and_kit(client, auth):
 
     started = client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "局麻"},
         headers=auth["treatment"],
     )
     assert started.status_code == 200, started.text
@@ -369,7 +369,7 @@ def test_multi_material_kit_and_cancel_return(client, auth):
 
     started = client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "局麻"},
         headers=auth["treatment"],
     )
     assert started.status_code == 200, started.text
@@ -521,7 +521,7 @@ def test_treatment_reconciliation_and_print_page(client, auth):
     patient, encounter, _, _, case = _setup(client, auth)
     client.post(
         f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻", "findings": "裂伤"},
+        json={"consent": True, "consent_signer": "患者本人", "consent_relation": "本人", "consent_signature_path": "data/test_consent.png", "anesthesia": "局麻", "findings": "裂伤"},
         headers=auth["treatment"],
     )
     client.post(
@@ -563,3 +563,4 @@ def test_treatment_reconciliation_and_print_page(client, auth):
     assert page.status_code == 200
     assert "治疗室收费对账" in page.text
     assert "打印" in page.text
+

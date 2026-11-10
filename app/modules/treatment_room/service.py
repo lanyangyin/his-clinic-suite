@@ -586,6 +586,10 @@ def start_case(db: Session, case_id: int, data: StartRequest, operator: str = ""
         raise ValueError("该病例当前状态不可开始")
     if not data.consent:
         raise ValueError("请先完成知情同意")
+    if not data.consent_signer.strip():
+        raise ValueError("请填写知情同意签署人")
+    if not data.consent_signature_path.strip():
+        raise ValueError("请上传知情同意签名图片")
     config = None
     if case.template_code:
         config = (
@@ -618,6 +622,11 @@ def start_case(db: Session, case_id: int, data: StartRequest, operator: str = ""
             raise ValueError(f"模板套餐耗材扣减失败：{e}")
     case.status = "in_progress"
     case.consent = True
+    case.consent_version = data.consent_version or "v1"
+    case.consent_signer = data.consent_signer.strip()
+    case.consent_relation = data.consent_relation.strip() or "本人"
+    case.consent_signature_path = data.consent_signature_path.strip()
+    case.consent_signed_at = datetime.now()
     case.anesthesia = data.anesthesia
     case.findings = data.findings
     case.operator = operator
