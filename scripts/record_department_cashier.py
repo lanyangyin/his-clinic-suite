@@ -143,7 +143,6 @@ class CashierDemo(QMainWindow):
             self.widget.p_emergency_name.setText("演示家属")
             self.widget.p_emergency_relation.setText("配偶")
             self.widget.p_emergency_phone.setText("13900001234")
-            self.widget.p_insurance.setCurrentIndex(self.widget.p_insurance.findData("employee"))
             self.widget.p_allergy_status.setCurrentIndex(self.widget.p_allergy_status.findData("none"))
             self.widget.p_privacy.setChecked(True)
             self.click(patient_tab, "建档")
@@ -151,9 +150,20 @@ class CashierDemo(QMainWindow):
                 "GET", "/patients/", params={"name": f"收费演示患者{self.suffix}"}
             )
             patient = found[0]
-            self.scene("患者建档完成，进入挂号", self.tab("挂号"))
+            self.scene("患者建档完成，绑定 NFC 就诊卡")
+            self.widget.q_name.setText(patient["name"])
+            self.click(patient_tab, "查询")
+            self.widget.patient_table.selectRow(0)
+            self.widget._select_patient_row(0, 0)
+            card_uid = f"NFC-DEMO-{self.suffix}"
+            self.widget.p_card_uid.setText(card_uid)
+            self.click(patient_tab, "绑定 NFC 卡")
+            assert "已绑定 NFC 卡" in self.widget.patient_msg.text()
+            self.scene("NFC 卡绑定成功，进入挂号并按卡带出患者", self.tab("挂号"))
             reg_tab = self.tab("挂号")
-            self.widget.r_patient_id.setValue(patient["id"])
+            self.widget.r_card_uid.setText(card_uid)
+            self.click(reg_tab, "按卡带出患者")
+            assert self.widget.r_patient_id.value() == patient["id"]
             self.click(reg_tab, "刷新医生列表")
             for row in range(self.widget.r_doctor_list.rowCount()):
                 if str(self.doc["id"]) == self.widget.r_doctor_list.item(row, 0).text():

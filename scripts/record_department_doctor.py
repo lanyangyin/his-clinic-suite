@@ -53,6 +53,7 @@ class DoctorDemo(QMainWindow):
         self.admin = Api("admin", "admin123")
         self.cashier = Api("cashier", "cashier123")
         self.doctor_api = Api("doctor", "doctor123")
+        self.lab_api = Api("lab", "lab123")
         self.suffix = datetime.now().strftime("%H%M%S")
 
     def wait(self, seconds=1.2):
@@ -172,7 +173,39 @@ class DoctorDemo(QMainWindow):
             )
             self.encounter = encounters[0]
             assert self.encounter["id"]
-            self.scene("接诊成功，进入病历书写与签名", self.tab("病历"))
+
+            lab_request = self.doctor_api.call(
+                "POST", f"/lab/encounters/{self.encounter['id']}/lab-requests",
+                json={"item_id": self.lab["id"]},
+            )
+            for action in ("collect", "receive", "start"):
+                self.lab_api.call("POST", f"/lab/requests/{lab_request['id']}/{action}")
+            self.lab_api.call(
+                "POST", f"/lab/requests/{lab_request['id']}/report",
+                json={
+                    "result": "WBC 25.0×10^9/L",
+                    "result_value": 25.0,
+                    "result_unit": "×10^9/L",
+                    "critical_flag": True,
+                    "critical_note": "白细胞显著升高",
+                    "critical_notified_to": "急诊医生",
+                },
+            )
+            self.widget._load_workbench()
+            for row in range(self.widget.wb_table.rowCount()):
+                if self.patient["name"] in self.widget.wb_table.item(row, 1).text():
+                    self.widget.wb_table.selectRow(row)
+                    self.widget._select_workbench(row, 0)
+                    break
+            self.widget._load_critical_alerts()
+            self.scene("检验科报告危急值，医生工作台红色提醒")
+            self.widget.critical_table.selectRow(0)
+            self.widget._select_critical(0, 0)
+            self.widget.critical_note.setText("已电话回读并确认")
+            self.click(work, "确认危急值")
+            ack = self.doctor_api.call("GET", f"/lab/requests/{lab_request['id']}")
+            assert ack.get("critical_ack_by"), ack
+            self.scene("危急值已确认，继续病历书写与签名", self.tab("病历"))
             record_tab = self.tab("病历")
             self.widget.mr_encounter_id.setValue(self.encounter["id"])
             self.click(record_tab, "载入病历")

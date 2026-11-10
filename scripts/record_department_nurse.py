@@ -112,7 +112,12 @@ class NurseDemo(QMainWindow):
             "POST", "/doctors/", json={"name": f"护理演示医生{self.suffix}", "department_id": dept["id"]}
         )
         self.drug = self.admin.call(
-            "POST", "/drugs/", json={"name": f"护理演示药{self.suffix}", "base_price": 20}
+            "POST", "/drugs/",
+            json={
+                "name": f"护理演示药{self.suffix}",
+                "base_price": 20,
+                "high_alert": True,
+            },
         )
         self.treat_item = self.admin.call(
             "POST", "/charges/items/",
@@ -203,11 +208,11 @@ class NurseDemo(QMainWindow):
             self.widget.rate.setText("60")
             self.click(nursing, "开始执行")
             assert "配药" in self.widget.nursing_msg.text(), self.widget.nursing_msg.text()
-            self.scene("被拦截；现在配药")
+            self.scene("被拦截；高危药品配药，核对人 second-nurse")
             self.widget.solvent.setText("0.9%氯化钠 250ml")
             self.widget.dose.setText("1g")
             self.widget.batch_no.setText(f"NR-{self.suffix}")
-            self.widget.checked_by.setText("nurse")
+            self.widget.checked_by.setText("second-nurse")
             self.click(nursing, "配药完成")
             self.scene("配药完成，开始穿刺执行")
             self.click(nursing, "开始执行")

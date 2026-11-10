@@ -151,6 +151,11 @@ class WarehouseDemo(QMainWindow):
             self.widget.in_expiry.setText(self.expiry)
             self.widget.in_qty.setValue(10)
             self.widget.in_price.setText("11.00")
+            self.widget.in_insurance_code.setText(f"YH{self.suffix[-6:]}")
+            self.widget.in_insurance_name.setText(f"库房演示药{self.suffix}（医保名）")
+            self.widget.in_insurance_category.setCurrentIndex(
+                self.widget.in_insurance_category.findData("乙")
+            )
             self.click(inbound, "添加药品行")
             self.widget.in_msg.setText("")
             self.scene("提交入库单")
