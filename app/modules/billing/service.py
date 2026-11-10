@@ -81,8 +81,15 @@ def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Pa
     close_encounter(db, encounter)
     try:
         db.flush()
-        # 发票票据号（演示：INV + 日期 + 6 位流水）
-        payment.invoice_no = f"INV{datetime.now():%Y%m%d}{payment.id:06d}"
+        # 优先使用发票号段；无可用号段时回退到内部流水号
+        from app.modules.invoice.service import allocate
+
+        batch = allocate(db, created_by)
+        if batch:
+            payment.invoice_no = f"{batch.prefix}{batch.next_no - 1:08d}"
+            payment.invoice_batch_id = batch.id
+        else:
+            payment.invoice_no = f"INV{datetime.now():%Y%m%d}{payment.id:06d}"
         db.commit()
     except IntegrityError:
         # 并发双收兜底：payments.encounter_id 唯一约束

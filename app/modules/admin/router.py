@@ -154,6 +154,12 @@ from app.modules.treatment_room.schemas import TemplateConfigUpdate
 from app.modules.charges.service import list_items as list_charge_items
 from app.modules.materials.service import list_items as list_materials
 from app.modules.cashier.service import daily as cashier_daily
+from app.modules.invoice.schemas import InvoiceBatchCreate
+from app.modules.invoice.service import (
+    close_batch as close_invoice_batch,
+    create_batch as create_invoice_batch,
+    list_batches as list_invoice_batches,
+)
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2349,3 +2355,58 @@ def cashier_daily_page(
         "cashier_daily.html",
         _ctx(request, data=cashier_daily(db, day)),
     )
+
+# ---------- 发票号段 ----------
+
+@router.get("/invoice-batches", response_class=HTMLResponse)
+def invoice_batches_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "invoice_batches.html",
+        _ctx(
+            request,
+            batches=list_invoice_batches(db),
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/invoice-batches")
+async def invoice_batch_submit(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        create_invoice_batch(
+            db,
+            InvoiceBatchCreate(
+                prefix=(form.get("prefix") or "INV").strip(),
+                start_no=int(form.get("start_no") or 1),
+                end_no=int(form.get("end_no") or 1),
+                assigned_to=(form.get("assigned_to") or "").strip(),
+                note=(form.get("note") or "").strip(),
+            ),
+        )
+        msg = "号段已创建"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/invoice-batches?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/invoice-batches/{batch_id}/close")
+def invoice_batch_close(
+    request: Request, batch_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        close_invoice_batch(db, batch_id)
+        msg = "号段已停用"
+    except Exception as e:  # noqa: BLE001
+        msg = f"操作失败：{e}"
+    return RedirectResponse(f"/admin/invoice-batches?msg={quote(msg)}", status_code=302)

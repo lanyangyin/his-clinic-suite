@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}发票号段 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>发票号段</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<div class="panel">
+  <form class="inline" method="post" action="/admin/invoice-batches">
+    <label>前缀<input name="prefix" value="INV"></label>
+    <label>起始号<input name="start_no" type="number" min="1" value="1"></label>
+    <label>结束号<input name="end_no" type="number" min="1" value="1000"></label>
+    <label>分配给收费员<input name="assigned_to" placeholder="空=公共号段"></label>
+    <label>备注<input name="note"></label>
+    <button type="submit">新增号段</button>
+  </form>
+</div>
+
+<div class="panel">
+  <table>
+    <tr><th>ID</th><th>前缀</th><th>起止</th><th>下一个号</th><th>分配</th><th>状态</th><th>备注</th><th>操作</th></tr>
+    {% for row in batches %}
+    <tr>
+      <td>{{ row.id }}</td><td>{{ row.prefix }}</td>
+      <td>{{ row.start_no }} - {{ row.end_no }}</td>
+      <td>{{ row.next_no }}</td>
+      <td>{{ row.assigned_to or '公共' }}</td>
+      <td>{{ '使用中' if row.status == 'active' else '已停用' }}</td>
+      <td>{{ row.note }}</td>
+      <td>
+        {% if row.status == 'active' %}
+        <form method="post" action="/admin/invoice-batches/{{ row.id }}/close">
+          <button type="submit">停用</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="8">暂无号段，收费时使用内部流水号</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

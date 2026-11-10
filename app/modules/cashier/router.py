@@ -16,18 +16,20 @@ router = APIRouter(prefix="/cashier", tags=["cashier"])
 def get_daily(
     day: date | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier", "admin")),
+    user=Depends(require_role("cashier", "admin")),
 ):
-    return daily(db, day)
+    cashier = user.username if user.role == "cashier" else None
+    return daily(db, day, cashier)
 
 
 @router.get("/shifts", response_model=list[ShiftResponse])
 def get_shifts(
     day: date | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier", "admin")),
+    user=Depends(require_role("cashier", "admin")),
 ):
-    return list_shifts(db, day)
+    cashier = user.username if user.role == "cashier" else None
+    return list_shifts(db, day, cashier)
 
 
 @router.post("/shifts/open", response_model=ShiftResponse, status_code=201)

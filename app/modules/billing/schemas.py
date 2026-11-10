@@ -20,6 +20,7 @@ class PaymentResponse(BaseModel):
     self_pay_amount: float
     # 发票票据号
     invoice_no: str | None = None
+    invoice_batch_id: int | None = None
     channel: str = "cash"
     channel_trade_no: str = ""
     channel_status: str = "success"

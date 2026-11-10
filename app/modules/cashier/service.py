@@ -97,20 +97,21 @@ def list_shifts(db: Session, day: date | None = None, cashier: str | None = None
     return query.order_by(CashierShift.id.desc()).all()
 
 
-def daily(db: Session, day: date | None = None) -> dict:
+def daily(db: Session, day: date | None = None, cashier: str | None = None) -> dict:
     day = day or date.today()
     start = datetime.combine(day, time.min)
     end = datetime.combine(day, time.max)
-    payments = (
-        db.query(Payment)
-        .filter(Payment.created_at >= start, Payment.created_at <= end)
-        .all()
+    payment_query = db.query(Payment).filter(
+        Payment.created_at >= start, Payment.created_at <= end
     )
-    refunds = (
-        db.query(ChargeRefund)
-        .filter(ChargeRefund.created_at >= start, ChargeRefund.created_at <= end)
-        .all()
+    refund_query = db.query(ChargeRefund).filter(
+        ChargeRefund.created_at >= start, ChargeRefund.created_at <= end
     )
+    if cashier:
+        payment_query = payment_query.filter(Payment.created_by == cashier)
+        refund_query = refund_query.filter(ChargeRefund.operator == cashier)
+    payments = payment_query.all()
+    refunds = refund_query.all()
     channels: dict[str, dict] = {}
     for payment in payments:
         row = channels.setdefault(
@@ -151,5 +152,6 @@ def daily(db: Session, day: date | None = None) -> dict:
         "refund_amount": round(sum(row.amount for row in refunds), 2),
         "pending_amount": round(float(pending_amount), 2),
         "channels": sorted(channels.values(), key=lambda row: row["amount"], reverse=True),
-        "shifts": list_shifts(db, day),
+        "shifts": list_shifts(db, day, cashier),
+        "scope": cashier or "all",
     }
