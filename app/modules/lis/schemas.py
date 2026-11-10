@@ -58,6 +58,10 @@ class CriticalRequest(BaseModel):
     notified_to: str = Field(default="", max_length=100)
 
 
+class CriticalAckRequest(BaseModel):
+    note: str = Field(default="", max_length=200)
+
+
 class LabRequestResponse(BaseModel):
     id: int
     encounter_id: int
@@ -90,5 +94,11 @@ class LabRequestResponse(BaseModel):
     critical_note: str | None
     critical_notified_to: str | None
     critical_notified_at: datetime | None
+    critical_ack_by: str | None
+    critical_ack_at: datetime | None
+    critical_ack_note: str | None
+    critical_pending: bool
+    critical_age_minutes: int | None
+    critical_overdue: bool
     result_display: str
     model_config = ConfigDict(from_attributes=True)

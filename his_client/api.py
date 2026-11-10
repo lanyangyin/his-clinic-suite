@@ -265,6 +265,16 @@ class ApiClient:
             json={"note": note, "notified_to": notified_to},
         )
 
+    def critical_alerts(self) -> list:
+        return self._request("GET", "/lab/critical-alerts")
+
+    def ack_critical_lab(self, request_id: int, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/lab/requests/{request_id}/critical-ack",
+            json={"note": note},
+        )
+
     # ---- 病案档案 ----
     def list_archive_records(self, **params) -> list:
         return self._request("GET", "/archive/records", params=params)

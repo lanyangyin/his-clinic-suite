@@ -235,8 +235,7 @@ def review_request(db: Session, request_id: int, operator: str = "") -> LabReque
     return request
 
 
-def register_critical(
-    db: Session, request_id: int, data: CriticalRequest, operator: str = ""
+def register_critical(    db: Session, request_id: int, data: CriticalRequest, operator: str = ""
 ) -> LabRequest:
     request = get_request(db, request_id)
     if not request:
@@ -252,6 +251,37 @@ def register_critical(
     db.commit()
     db.refresh(request)
     return request
+
+
+def acknowledge_critical(
+    db: Session, request_id: int, note: str = "", operator: str = ""
+) -> LabRequest:
+    """医生确认危急值：必须有通知对象，记录确认人/时间/备注。"""
+    request = get_request(db, request_id)
+    if not request:
+        raise ValueError("检验申请不存在")
+    if not request.critical_flag:
+        raise ValueError("该报告不是危急值")
+    if request.critical_ack_at:
+        raise ValueError("该危急值已确认，不能重复确认")
+    if not request.critical_notified_to:
+        raise ValueError("危急值尚未登记通知对象，不能确认")
+    request.critical_ack_by = operator
+    request.critical_ack_at = datetime.now()
+    request.critical_ack_note = note or None
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def critical_alerts(db: Session) -> list[dict]:
+    """医生工作台：未确认的危急值，按报告时间倒序。"""
+    rows = [
+        row
+        for row in worklist(db)
+        if row["critical_pending"] and row["status"] in ("reported", "reviewed")
+    ]
+    return rows
 
 
 def worklist(
@@ -303,6 +333,14 @@ def worklist(
                 "result_display": request.result_display,
                 "abnormal_flag": request.abnormal_flag,
                 "critical_flag": request.critical_flag,
+                "critical_notified_to": request.critical_notified_to,
+                "critical_notified_at": request.critical_notified_at,
+                "critical_ack_by": request.critical_ack_by,
+                "critical_ack_at": request.critical_ack_at,
+                "critical_ack_note": request.critical_ack_note,
+                "critical_pending": request.critical_pending,
+                "critical_age_minutes": request.critical_age_minutes,
+                "critical_overdue": request.critical_overdue,
                 "result_unit": request.result_unit,
                 "reference_low": request.reference_low,
                 "reference_high": request.reference_high,

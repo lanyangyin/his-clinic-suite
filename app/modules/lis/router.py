@@ -5,6 +5,7 @@ from app.database import get_db
 from app.modules.auth.security import require_role
 
 from .schemas import (
+    CriticalAckRequest,
     CriticalRequest,
     LabItemCreate,
     LabItemResponse,
@@ -15,9 +16,11 @@ from .schemas import (
     SpecimenActionRequest,
 )
 from .service import (
+    acknowledge_critical,
     collect_request,
     create_item,
     create_request,
+    critical_alerts,
     get_item,
     get_request,
     list_items,
@@ -93,6 +96,15 @@ def get_request_one(request_id: int, db: Session = Depends(get_db)):
     return request
 
 
+@router.get("/critical-alerts")
+def get_critical_alerts(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    """医生工作台：未确认的危急值。"""
+    return critical_alerts(db)
+
+
 @router.get("/worklist")
 def get_worklist(
     status: str | None = None,
@@ -166,6 +178,22 @@ def review(
 ):
     try:
         return review_request(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.post(
+    "/requests/{request_id}/critical-ack", response_model=LabRequestResponse
+)
+def critical_ack(
+    request_id: int,
+    data: CriticalAckRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor")),
+):
+    try:
+        return acknowledge_critical(db, request_id, data.note, user.username)
     except ValueError as e:
         code = 404 if str(e) == "检验申请不存在" else 400
         raise HTTPException(status_code=code, detail=str(e))

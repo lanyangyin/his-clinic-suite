@@ -77,6 +77,10 @@ class LabRequest(Base):
     critical_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
     critical_notified_to: Mapped[str | None] = mapped_column(String(100), nullable=True)
     critical_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # 医生确认闭环：谁、何时、备注
+    critical_ack_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    critical_ack_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    critical_ack_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     item = relationship("LabItem")
 
@@ -92,4 +96,19 @@ class LabRequest(Base):
                 value += f" {self.result_unit}"
             return value
         return self.result or ""
+
+    @property
+    def critical_pending(self) -> bool:
+        return bool(self.critical_flag and not self.critical_ack_at)
+
+    @property
+    def critical_age_minutes(self) -> int | None:
+        if not self.critical_flag or not self.reported_at:
+            return None
+        return max(0, int((datetime.now() - self.reported_at).total_seconds() // 60))
+
+    @property
+    def critical_overdue(self) -> bool:
+        age = self.critical_age_minutes
+        return bool(self.critical_pending and age is not None and age >= 30)
 

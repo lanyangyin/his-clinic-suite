@@ -73,6 +73,27 @@ class DoctorWidget(QWidget):
         self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
         layout.addWidget(self.wb_patient)
 
+        critical_box = QGroupBox("危急值待确认")
+        critical_layout = QVBoxLayout(critical_box)
+        self.critical_table = QTableWidget(0, 5)
+        self.critical_table.setHorizontalHeaderLabels(
+            ["患者", "项目", "结果", "报告时间", "超时"]
+        )
+        self.critical_table.setMaximumHeight(120)
+        self.critical_table.cellClicked.connect(self._select_critical)
+        critical_layout.addWidget(self.critical_table)
+        critical_row = QHBoxLayout()
+        self.critical_note = QLineEdit()
+        self.critical_note.setPlaceholderText("确认备注，如 已电话回读")
+        ack = QPushButton("确认危急值")
+        ack.clicked.connect(self._ack_critical)
+        critical_row.addWidget(self.critical_note)
+        critical_row.addWidget(ack)
+        critical_layout.addLayout(critical_row)
+        self.critical_msg = QLabel("")
+        critical_layout.addWidget(self.critical_msg)
+        layout.addWidget(critical_box)
+
         row = QHBoxLayout()
         self.wb_diagnosis_code = QComboBox()
         self.wb_diagnosis_code.addItem("诊断编码（可选）", "")
@@ -167,6 +188,64 @@ class DoctorWidget(QWidget):
             for col, value in enumerate(values):
                 self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
         self.wb_summary.setText(f"今日队列 {len(self.workbench_rows)} 人")
+        self._load_critical_alerts()
+
+    def _load_critical_alerts(self) -> None:
+        try:
+            alerts = self.api.critical_alerts()
+        except ApiError as e:
+            self.critical_msg.setText(f"危急值加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.critical_rows = alerts
+        self.critical_table.setRowCount(len(alerts))
+        for row, item in enumerate(alerts):
+            values = [
+                item.get("patient_name") or "",
+                item.get("item_name") or "",
+                item.get("result_display") or "—",
+                str(item.get("reported_at") or "")[:16].replace("T", " "),
+                f"{item.get('critical_age_minutes') or 0} 分钟"
+                + ("（超时）" if item.get("critical_overdue") else ""),
+            ]
+            for col, value in enumerate(values):
+                cell = QTableWidgetItem(str(value))
+                if col == 0:
+                    cell.setData(Qt.UserRole, item["id"])
+                if item.get("critical_overdue"):
+                    cell.setForeground(Qt.red)
+                self.critical_table.setItem(row, col, cell)
+        if alerts:
+            self.critical_msg.setText(
+                f"待确认 {len(alerts)} 条；超时 {sum(1 for x in alerts if x.get('critical_overdue'))} 条"
+            )
+            self.critical_msg.setStyleSheet("color:#b91c1c;font-weight:bold")
+        else:
+            self.critical_msg.setText("暂无未确认危急值")
+            self.critical_msg.setStyleSheet("")
+
+    def _select_critical(self, row: int, _col: int) -> None:
+        if 0 <= row < len(getattr(self, "critical_rows", [])):
+            item = self.critical_rows[row]
+            self.critical_note.setText(
+                f"{item.get('patient_name')} {item.get('item_name')} {item.get('result_display')}"
+            )
+
+    def _ack_critical(self) -> None:
+        row = self.critical_table.currentRow()
+        if row < 0:
+            self.critical_msg.setText("请先选择一条危急值")
+            return
+        cell = self.critical_table.item(row, 0)
+        request_id = cell.data(Qt.UserRole) if cell else None
+        if not request_id:
+            return
+        try:
+            self.api.ack_critical_lab(request_id, self.critical_note.text().strip())
+        except ApiError as e:
+            self.critical_msg.setText(f"确认失败（{e.status_code}）：{e.detail}")
+            return
+        self.critical_msg.setText("危急值已确认")
+        self._load_critical_alerts()
 
     def _select_workbench(self, row: int, _col: int) -> None:
         if not (0 <= row < len(self.workbench_rows)):
