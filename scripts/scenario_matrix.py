@@ -169,7 +169,14 @@ def path_b(admin, cashier, doctor, treatment, suffix):
     assert payment["status"] == "paid"
     started = treatment.call(
         "POST", f"/treatment-room/cases/{case['id']}/start",
-        json={"consent": True, "anesthesia": "局麻", "findings": "3cm 裂伤"},
+        json={
+            "consent": True,
+            "consent_signer": p["name"],
+            "consent_relation": "本人",
+            "consent_signature_path": "data/test_consent.png",
+            "anesthesia": "局麻",
+            "findings": "3cm 裂伤",
+        },
     )
     assert started["kit_applied"] is True
     completed = treatment.call(
