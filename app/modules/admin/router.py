@@ -443,6 +443,10 @@ def charge_items_create(
     category: str = Form("other"),
     price: float = Form(...),
     insurance_ratio: float = Form(0.7),
+    insurance_code: str = Form(""),
+    insurance_name: str = Form(""),
+    insurance_category: str = Form("未对码"),
+    unit: str = Form("次"),
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -457,6 +461,10 @@ def charge_items_create(
                 category=category,
                 price=price,
                 insurance_ratio=insurance_ratio,
+                insurance_code=insurance_code.strip(),
+                insurance_name=insurance_name.strip(),
+                insurance_category=insurance_category,
+                unit=unit.strip() or "次",
             ),
         )
     except ValueError as e:

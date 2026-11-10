@@ -33,6 +33,17 @@ class MaterialItem(Base):
     insurance_code: Mapped[str] = mapped_column(
         String(60), default="", server_default="", nullable=False
     )
+    insurance_name: Mapped[str] = mapped_column(
+        String(100), default="", server_default="", nullable=False
+    )
+    # 医保类别：甲 / 乙 / 丙 / 自费 / 未对码
+    insurance_category: Mapped[str] = mapped_column(
+        String(20), default="未对码", server_default="未对码", nullable=False
+    )
+    # matched / ambiguous / unmatched
+    insurance_match_status: Mapped[str] = mapped_column(
+        String(20), default="unmatched", server_default="unmatched", nullable=False
+    )
 
 
 class MaterialStock(Base):

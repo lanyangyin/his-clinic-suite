@@ -19,6 +19,24 @@ class ChargeItem(Base):
     insurance_ratio: Mapped[float] = mapped_column(
         default=0.7, server_default="0.7", nullable=False
     )
+    insurance_code: Mapped[str] = mapped_column(
+        String(60), default="", server_default="", nullable=False
+    )
+    insurance_name: Mapped[str] = mapped_column(
+        String(100), default="", server_default="", nullable=False
+    )
+    insurance_category: Mapped[str] = mapped_column(
+        String(20), default="未对码", server_default="未对码", nullable=False
+    )
+    insurance_match_status: Mapped[str] = mapped_column(
+        String(20), default="unmatched", server_default="unmatched", nullable=False
+    )
+    unit: Mapped[str] = mapped_column(
+        String(20), default="次", server_default="次", nullable=False
+    )
+    reimbursement_note: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
     active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="1", nullable=False
     )

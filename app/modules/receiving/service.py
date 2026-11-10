@@ -49,6 +49,13 @@ def _build_items(db: Session, data: InboundOrderCreate) -> list[InboundItem]:
                     unit_price=price,
                     amount=round(item.quantity * price, 2),
                     insurance_code=item.insurance_code or drug.insurance_code,
+                    insurance_name=item.insurance_name or drug.name,
+                    insurance_category=item.insurance_category or drug.insurance_category or "未对码",
+                    insurance_match_status=item.insurance_match_status
+                    or drug.insurance_match_status
+                    or "unmatched",
+                    dosage_form=item.dosage_form or drug.dosage_form,
+                    approval_no=item.approval_no or drug.approval_no,
                     manufacturer=item.manufacturer or drug.manufacturer,
                     storage_condition=item.storage_condition,
                     warehouse=item.warehouse,
@@ -79,6 +86,16 @@ def _build_items(db: Session, data: InboundOrderCreate) -> list[InboundItem]:
                     unit_price=price,
                     amount=round(item.quantity * price, 2),
                     registration_no=registration_no,
+                    insurance_code=item.insurance_code or material.insurance_code,
+                    insurance_name=item.insurance_name or material.insurance_name or material.name,
+                    insurance_category=item.insurance_category
+                    or material.insurance_category
+                    or "未对码",
+                    insurance_match_status=item.insurance_match_status
+                    or material.insurance_match_status
+                    or "unmatched",
+                    dosage_form=item.dosage_form,
+                    approval_no=item.approval_no,
                     manufacturer=item.manufacturer or material.manufacturer,
                     warehouse=item.warehouse,
                     location=item.location,

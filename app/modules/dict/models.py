@@ -11,6 +11,10 @@ class DictEntry(Base):
     dict_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 分类：诊断/手术操作/医疗服务项目等（可空，兼容已有字典）
+    category: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
     sort_order: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="1", nullable=False

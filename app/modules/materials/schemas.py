@@ -15,6 +15,13 @@ class MaterialItemCreate(BaseModel):
     manufacturer: str = Field(default="", max_length=100)
     registration_no: str = Field(default="", max_length=60)
     insurance_code: str = Field(default="", max_length=60)
+    insurance_name: str = Field(default="", max_length=100)
+    insurance_category: str = Field(
+        default="未对码", pattern="^(甲|乙|丙|自费|未对码)$"
+    )
+    insurance_match_status: str = Field(
+        default="unmatched", pattern="^(matched|ambiguous|unmatched)$"
+    )
 
 
 class MaterialItemResponse(MaterialItemCreate):

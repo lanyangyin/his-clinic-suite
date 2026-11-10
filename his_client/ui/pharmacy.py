@@ -124,6 +124,20 @@ class PharmacyWidget(QWidget):
         items_layout.addWidget(QLabel("药品行：来源 / 药品 / 批号 / 效期 / 数量 / 单价 / 储存 / 货位"))
         items_layout.addLayout(drug_row)
 
+        insurance_row = QHBoxLayout()
+        self.in_insurance_code = QLineEdit()
+        self.in_insurance_code.setPlaceholderText("医保编码（可空，空则取目录）")
+        self.in_insurance_name = QLineEdit()
+        self.in_insurance_name.setPlaceholderText("医保名称（可空）")
+        self.in_insurance_category = QComboBox()
+        for value in ("未对码", "甲", "乙", "丙", "自费"):
+            self.in_insurance_category.addItem(value, value)
+        insurance_row.addWidget(self.in_insurance_code)
+        insurance_row.addWidget(self.in_insurance_name)
+        insurance_row.addWidget(self.in_insurance_category)
+        items_layout.addWidget(QLabel("医保属性（快照）：编码 / 名称 / 甲乙丙类别"))
+        items_layout.addLayout(insurance_row)
+
         material_row = QHBoxLayout()
         self.in_material_source = QComboBox()
         if self.insurance_enabled:
@@ -147,9 +161,9 @@ class PharmacyWidget(QWidget):
         items_layout.addWidget(QLabel("物资行：来源 / 器械/耗材/办公 / 数量 / 单价 / 库房"))
         items_layout.addLayout(material_row)
 
-        self.pending_table = QTableWidget(0, 6)
+        self.pending_table = QTableWidget(0, 8)
         self.pending_table.setHorizontalHeaderLabels(
-            ["类型", "名称", "批号", "数量", "单价", "金额"]
+            ["类型", "名称", "批号", "数量", "单价", "金额", "医保编码", "医保类别"]
         )
         items_layout.addWidget(self.pending_table)
 
@@ -345,6 +359,9 @@ class PharmacyWidget(QWidget):
             "unit_price": float(price) if price else 0,
             "storage_condition": self.in_storage.currentText(),
             "location": self.in_location.text().strip(),
+            "insurance_code": self.in_insurance_code.text().strip(),
+            "insurance_name": self.in_insurance_name.text().strip(),
+            "insurance_category": self.in_insurance_category.currentData(),
         }
         self.pending_items.append(item)
         self._refresh_pending()
@@ -377,6 +394,9 @@ class PharmacyWidget(QWidget):
             "quantity": self.in_m_qty.value(),
             "unit_price": float(price) if price else 0,
             "warehouse": self.in_warehouse.text().strip() or "总库",
+            "insurance_code": self.in_insurance_code.text().strip(),
+            "insurance_name": self.in_insurance_name.text().strip(),
+            "insurance_category": self.in_insurance_category.currentData(),
         }
         self.pending_items.append(item)
         self._refresh_pending()
@@ -399,6 +419,8 @@ class PharmacyWidget(QWidget):
                 str(item["quantity"]),
                 f"{item['unit_price']:.2f}",
                 f"{amount:.2f}",
+                item.get("insurance_code", ""),
+                item.get("insurance_category", "未对码"),
             ]
             for col, value in enumerate(values):
                 self.pending_table.setItem(row, col, QTableWidgetItem(value))

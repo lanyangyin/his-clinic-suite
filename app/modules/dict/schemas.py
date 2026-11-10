@@ -4,11 +4,13 @@ from pydantic import BaseModel, ConfigDict, Field
 class DictEntryCreate(BaseModel):
     code: str = Field(min_length=1, max_length=50)
     name: str = Field(min_length=1, max_length=100)
+    category: str = Field(default="", max_length=50)
     sort_order: int = Field(default=0, ge=0)
 
 
 class DictEntryUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
+    category: str | None = Field(default=None, max_length=50)
     sort_order: int | None = Field(default=None, ge=0)
     active: bool | None = None
 

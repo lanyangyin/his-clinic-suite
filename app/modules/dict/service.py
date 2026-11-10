@@ -19,6 +19,7 @@ def create_entry(db: Session, dict_type: str, data: DictEntryCreate) -> DictEntr
         dict_type=dict_type,
         code=data.code,
         name=data.name,
+        category=data.category,
         sort_order=data.sort_order,
         active=True,
     )

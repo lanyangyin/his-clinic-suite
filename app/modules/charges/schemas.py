@@ -9,6 +9,16 @@ class ChargeItemCreate(BaseModel):
     category: str = Field(default="other", pattern="^(registration|consultation|lab|imaging|treatment|other)$")
     price: float = Field(ge=0)
     insurance_ratio: float = Field(default=0.7, ge=0, le=1)
+    insurance_code: str = Field(default="", max_length=60)
+    insurance_name: str = Field(default="", max_length=100)
+    insurance_category: str = Field(
+        default="未对码", pattern="^(甲|乙|丙|自费|未对码)$"
+    )
+    insurance_match_status: str = Field(
+        default="unmatched", pattern="^(matched|ambiguous|unmatched)$"
+    )
+    unit: str = Field(default="次", max_length=20)
+    reimbursement_note: str = Field(default="", max_length=200)
 
 
 class ChargeItemResponse(ChargeItemCreate):
