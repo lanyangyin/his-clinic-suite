@@ -544,12 +544,35 @@ class PharmacyWidget(QWidget):
         row = QHBoxLayout(box)
         self.disp_encounter_id = QSpinBox()
         self.disp_encounter_id.setRange(1, 10_000_000)
-        submit = QPushButton("发药")
+        self.disp_window = QLineEdit("1号窗")
+        self.disp_window.setMaximumWidth(90)
+        self.disp_note = QLineEdit()
+        self.disp_note.setPlaceholderText("核对备注")
+        submit = QPushButton("核对发药")
         submit.clicked.connect(self._dispense)
+        call_btn = QPushButton("叫号")
+        call_btn.clicked.connect(self._call)
         row.addWidget(QLabel("就诊 ID"))
         row.addWidget(self.disp_encounter_id)
+        row.addWidget(QLabel("窗口"))
+        row.addWidget(self.disp_window)
+        row.addWidget(self.disp_note)
+        row.addWidget(call_btn)
         row.addWidget(submit)
         layout.addWidget(box)
+
+        list_row = QHBoxLayout()
+        refresh = QPushButton("刷新待发药队列")
+        refresh.clicked.connect(self._load_worklist)
+        list_row.addWidget(refresh)
+        list_row.addStretch(1)
+        layout.addLayout(list_row)
+        self.worklist_table = QTableWidget(0, 6)
+        self.worklist_table.setHorizontalHeaderLabels(
+            ["叫号", "患者", "处方数", "药品", "状态", "窗口"]
+        )
+        self.worklist_table.cellClicked.connect(self._select_worklist)
+        layout.addWidget(self.worklist_table, 1)
 
         self.disp_msg = QLabel("")
         self.disp_msg.setWordWrap(True)
@@ -570,18 +593,63 @@ class PharmacyWidget(QWidget):
         self.return_msg.setWordWrap(True)
         layout.addWidget(self.return_msg)
         layout.addStretch(1)
+        self._load_worklist()
         return page
 
     def _dispense(self) -> None:
         try:
-            record = self.api.dispense(self.disp_encounter_id.value())
+            record = self.api.dispense(
+                self.disp_encounter_id.value(), self.disp_note.text().strip()
+            )
         except ApiError as e:
             self.disp_msg.setText(f"发药失败（{e.status_code}）：{e.detail}")
             return
         self.disp_msg.setText(
-            f"发药成功：记录 {record['id']}，就诊 {record['encounter_id']}（{zh('dispense_status', record['status'])}）"
+            f"核对发药成功：记录 {record['id']}，核对人 {record['verified_by']}"
         )
         self.return_dispense_id.setValue(record["id"])
+        self._load_worklist()
+
+    def _load_worklist(self) -> None:
+        try:
+            self.worklist = self.api.pharmacy_worklist()
+        except ApiError as e:
+            self.disp_msg.setText(f"队列加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.worklist_table.setRowCount(len(self.worklist))
+        for row, item in enumerate(self.worklist):
+            values = [
+                item["queue_no"] or "—",
+                item["patient_name"],
+                item["item_count"],
+                item["drugs"],
+                {"waiting": "待叫号", "called": "已叫号"}.get(
+                    item["call_status"], item["call_status"]
+                ),
+                item["window_no"] or "—",
+            ]
+            for col, value in enumerate(values):
+                self.worklist_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.disp_msg.setText(f"待发药 {len(self.worklist)} 人")
+
+    def _select_worklist(self, row: int, _col: int) -> None:
+        if 0 <= row < len(getattr(self, "worklist", [])):
+            self.disp_encounter_id.setValue(self.worklist[row]["encounter_id"])
+
+    def _call(self) -> None:
+        try:
+            call = self.api.call_pharmacy(
+                self.disp_encounter_id.value(),
+                self.disp_window.text().strip() or "1号窗",
+                self.disp_note.text().strip(),
+            )
+        except ApiError as e:
+            self.disp_msg.setText(f"叫号失败（{e.status_code}）：{e.detail}")
+            return
+        self.disp_msg.setText(
+            f"已叫号 {call['queue_no']}，窗口 {call['window_no']}"
+        )
+        self._load_worklist()
 
     def _return_dispense(self) -> None:
         try:

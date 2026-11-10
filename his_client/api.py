@@ -675,8 +675,20 @@ class ApiClient:
     def stock_in(self, payload: dict) -> dict:
         return self._request("POST", "/pharmacy/stock-in", json=payload)
 
-    def dispense(self, encounter_id: int) -> dict:
-        return self._request("POST", "/pharmacy/dispense", json={"encounter_id": encounter_id})
+    def dispense(self, encounter_id: int, note: str = "") -> dict:
+        return self._request(
+            "POST", "/pharmacy/dispense", json={"encounter_id": encounter_id, "note": note}
+        )
+
+    def pharmacy_worklist(self) -> list:
+        return self._request("GET", "/pharmacy/worklist")
+
+    def call_pharmacy(self, encounter_id: int, window_no: str, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/pharmacy/calls/{encounter_id}",
+            json={"window_no": window_no, "note": note},
+        )
 
     def return_dispense(self, dispense_id: int) -> dict:
         return self._request("POST", f"/pharmacy/dispense/{dispense_id}/return")

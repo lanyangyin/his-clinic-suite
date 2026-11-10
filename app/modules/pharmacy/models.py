@@ -18,6 +18,9 @@ class Dispense(Base):
         String(10), default="dispensed", nullable=False
     )
     returned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    note: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
 
 
 class DrugStock(Base):
@@ -37,3 +40,21 @@ class DrugStock(Base):
     )
 
     drug = relationship("Drug")
+
+class PharmacyCall(Base):
+    """药房叫号：一个就诊一条叫号记录。"""
+
+    __tablename__ = "pharmacy_calls"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), unique=True, nullable=False, index=True
+    )
+    queue_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    # called 已叫号 / dispensed 已发药 / skipped 过号
+    status: Mapped[str] = mapped_column(String(20), default="called", nullable=False)
+    window_no: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    called_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    called_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+

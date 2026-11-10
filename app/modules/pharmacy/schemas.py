@@ -5,12 +5,31 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class DispenseRequest(BaseModel):
     encounter_id: int
+    note: str = ""
 
 
 class DispenseResponse(DispenseRequest):
     id: int
     status: str
     returned_at: datetime | None = None
+    verified_by: str = ""
+    verified_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PharmacyCallRequest(BaseModel):
+    window_no: str = Field(default="", max_length=20)
+    note: str = Field(default="", max_length=200)
+
+
+class PharmacyCallResponse(BaseModel):
+    encounter_id: int
+    queue_no: str
+    status: str
+    window_no: str
+    called_by: str
+    called_at: datetime
+    note: str
     model_config = ConfigDict(from_attributes=True)
 
 

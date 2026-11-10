@@ -1,14 +1,19 @@
 from datetime import date, datetime
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.drug.service import get_drug
+from app.modules.encounter.models import Encounter
 from app.modules.encounter.service import get_encounter, list_prescription_items
+from app.modules.billing.models import Payment
 from app.modules.billing.service import get_payment_by_encounter
+from app.modules.patient.models import Patient
+from app.modules.registration.models import Registration
 from app.modules.stock_ledger.service import record_drug
 
-from .models import Dispense, DrugStock
+from .models import Dispense, DrugStock, PharmacyCall
 from .schemas import DispenseRequest, StockInRequest
 
 
@@ -101,6 +106,9 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
         raise ValueError("该就诊已发药")
 
     record = Dispense(encounter_id=data.encounter_id)
+    record.verified_by = operator
+    record.verified_at = datetime.now()
+    record.note = data.note
     db.add(record)
     try:
         db.flush()
@@ -120,9 +128,109 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
             operator=operator,
         )
 
+    call = (
+        db.query(PharmacyCall)
+        .filter(PharmacyCall.encounter_id == encounter.id)
+        .first()
+    )
+    if call:
+        call.status = "dispensed"
+
     db.commit()
     db.refresh(record)
     return record
+
+
+def _next_queue_no(db: Session) -> str:
+    today = datetime.now().date()
+    count = (
+        db.query(PharmacyCall)
+        .filter(func.date(PharmacyCall.called_at) == today.isoformat())
+        .count()
+    )
+    return f"Q{today:%Y%m%d}{count + 1:03d}"
+
+
+def call_patient(db: Session, encounter_id: int, window_no: str, operator: str, note: str = "") -> PharmacyCall:
+    encounter = get_encounter(db, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    payment = get_payment_by_encounter(db, encounter_id)
+    if not payment or payment.status != "paid":
+        raise ValueError("该就诊尚未收费")
+    if (
+        db.query(Dispense)
+        .filter(Dispense.encounter_id == encounter_id)
+        .first()
+    ):
+        raise ValueError("该就诊已发药")
+    if not list_prescription_items(db, encounter_id):
+        raise ValueError("该就诊没有处方")
+    call = (
+        db.query(PharmacyCall)
+        .filter(PharmacyCall.encounter_id == encounter_id)
+        .first()
+    )
+    if call:
+        call.status = "called"
+        call.window_no = window_no
+        call.called_by = operator
+        call.called_at = datetime.now()
+        call.note = note
+    else:
+        call = PharmacyCall(
+            encounter_id=encounter_id,
+            queue_no=_next_queue_no(db),
+            window_no=window_no,
+            called_by=operator,
+            note=note,
+        )
+        db.add(call)
+    db.commit()
+    db.refresh(call)
+    return call
+
+
+def worklist(db: Session) -> list[dict]:
+    rows = (
+        db.query(Payment, Patient, Registration)
+        .join(Encounter, Payment.encounter_id == Encounter.id)
+        .join(Registration, Encounter.registration_id == Registration.id)
+        .join(Patient, Registration.patient_id == Patient.id)
+        .filter(Payment.status == "paid")
+        .order_by(Payment.created_at)
+        .all()
+    )
+    result = []
+    for payment, patient, registration in rows:
+        items = list_prescription_items(db, payment.encounter_id)
+        if not items:
+            continue
+        dispense = (
+            db.query(Dispense)
+            .filter(Dispense.encounter_id == payment.encounter_id)
+            .first()
+        )
+        if dispense:
+            continue
+        call = (
+            db.query(PharmacyCall)
+            .filter(PharmacyCall.encounter_id == payment.encounter_id)
+            .first()
+        )
+        result.append(
+            {
+                "encounter_id": payment.encounter_id,
+                "patient_name": patient.name,
+                "queue_no": call.queue_no if call else "",
+                "call_status": call.status if call else "waiting",
+                "window_no": call.window_no if call else "",
+                "paid_at": payment.created_at,
+                "item_count": len(items),
+                "drugs": "、".join(item.drug_name for item in items[:4]),
+            }
+        )
+    return result
 
 
 def deduct_stock(

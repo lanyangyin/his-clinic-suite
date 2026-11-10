@@ -7,11 +7,22 @@ from app.modules.auth.security import require_role
 from .schemas import (
     DispenseRequest,
     DispenseResponse,
+    PharmacyCallRequest,
+    PharmacyCallResponse,
     StockInRequest,
     StockInResponse,
     StockResponse,
 )
-from .service import dispense, get_dispense, get_stock, list_stocks, return_dispense, stock_in
+from .service import (
+    call_patient,
+    dispense,
+    get_dispense,
+    get_stock,
+    list_stocks,
+    return_dispense,
+    stock_in,
+    worklist,
+)
 
 router = APIRouter(prefix="/pharmacy", tags=["pharmacy"])
 
@@ -72,3 +83,23 @@ def get_stock_one(stock_id: int, db: Session = Depends(get_db)):
     if not stock:
         raise HTTPException(status_code=404, detail="库存记录不存在")
     return stock
+
+@router.get("/worklist")
+def pharmacy_worklist(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist")),
+):
+    return worklist(db)
+
+
+@router.post("/calls/{encounter_id}", response_model=PharmacyCallResponse)
+def call(
+    encounter_id: int,
+    data: PharmacyCallRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist")),
+):
+    try:
+        return call_patient(db, encounter_id, data.window_no, user.username, data.note)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
