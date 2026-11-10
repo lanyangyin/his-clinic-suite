@@ -177,3 +177,129 @@ def find_duplicates(
         )
         for row in rows
     ]
+
+
+def _card_payload(card, patient) -> dict:
+    return {
+        "id": card.id,
+        "patient_id": card.patient_id,
+        "patient_no": patient.patient_no if patient else None,
+        "patient_name": patient.name if patient else "",
+        "card_uid": card.card_uid,
+        "status": card.status,
+        "issued_at": card.issued_at,
+        "issued_by": card.issued_by,
+        "note": card.note,
+    }
+
+
+def issue_card(db: Session, patient_id: int, card_uid: str, operator: str = "", note: str = "") -> dict:
+    from .models import PatientCard
+
+    patient = get_patient(db, patient_id)
+    if not patient:
+        raise ValueError("患者不存在")
+    card_uid = (card_uid or "").strip()
+    if not card_uid:
+        raise ValueError("NFC 卡号不能为空")
+    existing = db.query(PatientCard).filter(PatientCard.card_uid == card_uid).first()
+    if existing:
+        raise ValueError("该 NFC 卡已绑定其他患者")
+    active = (
+        db.query(PatientCard)
+        .filter(PatientCard.patient_id == patient_id, PatientCard.status == "active")
+        .first()
+    )
+    if active:
+        raise ValueError("该患者已有正常就诊卡，请先挂失或换卡")
+    card = PatientCard(
+        patient_id=patient_id,
+        card_uid=card_uid,
+        status="active",
+        issued_by=operator,
+        note=note,
+    )
+    db.add(card)
+    db.commit()
+    db.refresh(card)
+    return _card_payload(card, patient)
+
+
+def list_cards(db: Session, patient_id: int) -> list[dict]:
+    from .models import PatientCard
+
+    patient = get_patient(db, patient_id)
+    if not patient:
+        raise ValueError("患者不存在")
+    rows = (
+        db.query(PatientCard)
+        .filter(PatientCard.patient_id == patient_id)
+        .order_by(PatientCard.id.desc())
+        .all()
+    )
+    return [_card_payload(row, patient) for row in rows]
+
+
+def find_by_card(db: Session, card_uid: str) -> dict | None:
+    from .models import PatientCard
+
+    card = (
+        db.query(PatientCard)
+        .filter(
+            PatientCard.card_uid == (card_uid or "").strip(),
+            PatientCard.status == "active",
+        )
+        .first()
+    )
+    if not card:
+        return None
+    patient = get_patient(db, card.patient_id)
+    if not patient:
+        return None
+    return {"card": _card_payload(card, patient), "patient": patient}
+
+
+def mark_card_lost(db: Session, patient_id: int, card_id: int, operator: str = "") -> dict:
+    from .models import PatientCard
+
+    card = db.get(PatientCard, card_id)
+    if not card or card.patient_id != patient_id:
+        raise ValueError("就诊卡不存在")
+    if card.status != "active":
+        raise ValueError("该卡当前不是正常状态")
+    card.status = "lost"
+    card.note = f"{card.note}；挂失：{operator}".strip("；")
+    db.commit()
+    db.refresh(card)
+    return _card_payload(card, get_patient(db, patient_id))
+
+
+def reissue_card(db: Session, patient_id: int, card_uid: str, operator: str = "", note: str = "") -> dict:
+    from .models import PatientCard
+
+    patient = get_patient(db, patient_id)
+    if not patient:
+        raise ValueError("患者不存在")
+    card_uid = (card_uid or "").strip()
+    if not card_uid:
+        raise ValueError("NFC 卡号不能为空")
+    if db.query(PatientCard).filter(PatientCard.card_uid == card_uid).first():
+        raise ValueError("该 NFC 卡已绑定其他患者")
+    old = (
+        db.query(PatientCard)
+        .filter(PatientCard.patient_id == patient_id, PatientCard.status == "active")
+        .first()
+    )
+    if old:
+        old.status = "replaced"
+    card = PatientCard(
+        patient_id=patient_id,
+        card_uid=card_uid,
+        status="active",
+        issued_by=operator,
+        note=note,
+    )
+    db.add(card)
+    db.commit()
+    db.refresh(card)
+    return _card_payload(card, patient)

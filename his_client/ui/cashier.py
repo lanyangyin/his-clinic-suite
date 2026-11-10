@@ -132,6 +132,20 @@ class CashierWidget(QWidget):
         grid.addWidget(self.p_allergy_detail, row, 2, 1, 2)
         row += 1
         grid.addWidget(self.p_privacy, row, 0, 1, 3)
+        row += 1
+        self.p_card_uid = QLineEdit()
+        self.p_card_uid.setPlaceholderText("NFC 就诊卡号（刷卡或手输）")
+        bind_card = QPushButton("绑定 NFC 卡")
+        bind_card.clicked.connect(self._bind_patient_card)
+        lookup_card = QPushButton("按卡查患者")
+        lookup_card.clicked.connect(self._lookup_patient_card)
+        grid.addWidget(QLabel("NFC 卡"), row, 0)
+        grid.addWidget(self.p_card_uid, row, 1)
+        card_buttons = QHBoxLayout()
+        card_buttons.addWidget(bind_card)
+        card_buttons.addWidget(lookup_card)
+        grid.addLayout(card_buttons, row, 2, 1, 2)
+        row += 1
         buttons = QHBoxLayout()
         create_btn = QPushButton("建档")
         create_btn.clicked.connect(self._create_patient)
@@ -331,6 +345,44 @@ class CashierWidget(QWidget):
         if not keep_message:
             self.patient_msg.clear()
 
+    def _bind_patient_card(self) -> None:
+        row = self.patient_table.currentRow()
+        if row < 0 or row >= len(self.patient_rows):
+            self.patient_msg.setText("请先在患者列表选中要绑卡的人")
+            return
+        card_uid = self.p_card_uid.text().strip()
+        if not card_uid:
+            self.patient_msg.setText("请刷卡或输入 NFC 卡号")
+            return
+        try:
+            card = self.api.issue_patient_card(self.patient_rows[row]["id"], card_uid)
+        except ApiError as e:
+            self.patient_msg.setText(f"绑卡失败（{e.status_code}）：{e.detail}")
+            return
+        self.patient_msg.setText(
+            f"已绑定 NFC 卡：{card['card_uid']} → {card['patient_no'] or card['patient_id']} "
+            f"{card['patient_name']}"
+        )
+
+    def _lookup_patient_card(self) -> None:
+        card_uid = self.p_card_uid.text().strip()
+        if not card_uid:
+            self.patient_msg.setText("请刷卡或输入 NFC 卡号")
+            return
+        try:
+            found = self.api.get_patient_by_card(card_uid)
+        except ApiError as e:
+            self.patient_msg.setText(f"读卡失败（{e.status_code}）：{e.detail}")
+            return
+        patient = found["patient"]
+        self.q_name.setText(patient["name"])
+        self.q_phone.setText(patient.get("phone") or "")
+        self._query_patients()
+        self.patient_msg.setText(
+            f"NFC 卡 {card_uid} → {patient.get('patient_no') or patient['id']} "
+            f"{patient['name']}，可直接挂号"
+        )
+
     def _select_patient_row(self, row: int, _col: int) -> None:
         if not (0 <= row < len(self.patient_rows)):
             return
@@ -410,6 +462,14 @@ class CashierWidget(QWidget):
         row = QHBoxLayout()
         row.addWidget(self.r_doctor_list)
         form.addRow("患者 ID", self.r_patient_id)
+        self.r_card_uid = QLineEdit()
+        self.r_card_uid.setPlaceholderText("NFC 就诊卡号")
+        lookup_card = QPushButton("按卡带出患者")
+        lookup_card.clicked.connect(self._lookup_registration_card)
+        card_row = QHBoxLayout()
+        card_row.addWidget(self.r_card_uid)
+        card_row.addWidget(lookup_card)
+        form.addRow("NFC 卡", card_row)
         form.addRow("医生", row)
         form.addRow("", refresh_btn)
         form.addRow("排班 ID（可选）", self.r_schedule_id)
@@ -442,6 +502,22 @@ class CashierWidget(QWidget):
         item = self.r_doctor_list.item(row, 0)
         if item:
             self.r_doctor_combo.setText(item.text())
+
+    def _lookup_registration_card(self) -> None:
+        card_uid = self.r_card_uid.text().strip()
+        if not card_uid:
+            self.reg_msg.setText("请刷卡或输入 NFC 卡号")
+            return
+        try:
+            found = self.api.get_patient_by_card(card_uid)
+        except ApiError as e:
+            self.reg_msg.setText(f"读卡失败（{e.status_code}）：{e.detail}")
+            return
+        patient = found["patient"]
+        self.r_patient_id.setValue(patient["id"])
+        self.reg_msg.setText(
+            f"已带出患者：{patient.get('patient_no') or patient['id']} {patient['name']}"
+        )
 
     def _create_registration(self) -> None:
         try:

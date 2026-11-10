@@ -169,19 +169,24 @@ class ArchiveWidget(QWidget):
         self.seal_reason = QLineEdit()
         self.witness = QLineEdit()
         self.destroy_reason = QLineEdit()
-        self.approved_by = QLineEdit()
         seal_btn = QPushButton("封存")
         seal_btn.clicked.connect(self._seal)
         unseal_btn = QPushButton("启封")
         unseal_btn.clicked.connect(self._unseal)
-        destroy_btn = QPushButton("销毁")
-        destroy_btn.clicked.connect(self._destroy)
+        request_destroy = QPushButton("申请销毁")
+        request_destroy.clicked.connect(self._request_destroy)
+        self.destroy_request_id = QSpinBox()
+        self.destroy_request_id.setRange(0, 10_000_000)
+        self.destroy_request_id.setSpecialValueText("销毁申请 ID")
+        execute_destroy = QPushButton("执行已批准销毁")
+        execute_destroy.clicked.connect(self._execute_destroy)
         form.addRow("封存/启封原因", self.seal_reason)
         form.addRow("见证人", self.witness)
         form.addRow("销毁原因", self.destroy_reason)
-        form.addRow("销毁审批人", self.approved_by)
         form.addRow(seal_btn, unseal_btn)
-        form.addRow("", destroy_btn)
+        form.addRow("", request_destroy)
+        form.addRow("", self.destroy_request_id)
+        form.addRow("", execute_destroy)
         layout.addWidget(box)
         self.seal_msg = QLabel("")
         self.seal_msg.setWordWrap(True)
@@ -342,6 +347,41 @@ class ArchiveWidget(QWidget):
         self.borrow_msg.setText("复印申请已登记，待收费/完成")
         self._refresh_borrow()
 
+    def _request_destroy(self) -> None:
+        record = self._selected(self.seal_msg)
+        if not record:
+            return
+        reason = self.destroy_reason.text().strip()
+        if not reason:
+            self.seal_msg.setText("请填写销毁原因")
+            return
+        try:
+            row = self.api.request_archive_destruction(
+                record["id"], {"reason": reason, "note": ""}
+            )
+        except ApiError as e:
+            self.seal_msg.setText(f"申请失败（{e.status_code}）：{e.detail}")
+            return
+        self.destroy_request_id.setValue(row["id"])
+        self.seal_msg.setText(f"已提交销毁申请 {row['id']}，等待院长审批")
+
+    def _execute_destroy(self) -> None:
+        request_id = self.destroy_request_id.value()
+        if not request_id:
+            self.seal_msg.setText("请填写已批准的销毁申请 ID")
+            return
+        witness = self.witness.text().strip()
+        if not witness:
+            self.seal_msg.setText("请填写销毁见证人")
+            return
+        try:
+            row = self.api.execute_archive_destruction(request_id, witness)
+        except ApiError as e:
+            self.seal_msg.setText(f"执行失败（{e.status_code}）：{e.detail}")
+            return
+        self.seal_msg.setText("销毁已执行")
+        self._refresh_seal()
+
     def _refresh_seal(self) -> None:
         try:
             self.rows = self.api.list_archive_records()
@@ -396,22 +436,4 @@ class ArchiveWidget(QWidget):
             self.seal_msg.setText(f"启封失败（{e.status_code}）：{e.detail}")
             return
         self.seal_msg.setText("已启封")
-        self._refresh_seal()
-
-    def _destroy(self) -> None:
-        record = self._selected(self.seal_msg)
-        if not record:
-            return
-        try:
-            self.api.destroy_archive(
-                record["id"],
-                {
-                    "reason": self.destroy_reason.text().strip(),
-                    "approved_by": self.approved_by.text().strip(),
-                },
-            )
-        except ApiError as e:
-            self.seal_msg.setText(f"销毁失败（{e.status_code}）：{e.detail}")
-            return
-        self.seal_msg.setText("已销毁")
         self._refresh_seal()

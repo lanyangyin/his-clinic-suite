@@ -111,3 +111,39 @@ class ArchiveDestruction(Base):
     operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     destroyed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+
+class ArchiveDestructionRequest(Base):
+    """病案销毁申请：病案室发起 → 院长审批 → 病案室双人执行。"""
+
+    __tablename__ = "archive_destruction_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    record_id: Mapped[int] = mapped_column(
+        ForeignKey("archive_records.id"), nullable=False, index=True
+    )
+    reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # pending 待审批 / approved 已批准 / rejected 已驳回 / executed 已执行
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False
+    )
+    requested_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )
+    approver: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    approval_note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    executed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    witness: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+
+    record = relationship("ArchiveRecord")
+
+    @property
+    def archive_no(self) -> str:
+        return self.record.archive_no or "" if self.record else ""
+
+    @property
+    def patient_name(self) -> str:
+        return self.record.patient_name if self.record else ""

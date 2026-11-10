@@ -10,6 +10,7 @@ from .models import (
     ArchiveBorrowing,
     ArchiveCopyRequest,
     ArchiveDestruction,
+    ArchiveDestructionRequest,
     ArchiveRecord,
     ArchiveSeal,
 )
@@ -20,6 +21,9 @@ from .schemas import (
     CopyCompleteRequest,
     CopyCreate,
     DestroyCreate,
+    DestructionDecision,
+    DestructionExecute,
+    DestructionRequestCreate,
     SealCreate,
 )
 
@@ -269,3 +273,95 @@ def history(db: Session, record_id: int) -> dict:
         .order_by(ArchiveDestruction.id.desc())
         .all(),
     }
+
+
+def create_destruction_request(
+    db: Session, record_id: int, data: DestructionRequestCreate, operator: str = ""
+) -> ArchiveDestructionRequest:
+    record = get_record(db, record_id)
+    if not record:
+        raise ValueError("病案不存在")
+    if record.status not in ("archived", "draft"):
+        raise ValueError("该病案当前不可申请销毁")
+    if record.active_borrowing:
+        raise ValueError("病案借出中，不能申请销毁")
+    pending = (
+        db.query(ArchiveDestructionRequest)
+        .filter(
+            ArchiveDestructionRequest.record_id == record_id,
+            ArchiveDestructionRequest.status.in_(("pending", "approved")),
+        )
+        .first()
+    )
+    if pending:
+        raise ValueError("该病案已有未完成的销毁申请")
+    row = ArchiveDestructionRequest(
+        record_id=record_id,
+        reason=data.reason.strip(),
+        note=data.note.strip(),
+        requested_by=operator,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_destruction_requests(
+    db: Session, status: str | None = None
+) -> list[ArchiveDestructionRequest]:
+    query = db.query(ArchiveDestructionRequest)
+    if status:
+        query = query.filter(ArchiveDestructionRequest.status == status)
+    return query.order_by(ArchiveDestructionRequest.id.desc()).all()
+
+
+def decide_destruction_request(
+    db: Session, request_id: int, approved: bool, data: DestructionDecision, approver: str
+) -> ArchiveDestructionRequest:
+    row = db.get(ArchiveDestructionRequest, request_id)
+    if not row:
+        raise ValueError("销毁申请不存在")
+    if row.status != "pending":
+        raise ValueError("该申请当前不可审批")
+    row.status = "approved" if approved else "rejected"
+    row.approver = approver
+    row.approved_at = datetime.now()
+    row.approval_note = data.note.strip()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def execute_destruction_request(
+    db: Session, request_id: int, data: DestructionExecute, operator: str
+) -> ArchiveDestructionRequest:
+    row = db.get(ArchiveDestructionRequest, request_id)
+    if not row:
+        raise ValueError("销毁申请不存在")
+    if row.status != "approved":
+        raise ValueError("销毁申请尚未批准")
+    if data.witness.strip() == operator.strip():
+        raise ValueError("执行人不能同时作为见证人")
+    record = get_record(db, row.record_id)
+    if not record:
+        raise ValueError("病案不存在")
+    if record.active_borrowing:
+        raise ValueError("病案借出中，不能销毁")
+    record.status = "destroyed"
+    row.status = "executed"
+    row.executed_by = operator
+    row.executed_at = datetime.now()
+    row.witness = data.witness.strip()
+    db.add(
+        ArchiveDestruction(
+            record_id=record.id,
+            reason=row.reason,
+            approved_by=row.approver,
+            operator=operator,
+            note=f"{row.approval_note}；见证人：{row.witness}".strip("；"),
+        )
+    )
+    db.commit()
+    db.refresh(row)
+    return row

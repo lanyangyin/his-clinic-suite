@@ -14,6 +14,10 @@ from .schemas import (
     CopyCreate,
     CopyResponse,
     DestroyCreate,
+    DestructionDecision,
+    DestructionExecute,
+    DestructionRequestCreate,
+    DestructionRequestResponse,
     SealCreate,
     SealResponse,
 )
@@ -22,10 +26,14 @@ from .service import (
     borrow_record,
     complete_copy,
     create_copy,
+    create_destruction_request,
     create_record,
+    decide_destruction_request,
     destroy_record,
+    execute_destruction_request,
     get_record,
     history,
+    list_destruction_requests,
     list_records,
     return_borrowing,
     seal_record,
@@ -185,3 +193,79 @@ def destroy(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"id": row.id, "record_id": row.record_id, "destroyed_at": row.destroyed_at}
+
+
+@router.post(
+    "/records/{record_id}/destruction-requests",
+    response_model=DestructionRequestResponse,
+    status_code=201,
+)
+def request_destruction(
+    record_id: int,
+    data: DestructionRequestCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("archive")),
+):
+    try:
+        return create_destruction_request(db, record_id, data, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/destruction-requests", response_model=list[DestructionRequestResponse]
+)
+def destruction_requests(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("archive", "director", "admin")),
+):
+    return list_destruction_requests(db, status)
+
+
+@router.post(
+    "/destruction-requests/{request_id}/approve",
+    response_model=DestructionRequestResponse,
+)
+def approve_destruction(
+    request_id: int,
+    data: DestructionDecision,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("director")),
+):
+    try:
+        return decide_destruction_request(db, request_id, True, data, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/destruction-requests/{request_id}/reject",
+    response_model=DestructionRequestResponse,
+)
+def reject_destruction(
+    request_id: int,
+    data: DestructionDecision,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("director")),
+):
+    try:
+        return decide_destruction_request(db, request_id, False, data, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/destruction-requests/{request_id}/execute",
+    response_model=DestructionRequestResponse,
+)
+def execute_destruction(
+    request_id: int,
+    data: DestructionExecute,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("archive")),
+):
+    try:
+        return execute_destruction_request(db, request_id, data, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

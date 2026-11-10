@@ -111,3 +111,35 @@ class ArchiveRecordResponse(BaseModel):
     created_at: datetime
     active_borrowing_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
+
+class DestructionRequestCreate(BaseModel):
+    reason: str = Field(min_length=1, max_length=200)
+    note: str = Field(default="", max_length=500)
+
+
+class DestructionDecision(BaseModel):
+    note: str = Field(default="", max_length=200)
+
+
+class DestructionExecute(BaseModel):
+    witness: str = Field(min_length=1, max_length=50)
+    note: str = Field(default="", max_length=200)
+
+
+class DestructionRequestResponse(BaseModel):
+    id: int
+    record_id: int
+    archive_no: str
+    patient_name: str
+    reason: str
+    note: str
+    status: str
+    requested_by: str
+    requested_at: datetime
+    approver: str
+    approved_at: datetime | None
+    approval_note: str
+    executed_by: str
+    executed_at: datetime | None
+    witness: str
+    model_config = ConfigDict(from_attributes=True)

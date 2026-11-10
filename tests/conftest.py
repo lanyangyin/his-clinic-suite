@@ -96,6 +96,7 @@ def auth(client):
         UserCreate(username="decoction", password="decoction123", role="decoction", display_name="煎药员"),
         UserCreate(username="surgery", password="surgery123", role="surgery", display_name="手术室护士"),
         UserCreate(username="treatment", password="treatment123", role="treatment", display_name="治疗室护士"),
+        UserCreate(username="director", password="director123", role="director", display_name="院长"),
     ]
     with TestingSessionLocal() as db:
         for data in demo_users:
@@ -113,4 +114,5 @@ def auth(client):
         "decoction": basic_auth("decoction", "decoction123"),
         "surgery": basic_auth("surgery", "surgery123"),
         "treatment": basic_auth("treatment", "treatment123"),
+        "director": basic_auth("director", "director123"),
     }

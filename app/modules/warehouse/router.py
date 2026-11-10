@@ -263,7 +263,7 @@ def purchase_request_from_outbound(
 def approve_purchase_request_route(
     request_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("admin")),
+    user=Depends(require_role("admin", "director")),
 ):
     try:
         return approve_purchase_request(db, request_id, user.username)
@@ -276,7 +276,7 @@ def reject_purchase_request_route(
     request_id: int,
     data: PurchaseRejectRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_role("admin")),
+    user=Depends(require_role("admin", "director")),
 ):
     try:
         return reject_purchase_request(db, request_id, data, user.username)
@@ -308,3 +308,4 @@ def receive_purchase_request_route(
         return receive_purchase_request(db, request_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+

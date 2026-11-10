@@ -96,3 +96,20 @@ class DuplicateCandidate(BaseModel):
 class DuplicateCheckResponse(BaseModel):
     exact: bool
     candidates: list[DuplicateCandidate]
+
+
+class PatientCardCreate(BaseModel):
+    card_uid: str = Field(min_length=4, max_length=64)
+    note: str = Field(default="", max_length=200)
+
+
+class PatientCardResponse(BaseModel):
+    id: int
+    patient_id: int
+    patient_no: str | None = None
+    patient_name: str = ""
+    card_uid: str
+    status: str
+    issued_at: datetime
+    issued_by: str
+    note: str

@@ -8,15 +8,22 @@ from .history import get_patient_history
 from .profile import patient_profile
 from .schemas import (
     DuplicateCheckResponse,
+    PatientCardCreate,
+    PatientCardResponse,
     PatientCreate,
     PatientResponse,
     PatientUpdate,
 )
 from .service import (
     create_patient,
+    find_by_card,
     find_duplicates,
     get_patient,
+    issue_card,
+    list_cards,
     list_patients,
+    mark_card_lost,
+    reissue_card,
     update_patient,
 )
 
@@ -68,6 +75,66 @@ def update_one(
     if not patient:
         raise HTTPException(status_code=404, detail="患者不存在")
     return patient
+
+
+@router.get("/by-card/{card_uid}")
+def get_by_card(card_uid: str, db: Session = Depends(get_db)):
+    """NFC 刷卡查患者：只返回正常状态的卡。"""
+    found = find_by_card(db, card_uid)
+    if not found:
+        raise HTTPException(status_code=404, detail="未找到有效就诊卡")
+    patient = found["patient"]
+    return {
+        "card": found["card"],
+        "patient": PatientResponse.model_validate(patient).model_dump(),
+    }
+
+
+@router.post("/{patient_id}/cards", response_model=PatientCardResponse, status_code=201)
+def create_card(
+    patient_id: int,
+    data: PatientCardCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("cashier")),
+):
+    try:
+        return issue_card(db, patient_id, data.card_uid, user.username, data.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/{patient_id}/cards", response_model=list[PatientCardResponse])
+def cards(patient_id: int, db: Session = Depends(get_db)):
+    try:
+        return list_cards(db, patient_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/{patient_id}/cards/{card_id}/lost", response_model=PatientCardResponse)
+def lost_card(
+    patient_id: int,
+    card_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("cashier")),
+):
+    try:
+        return mark_card_lost(db, patient_id, card_id, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{patient_id}/cards/reissue", response_model=PatientCardResponse, status_code=201)
+def reissue(
+    patient_id: int,
+    data: PatientCardCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("cashier")),
+):
+    try:
+        return reissue_card(db, patient_id, data.card_uid, user.username, data.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)

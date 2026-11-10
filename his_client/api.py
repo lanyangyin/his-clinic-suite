@@ -97,6 +97,31 @@ class ApiClient:
     def get_registration(self, registration_id: int) -> dict:
         return self._request("GET", f"/registrations/{registration_id}")
 
+    def get_patient_by_card(self, card_uid: str) -> dict:
+        return self._request("GET", f"/patients/by-card/{card_uid}")
+
+    def issue_patient_card(self, patient_id: int, card_uid: str, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/patients/{patient_id}/cards",
+            json={"card_uid": card_uid, "note": note},
+        )
+
+    def list_patient_cards(self, patient_id: int) -> list:
+        return self._request("GET", f"/patients/{patient_id}/cards")
+
+    def mark_patient_card_lost(self, patient_id: int, card_id: int) -> dict:
+        return self._request(
+            "POST", f"/patients/{patient_id}/cards/{card_id}/lost"
+        )
+
+    def reissue_patient_card(self, patient_id: int, card_uid: str, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/patients/{patient_id}/cards/reissue",
+            json={"card_uid": card_uid, "note": note},
+        )
+
     def check_patient_duplicates(
         self, name: str = "", id_number: str = "", phone: str = ""
     ) -> dict:
@@ -302,6 +327,40 @@ class ApiClient:
 
     def destroy_archive(self, record_id: int, payload: dict) -> dict:
         return self._request("POST", f"/archive/records/{record_id}/destroy", json=payload)
+
+    def request_archive_destruction(self, record_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST",
+            f"/archive/records/{record_id}/destruction-requests",
+            json=payload,
+        )
+
+    def list_archive_destruction_requests(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/archive/destruction-requests", params=params)
+
+    def approve_archive_destruction(self, request_id: int, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/archive/destruction-requests/{request_id}/approve",
+            json={"note": note},
+        )
+
+    def reject_archive_destruction(self, request_id: int, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/archive/destruction-requests/{request_id}/reject",
+            json={"note": note},
+        )
+
+    def execute_archive_destruction(
+        self, request_id: int, witness: str, note: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/archive/destruction-requests/{request_id}/execute",
+            json={"witness": witness, "note": note},
+        )
 
     # ---- 护士输液/医嘱执行 ----
     def sync_nursing(self, encounter_id: int) -> list:

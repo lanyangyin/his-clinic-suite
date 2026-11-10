@@ -55,3 +55,22 @@ def ensure_initial_admin(db) -> bool:
         ),
     )
     return True
+
+
+def ensure_initial_director(db) -> bool:
+    """确保存在院长账号 director/director123，用于审批工作站。"""
+    from app.modules.auth.schemas import UserCreate
+    from app.modules.auth.service import create_user, get_user_by_username
+
+    if get_user_by_username(db, "director"):
+        return False
+    create_user(
+        db,
+        UserCreate(
+            username="director",
+            password="director123",
+            role="director",
+            display_name="院长",
+        ),
+    )
+    return True

@@ -5,7 +5,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
-
 class Patient(Base):
     __tablename__ = "patients"
 
@@ -80,3 +79,29 @@ class Patient(Base):
         if self.allergy_status == "present":
             return self.allergy_detail or "有过敏史"
         return "过敏史不详"
+
+class PatientCard(Base):
+    """NFC 就诊卡：一张卡同一时间只能绑定一个患者。"""
+
+    __tablename__ = "patient_cards"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("patients.id"), nullable=False, index=True
+    )
+    card_uid: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True, nullable=False
+    )
+    # active 正常 / lost 挂失 / replaced 已换卡
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default="active", nullable=False
+    )
+    issued_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )
+    issued_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    note: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )

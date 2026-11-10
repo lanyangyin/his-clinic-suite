@@ -9,7 +9,7 @@ if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.main import app
-from app.migrate import ensure_initial_admin, ensure_schema
+from app.migrate import ensure_initial_admin, ensure_initial_director, ensure_schema
 from app.settings import BASE_DIR, DATABASE_URL, HOST, PORT
 
 
@@ -38,6 +38,8 @@ def main() -> int:
     try:
         if ensure_initial_admin(db):
             print("已创建初始管理员：admin / admin123（请尽快修改密码）")
+        if ensure_initial_director(db):
+            print("已创建院长账号：director / director123（请尽快修改密码）")
     finally:
         db.close()
 
