@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.payment import PaymentPanel
 
@@ -36,6 +37,7 @@ class PharmacyWidget(QWidget):
         super().__init__(parent)
         self.api = api
         self.role = role
+        self.insurance_enabled = load_config().insurance_enabled
         self.pending_items: list[dict] = []
         self.outbound_items: list[dict] = []
         self.current_order: dict | None = None
@@ -53,7 +55,8 @@ class PharmacyWidget(QWidget):
             tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
             tabs.addTab(PaymentPanel(api), "收费")
             tabs.addTab(self._build_stock_tab(), "库存查询")
-            tabs.addTab(self._build_catalog_tab(), "医保目录")
+            if self.insurance_enabled:
+                tabs.addTab(self._build_catalog_tab(), "医保目录")
         tabs.addTab(self._build_expiry_tab(), "效期预警")
         tabs.addTab(self._build_trace_tab(), "追溯码")
         layout = QVBoxLayout(self)
@@ -94,7 +97,8 @@ class PharmacyWidget(QWidget):
 
         drug_row = QHBoxLayout()
         self.in_drug_source = QComboBox()
-        self.in_drug_source.addItem("医保目录（默认）", "catalog")
+        if self.insurance_enabled:
+            self.in_drug_source.addItem("医保目录（默认）", "catalog")
         self.in_drug_source.addItem("本店药品", "local")
         self.in_drug_source.currentIndexChanged.connect(self._load_drugs)
         self.in_drug = QComboBox()
@@ -122,7 +126,8 @@ class PharmacyWidget(QWidget):
 
         material_row = QHBoxLayout()
         self.in_material_source = QComboBox()
-        self.in_material_source.addItem("医保耗材目录（默认）", "catalog")
+        if self.insurance_enabled:
+            self.in_material_source.addItem("医保耗材目录（默认）", "catalog")
         self.in_material_source.addItem("本店物资", "local")
         self.in_material_source.currentIndexChanged.connect(self._load_materials)
         self.in_material = QComboBox()

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.config import load_config
 from his_client.labels import zh
 
 
@@ -21,6 +22,7 @@ class PaymentPanel(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
+        self.insurance_enabled = load_config().insurance_enabled
         layout = QVBoxLayout(self)
 
         box = QGroupBox("就诊费用")
@@ -40,18 +42,20 @@ class PaymentPanel(QWidget):
 
         method_row = QHBoxLayout()
         self.channel = QComboBox()
-        for label, value in [
+        channels = [
             ("现金", "cash"),
             ("微信支付", "wechat"),
             ("支付宝", "alipay"),
             ("POS 刷卡", "pos"),
-            ("医保卡", "insurance_card"),
-        ]:
+        ]
+        if self.insurance_enabled:
+            channels.append(("医保卡", "insurance_card"))
+        for label, value in channels:
             self.channel.addItem(label, value)
         self.auth_code = QLineEdit()
         self.auth_code.setPlaceholderText("付款码（微信/支付宝）")
         self.card_no = QLineEdit()
-        self.card_no.setPlaceholderText("卡号/读卡返回值（POS/医保卡）")
+        self.card_no.setPlaceholderText("卡号/读卡返回值（POS）")
         method_row.addWidget(QLabel("支付方式"))
         method_row.addWidget(self.channel)
         method_row.addWidget(self.auth_code)
@@ -110,8 +114,12 @@ class PaymentPanel(QWidget):
             return
         self.message.setText(
             f"收费成功：单号 {payment['id']}，金额 {payment['amount']:.2f} 元，"
-            f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}，"
-            f"方式 {zh('payment_channel', payment.get('channel'))}"
+            + (
+                f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}，"
+                if self.insurance_enabled
+                else "实收 "
+            )
+            + f"方式 {zh('payment_channel', payment.get('channel'))}"
             + (
                 f"，交易号 {payment['channel_trade_no']}"
                 if payment.get("channel_trade_no")

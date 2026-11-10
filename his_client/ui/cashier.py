@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.config import load_config
 from his_client.labels import zh
 
 
@@ -30,6 +31,7 @@ class CashierWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
+        self.insurance_enabled = load_config().insurance_enabled
         tabs = QTabWidget()
         tabs.addTab(self._build_patient_tab(), "患者建档 / 查询")
         tabs.addTab(self._build_registration_tab(), "挂号")
@@ -117,8 +119,13 @@ class CashierWidget(QWidget):
         row += 1
         grid.addWidget(QLabel("联系人电话*"), row, 0)
         grid.addWidget(self.p_emergency_phone, row, 1)
-        grid.addWidget(QLabel("医保类型*"), row, 2)
+        self.p_insurance_label = QLabel("医保类型*")
+        grid.addWidget(self.p_insurance_label, row, 2)
         grid.addWidget(self.p_insurance, row, 3)
+        if not self.insurance_enabled:
+            self.p_insurance_label.setVisible(False)
+            self.p_insurance.setVisible(False)
+            self.p_insurance.setCurrentIndex(self.p_insurance.findData("self_pay"))
         row += 1
         grid.addWidget(QLabel("过敏史*"), row, 0)
         grid.addWidget(self.p_allergy_status, row, 1)
@@ -158,6 +165,8 @@ class CashierWidget(QWidget):
         self.patient_table.setHorizontalHeaderLabels(
             ["ID", "患者编号", "姓名", "性别/年龄", "电话", "医保", "过敏"]
         )
+        if not self.insurance_enabled:
+            self.patient_table.setColumnHidden(5, True)
         self.patient_table.cellClicked.connect(self._select_patient_row)
         layout.addWidget(self.patient_table)
         self.patient_rows: list[dict] = []
@@ -474,18 +483,20 @@ class CashierWidget(QWidget):
 
         method_row = QHBoxLayout()
         self.c_channel = QComboBox()
-        for label, value in [
+        channels = [
             ("现金", "cash"),
             ("微信支付", "wechat"),
             ("支付宝", "alipay"),
             ("POS 刷卡", "pos"),
-            ("医保卡", "insurance_card"),
-        ]:
+        ]
+        if self.insurance_enabled:
+            channels.append(("医保卡", "insurance_card"))
+        for label, value in channels:
             self.c_channel.addItem(label, value)
         self.c_auth_code = QLineEdit()
         self.c_auth_code.setPlaceholderText("付款码（微信/支付宝）")
         self.c_card_no = QLineEdit()
-        self.c_card_no.setPlaceholderText("卡号/读卡返回值（POS/医保卡）")
+        self.c_card_no.setPlaceholderText("卡号/读卡返回值（POS）")
         method_row.addWidget(QLabel("支付方式"))
         method_row.addWidget(self.c_channel)
         method_row.addWidget(self.c_auth_code)
@@ -585,8 +596,12 @@ class CashierWidget(QWidget):
             return
         self.charge_msg.setText(
             f"收费成功：单号 {payment['id']}，金额 {payment['amount']:.2f} 元，"
-            f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}，"
-            f"方式 {zh('payment_channel', payment.get('channel'))}"
+            + (
+                f"医保 {payment['insurance_amount']:.2f}，自费 {payment['self_pay_amount']:.2f}，"
+                if self.insurance_enabled
+                else "实收 "
+            )
+            + f"方式 {zh('payment_channel', payment.get('channel'))}"
             + (f"，交易号 {payment['channel_trade_no']}" if payment.get("channel_trade_no") else "")
         )
         self.refund_payment_id.setValue(payment["id"])
@@ -620,8 +635,7 @@ class CashierWidget(QWidget):
         if insurance_only:
             self.refund_selected_btn.setEnabled(False)
             self.refund_rule.setText(
-                f"该收费为医保支付/医保卡（医保支付 {insurance:.2f} 元）："
-                "按医保规则只能整单全额退（点「全部退」），不能按明细/数量部分退。"
+                "该收费需整单全额退（点「全部退」），不能按明细/数量部分退。"
             )
         else:
             self.refund_selected_btn.setEnabled(True)
@@ -643,7 +657,7 @@ class CashierWidget(QWidget):
 
     def _refund_selected(self) -> None:
         if not self.refund_selected_btn.isEnabled():
-            self.refund_msg.setText("该收费含医保支付，只能整单全额退")
+            self.refund_msg.setText("该收费需整单全额退")
             return
         if not self.refund_charge_id:
             self.refund_msg.setText("请先在明细中选择要退的项目")

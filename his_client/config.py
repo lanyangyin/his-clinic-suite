@@ -17,6 +17,7 @@ class ClientConfig:
     server_url: str = DEFAULT_SERVER
     timeout: int = 10
     printer: str = ""
+    insurance_enabled: bool = False
 
 
 def _candidate_paths(explicit: str | Path | None) -> list[Path]:
@@ -54,6 +55,8 @@ def _read_values(path: Path) -> dict:
         values["timeout"] = parser.getint("client", "timeout")
     if parser.has_option("client", "printer"):
         values["printer"] = parser.get("client", "printer").strip()
+    if parser.has_option("features", "insurance"):
+        values["insurance_enabled"] = parser.getboolean("features", "insurance")
     return values
 
 

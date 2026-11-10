@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.payment import PaymentPanel
 
@@ -36,6 +37,7 @@ class DoctorWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
+        self.insurance_enabled = load_config().insurance_enabled
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_workbench_tab(), "门诊工作台")
         self.tabs.addTab(self._build_register_tab(), "挂号")
@@ -898,6 +900,9 @@ class DoctorWidget(QWidget):
 
         self.drug_table = QTableWidget(0, 6)
         self.drug_table.setHorizontalHeaderLabels(["ID", "药品", "规格", "单价", "医保比例", "医保类别"])
+        if not self.insurance_enabled:
+            self.drug_table.setColumnHidden(4, True)
+            self.drug_table.setColumnHidden(5, True)
         layout.addWidget(self.drug_table)
 
         box = QGroupBox("开立处方")
@@ -994,7 +999,7 @@ class DoctorWidget(QWidget):
             else:
                 self.rx_msg.setText(f"开方失败（{e.status_code}）：{e.detail}")
                 return
-        warning = f"；医保提醒：{item['insurance_warning']}" if item.get("insurance_warning") else ""
+        warning = f"；医保提醒：{item['insurance_warning']}" if self.insurance_enabled and item.get("insurance_warning") else ""
         allergy = f"；过敏冲突已 override：{item['allergy_warning']}" if item.get("allergy_warning") else ""
         self.rx_msg.setText(
             f"开方成功：{item['drug_name']} × {item['quantity']}{warning}{allergy}"
