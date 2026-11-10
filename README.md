@@ -58,9 +58,10 @@ uv run python -m his_client --auto-login
 | 账号 | 密码 | 角色 |
 |---|---|---|
 | admin | admin123 | 管理员（管理台 + 全部工作站） |
+| director | director123 | 院长（病案销毁/采购审批） |
 | cashier | cashier123 | 收费员 |
 | doctor | doctor123 | 医生 |
-| pharmacist | pharm123 | 药房（领用申请/发药/退药/库存/医保目录） |
+| pharmacist | pharm123 | 药房（领用申请/发药/退药/库存；医保目录默认隐藏） |
 | warehouse | warehouse123 | 库房（入库/验收/出库审核/出库/总库库存） |
 | nurse | nurse123 | 护士 |
 | lab / radiology | lab123 / rad123 | 检验 / 影像 |

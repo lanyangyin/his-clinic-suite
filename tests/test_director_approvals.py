@@ -129,6 +129,12 @@ def test_director_can_approve_purchase_request(client, auth):
     assert request.status_code == 201, request.text
     request_id = request.json()["id"]
 
+    listed = client.get(
+        "/warehouse/purchase-requests", headers=auth["director"]
+    )
+    assert listed.status_code == 200
+    assert any(row["id"] == request_id for row in listed.json())
+
     denied = client.post(
         f"/warehouse/purchase-requests/{request_id}/approve",
         headers=auth["warehouse"],

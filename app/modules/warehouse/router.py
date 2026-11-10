@@ -226,7 +226,7 @@ def new_purchase_request(
 def purchase_requests(
     status: str | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("warehouse")),
+    _: None = Depends(require_role("warehouse", "director", "admin")),
 ):
     return list_purchase_requests(db, status)
 
@@ -235,7 +235,7 @@ def purchase_requests(
 def purchase_request_detail(
     request_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("warehouse")),
+    _: None = Depends(require_role("warehouse", "director", "admin")),
 ):
     request = get_purchase_request(db, request_id)
     if not request:
