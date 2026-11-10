@@ -36,6 +36,7 @@ import requests  # noqa: E402
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.cashier import CashierWidget  # noqa: E402
 from his_client.ui.doctor import DoctorWidget  # noqa: E402
+from his_client.ui.lab import LabWidget  # noqa: E402
 from his_client.ui.nurse import NurseWidget  # noqa: E402
 from his_client.ui.pharmacy import PharmacyWidget  # noqa: E402
 from his_client.ui.treatment_room import TreatmentRoomWidget  # noqa: E402
@@ -112,6 +113,7 @@ class DemoController:
         self.treatment = TreatmentRoomWidget(
             ApiClient(BASE, "treatment", "treatment123")
         )
+        self.lab = LabWidget(ApiClient(BASE, "lab", "lab123"))
         self.windows = {
             self.warehouse: RoleWindow("库房工作站 · warehouse", self.warehouse),
             self.cashier: RoleWindow("收费员工作站 · cashier", self.cashier),
@@ -119,6 +121,7 @@ class DemoController:
             self.doctor: RoleWindow("医生工作站 · doctor", self.doctor),
             self.pharmacy: RoleWindow("药房工作站 · pharmacist", self.pharmacy),
             self.treatment: RoleWindow("治疗室工作站 · treatment", self.treatment),
+            self.lab: RoleWindow("检验工作站 · lab", self.lab),
         }
         self.caption = CaptionBar()
         self.screen = QApplication.primaryScreen()
@@ -137,10 +140,10 @@ class DemoController:
 
     # ---------- 窗口/录制 ----------
     def tile_windows(self) -> None:
-        width = self.geo.width() // 3
+        width = self.geo.width() // 4
         height = self.geo.height() // 2
         positions = [
-            (0, 0), (width, 0), (width * 2, 0),
+            (0, 0), (width, 0), (width * 2, 0), (width * 3, 0),
             (0, height), (width, height), (width * 2, height),
         ]
         for window, (x, y) in zip(self.windows.values(), positions):
@@ -615,12 +618,44 @@ class DemoController:
         assert daily["shifts"], "交班记录未生成"
         self.scene("✅ 收费员开班，日结可见交班记录")
 
-        self.scene("演示完成：挂号 → 医生 → 治疗室 → 收费 → 库房 → 药房 → 交班")
+        self.scene("⑮ 检验科窗口：采样 → 签收 → 检验 → 报告 → 审核", self.lab)
+        lab_tab = self.switch_inner(self.lab, "检验工作台")
+        lab_id = self.select_lab_row()
+        self.click(lab_tab, "采样")
+        lab_id = self.select_lab_row()
+        self.click(lab_tab, "签收")
+        lab_id = self.select_lab_row()
+        self.click(lab_tab, "开始检验")
+        lab_id = self.select_lab_row()
+        self.lab.result_text.setText("白细胞 6.2×10^9/L，中性粒细胞 62%")
+        self.click(lab_tab, "出具报告")
+        lab_id = self.select_lab_row()
+        self.click(lab_tab, "审核报告")
+        reviewed = self.lab_api.call("GET", f"/lab/requests/{lab_id}")
+        assert reviewed["status"] in ("reported", "reviewed"), reviewed
+        self.lab._refresh_reviewed()
+        assert self.lab.reviewed_table.rowCount() >= 1
+        self.scene("✅ 检验采样、签收、报告、审核完成")
+
+        self.scene("演示完成：挂号 → 医生 → 治疗室 → 收费 → 库房 → 药房 → 交班 → 检验")
         self.tile_windows()
         self.wait(2.5)
         self.capture_timer.stop()
         self.capture()
         self.success = True
+
+
+    def select_lab_row(self) -> int:
+        self.lab._refresh()
+        for row in range(self.lab.table.rowCount()):
+            if (
+                self.lab.table.item(row, 2).text() == f"演示患者{self.suffix}"
+                and "血常规" in self.lab.table.item(row, 3).text()
+            ):
+                self.lab.table.selectRow(row)
+                self.lab._select_row(row, 0)
+                return int(self.lab.table.item(row, 0).text())
+        raise RuntimeError("检验工作列表没有本次申请")
 
     def start(self) -> None:
         try:
@@ -683,3 +718,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+
