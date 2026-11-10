@@ -14,10 +14,10 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 def pay(
     data: PaymentCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier", "doctor", "pharmacist")),
+    user=Depends(require_role("cashier", "doctor", "pharmacist")),
 ):
     try:
-        return create_payment(db, data)
+        return create_payment(db, data, created_by=user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

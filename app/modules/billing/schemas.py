@@ -23,6 +23,7 @@ class PaymentResponse(BaseModel):
     channel: str = "cash"
     channel_trade_no: str = ""
     channel_status: str = "success"
+    created_by: str = ""
     refunded_amount: float = 0
     refunded_insurance_amount: float = 0
     refunded_self_pay_amount: float = 0

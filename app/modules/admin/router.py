@@ -153,6 +153,7 @@ from app.modules.treatment_room.service import (
 from app.modules.treatment_room.schemas import TemplateConfigUpdate
 from app.modules.charges.service import list_items as list_charge_items
 from app.modules.materials.service import list_items as list_materials
+from app.modules.cashier.service import daily as cashier_daily
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2326,4 +2327,25 @@ def treatment_reconciliation_page(
         request,
         "treatment_reconciliation.html",
         _ctx(request, data=treatment_reconciliation(db, day)),
+    )
+
+# ---------- 门诊收费日结 ----------
+
+@router.get("/cashier-daily", response_class=HTMLResponse)
+def cashier_daily_page(
+    request: Request,
+    report_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        day = date.fromisoformat(report_date) if report_date else date.today()
+    except ValueError:
+        day = date.today()
+    return templates.TemplateResponse(
+        request,
+        "cashier_daily.html",
+        _ctx(request, data=cashier_daily(db, day)),
     )

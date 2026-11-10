@@ -4,6 +4,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -30,6 +31,7 @@ class CashierWidget(QWidget):
         tabs.addTab(self._build_patient_tab(), "患者建档 / 查询")
         tabs.addTab(self._build_registration_tab(), "挂号")
         tabs.addTab(self._build_charge_tab(), "收费 / 退费")
+        tabs.addTab(self._build_shift_tab(), "交班 / 日结")
         tabs.addTab(self._build_print_tab(), "打印")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
@@ -442,3 +444,114 @@ class CashierWidget(QWidget):
         layout.addStretch(1)
         return page
 
+
+    # ---------- 交班 / 日结 ----------
+    def _build_shift_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        open_box = QGroupBox("开班")
+        form = QFormLayout(open_box)
+        self.opening_float = QDoubleSpinBox()
+        self.opening_float.setRange(0, 1000000)
+        self.opening_float.setDecimals(2)
+        self.shift_note = QLineEdit()
+        open_btn = QPushButton("开班")
+        open_btn.clicked.connect(self._open_shift)
+        form.addRow("备用金", self.opening_float)
+        form.addRow("备注", self.shift_note)
+        form.addRow("", open_btn)
+        layout.addWidget(open_box)
+
+        close_box = QGroupBox("交班")
+        close_form = QFormLayout(close_box)
+        self.counted_cash = QDoubleSpinBox()
+        self.counted_cash.setRange(0, 10000000)
+        self.counted_cash.setDecimals(2)
+        close_btn = QPushButton("交班")
+        close_btn.clicked.connect(self._close_shift)
+        close_form.addRow("实收现金", self.counted_cash)
+        close_form.addRow("", close_btn)
+        layout.addWidget(close_box)
+
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新日结")
+        refresh.clicked.connect(self._load_daily)
+        top.addWidget(refresh)
+        top.addStretch(1)
+        layout.addLayout(top)
+        self.shift_summary = QLabel("")
+        self.shift_summary.setWordWrap(True)
+        layout.addWidget(self.shift_summary)
+        self.channel_table = QTableWidget(0, 4)
+        self.channel_table.setHorizontalHeaderLabels(["渠道", "笔数", "金额", "已退"])
+        layout.addWidget(self.channel_table)
+        self.shift_table = QTableWidget(0, 6)
+        self.shift_table.setHorizontalHeaderLabels(
+            ["交班单", "收费员", "备用金", "应有现金", "实收", "差异"]
+        )
+        layout.addWidget(self.shift_table)
+        self.shift_msg = QLabel("")
+        layout.addWidget(self.shift_msg)
+        self._load_daily()
+        return page
+
+    def _load_daily(self) -> None:
+        try:
+            data = self.api.cashier_daily()
+        except ApiError as e:
+            self.shift_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.shift_data = data
+        self.shift_summary.setText(
+            f"{data['date']}　收费 {data['payment_count']} 笔　"
+            f"总额 {data['amount']:.2f}　净收入 {data['net']:.2f}　待收费 {data['pending_amount']:.2f}"
+        )
+        self.channel_table.setRowCount(len(data["channels"]))
+        for row, item in enumerate(data["channels"]):
+            values = [item["label"], item["count"], f"{item['amount']:.2f}", f"{item['refunded']:.2f}"]
+            for col, value in enumerate(values):
+                self.channel_table.setItem(row, col, QTableWidgetItem(str(value)))
+        self.shift_table.setRowCount(len(data["shifts"]))
+        self.open_shift_id = None
+        for row, item in enumerate(data["shifts"]):
+            values = [
+                item["shift_no"],
+                item["cashier"],
+                f"{item['opening_float']:.2f}",
+                f"{item['expected_cash']:.2f}" if item["expected_cash"] is not None else "—",
+                f"{item['counted_cash']:.2f}" if item["counted_cash"] is not None else "—",
+                f"{item['difference']:.2f}" if item["difference"] is not None else "—",
+            ]
+            for col, value in enumerate(values):
+                self.shift_table.setItem(row, col, QTableWidgetItem(str(value)))
+            if item["status"] == "open":
+                self.open_shift_id = item["id"]
+        self.shift_msg.setText(f"日结已刷新；{'当前有未交班记录' if self.open_shift_id else '当前无未交班记录'}")
+
+    def _open_shift(self) -> None:
+        try:
+            shift = self.api.open_cashier_shift(
+                self.opening_float.value(), self.shift_note.text().strip()
+            )
+        except ApiError as e:
+            self.shift_msg.setText(f"开班失败（{e.status_code}）：{e.detail}")
+            return
+        self.shift_msg.setText(f"已开班：{shift['shift_no']}")
+        self._load_daily()
+
+    def _close_shift(self) -> None:
+        shift_id = getattr(self, "open_shift_id", None)
+        if not shift_id:
+            self.shift_msg.setText("没有待交班记录")
+            return
+        try:
+            shift = self.api.close_cashier_shift(
+                shift_id, self.counted_cash.value(), self.shift_note.text().strip()
+            )
+        except ApiError as e:
+            self.shift_msg.setText(f"交班失败（{e.status_code}）：{e.detail}")
+            return
+        self.shift_msg.setText(
+            f"已交班，应有 {shift['expected_cash']:.2f}，差异 {shift['difference']:.2f}"
+        )
+        self._load_daily()

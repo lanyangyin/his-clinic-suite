@@ -18,7 +18,7 @@ from .models import ChargeRefund, Payment
 from .schemas import PaymentCreate
 
 
-def create_payment(db: Session, data: PaymentCreate) -> Payment:
+def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Payment:
     """收费：汇总就诊全部待收费用明细，医保按明细比例结算，关闭就诊。"""
     encounter = get_encounter(db, data.encounter_id)
     if not encounter:
@@ -73,6 +73,7 @@ def create_payment(db: Session, data: PaymentCreate) -> Payment:
         channel=channel,
         channel_trade_no=result.get("trade_no", ""),
         channel_status=result.get("channel_status", "success"),
+        created_by=created_by,
     )
     db.add(payment)
     for charge in charges:

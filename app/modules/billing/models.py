@@ -35,6 +35,9 @@ class Payment(Base):
     channel_status: Mapped[str] = mapped_column(
         String(20), default="success", server_default="success", nullable=False
     )
+    created_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
     # 已退金额累计（支持部分退费）
     refunded_amount: Mapped[float] = mapped_column(
         default=0.0, server_default="0", nullable=False

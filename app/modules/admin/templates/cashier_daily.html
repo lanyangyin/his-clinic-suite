@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}门诊收费日结 · HIS 管理台{% endblock %}
+{% block content %}
+<style>
+@media print {
+  header, form, .no-print { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .panel { border: 0; padding: 0; }
+}
+</style>
+<h2>门诊收费日结</h2>
+<form class="inline" method="get" action="/admin/cashier-daily">
+  <label>日期<input type="date" name="report_date" value="{{ data.date }}"></label>
+  <button type="submit">查询</button>
+  <button type="button" onclick="window.print()">打印</button>
+</form>
+
+<div class="cards">
+  <div class="card"><div class="num">{{ data.payment_count }}</div><div class="label">收费笔数</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.amount) }}</div><div class="label">收费总额</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.insurance) }}</div><div class="label">医保支付</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.self_pay) }}</div><div class="label">个人自费</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.refunded) }}</div><div class="label">已退金额</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.net) }}</div><div class="label">净收入</div></div>
+  <div class="card"><div class="num">￥{{ '%.2f'|format(data.pending_amount) }}</div><div class="label">待收费</div></div>
+</div>
+
+<div class="panel">
+  <h3>{{ data.date }} 支付方式汇总</h3>
+  <table>
+    <tr><th>渠道</th><th>笔数</th><th>金额</th><th>医保</th><th>自费</th><th>已退</th></tr>
+    {% for row in data.channels %}
+    <tr>
+      <td>{{ row.label }}</td><td>{{ row.count }}</td>
+      <td>{{ '%.2f'|format(row.amount) }}</td><td>{{ '%.2f'|format(row.insurance) }}</td>
+      <td>{{ '%.2f'|format(row.self_pay) }}</td><td>{{ '%.2f'|format(row.refunded) }}</td>
+    </tr>
+    {% else %}<tr><td colspan="6">当日无收费</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>收费员交班</h3>
+  <table>
+    <tr><th>交班单</th><th>收费员</th><th>开班</th><th>交班</th><th>备用金</th><th>应有现金</th><th>实收现金</th><th>差异</th><th>状态</th></tr>
+    {% for row in data.shifts %}
+    <tr>
+      <td>{{ row.shift_no }}</td><td>{{ row.cashier }}</td>
+      <td>{{ row.opened_at.strftime('%H:%M') }}</td>
+      <td>{{ row.closed_at.strftime('%H:%M') if row.closed_at else '—' }}</td>
+      <td>{{ '%.2f'|format(row.opening_float) }}</td>
+      <td>{{ '%.2f'|format(row.expected_cash) if row.expected_cash is not none else '—' }}</td>
+      <td>{{ '%.2f'|format(row.counted_cash) if row.counted_cash is not none else '—' }}</td>
+      <td>{{ '%.2f'|format(row.difference) if row.difference is not none else '—' }}</td>
+      <td>{{ '已交班' if row.status == 'closed' else '交班中' }}</td>
+    </tr>
+    {% else %}<tr><td colspan="9">当日无交班记录</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel" style="display:flex;justify-content:space-between;margin-top:40px">
+  <div>收费员：__________</div>
+  <div>财务：__________</div>
+  <div>日期：{{ data.date }}</div>
+</div>
+{% endblock %}

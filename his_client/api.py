@@ -553,6 +553,25 @@ class ApiClient:
         params = {"status": status} if status else None
         return self._request("GET", "/treatment-room/follow-ups", params=params)
 
+    # ---- 收费交班 / 日结 ----
+    def cashier_daily(self, day: str | None = None) -> dict:
+        params = {"day": day} if day else None
+        return self._request("GET", "/cashier/daily", params=params)
+
+    def open_cashier_shift(self, opening_float: float, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            "/cashier/shifts/open",
+            json={"opening_float": opening_float, "note": note},
+        )
+
+    def close_cashier_shift(self, shift_id: int, counted_cash: float, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/cashier/shifts/{shift_id}/close",
+            json={"counted_cash": counted_cash, "note": note},
+        )
+
     def complete_treatment_followup(self, followup_id: int, payload: dict | None = None) -> dict:
         return self._request(
             "POST",
