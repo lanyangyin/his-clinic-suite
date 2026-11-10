@@ -137,6 +137,12 @@ class ArchiveDestructionRequest(Base):
     executed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     witness: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    attachment_path: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    attachment_name: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
 
     record = relationship("ArchiveRecord")
 

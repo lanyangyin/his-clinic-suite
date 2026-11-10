@@ -142,4 +142,6 @@ class DestructionRequestResponse(BaseModel):
     executed_by: str
     executed_at: datetime | None
     witness: str
+    attachment_path: str = ""
+    attachment_name: str = ""
     model_config = ConfigDict(from_attributes=True)

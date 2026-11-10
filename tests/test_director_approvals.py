@@ -45,6 +45,19 @@ def test_archive_destruction_requires_director_and_execution(client, auth):
     request_id = requested.json()["id"]
     assert requested.json()["status"] == "pending"
 
+    attachment = client.post(
+        f"/archive/destruction-requests/{request_id}/attachment",
+        files={"file": ("清册.pdf", b"%PDF-1.4 demo", "application/pdf")},
+        headers=auth["archive"],
+    )
+    assert attachment.status_code == 200, attachment.text
+    assert attachment.json()["attachment_name"] == "清册.pdf"
+    download = client.get(
+        f"/archive/destruction-requests/{request_id}/attachment",
+        headers=auth["director"],
+    )
+    assert download.status_code == 200
+
     denied = client.post(
         f"/archive/destruction-requests/{request_id}/approve",
         json={"note": "同意"},
@@ -75,6 +88,13 @@ def test_archive_destruction_requires_director_and_execution(client, auth):
     )
     assert executed.status_code == 200, executed.text
     assert executed.json()["status"] == "executed"
+    printed = client.get(
+        f"/archive/destruction-requests/{request_id}/print",
+        headers=auth["director"],
+    )
+    assert printed.status_code == 200
+    assert "病案销毁清册" in printed.text
+    assert "清册.pdf" in printed.text
     assert (
         client.get(
             f"/archive/records/{record['id']}", headers=auth["archive"]
@@ -148,3 +168,24 @@ def test_director_can_approve_purchase_request(client, auth):
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
     assert approved.json()["approver"] == "director"
+
+
+def test_rejected_destruction_can_be_reapplied(client, auth):
+    record = _archive_record(client, auth)
+    first = client.post(
+        f"/archive/records/{record['id']}/destruction-requests",
+        json={"reason": "保存期满"},
+        headers=auth["archive"],
+    ).json()
+    client.post(
+        f"/archive/destruction-requests/{first['id']}/reject",
+        json={"note": "材料不齐"},
+        headers=auth["director"],
+    )
+    again = client.post(
+        f"/archive/records/{record['id']}/destruction-requests",
+        json={"reason": "补齐材料后重新申请"},
+        headers=auth["archive"],
+    )
+    assert again.status_code == 201, again.text
+    assert again.json()["status"] == "pending"

@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import requests
 from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtTest import QTest
@@ -159,6 +160,16 @@ class DirectorDemo(QMainWindow):
             "POST", f"/archive/records/{record['id']}/destruction-requests",
             json={"reason": "保存期满", "note": "院长演示"},
         )
+        attachment = ROOT / "docs" / "dept_preview" / "destroy_attachment.pdf"
+        attachment.parent.mkdir(parents=True, exist_ok=True)
+        attachment.write_bytes(b"%PDF-1.4\n% demo destruction list\n")
+        upload = requests.post(
+            f"{BASE}/archive/destruction-requests/{request['id']}/attachment",
+            files={"file": ("销毁清册.pdf", attachment.read_bytes(), "application/pdf")},
+            auth=("archive", "archive123"),
+            timeout=30,
+        )
+        assert upload.status_code == 200, upload.text
         supplier = self.admin.call(
             "POST", "/suppliers/", json={"code": f"DS{self.suffix[-6:]}", "name": f"院长供应商{self.suffix}"}
         )

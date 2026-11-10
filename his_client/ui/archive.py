@@ -1,6 +1,9 @@
 """病案档案工作站：建档、归档上架、借阅/归还、复印、封存/启封、销毁。"""
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -169,6 +172,11 @@ class ArchiveWidget(QWidget):
         self.seal_reason = QLineEdit()
         self.witness = QLineEdit()
         self.destroy_reason = QLineEdit()
+        self.destroy_attachment_path = QLineEdit()
+        self.destroy_attachment_path.setReadOnly(True)
+        self.destroy_attachment_path.setPlaceholderText("销毁附件（PDF/JPG/PNG，可选）")
+        pick_attachment = QPushButton("选择附件")
+        pick_attachment.clicked.connect(self._pick_destroy_attachment)
         seal_btn = QPushButton("封存")
         seal_btn.clicked.connect(self._seal)
         unseal_btn = QPushButton("启封")
@@ -180,13 +188,17 @@ class ArchiveWidget(QWidget):
         self.destroy_request_id.setSpecialValueText("销毁申请 ID")
         execute_destroy = QPushButton("执行已批准销毁")
         execute_destroy.clicked.connect(self._execute_destroy)
+        print_destroy = QPushButton("打印销毁清册")
+        print_destroy.clicked.connect(self._print_destroy)
         form.addRow("封存/启封原因", self.seal_reason)
         form.addRow("见证人", self.witness)
         form.addRow("销毁原因", self.destroy_reason)
+        form.addRow("销毁附件", self.destroy_attachment_path)
+        form.addRow("", pick_attachment)
         form.addRow(seal_btn, unseal_btn)
         form.addRow("", request_destroy)
         form.addRow("", self.destroy_request_id)
-        form.addRow("", execute_destroy)
+        form.addRow(execute_destroy, print_destroy)
         layout.addWidget(box)
         self.seal_msg = QLabel("")
         self.seal_msg.setWordWrap(True)
@@ -347,6 +359,13 @@ class ArchiveWidget(QWidget):
         self.borrow_msg.setText("复印申请已登记，待收费/完成")
         self._refresh_borrow()
 
+    def _pick_destroy_attachment(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择销毁附件", "", "附件 (*.pdf *.png *.jpg *.jpeg)"
+        )
+        if path:
+            self.destroy_attachment_path.setText(path)
+
     def _request_destroy(self) -> None:
         record = self._selected(self.seal_msg)
         if not record:
@@ -359,11 +378,27 @@ class ArchiveWidget(QWidget):
             row = self.api.request_archive_destruction(
                 record["id"], {"reason": reason, "note": ""}
             )
+            attachment = self.destroy_attachment_path.text().strip()
+            if attachment:
+                self.api.upload_archive_destruction_attachment(row["id"], attachment)
         except ApiError as e:
             self.seal_msg.setText(f"申请失败（{e.status_code}）：{e.detail}")
             return
         self.destroy_request_id.setValue(row["id"])
-        self.seal_msg.setText(f"已提交销毁申请 {row['id']}，等待院长审批")
+        self.seal_msg.setText(
+            f"已提交销毁申请 {row['id']}"
+            + ("（含附件）" if attachment else "")
+            + "，等待院长审批"
+        )
+
+    def _print_destroy(self) -> None:
+        request_id = self.destroy_request_id.value()
+        if not request_id:
+            self.seal_msg.setText("请填写销毁申请 ID")
+            return
+        QDesktopServices.openUrl(
+            QUrl(self.api.archive_destruction_print_url(request_id))
+        )
 
     def _execute_destroy(self) -> None:
         request_id = self.destroy_request_id.value()

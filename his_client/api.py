@@ -362,6 +362,19 @@ class ApiClient:
             json={"witness": witness, "note": note},
         )
 
+    def upload_archive_destruction_attachment(
+        self, request_id: int, file_path: str
+    ) -> dict:
+        with open(file_path, "rb") as handle:
+            return self._request(
+                "POST",
+                f"/archive/destruction-requests/{request_id}/attachment",
+                files={"file": (file_path.split("\\")[-1].split("/")[-1], handle)},
+            )
+
+    def archive_destruction_print_url(self, request_id: int) -> str:
+        return f"{self.base_url}/archive/destruction-requests/{request_id}/print"
+
     # ---- 护士输液/医嘱执行 ----
     def sync_nursing(self, encounter_id: int) -> list:
         return self._request("POST", f"/nursing/encounters/{encounter_id}/sync")

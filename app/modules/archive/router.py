@@ -1,5 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
+from html import escape
+from pathlib import Path
+import uuid
 
 from app.database import get_db
 from app.modules.auth.security import require_role
@@ -41,6 +45,7 @@ from .service import (
 )
 
 router = APIRouter(prefix="/archive", tags=["archive"])
+DESTRUCTION_DIR = Path("data/archive_destructions")
 
 
 @router.post("/records", response_model=ArchiveRecordResponse, status_code=201)
@@ -269,3 +274,94 @@ def execute_destruction(
         return execute_destruction_request(db, request_id, data, user.username)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/destruction-requests/{request_id}/attachment",
+    response_model=DestructionRequestResponse,
+)
+async def upload_destruction_attachment(
+    request_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(require_role("archive")),
+):
+    from .models import ArchiveDestructionRequest
+
+    row = db.get(ArchiveDestructionRequest, request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="销毁申请不存在")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".pdf", ".png", ".jpg", ".jpeg"}:
+        raise HTTPException(status_code=400, detail="仅支持 PDF/JPG/PNG 附件")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="附件不能超过 10MB")
+    DESTRUCTION_DIR.mkdir(parents=True, exist_ok=True)
+    path = DESTRUCTION_DIR / f"destroy_{request_id}_{uuid.uuid4().hex}{suffix}"
+    path.write_bytes(content)
+    row.attachment_path = str(path).replace("\\", "/")
+    row.attachment_name = file.filename or path.name
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.get("/destruction-requests/{request_id}/attachment")
+def download_destruction_attachment(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("archive", "director", "admin")),
+):
+    from .models import ArchiveDestructionRequest
+
+    row = db.get(ArchiveDestructionRequest, request_id)
+    if not row or not row.attachment_path:
+        raise HTTPException(status_code=404, detail="没有附件")
+    path = Path(row.attachment_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="附件文件不存在")
+    return FileResponse(path, filename=row.attachment_name or path.name)
+
+
+@router.get("/destruction-requests/{request_id}/print", response_class=HTMLResponse)
+def print_destruction_list(
+    request_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("archive", "director", "admin")),
+):
+    from .models import ArchiveDestructionRequest
+
+    row = db.get(ArchiveDestructionRequest, request_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="销毁申请不存在")
+    print_btn = '<button onclick="window.print()" style="padding:8px 16px">打印</button>'
+    return HTMLResponse(f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>病案销毁清册</title>
+<style>
+body{{font-family:"Microsoft YaHei",sans-serif;max-width:760px;margin:32px auto;color:#111}}
+h2{{text-align:center}}table{{width:100%;border-collapse:collapse;margin:18px 0}}
+td,th{{border:1px solid #999;padding:8px;text-align:left}}
+.small{{color:#555;font-size:13px}}@media print{{button{{display:none}}}}
+</style></head><body>
+{print_btn}
+<h2>病案销毁清册</h2>
+<table>
+<tr><th>销毁申请号</th><td>{row.id}</td></tr>
+<tr><th>病案号</th><td>{escape(row.archive_no or "—")}</td></tr>
+<tr><th>患者</th><td>{escape(row.patient_name or "—")}</td></tr>
+<tr><th>销毁原因</th><td>{escape(row.reason)}</td></tr>
+<tr><th>备注</th><td>{escape(row.note or "—")}</td></tr>
+<tr><th>申请人</th><td>{escape(row.requested_by or "—")}</td></tr>
+<tr><th>申请时间</th><td>{row.requested_at:%Y-%m-%d %H:%M}</td></tr>
+<tr><th>审批人</th><td>{escape(row.approver or "—")}</td></tr>
+<tr><th>审批意见</th><td>{escape(row.approval_note or "—")}</td></tr>
+<tr><th>审批时间</th><td>{row.approved_at.strftime("%Y-%m-%d %H:%M") if row.approved_at else "—"}</td></tr>
+<tr><th>执行人</th><td>{escape(row.executed_by or "—")}</td></tr>
+<tr><th>见证人</th><td>{escape(row.witness or "—")}</td></tr>
+<tr><th>执行时间</th><td>{row.executed_at.strftime("%Y-%m-%d %H:%M") if row.executed_at else "—"}</td></tr>
+<tr><th>附件</th><td>{escape(row.attachment_name or "无")}</td></tr>
+<tr><th>状态</th><td>{escape(row.status)}</td></tr>
+</table>
+<p class="small">本清册由 HIS 生成。纸质病案销毁需双人现场核对并签字。</p>
+</body></html>""")

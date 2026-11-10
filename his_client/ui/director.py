@@ -49,9 +49,9 @@ class DirectorWidget(QWidget):
         row.addWidget(refresh)
         row.addStretch(1)
         layout.addLayout(row)
-        self.archive_table = QTableWidget(0, 6)
+        self.archive_table = QTableWidget(0, 7)
         self.archive_table.setHorizontalHeaderLabels(
-            ["申请号", "病案号", "患者", "原因", "申请人", "状态"]
+            ["申请号", "病案号", "患者", "原因", "申请人", "附件", "状态"]
         )
         layout.addWidget(self.archive_table, 1)
         self.archive_note = QLineEdit()
@@ -115,6 +115,7 @@ class DirectorWidget(QWidget):
                 item.get("patient_name") or "",
                 item.get("reason") or "",
                 item.get("requested_by") or "",
+                item.get("attachment_name") or "无",
                 ARCHIVE_STATUS.get(item["status"], item["status"]),
             ]
             for col, value in enumerate(values):
