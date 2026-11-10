@@ -1,4 +1,5 @@
 """护士工作站：门诊分诊叫号、治疗执行。"""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -336,9 +337,9 @@ class NurseWidget(QWidget):
         top.addWidget(self.nursing_filter)
         layout.addLayout(top)
 
-        self.nursing_table = QTableWidget(0, 8)
+        self.nursing_table = QTableWidget(0, 9)
         self.nursing_table.setHorizontalHeaderLabels(
-            ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单"]
+            ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单", "高危"]
         )
         self.nursing_table.cellClicked.connect(self._select_nursing)
         layout.addWidget(self.nursing_table, 1)
@@ -437,9 +438,13 @@ class NurseWidget(QWidget):
                 order.get("seat_no") or "—",
                 f"{order['rate_ml_h']:g}" if order.get("rate_ml_h") else "—",
                 str(order["id"]),
+                "是" if order.get("high_alert") else "",
             ]
             for col, value in enumerate(values):
-                self.nursing_table.setItem(row, col, QTableWidgetItem(str(value)))
+                cell = QTableWidgetItem(str(value))
+                if order.get("high_alert"):
+                    cell.setForeground(Qt.red)
+                self.nursing_table.setItem(row, col, cell)
         self.nursing_msg.setText(f"执行单 {len(self.nursing_rows)} 条")
 
     def _select_nursing(self, row: int, _col: int) -> None:
@@ -448,6 +453,7 @@ class NurseWidget(QWidget):
             self.nursing_msg.setText(
                 f"当前：{self.current_nursing['item_name']} · "
                 f"{self.current_nursing['status']}"
+                + (" · 高危药品需双人核对" if self.current_nursing.get("high_alert") else "")
             )
 
     def _selected_nursing(self) -> dict | None:

@@ -39,6 +39,7 @@ class NursingOrderResponse(BaseModel):
     source_id: int
     order_type: str
     item_name: str
+    high_alert: bool = False
     dosage: str
     route: str
     frequency: str

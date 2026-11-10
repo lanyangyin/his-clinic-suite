@@ -9,6 +9,8 @@ class DrugCreate(BaseModel):
     insurance_ratio: float = Field(default=0.7, ge=0, le=1)
     # 抗菌药物分级：0 非抗菌药 / 1 非限制 / 2 限制 / 3 特殊使用
     antibiotic_level: int = Field(default=0, ge=0, le=3)
+    # 高危药品：配药需要第二人核对
+    high_alert: bool = False
     # 医保贯标与生产信息
     insurance_code: str = ""
     approval_no: str = ""

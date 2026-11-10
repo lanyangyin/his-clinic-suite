@@ -17,10 +17,11 @@
         <option value="3">特殊使用</option>
       </select>
     </label>
+    <label>高危药品 <input type="checkbox" name="high_alert" value="true"></label>
     <button type="submit">新增药品</button>
   </form>
   <table>
-    <tr><th>ID</th><th>名称</th><th>规格</th><th>单位</th><th>基准价</th><th>医保比例</th><th>抗菌级别</th></tr>
+    <tr><th>ID</th><th>名称</th><th>规格</th><th>单位</th><th>基准价</th><th>医保比例</th><th>抗菌级别</th><th>高危</th></tr>
     {% for drug in drugs %}
     <tr>
       <td>{{ drug.id }}</td>
@@ -30,9 +31,10 @@
       <td>{{ '%.2f'|format(drug.base_price) }}</td>
       <td>{{ drug.insurance_ratio }}</td>
       <td>{{ drug.antibiotic_level }}</td>
+      <td>{{ '是' if drug.high_alert else '' }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="7">暂无药品</td></tr>
+    <tr><td colspan="8">暂无药品</td></tr>
     {% endfor %}
   </table>
 </div>

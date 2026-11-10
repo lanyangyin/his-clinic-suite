@@ -59,6 +59,7 @@ def sync_orders(db: Session, encounter_id: int) -> list[NursingOrder]:
             source_id=item.id,
             order_type=order_type,
             item_name=item.drug_name,
+            high_alert=bool(item.drug and item.drug.high_alert),
             dosage=item.dosage,
             route=item.route,
             frequency=item.frequency,
@@ -133,6 +134,7 @@ def list_orders(
                 "diagnosis": encounter.diagnosis if encounter else "",
                 "order_type": order.order_type,
                 "item_name": order.item_name,
+                "high_alert": order.high_alert,
                 "dosage": order.dosage,
                 "route": order.route,
                 "frequency": order.frequency,
@@ -160,13 +162,19 @@ def prepare(
         raise ValueError("执行单不存在")
     if order.status != "pending":
         raise ValueError("该执行单当前状态不可配药")
+    checked_by = (data.checked_by or "").strip()
+    if order.high_alert:
+        if not checked_by:
+            raise ValueError("高危药品必须填写第二核对人")
+        if checked_by.lower() == (operator or "").strip().lower():
+            raise ValueError("高危药品核对人不能与配药人相同")
     row = NursingPreparation(
         order_id=order.id,
         solvent=data.solvent,
         dose=data.dose,
         batch_no=data.batch_no,
         prepared_by=operator,
-        checked_by=data.checked_by,
+        checked_by=checked_by,
         expires_at=datetime.now() + timedelta(minutes=data.expires_minutes),
         note=data.note,
     )

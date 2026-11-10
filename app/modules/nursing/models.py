@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -23,6 +23,10 @@ class NursingOrder(Base):
     # infusion 输液 / injection 注射 / treatment 治疗
     order_type: Mapped[str] = mapped_column(String(20), default="infusion", nullable=False)
     item_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 高危药品：配药需第二人核对
+    high_alert: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
     dosage: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     route: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     frequency: Mapped[str] = mapped_column(String(20), default="", nullable=False)

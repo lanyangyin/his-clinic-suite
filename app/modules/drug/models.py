@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -18,6 +18,10 @@ class Drug(Base):
     # 抗菌药物分级：0 非抗菌药 / 1 非限制使用 / 2 限制使用 / 3 特殊使用
     antibiotic_level: Mapped[int] = mapped_column(
         default=0, server_default="0", nullable=False
+    )
+    # 高危药品：配药需要第二人核对
+    high_alert: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
     )
     # 医保贯标：国家医保药品代码（与医保目录对应）
     insurance_code: Mapped[str] = mapped_column(
