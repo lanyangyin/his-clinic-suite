@@ -2,7 +2,7 @@ from datetime import datetime
 from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -14,10 +14,13 @@ from app.modules.print.documents import (
     render_tcm,
     render_western,
 )
+from app.modules.print.barcode import code128_svg
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
 from app.modules.lis.service import get_request
+from app.modules.lis.models import LabRequest
+from app.modules.pacs.models import ImagingRequest
 from app.modules.patient.service import get_patient
 from app.modules.staff.models import Department
 from app.modules.tcm.models import TcmPrescription
@@ -97,7 +100,49 @@ def _collect(db: Session, encounter_id: int) -> dict:
         "lines": lines,
         "total": round(total, 2),
         "tcm": _tcm_prescriptions(db, encounter_id),
+        "aux_exams": _aux_exams(db, encounter_id),
     }
+
+
+def _aux_exams(db: Session, encounter_id: int) -> list[dict]:
+    result = []
+    labs = (
+        db.query(LabRequest)
+        .filter(LabRequest.encounter_id == encounter_id)
+        .order_by(LabRequest.id)
+        .all()
+    )
+    for row in labs:
+        if row.status not in {"reported", "reviewed"} or not row.result_display:
+            continue
+        result.append(
+            {
+                "type": "检验",
+                "name": row.item_name,
+                "result": row.result_display,
+                "date": row.reported_at.strftime("%Y-%m-%d") if row.reported_at else "",
+                "critical": row.critical_flag,
+            }
+        )
+    images = (
+        db.query(ImagingRequest)
+        .filter(ImagingRequest.encounter_id == encounter_id)
+        .order_by(ImagingRequest.id)
+        .all()
+    )
+    for row in images:
+        if row.status != "reported" or not row.report:
+            continue
+        result.append(
+            {
+                "type": "影像",
+                "name": row.item_name,
+                "result": row.report,
+                "date": row.reported_at.strftime("%Y-%m-%d") if row.reported_at else "",
+                "critical": False,
+            }
+        )
+    return result
 
 
 def _tcm_prescriptions(db: Session, encounter_id: int) -> list[dict]:
@@ -237,6 +282,15 @@ def render_receipt(data: dict) -> str:
 <div class="divider"></div>
 <p class="center">打印时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
 </body></html>"""
+
+
+@router.get("/barcode/{code}.svg")
+def barcode_svg(code: str):
+    try:
+        svg = code128_svg(code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return Response(content=svg, media_type="image/svg+xml")
 
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)

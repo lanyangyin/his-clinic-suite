@@ -114,13 +114,36 @@ def test_print_record_and_tcm_pages(client, auth):
         headers=auth["doctor"],
     )
     assert tcm_created.status_code == 201, tcm_created.text
+    lab_item = client.post(
+        "/lab/items/",
+        json={"code": "L-PRINT", "name": "白细胞", "price": 10, "unit": "×10^9/L"},
+        headers=auth["admin"],
+    ).json()
+    lab_request = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": lab_item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    for action in ("collect", "receive", "start"):
+        assert client.post(
+            f"/lab/requests/{lab_request['id']}/{action}", headers=auth["lab"]
+        ).status_code == 200
+    assert client.post(
+        f"/lab/requests/{lab_request['id']}/report",
+        json={"result": "12.5", "result_value": 12.5, "result_unit": "×10^9/L"},
+        headers=auth["lab"],
+    ).status_code == 200
     full = client.get(f"/print/prescription/{encounter['id']}")
     assert full.status_code == 200
     assert "门诊病历" in full.text
     assert "处方笺" in full.text
     assert "血府逐瘀汤" in full.text
     assert "桃仁" in full.text
+    assert "白细胞" in full.text
+    assert "12.5" in full.text
     assert "邹治国中西医结合诊所" in full.text
+    assert "data-barcode" not in full.text
+    assert "<svg" in full.text
 
     record = client.get(f"/print/medical-record/{encounter['id']}")
     assert record.status_code == 200
@@ -155,3 +178,17 @@ def test_print_receipt(client, auth):
 def test_print_receipt_missing(client):
     r = client.get("/print/receipt/999")
     assert r.status_code == 404
+
+
+def test_barcode_svg(client):
+    response = client.get("/print/barcode/RX000200.svg")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/svg+xml")
+    assert response.text.startswith("<svg")
+    assert "rect" in response.text
+    assert "RX000200" in response.text
+
+
+def test_barcode_rejects_non_ascii(client):
+    response = client.get("/print/barcode/处方.svg")
+    assert response.status_code == 400

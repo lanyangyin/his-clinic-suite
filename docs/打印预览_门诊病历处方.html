@@ -24,9 +24,8 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
 .blank { color: #666; }
 .sign { margin-top: 26px; display: flex; justify-content: space-between; font-size: 13px; }
 .footer { margin-top: 10px; font-size: 12px; color: #333; }
-.barcode { display: flex; align-items: flex-end; gap: 2px; height: 38px; margin: 2px 0 2px; }
-.barcode span { display: block; width: 2px; background: #111; }
-.barcode .wide { width: 4px; }
+.barcode { margin: 2px 0 2px; line-height: 0; }
+.barcode svg { display: block; max-width: 100%; height: auto; }
 .barcode-no { font-family: monospace; font-size: 11px; letter-spacing: 2px; }
 .rx-meta { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 .rx-meta td { padding: 2px 4px; font-size: 13px; }
@@ -41,7 +40,7 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
   <div class="doc-title">门诊病历</div>
   <div class="rule"></div>
   <table class="info">
-    <tr><td class="label">病历编号：</td><td>BL202611110200</td>
+    <tr><td class="label">病历编号：</td><td>BL202611110201</td>
         <td class="label">就诊日期：</td><td>2026-11-11</td></tr>
     <tr><td class="label">姓名：</td><td>何燕琼</td>
         <td class="label">性别：</td><td>女</td>
@@ -56,7 +55,7 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
   <div class="section"><span class="section-title">现病史：</span>2026/7/21 血脂四项甘油三酯 8.25，胆固醇 6.31。</div>
   <div class="section"><span class="section-title">既往史：</span>无特殊慢性病史。</div>
   <div class="section"><span class="section-title">体格检查：</span>—</div>
-  <div class="section"><span class="section-title">辅助检查：</span>—</div>
+  <div class="section"><span class="section-title">辅助检查：</span>检验：甘油三酯　8.25 mmol/L　2026-11-11</div>
   <div class="section"><span class="section-title">诊断：</span>高脂血症</div>
   <div class="section"><span class="section-title">西药处方：</span><div class="rx-line">1. 辛伐他汀分散片　10mg　×7片</div><div class="usage">用法：每次10mg 每日一次 口服 7天</div></div>
   <div class="section"><span class="section-title">中药处方：</span><p><b>降脂化瘀方</b>　配3付　代煎　水煎服 每日两次</p><table class="herbs"><tr><td>桃仁 10g</td><td>焦山楂 10g</td><td>丹参 10g</td><td>杏仁 10g</td></tr><tr><td>甘草 6g</td><td>麻黄梢 6g</td><td>地龙 10g</td><td>黄芪 10g</td></tr><tr><td>瓜蒌皮 10g</td><td>杏仁 10g</td><td>枇杷叶 10g</td><td>地龙 10g</td></tr><tr><td>前胡 10g</td><td>紫苏叶 10g</td><td>炒苏子 10g</td><td>炒牛蒡子 10g</td></tr></table></div>
@@ -68,16 +67,16 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
   </div>
 </div>
 <div class="page">
-  <div class="barcode"><span class="wide" style="height:28px"></span><span class="" style="height:34px"></span><span class="" style="height:30px"></span><span class="" style="height:30px"></span><span class="wide" style="height:30px"></span><span class="" style="height:32px"></span><span class="" style="height:30px"></span><span class="" style="height:30px"></span></div>
-  <div class="barcode-no">RX000200</div>
+  <div class="barcode"><svg xmlns="http://www.w3.org/2000/svg" width="286" height="54" viewBox="0 0 286 54" shape-rendering="crispEdges" role="img" aria-label="Code128 RX000201"><rect width="286" height="54" fill="#fff"/><g fill="#000"><rect x="20" y="0" width="4" height="54"/><rect x="26" y="0" width="2" height="54"/><rect x="32" y="0" width="2" height="54"/><rect x="42" y="0" width="4" height="54"/><rect x="52" y="0" width="2" height="54"/><rect x="56" y="0" width="6" height="54"/><rect x="64" y="0" width="6" height="54"/><rect x="76" y="0" width="2" height="54"/><rect x="80" y="0" width="4" height="54"/><rect x="86" y="0" width="2" height="54"/><rect x="92" y="0" width="6" height="54"/><rect x="100" y="0" width="4" height="54"/><rect x="108" y="0" width="2" height="54"/><rect x="114" y="0" width="6" height="54"/><rect x="122" y="0" width="4" height="54"/><rect x="130" y="0" width="2" height="54"/><rect x="136" y="0" width="6" height="54"/><rect x="144" y="0" width="4" height="54"/><rect x="152" y="0" width="4" height="54"/><rect x="160" y="0" width="6" height="54"/><rect x="170" y="0" width="2" height="54"/><rect x="174" y="0" width="2" height="54"/><rect x="180" y="0" width="6" height="54"/><rect x="188" y="0" width="4" height="54"/><rect x="196" y="0" width="2" height="54"/><rect x="202" y="0" width="6" height="54"/><rect x="212" y="0" width="4" height="54"/><rect x="218" y="0" width="2" height="54"/><rect x="222" y="0" width="2" height="54"/><rect x="230" y="0" width="8" height="54"/><rect x="240" y="0" width="4" height="54"/><rect x="250" y="0" width="6" height="54"/><rect x="258" y="0" width="2" height="54"/><rect x="262" y="0" width="4" height="54"/></g></svg></div>
+  <div class="barcode-no">RX000201</div>
   <div class="clinic">邹治国中西医结合诊所</div>
   <div class="doc-title">处方笺</div>
   <table class="rx-meta">
-    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：RX000200</td></tr>
+    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：RX000201</td></tr>
     <tr><td>姓名：何燕琼</td>
         <td>性别：女</td>
         <td>年龄：52岁</td></tr>
-    <tr><td>门诊/住院病历号：BL202611110200</td>
+    <tr><td>门诊/住院病历号：BL202611110201</td>
         <td>科室：中西医结合科</td>
         <td>开具日期：2026-11-11</td></tr>
     <tr><td colspan="2">临床诊断：高脂血症</td><td></td></tr>
@@ -99,16 +98,16 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
   </div>
 </div>
 <div class="page">
-  <div class="barcode"><span class="wide" style="height:30px"></span><span class="" style="height:31px"></span><span class="" style="height:23px"></span><span class="" style="height:32px"></span><span class="wide" style="height:30px"></span><span class="" style="height:32px"></span><span class="" style="height:18px"></span><span class="" style="height:31px"></span><span class="wide" style="height:31px"></span><span class="" style="height:31px"></span><span class="" style="height:31px"></span><span class="" style="height:30px"></span><span class="wide" style="height:30px"></span><span class="" style="height:31px"></span><span class="" style="height:35px"></span></div>
-  <div class="barcode-no">TCM202611110015</div>
+  <div class="barcode"><svg xmlns="http://www.w3.org/2000/svg" width="440" height="54" viewBox="0 0 440 54" shape-rendering="crispEdges" role="img" aria-label="Code128 TCM202611110016"><rect width="440" height="54" fill="#fff"/><g fill="#000"><rect x="20" y="0" width="4" height="54"/><rect x="26" y="0" width="2" height="54"/><rect x="32" y="0" width="2" height="54"/><rect x="42" y="0" width="4" height="54"/><rect x="48" y="0" width="6" height="54"/><rect x="60" y="0" width="2" height="54"/><rect x="64" y="0" width="2" height="54"/><rect x="72" y="0" width="2" height="54"/><rect x="80" y="0" width="4" height="54"/><rect x="86" y="0" width="2" height="54"/><rect x="90" y="0" width="6" height="54"/><rect x="98" y="0" width="4" height="54"/><rect x="108" y="0" width="4" height="54"/><rect x="116" y="0" width="6" height="54"/><rect x="126" y="0" width="2" height="54"/><rect x="130" y="0" width="2" height="54"/><rect x="136" y="0" width="6" height="54"/><rect x="144" y="0" width="4" height="54"/><rect x="152" y="0" width="4" height="54"/><rect x="160" y="0" width="6" height="54"/><rect x="170" y="0" width="2" height="54"/><rect x="174" y="0" width="4" height="54"/><rect x="182" y="0" width="6" height="54"/><rect x="190" y="0" width="2" height="54"/><rect x="196" y="0" width="2" height="54"/><rect x="202" y="0" width="6" height="54"/><rect x="212" y="0" width="4" height="54"/><rect x="218" y="0" width="2" height="54"/><rect x="224" y="0" width="6" height="54"/><rect x="234" y="0" width="4" height="54"/><rect x="240" y="0" width="2" height="54"/><rect x="246" y="0" width="6" height="54"/><rect x="256" y="0" width="4" height="54"/><rect x="262" y="0" width="2" height="54"/><rect x="268" y="0" width="6" height="54"/><rect x="278" y="0" width="4" height="54"/><rect x="284" y="0" width="2" height="54"/><rect x="290" y="0" width="6" height="54"/><rect x="298" y="0" width="4" height="54"/><rect x="306" y="0" width="2" height="54"/><rect x="312" y="0" width="6" height="54"/><rect x="320" y="0" width="4" height="54"/><rect x="328" y="0" width="2" height="54"/><rect x="334" y="0" width="6" height="54"/><rect x="344" y="0" width="4" height="54"/><rect x="350" y="0" width="4" height="54"/><rect x="358" y="0" width="6" height="54"/><rect x="366" y="0" width="2" height="54"/><rect x="372" y="0" width="4" height="54"/><rect x="380" y="0" width="2" height="54"/><rect x="386" y="0" width="6" height="54"/><rect x="394" y="0" width="4" height="54"/><rect x="404" y="0" width="6" height="54"/><rect x="412" y="0" width="2" height="54"/><rect x="416" y="0" width="4" height="54"/></g></svg></div>
+  <div class="barcode-no">TCM202611110016</div>
   <div class="clinic">邹治国中西医结合诊所</div>
   <div class="doc-title">处方笺</div>
   <table class="rx-meta">
-    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：TCM202611110015</td></tr>
+    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：TCM202611110016</td></tr>
     <tr><td>姓名：何燕琼</td>
         <td>性别：女</td>
         <td>年龄：52岁</td></tr>
-    <tr><td>门诊/住院病历号：BL202611110200</td>
+    <tr><td>门诊/住院病历号：BL202611110201</td>
         <td>科室：中西医结合科</td>
         <td>开具日期：2026-11-11</td></tr>
     <tr><td colspan="2">临床诊断：高脂血症</td><td></td></tr>

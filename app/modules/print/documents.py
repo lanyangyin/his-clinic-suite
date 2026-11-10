@@ -3,6 +3,7 @@ from datetime import datetime
 from html import escape
 
 from app import settings
+from app.modules.print.barcode import code128_svg
 
 PAGE_CSS = """
 @page { size: A4; margin: 12mm; }
@@ -28,9 +29,8 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
 .blank { color: #666; }
 .sign { margin-top: 26px; display: flex; justify-content: space-between; font-size: 13px; }
 .footer { margin-top: 10px; font-size: 12px; color: #333; }
-.barcode { display: flex; align-items: flex-end; gap: 2px; height: 38px; margin: 2px 0 2px; }
-.barcode span { display: block; width: 2px; background: #111; }
-.barcode .wide { width: 4px; }
+.barcode { margin: 2px 0 2px; line-height: 0; }
+.barcode svg { display: block; max-width: 100%; height: auto; }
 .barcode-no { font-family: monospace; font-size: 11px; letter-spacing: 2px; }
 .rx-meta { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 .rx-meta td { padding: 2px 4px; font-size: 13px; }
@@ -46,12 +46,7 @@ def _value(value, fallback="—"):
 
 
 def _barcode(code: str) -> str:
-    bars = []
-    for index, char in enumerate(code):
-        height = 18 + (ord(char) % 18)
-        wide = " wide" if index % 4 == 0 else ""
-        bars.append(f'<span class="{wide.strip()}" style="height:{height}px"></span>')
-    return '<div class="barcode">' + "".join(bars) + "</div>"
+    return f'<div class="barcode">{code128_svg(code)}</div>'
 
 
 def _print_button() -> str:
@@ -96,6 +91,13 @@ def _record_page(data: dict) -> str:
             f'{_herb_table(rx["items"])}'
         )
     tcm_html = tcm_html or '<p class="blank">（无）</p>'
+    aux = data.get("aux_exams") or []
+    aux_html = "<br>".join(
+        f'{escape(item["type"])}：{escape(item["name"])}　{escape(item["result"])}'
+        f'{"　【危急值】" if item.get("critical") else ""}'
+        f'{"　" + escape(item["date"]) if item.get("date") else ""}'
+        for item in aux
+    ) or "—"
     return f"""
 <div class="page">
   <div class="clinic">{escape(meta['name'])}</div>
@@ -117,7 +119,7 @@ def _record_page(data: dict) -> str:
   <div class="section"><span class="section-title">现病史：</span>{_value(record.present_illness if record else '')}</div>
   <div class="section"><span class="section-title">既往史：</span>{_value(record.past_history if record else '')}</div>
   <div class="section"><span class="section-title">体格检查：</span>{_value(record.physical_exam if record else '')}</div>
-  <div class="section"><span class="section-title">辅助检查：</span>—</div>
+  <div class="section"><span class="section-title">辅助检查：</span>{aux_html}</div>
   <div class="section"><span class="section-title">诊断：</span>{_value(diagnosis)}</div>
   <div class="section"><span class="section-title">西药处方：</span>{western}</div>
   <div class="section"><span class="section-title">中药处方：</span>{tcm_html}</div>

@@ -140,6 +140,36 @@ def main() -> int:
     )
     assert tcm.status_code == 201, tcm.text
 
+    lab = auth("lab", "lab123")
+    lab_item = requests.post(
+        f"{BASE}/lab/items/",
+        headers=admin,
+        json={"code": f"LIP{suffix[-4:]}", "name": "甘油三酯", "price": 10, "unit": "mmol/L"},
+        timeout=30,
+    ).json()
+    lab_req = requests.post(
+        f"{BASE}/lab/encounters/{encounter['id']}/lab-requests",
+        headers=doctor,
+        json={"item_id": lab_item["id"]},
+        timeout=30,
+    ).json()
+    for action in ("collect", "receive", "start"):
+        assert requests.post(
+            f"{BASE}/lab/requests/{lab_req['id']}/{action}", headers=lab, timeout=30
+        ).status_code == 200
+    report = requests.post(
+        f"{BASE}/lab/requests/{lab_req['id']}/report",
+        headers=lab,
+        json={
+            "result": "8.25",
+            "result_value": 8.25,
+            "result_unit": "mmol/L",
+            "critical_flag": False,
+        },
+        timeout=30,
+    )
+    assert report.status_code == 200, report.text
+
     page = requests.get(f"{BASE}/print/prescription/{encounter['id']}", timeout=30)
     assert page.status_code == 200
     html_path = ROOT / "docs" / "打印预览_门诊病历处方.html"
