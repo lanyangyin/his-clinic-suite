@@ -55,6 +55,11 @@ INSURANCE_ENABLED = (
     or _ini.getboolean("features", "insurance", fallback=False)
 )
 
+# 打印抬头（可在 config.ini [clinic] 覆盖）
+CLINIC_NAME = _ini.get("clinic", "name", fallback="邹治国中西医结合诊所")
+CLINIC_ADDRESS = _ini.get("clinic", "address", fallback="")
+CLINIC_PHONE = _ini.get("clinic", "phone", fallback="")
+
 # 数据库：默认程序目录下 his.db（绝对路径，与 CWD 无关）
 _DEFAULT_DB_PATH = BASE_DIR / "his.db"
 DATABASE_URL = (

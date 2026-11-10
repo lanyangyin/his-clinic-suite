@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>门诊病历 / 处方笺</title>
+<style>
+@page { size: A4; margin: 12mm; }
+* { box-sizing: border-box; }
+body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-size: 13px; line-height: 1.6; }
+.page { page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+.clinic { text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 2px 0 0; }
+.doc-title { text-align: center; font-size: 17px; letter-spacing: 5px; margin: 2px 0 8px; }
+.rule { border-top: 2px solid #111; margin: 4px 0 8px; }
+.rule-thin { border-top: 1px solid #333; margin: 8px 0; }
+.info { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.info td { padding: 3px 4px; font-size: 13px; vertical-align: bottom; }
+.label { color: #333; white-space: nowrap; }
+.line { border-bottom: 1px solid #555; display: inline-block; min-width: 90px; padding: 0 4px; }
+.section { margin: 8px 0; }
+.section-title { font-weight: bold; margin-right: 6px; }
+.rx-line { margin: 3px 0 2px 18px; }
+.usage { margin: 0 0 4px 42px; color: #222; }
+.herbs { width: 100%; border-collapse: collapse; margin: 4px 0; }
+.herbs td { padding: 2px 6px; font-size: 13px; }
+.rp { font-size: 17px; font-weight: bold; margin: 8px 0 4px; }
+.blank { color: #666; }
+.sign { margin-top: 26px; display: flex; justify-content: space-between; font-size: 13px; }
+.footer { margin-top: 10px; font-size: 12px; color: #333; }
+.barcode { display: flex; align-items: flex-end; gap: 2px; height: 38px; margin: 2px 0 2px; }
+.barcode span { display: block; width: 2px; background: #111; }
+.barcode .wide { width: 4px; }
+.barcode-no { font-family: monospace; font-size: 11px; letter-spacing: 2px; }
+.rx-meta { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
+.rx-meta td { padding: 2px 4px; font-size: 13px; }
+.prescription-box { border: 1px solid #777; padding: 8px 10px; min-height: 58mm; }
+.no-print { text-align: center; margin: 8px 0; }
+@media print { .no-print { display: none; } }
+</style></head><body>
+<p class="no-print"><button onclick="window.print()">打印</button></p>
+
+<div class="page">
+  <div class="clinic">邹治国中西医结合诊所</div>
+  <div class="doc-title">门诊病历</div>
+  <div class="rule"></div>
+  <table class="info">
+    <tr><td class="label">病历编号：</td><td>BL202611110200</td>
+        <td class="label">就诊日期：</td><td>2026-11-11</td></tr>
+    <tr><td class="label">姓名：</td><td>何燕琼</td>
+        <td class="label">性别：</td><td>女</td>
+        <td class="label">年龄：</td><td>52岁</td>
+        <td class="label">科别：</td><td>中西医结合科</td></tr>
+    <tr><td class="label">住址：</td><td colspan="3">演示地址</td>
+        <td class="label">电话：</td><td colspan="3">13678970575</td></tr>
+    <tr><td class="label">过敏史：</td><td colspan="7">不详</td></tr>
+  </table>
+  <div class="rule-thin"></div>
+  <div class="section"><span class="section-title">主诉：</span>血脂异常</div>
+  <div class="section"><span class="section-title">现病史：</span>2026/7/21 血脂四项甘油三酯 8.25，胆固醇 6.31。</div>
+  <div class="section"><span class="section-title">既往史：</span>无特殊慢性病史。</div>
+  <div class="section"><span class="section-title">体格检查：</span>—</div>
+  <div class="section"><span class="section-title">辅助检查：</span>—</div>
+  <div class="section"><span class="section-title">诊断：</span>高脂血症</div>
+  <div class="section"><span class="section-title">西药处方：</span><div class="rx-line">1. 辛伐他汀分散片　10mg　×7片</div><div class="usage">用法：每次10mg 每日一次 口服 7天</div></div>
+  <div class="section"><span class="section-title">中药处方：</span><p><b>降脂化瘀方</b>　配3付　代煎　水煎服 每日两次</p><table class="herbs"><tr><td>桃仁 10g</td><td>焦山楂 10g</td><td>丹参 10g</td><td>杏仁 10g</td></tr><tr><td>甘草 6g</td><td>麻黄梢 6g</td><td>地龙 10g</td><td>黄芪 10g</td></tr><tr><td>瓜蒌皮 10g</td><td>杏仁 10g</td><td>枇杷叶 10g</td><td>地龙 10g</td></tr><tr><td>前胡 10g</td><td>紫苏叶 10g</td><td>炒苏子 10g</td><td>炒牛蒡子 10g</td></tr></table></div>
+  <div class="section"><span class="section-title">建议：</span>病情无缓解或加重时，请速到市人民医院就诊。</div>
+  <div class="section"><span class="section-title">合计：</span>3.50 元</div>
+  <div class="sign">
+    <span>医师：李德珍</span>
+    <span>医师签名：__________</span>
+  </div>
+</div>
+<div class="page">
+  <div class="barcode"><span class="wide" style="height:28px"></span><span class="" style="height:34px"></span><span class="" style="height:30px"></span><span class="" style="height:30px"></span><span class="wide" style="height:30px"></span><span class="" style="height:32px"></span><span class="" style="height:30px"></span><span class="" style="height:30px"></span></div>
+  <div class="barcode-no">RX000200</div>
+  <div class="clinic">邹治国中西医结合诊所</div>
+  <div class="doc-title">处方笺</div>
+  <table class="rx-meta">
+    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：RX000200</td></tr>
+    <tr><td>姓名：何燕琼</td>
+        <td>性别：女</td>
+        <td>年龄：52岁</td></tr>
+    <tr><td>门诊/住院病历号：BL202611110200</td>
+        <td>科室：中西医结合科</td>
+        <td>开具日期：2026-11-11</td></tr>
+    <tr><td colspan="2">临床诊断：高脂血症</td><td></td></tr>
+  </table>
+  <div class="rule-thin"></div>
+  <div class="prescription-box">
+    <div class="rp">Rp.</div>
+    <div class="rx-line">1. 辛伐他汀分散片　10mg　×7片</div><div class="usage">用法：每次10mg 每日一次 口服 7天</div>
+    <p>合计：3.50 元</p>
+    <p class="blank">（以下空白）</p>
+  </div>
+  <div class="footer">
+    <div class="sign">
+      <span>医师：李德珍</span>
+      <span>审核药师：__________</span>
+      <span>调配药师：__________</span>
+      <span>核对、发药药师：__________</span>
+    </div>
+  </div>
+</div>
+<div class="page">
+  <div class="barcode"><span class="wide" style="height:30px"></span><span class="" style="height:31px"></span><span class="" style="height:23px"></span><span class="" style="height:32px"></span><span class="wide" style="height:30px"></span><span class="" style="height:32px"></span><span class="" style="height:18px"></span><span class="" style="height:31px"></span><span class="wide" style="height:31px"></span><span class="" style="height:31px"></span><span class="" style="height:31px"></span><span class="" style="height:30px"></span><span class="wide" style="height:30px"></span><span class="" style="height:31px"></span><span class="" style="height:35px"></span></div>
+  <div class="barcode-no">TCM202611110015</div>
+  <div class="clinic">邹治国中西医结合诊所</div>
+  <div class="doc-title">处方笺</div>
+  <table class="rx-meta">
+    <tr><td>费别：自费</td><td>医保卡号：</td><td>处方编号：TCM202611110015</td></tr>
+    <tr><td>姓名：何燕琼</td>
+        <td>性别：女</td>
+        <td>年龄：52岁</td></tr>
+    <tr><td>门诊/住院病历号：BL202611110200</td>
+        <td>科室：中西医结合科</td>
+        <td>开具日期：2026-11-11</td></tr>
+    <tr><td colspan="2">临床诊断：高脂血症</td><td></td></tr>
+  </table>
+  <div class="rule-thin"></div>
+  <div class="prescription-box">
+    <div class="rp">Rp.</div>
+    <p><b>降脂化瘀方</b></p>
+    <table class="herbs"><table class="herbs"><tr><td>桃仁 10g</td><td>焦山楂 10g</td><td>丹参 10g</td><td>杏仁 10g</td></tr><tr><td>甘草 6g</td><td>麻黄梢 6g</td><td>地龙 10g</td><td>黄芪 10g</td></tr><tr><td>瓜蒌皮 10g</td><td>杏仁 10g</td><td>枇杷叶 10g</td><td>地龙 10g</td></tr><tr><td>前胡 10g</td><td>紫苏叶 10g</td><td>炒苏子 10g</td><td>炒牛蒡子 10g</td></tr></table></table>
+    <p>配3付　每日一剂　水煎服 每日两次</p>
+    <p class="blank">（以下空白）</p>
+  </div>
+  <div class="footer">
+    <div class="sign">
+      <span>医师：李德珍</span>
+      <span>审核药师：__________</span>
+      <span>调配药师：__________</span>
+      <span>核对、发药药师：__________</span>
+    </div>
+  </div>
+</div>
+</body></html>

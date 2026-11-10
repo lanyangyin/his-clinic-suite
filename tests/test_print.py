@@ -60,6 +60,84 @@ def test_print_prescription_missing(client):
     assert r.status_code == 404
 
 
+def test_print_record_and_tcm_pages(client, auth):
+    patient = client.post(
+        "/patients/",
+        json={"name": "打印患者", "id_number": "110101199001015678"},
+        headers=auth["cashier"],
+    ).json()
+    dept = client.post(
+        "/departments/", json={"name": "打印科"}, headers=auth["admin"]
+    ).json()
+    doctor = client.post(
+        "/doctors/",
+        json={"name": "打印医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    reg = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
+        headers=auth["cashier"],
+    ).json()
+    encounter = client.post(
+        "/encounters/",
+        json={"registration_id": reg["id"], "diagnosis": "血瘀证"},
+        headers=auth["doctor"],
+    ).json()
+    client.post(
+        f"/encounters/{encounter['id']}/medical-record",
+        json={"chief_complaint": "胸闷", "treatment_advice": "忌生冷"},
+        headers=auth["doctor"],
+    )
+    drug = client.post(
+        "/drugs/", json={"name": "打印西药", "base_price": 5},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "H-PRINT", "name": "桃仁", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    tcm_created = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={
+            "formula_name": "血府逐瘀汤",
+            "packs": 3,
+            "decoct_service": "decoct",
+            "items": [{"herb_id": herb["id"], "dose_g": 10}],
+        },
+        headers=auth["doctor"],
+    )
+    assert tcm_created.status_code == 201, tcm_created.text
+    full = client.get(f"/print/prescription/{encounter['id']}")
+    assert full.status_code == 200
+    assert "门诊病历" in full.text
+    assert "处方笺" in full.text
+    assert "血府逐瘀汤" in full.text
+    assert "桃仁" in full.text
+    assert "邹治国中西医结合诊所" in full.text
+
+    record = client.get(f"/print/medical-record/{encounter['id']}")
+    assert record.status_code == 200
+    assert "门诊病历" in record.text
+    assert "处方笺" not in record.text
+
+    western = client.get(f"/print/western-prescription/{encounter['id']}")
+    assert western.status_code == 200
+    assert "处方笺" in western.text
+    assert "门诊病历" not in western.text
+
+    tcm = client.get(f"/print/tcm-prescription/{encounter['id']}")
+    assert tcm.status_code == 200
+    assert "血府逐瘀汤" in tcm.text
+    assert "桃仁" in tcm.text
+
+
 def test_print_receipt(client, auth):
     encounter, payment = setup_paid_encounter(client, auth)
     r = client.get(f"/print/receipt/{payment['id']}")

@@ -8,11 +8,19 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import settings
 from app.modules.billing.service import get_payment
+from app.modules.print.documents import (
+    render_full_set,
+    render_record,
+    render_tcm,
+    render_western,
+)
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
 from app.modules.lis.service import get_request
 from app.modules.patient.service import get_patient
+from app.modules.staff.models import Department
+from app.modules.tcm.models import TcmPrescription
 from app.modules.registration.service import get_registration
 from app.modules.staff.service import get_doctor
 
@@ -20,7 +28,11 @@ router = APIRouter(prefix="/print", tags=["print"])
 
 
 def _clinic_meta() -> dict:
-    return {"name": "社区卫生服务中心（演示）", "phone": "0571-12345678", "address": "演示地址"}
+    return {
+        "name": settings.CLINIC_NAME,
+        "phone": settings.CLINIC_PHONE,
+        "address": settings.CLINIC_ADDRESS,
+    }
 
 
 def _collect(db: Session, encounter_id: int) -> dict:
@@ -50,6 +62,8 @@ def _collect(db: Session, encounter_id: int) -> dict:
         lines.append(
             {
                 "name": item.drug_name,
+                "spec": item.drug.spec if item.drug else "",
+                "unit": item.drug.unit if item.drug else "",
                 "qty": item.quantity,
                 "price": item.unit_price,
                 "amount": amount,
@@ -60,11 +74,61 @@ def _collect(db: Session, encounter_id: int) -> dict:
         "encounter": encounter,
         "patient_name": patient.name if patient else "（未知患者）",
         "patient_id_number": patient.id_number if patient else "",
+        "patient_gender": {"male": "男", "female": "女"}.get(
+            patient.gender if patient else "", "不详"
+        ),
+        "patient_age": patient.age if patient else None,
+        "patient_address": patient.address if patient else "",
+        "patient_phone": patient.phone if patient else "",
+        "allergy": (
+            patient.allergy_label.replace("过敏史", "", 1).strip()
+            if patient
+            else "不详"
+        ),
+        "department_name": (
+            db.get(Department, doctor.department_id).name
+            if doctor and db.get(Department, doctor.department_id)
+            else ""
+        ),
         "doctor_name": doctor.name if doctor else "（未知医师）",
         "record": record,
+        "record_no": f"BL{encounter.created_at:%Y%m%d}{encounter.id:04d}",
+        "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
         "lines": lines,
         "total": round(total, 2),
+        "tcm": _tcm_prescriptions(db, encounter_id),
     }
+
+
+def _tcm_prescriptions(db: Session, encounter_id: int) -> list[dict]:
+    rows = (
+        db.query(TcmPrescription)
+        .filter(TcmPrescription.encounter_id == encounter_id)
+        .order_by(TcmPrescription.id)
+        .all()
+    )
+    result = []
+    for rx in rows:
+        result.append(
+            {
+                "id": rx.id,
+                "prescription_no": rx.prescription_no,
+                "formula_name": rx.formula_name,
+                "packs": rx.packs,
+                "decoct_service": rx.decoct_service,
+                "decoction_method": rx.decoction_method,
+                "total": rx.total_amount,
+                "items": [
+                    {
+                        "name": item.herb_name,
+                        "dose": item.dose_g,
+                        "special": item.special,
+                    }
+                    for item in rx.items
+                ],
+            }
+        )
+    return result
 
 
 PRESCRIPTION_CSS = """
@@ -181,7 +245,34 @@ def print_prescription(encounter_id: int, db: Session = Depends(get_db)):
         data = _collect(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(render_prescription(data))
+    return HTMLResponse(render_full_set(data))
+
+
+@router.get("/medical-record/{encounter_id}", response_class=HTMLResponse)
+def print_medical_record(encounter_id: int, db: Session = Depends(get_db)):
+    try:
+        data = _collect(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return HTMLResponse(render_record(data))
+
+
+@router.get("/western-prescription/{encounter_id}", response_class=HTMLResponse)
+def print_western(encounter_id: int, db: Session = Depends(get_db)):
+    try:
+        data = _collect(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return HTMLResponse(render_western(data))
+
+
+@router.get("/tcm-prescription/{encounter_id}", response_class=HTMLResponse)
+def print_tcm(encounter_id: int, db: Session = Depends(get_db)):
+    try:
+        data = _collect(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return HTMLResponse(render_tcm(data))
 
 
 @router.get("/receipt/{payment_id}", response_class=HTMLResponse)
