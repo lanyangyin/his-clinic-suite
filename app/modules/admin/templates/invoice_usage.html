@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}发票使用明细 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>发票使用明细</h2>
+<form class="inline" method="get" action="/admin/invoice-usage">
+  <label>开始日期<input type="date" name="start_date" value="{{ start_date }}"></label>
+  <label>结束日期<input type="date" name="end_date" value="{{ end_date }}"></label>
+  <button type="submit">查询</button>
+</form>
+
+<div class="cards">
+  <div class="card"><div class="num">{{ data.total }}</div><div class="label">发票数量</div></div>
+  <div class="card"><div class="num">{{ data.printed_count }}</div><div class="label">打印次数</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ data.void_count }}</div><div class="label">已作废</div></div>
+</div>
+
+<div class="panel">
+  <h3>号段使用</h3>
+  <table>
+    <tr><th>前缀</th><th>起止</th><th>已用</th><th>剩余</th><th>分配</th><th>状态</th><th>发票数</th><th>作废</th></tr>
+    {% for row in data.batches %}
+    <tr>
+      <td>{{ row.prefix }}</td><td>{{ row.start_no }} - {{ row.end_no }}</td>
+      <td>{{ row.used }}</td><td>{{ row.remaining }}</td>
+      <td>{{ row.assigned_to or '公共' }}</td>
+      <td>{{ '使用中' if row.status == 'active' else '已停用' }}</td>
+      <td>{{ row.invoice_count }}</td><td>{{ row.void_count }}</td>
+    </tr>
+    {% else %}<tr><td colspan="8">暂无号段</td></tr>{% endfor %}
+  </table>
+</div>
+
+<div class="panel">
+  <h3>发票明细</h3>
+  <table>
+    <tr><th>发票号</th><th>收费单</th><th>患者</th><th>金额</th><th>收费员</th><th>打印次数</th><th>状态</th><th>作废原因</th><th>时间</th></tr>
+    {% for row in data.invoices %}
+    <tr>
+      <td>{{ row.invoice_no }}</td><td>{{ row.payment_id }}</td><td>{{ row.patient_name }}</td>
+      <td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.created_by }}</td>
+      <td>{{ row.print_count }}</td>
+      <td>{{ '正常' if row.invoice_status == 'normal' else '已作废' }}</td>
+      <td>{{ row.void_reason }}</td>
+      <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}<tr><td colspan="9">该期间无发票</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

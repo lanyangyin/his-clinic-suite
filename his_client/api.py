@@ -572,6 +572,16 @@ class ApiClient:
             json={"counted_cash": counted_cash, "note": note},
         )
 
+    def print_invoice(self, payment_id: int) -> dict:
+        return self._request("POST", f"/invoices/payments/{payment_id}/print")
+
+    def void_invoice(self, payment_id: int, reason: str) -> dict:
+        return self._request(
+            "POST",
+            f"/invoices/payments/{payment_id}/void",
+            json={"reason": reason},
+        )
+
     def complete_treatment_followup(self, followup_id: int, payload: dict | None = None) -> dict:
         return self._request(
             "POST",

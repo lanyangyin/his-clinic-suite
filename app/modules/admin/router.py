@@ -160,6 +160,7 @@ from app.modules.invoice.service import (
     create_batch as create_invoice_batch,
     list_batches as list_invoice_batches,
 )
+from app.modules.invoice.service_ops import usage as invoice_usage
 from app.modules.gsp.schemas import (
     AcceptanceCreate,
     AcceptanceItemCreate,
@@ -2410,3 +2411,31 @@ def invoice_batch_close(
     except Exception as e:  # noqa: BLE001
         msg = f"操作失败：{e}"
     return RedirectResponse(f"/admin/invoice-batches?msg={quote(msg)}", status_code=302)
+
+# ---------- 发票使用明细 ----------
+
+@router.get("/invoice-usage", response_class=HTMLResponse)
+def invoice_usage_page(
+    request: Request,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        start = date.fromisoformat(start_date) if start_date else None
+        end = date.fromisoformat(end_date) if end_date else None
+    except ValueError:
+        start, end = None, None
+    return templates.TemplateResponse(
+        request,
+        "invoice_usage.html",
+        _ctx(
+            request,
+            data=invoice_usage(db, start, end),
+            start_date=start.isoformat() if start else "",
+            end_date=end.isoformat() if end else "",
+        ),
+    )

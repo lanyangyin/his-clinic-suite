@@ -22,6 +22,21 @@ class Payment(Base):
     # 发票票据号（收费时生成）
     invoice_no: Mapped[str | None] = mapped_column(String(30), nullable=True)
     invoice_batch_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # normal 正常 / void 已作废
+    invoice_status: Mapped[str] = mapped_column(
+        String(20), default="normal", server_default="normal", nullable=False
+    )
+    invoice_print_count: Mapped[int] = mapped_column(
+        default=0, server_default="0", nullable=False
+    )
+    invoice_printed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    invoice_voided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    invoice_voided_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    invoice_void_reason: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )

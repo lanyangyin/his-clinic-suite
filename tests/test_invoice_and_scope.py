@@ -116,3 +116,65 @@ def test_cashier_daily_isolation(client, auth):
     assert all_data["scope"] == "all"
     assert all_data["payment_count"] >= own["payment_count"] + 1
     assert len(all_data["channels"]) >= len(own["channels"])
+
+
+def test_invoice_print_and_void(client, auth):
+    batch = client.post(
+        "/invoices/batches",
+        json={
+            "prefix": "VD",
+            "start_no": 1,
+            "end_no": 5,
+            "assigned_to": "cashier",
+        },
+        headers=auth["admin"],
+    ).json()
+    encounter = _sale(client, auth, "04")
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"], "channel": "cash"},
+        headers=auth["cashier"],
+    ).json()
+    assert payment["invoice_no"] == "VD00000001"
+
+    first = client.post(
+        f"/invoices/payments/{payment['id']}/print", headers=auth["cashier"]
+    )
+    assert first.status_code == 200
+    assert first.json()["print_count"] == 1
+    second = client.post(
+        f"/invoices/payments/{payment['id']}/print", headers=auth["cashier"]
+    )
+    assert second.json()["print_count"] == 2
+
+    no_reason = client.post(
+        f"/invoices/payments/{payment['id']}/void",
+        json={"reason": ""},
+        headers=auth["cashier"],
+    )
+    assert no_reason.status_code == 422
+    voided = client.post(
+        f"/invoices/payments/{payment['id']}/void",
+        json={"reason": "打印错误"},
+        headers=auth["cashier"],
+    )
+    assert voided.status_code == 200, voided.text
+    assert voided.json()["invoice_status"] == "void"
+    assert voided.json()["void_reason"] == "打印错误"
+    again = client.post(
+        f"/invoices/payments/{payment['id']}/print", headers=auth["cashier"]
+    )
+    assert again.status_code == 400
+
+    usage = client.get("/invoices/usage", headers=auth["admin"]).json()
+    row = next(item for item in usage["invoices"] if item["payment_id"] == payment["id"])
+    assert row["invoice_status"] == "void"
+    assert row["print_count"] == 2
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/invoice-usage")
+    assert page.status_code == 200
+    assert "发票使用明细" in page.text

@@ -441,6 +441,21 @@ class CashierWidget(QWidget):
         row2.addWidget(open_rc)
         layout.addWidget(box2)
 
+        box3 = QGroupBox("发票打印 / 作废")
+        row3 = QHBoxLayout(box3)
+        print_btn = QPushButton("登记打印")
+        print_btn.clicked.connect(self._print_invoice)
+        self.void_reason = QLineEdit()
+        self.void_reason.setPlaceholderText("作废原因")
+        void_btn = QPushButton("作废发票")
+        void_btn.clicked.connect(self._void_invoice)
+        row3.addWidget(print_btn)
+        row3.addWidget(self.void_reason)
+        row3.addWidget(void_btn)
+        layout.addWidget(box3)
+        self.invoice_msg = QLabel("")
+        layout.addWidget(self.invoice_msg)
+
         layout.addStretch(1)
         return page
 
@@ -555,3 +570,28 @@ class CashierWidget(QWidget):
             f"已交班，应有 {shift['expected_cash']:.2f}，差异 {shift['difference']:.2f}"
         )
         self._load_daily()
+
+    def _print_invoice(self) -> None:
+        try:
+            row = self.api.print_invoice(self.pr_payment_id.value())
+        except ApiError as e:
+            self.invoice_msg.setText(f"打印登记失败（{e.status_code}）：{e.detail}")
+            return
+        self.invoice_msg.setText(
+            f"发票 {row['invoice_no']} 已登记打印，第 {row['print_count']} 次"
+        )
+        QDesktopServices.openUrl(
+            QUrl(self.api.receipt_print_url(self.pr_payment_id.value()))
+        )
+
+    def _void_invoice(self) -> None:
+        reason = self.void_reason.text().strip()
+        if not reason:
+            self.invoice_msg.setText("请填写作废原因")
+            return
+        try:
+            row = self.api.void_invoice(self.pr_payment_id.value(), reason)
+        except ApiError as e:
+            self.invoice_msg.setText(f"作废失败（{e.status_code}）：{e.detail}")
+            return
+        self.invoice_msg.setText(f"发票 {row['invoice_no']} 已作废")

@@ -22,3 +22,12 @@ class InvoiceBatchResponse(BaseModel):
     note: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class InvoicePrintResponse(BaseModel):
+    payment_id: int
+    invoice_no: str | None
+    invoice_status: str
+    print_count: int
+
+class InvoiceVoid(BaseModel):
+    reason: str = Field(min_length=1, max_length=200)

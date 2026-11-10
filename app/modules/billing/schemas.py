@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -21,6 +23,12 @@ class PaymentResponse(BaseModel):
     # 发票票据号
     invoice_no: str | None = None
     invoice_batch_id: int | None = None
+    invoice_status: str = "normal"
+    invoice_print_count: int = 0
+    invoice_printed_at: datetime | None = None
+    invoice_voided_at: datetime | None = None
+    invoice_voided_by: str = ""
+    invoice_void_reason: str = ""
     channel: str = "cash"
     channel_trade_no: str = ""
     channel_status: str = "success"
