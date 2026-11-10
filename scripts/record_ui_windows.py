@@ -499,6 +499,7 @@ class DemoController:
             "GET", "/payments/", params={"encounter_id": self.encounter_id}
         )
         assert payments and payments[0]["status"] == "paid"
+        assert abs(payments[0]["amount"] - 185.0) < 0.01, payments[0]
         self.scene(f"✅ 收费完成：{payments[0]['amount']:.2f} 元")
 
         self.scene("⑨ 治疗室窗口：知情同意 → 开始 → 完成处置", self.treatment)
@@ -551,7 +552,7 @@ class DemoController:
         assert sum(row["quantity"] for row in stock) == 10
         self.scene("✅ 入库完成，总库 10 盒")
 
-        self.scene("⑨ 药房窗口：向库房申请领用", self.pharmacy)
+        self.scene("⑪ 药房窗口：向库房申请领用", self.pharmacy)
         out_tab = self.switch_inner(self.pharmacy, "领用出库")
         self.click(out_tab, "刷新药品")
         self.set_combo(self.pharmacy.out_drug, f"演示阿莫西林{self.suffix}")
@@ -561,7 +562,7 @@ class DemoController:
         self.click(out_tab, "提交领用申请")
         self.scene("✅ 领用申请已提交")
 
-        self.scene("⑩ 库房窗口：审核并出库给药房", self.warehouse)
+        self.scene("⑫ 库房窗口：审核并出库给药房", self.warehouse)
         handle_tab = self.switch_inner(self.warehouse, "出库处理")
         self.click(handle_tab, "刷新出库单")
         pendings = self.warehouse_api.call(
@@ -581,7 +582,7 @@ class DemoController:
         assert sum(row["quantity"] for row in stock) == 2
         self.scene("✅ 出库完成，药房库存 2 盒")
 
-        self.scene("⑪ 药房窗口：取药码核对 → 叫号 → 签字发药", self.pharmacy)
+        self.scene("⑬ 药房窗口：取药码核对 → 叫号 → 签字发药", self.pharmacy)
         disp_tab = self.switch_inner(self.pharmacy, "发药")
         self.pharmacy._load_worklist()
         target_index = next(
@@ -604,7 +605,7 @@ class DemoController:
         assert all(row["encounter_id"] != self.encounter_id for row in remaining)
         self.scene("✅ 取药码核对、发药、退药完成")
 
-        self.scene("⑫ 收费员窗口：开班与日结", self.cashier)
+        self.scene("⑭ 收费员窗口：开班与日结", self.cashier)
         shift_tab = self.switch_inner(self.cashier, "交班")
         daily = self.cashier_api.call("GET", "/cashier/daily")
         if not any(row.get("status") == "open" for row in daily["shifts"]):
