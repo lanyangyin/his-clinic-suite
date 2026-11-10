@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -113,9 +114,11 @@ class DoctorWidget(QWidget):
             gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
             age = item.get("age")
             allergy = item.get("allergy_label") or "不详"
+            level = item.get("triage_level")
+            level_text = f"[{level}级]" if level else ""
             values = [
                 str(item["registration_id"]),
-                f"{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
+                f"{level_text}{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 str(item.get("encounter_id") or "—"),
@@ -136,9 +139,17 @@ class DoctorWidget(QWidget):
         allergy = item.get("allergy_label") or "不详"
         self.wb_patient.setText(
             f"{item['patient_name']} · {gender}/{age if age is not None else '—'}岁 · "
-            f"过敏：{allergy} · 挂号 {item['registration_id']} · "
-            f"就诊 {item.get('encounter_id') or '未接诊'}"
+            f"过敏：{allergy} · 分诊 {item.get('triage_level') or '—'} 级 · "
+            f"{item.get('vital_summary') or '未测生命体征'} · "
+            f"挂号 {item['registration_id']} · 就诊 {item.get('encounter_id') or '未接诊'}"
         )
+        if item.get("isolation"):
+            self.wb_patient.setText(self.wb_patient.text() + " · 隔离提示")
+            self.wb_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+        elif item.get("allergy_label") not in (None, "", "无过敏史", "过敏史不详"):
+            self.wb_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+        else:
+            self.wb_patient.setStyleSheet("")
         self.wb_diagnosis.setText(item.get("diagnosis") or "")
         self.wb_start.setEnabled(not item.get("encounter_id"))
         if item.get("encounter_id"):
@@ -830,10 +841,33 @@ class DoctorWidget(QWidget):
         try:
             item = self.api.add_prescription(self.rx_encounter_id.value(), payload)
         except ApiError as e:
-            self.rx_msg.setText(f"开方失败（{e.status_code}）：{e.detail}")
-            return
+            if e.status_code == 400 and "过敏" in (e.detail or ""):
+                reason, ok = QInputDialog.getText(
+                    self,
+                    "过敏史冲突",
+                    f"{e.detail}\n\n如确认可继续使用，请填写 override 理由：",
+                )
+                if not ok or not reason.strip():
+                    self.rx_msg.setText("已取消开方：患者过敏史与药品冲突")
+                    return
+                payload["allergy_override_reason"] = reason.strip()
+                try:
+                    item = self.api.add_prescription(
+                        self.rx_encounter_id.value(), payload
+                    )
+                except ApiError as retry_error:
+                    self.rx_msg.setText(
+                        f"开方失败（{retry_error.status_code}）：{retry_error.detail}"
+                    )
+                    return
+            else:
+                self.rx_msg.setText(f"开方失败（{e.status_code}）：{e.detail}")
+                return
         warning = f"；医保提醒：{item['insurance_warning']}" if item.get("insurance_warning") else ""
-        self.rx_msg.setText(f"开方成功：{item['drug_name']} × {item['quantity']}{warning}")
+        allergy = f"；过敏冲突已 override：{item['allergy_warning']}" if item.get("allergy_warning") else ""
+        self.rx_msg.setText(
+            f"开方成功：{item['drug_name']} × {item['quantity']}{warning}{allergy}"
+        )
         self._refresh_prescriptions()
 
     def _refresh_prescriptions(self) -> None:

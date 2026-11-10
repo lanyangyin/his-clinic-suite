@@ -749,10 +749,12 @@ class ApiClient:
         return self._request("POST", f"/pharmacy/dispense/{dispense_id}/return")
 
     # ---- 分诊 ----
-    def create_triage_ticket(self, registration_id: int) -> dict:
-        return self._request(
-            "POST", "/triage/tickets", json={"registration_id": registration_id}
-        )
+    def create_triage_ticket(
+        self, registration_id: int, payload: dict | None = None
+    ) -> dict:
+        body = {"registration_id": registration_id}
+        body.update(payload or {})
+        return self._request("POST", "/triage/tickets", json=body)
 
     def triage_queue(self) -> list:
         return self._request("GET", "/triage/queue")

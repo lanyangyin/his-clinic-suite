@@ -6,10 +6,14 @@ from sqlalchemy.orm import Session
 from app.modules.registration.service import get_registration
 
 from .models import TriageTicket
+from .schemas import TicketCreate
 
 
-def create_ticket(db: Session, registration_id: int) -> TriageTicket:
-    """挂号后入分诊队列：同一挂号只能有一张叫号单。"""
+def create_ticket(
+    db: Session, data: TicketCreate, operator: str = ""
+) -> TriageTicket:
+    """挂号后入分诊队列：同一挂号只能有一张叫号单，并记录预检分诊。"""
+    registration_id = data.registration_id
     if not get_registration(db, registration_id):
         raise ValueError("挂号记录不存在")
 
@@ -21,7 +25,22 @@ def create_ticket(db: Session, registration_id: int) -> TriageTicket:
     if existing:
         raise ValueError("该挂号已在分诊队列中")
 
-    ticket = TriageTicket(registration_id=registration_id, status="waiting")
+    ticket = TriageTicket(
+        registration_id=registration_id,
+        status="waiting",
+        triage_level=data.triage_level,
+        chief_complaint=data.chief_complaint,
+        temperature=data.temperature,
+        pulse=data.pulse,
+        respiration=data.respiration,
+        systolic=data.systolic,
+        diastolic=data.diastolic,
+        spo2=data.spo2,
+        pain_score=data.pain_score,
+        isolation=data.isolation,
+        assessed_by=operator,
+        assessed_at=datetime.now(),
+    )
     db.add(ticket)
     try:
         db.commit()

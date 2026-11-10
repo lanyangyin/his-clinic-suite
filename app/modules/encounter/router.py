@@ -167,10 +167,10 @@ def add_item(
     encounter_id: int,
     data: PrescriptionItemCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("doctor")),
+    user=Depends(require_role("doctor")),
 ):
     try:
-        return add_prescription_item(db, encounter_id, data)
+        return add_prescription_item(db, encounter_id, data, user.username)
     except EncounterClosedError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except PrescriptionRuleError as e:

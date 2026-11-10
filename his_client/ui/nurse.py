@@ -1,7 +1,9 @@
 """护士工作站：门诊分诊叫号、治疗执行。"""
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -35,15 +37,58 @@ class NurseWidget(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        box = QGroupBox("分诊登记")
-        row = QHBoxLayout(box)
+        box = QGroupBox("预检分诊登记")
+        grid = QGridLayout(box)
         self.triage_reg_id = QSpinBox()
         self.triage_reg_id.setRange(1, 10_000_000)
+        self.triage_level = QComboBox()
+        for value, label in (
+            (1, "1 级 濒危"), (2, "2 级 危重"), (3, "3 级 急症"), (4, "4 级 非急症")
+        ):
+            self.triage_level.addItem(label, value)
+        self.triage_level.setCurrentIndex(3)
+        self.triage_complaint = QLineEdit()
+        self.triage_complaint.setPlaceholderText("主诉，如 胸闷气促 2 小时")
+        self.triage_temp = QLineEdit()
+        self.triage_temp.setPlaceholderText("℃")
+        self.triage_pulse = QLineEdit()
+        self.triage_pulse.setPlaceholderText("次/分")
+        self.triage_resp = QLineEdit()
+        self.triage_resp.setPlaceholderText("次/分")
+        self.triage_sbp = QLineEdit()
+        self.triage_sbp.setPlaceholderText("收缩压")
+        self.triage_dbp = QLineEdit()
+        self.triage_dbp.setPlaceholderText("舒张压")
+        self.triage_spo2 = QLineEdit()
+        self.triage_spo2.setPlaceholderText("%")
+        self.triage_pain = QLineEdit()
+        self.triage_pain.setPlaceholderText("0–10")
+        self.triage_isolation = QCheckBox("隔离/传染病提示")
         submit = QPushButton("登记分诊")
         submit.clicked.connect(self._create_ticket)
-        row.addWidget(QLabel("挂号 ID"))
-        row.addWidget(self.triage_reg_id)
-        row.addWidget(submit)
+
+        grid.addWidget(QLabel("挂号 ID*"), 0, 0)
+        grid.addWidget(self.triage_reg_id, 0, 1)
+        grid.addWidget(QLabel("分诊级别*"), 0, 2)
+        grid.addWidget(self.triage_level, 0, 3)
+        grid.addWidget(QLabel("主诉*"), 0, 4)
+        grid.addWidget(self.triage_complaint, 0, 5, 1, 3)
+        grid.addWidget(QLabel("体温*"), 1, 0)
+        grid.addWidget(self.triage_temp, 1, 1)
+        grid.addWidget(QLabel("脉搏*"), 1, 2)
+        grid.addWidget(self.triage_pulse, 1, 3)
+        grid.addWidget(QLabel("呼吸*"), 1, 4)
+        grid.addWidget(self.triage_resp, 1, 5)
+        grid.addWidget(QLabel("SpO2*"), 1, 6)
+        grid.addWidget(self.triage_spo2, 1, 7)
+        grid.addWidget(QLabel("血压*"), 2, 0)
+        grid.addWidget(self.triage_sbp, 2, 1)
+        grid.addWidget(QLabel("/"), 2, 2)
+        grid.addWidget(self.triage_dbp, 2, 3)
+        grid.addWidget(QLabel("疼痛评分"), 2, 4)
+        grid.addWidget(self.triage_pain, 2, 5)
+        grid.addWidget(self.triage_isolation, 2, 6, 1, 2)
+        grid.addWidget(submit, 3, 7)
         layout.addWidget(box)
 
         queue_row = QHBoxLayout()
@@ -59,8 +104,10 @@ class NurseWidget(QWidget):
         queue_row.addStretch(1)
         layout.addLayout(queue_row)
 
-        self.queue_table = QTableWidget(0, 3)
-        self.queue_table.setHorizontalHeaderLabels(["叫号单 ID", "挂号 ID", "状态"])
+        self.queue_table = QTableWidget(0, 7)
+        self.queue_table.setHorizontalHeaderLabels(
+            ["叫号单", "挂号", "级别", "体温", "血压", "SpO2", "状态"]
+        )
         self.queue_table.cellClicked.connect(self._select_ticket_patient)
         layout.addWidget(self.queue_table)
 
@@ -96,20 +143,62 @@ class NurseWidget(QWidget):
         allergy = patient.get("allergy_label") or "不详"
         self.triage_patient.setText(
             f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
-            f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
+            f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy} · "
+            f"分诊：{self.queue_table.item(row, 2).text()} · "
+            f"体温 {self.queue_table.item(row, 3).text()} · "
+            f"血压 {self.queue_table.item(row, 4).text()} · "
+            f"SpO2 {self.queue_table.item(row, 5).text()}"
         )
         if patient.get("allergy_status") == "present":
             self.triage_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
         else:
             self.triage_patient.setStyleSheet("")
 
+    def _parse_number(self, field: QLineEdit, label: str, cast=float):
+        text = field.text().strip()
+        if not text:
+            raise ValueError(f"请填写{label}")
+        try:
+            return cast(text)
+        except ValueError:
+            raise ValueError(f"{label}必须是数字") from None
+
     def _create_ticket(self) -> None:
         try:
-            ticket = self.api.create_triage_ticket(self.triage_reg_id.value())
+            temperature = self._parse_number(self.triage_temp, "体温")
+            pulse = self._parse_number(self.triage_pulse, "脉搏", int)
+            respiration = self._parse_number(self.triage_resp, "呼吸", int)
+            systolic = self._parse_number(self.triage_sbp, "收缩压", int)
+            diastolic = self._parse_number(self.triage_dbp, "舒张压", int)
+            spo2 = self._parse_number(self.triage_spo2, "SpO2", int)
+        except ValueError as e:
+            self.triage_msg.setText(str(e))
+            return
+        if not self.triage_complaint.text().strip():
+            self.triage_msg.setText("请填写主诉")
+            return
+        pain_text = self.triage_pain.text().strip()
+        payload = {
+            "triage_level": self.triage_level.currentData(),
+            "chief_complaint": self.triage_complaint.text().strip(),
+            "temperature": temperature,
+            "pulse": pulse,
+            "respiration": respiration,
+            "systolic": systolic,
+            "diastolic": diastolic,
+            "spo2": spo2,
+            "pain_score": int(pain_text) if pain_text else None,
+            "isolation": self.triage_isolation.isChecked(),
+        }
+        try:
+            ticket = self.api.create_triage_ticket(self.triage_reg_id.value(), payload)
         except ApiError as e:
             self.triage_msg.setText(f"分诊失败（{e.status_code}）：{e.detail}")
             return
-        self.triage_msg.setText(f"分诊成功：叫号单 {ticket['id']}（{zh('ticket_status', ticket['status'])}）")
+        self.triage_msg.setText(
+            f"分诊成功：叫号单 {ticket['id']}，{ticket['triage_level']} 级，"
+            f"{ticket.get('vital_summary') or ''}"
+        )
         self._load_queue()
 
     def _load_queue(self) -> None:
@@ -120,11 +209,17 @@ class NurseWidget(QWidget):
             return
         self.queue_table.setRowCount(len(tickets))
         for row, ticket in enumerate(tickets):
-            self.queue_table.setItem(row, 0, QTableWidgetItem(str(ticket["id"])))
-            self.queue_table.setItem(
-                row, 1, QTableWidgetItem(str(ticket["registration_id"]))
-            )
-            self.queue_table.setItem(row, 2, QTableWidgetItem(zh('ticket_status', ticket["status"])))
+            values = [
+                str(ticket["id"]),
+                str(ticket["registration_id"]),
+                f"{ticket.get('triage_level') or 4} 级",
+                f"{ticket['temperature']:g}℃" if ticket.get("temperature") is not None else "—",
+                ticket.get("bp_display") or "—",
+                f"{ticket['spo2']}%" if ticket.get("spo2") is not None else "—",
+                zh("ticket_status", ticket["status"]),
+            ]
+            for col, value in enumerate(values):
+                self.queue_table.setItem(row, col, QTableWidgetItem(str(value)))
         self.triage_msg.setText(f"当前队列 {len(tickets)} 人")
 
     def _call_ticket(self) -> None:

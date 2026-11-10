@@ -48,6 +48,12 @@ class PrescriptionItem(Base):
     insurance_category: Mapped[str] = mapped_column(
         String(10), default="", server_default="", nullable=False
     )
+    # 过敏冲突：命中时记录冲突说明；医生 override 后记录理由和操作人
+    allergy_warning: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    allergy_override_reason: Mapped[str | None] = mapped_column(
+        String(300), nullable=True
+    )
+    allergy_override_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # 字符串关系：由同一 registry 解析，不跨模块 import models
     drug = relationship("Drug")

@@ -22,6 +22,8 @@ class PrescriptionItemCreate(BaseModel):
     frequency: str = Field(default="", max_length=20)
     route: str = Field(default="", max_length=20)
     days: int = Field(default=1, ge=1, le=365)
+    # 过敏冲突时医生填写理由后强制放行，服务端留痕
+    allergy_override_reason: str = Field(default="", max_length=300)
 
 
 class PrescriptionItemResponse(BaseModel):
@@ -37,6 +39,9 @@ class PrescriptionItemResponse(BaseModel):
     days: int
     insurance_warning: str | None = None
     insurance_category: str = ""
+    allergy_warning: str | None = None
+    allergy_override_reason: str | None = None
+    allergy_override_by: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -16,6 +16,8 @@ from app.modules.insurance.adapter import (
     InsuranceUnavailable,
     check_prescription,
 )
+from app.modules.patient.allergy import allergy_conflict
+from app.modules.patient.service import get_patient
 from app.modules.registration.service import (
     get_patient_registration_ids,
     get_registration,
@@ -88,7 +90,7 @@ def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
 
 
 def add_prescription_item(
-    db: Session, encounter_id: int, data: PrescriptionItemCreate
+    db: Session, encounter_id: int, data: PrescriptionItemCreate, operator: str = ""
 ) -> PrescriptionItem:
     """给就诊添加一条处方明细：单价取药品基准价（快照进明细）。
 
@@ -120,6 +122,20 @@ def add_prescription_item(
     # 合理用药：特殊使用级抗菌药物需会诊审批
     if drug.antibiotic_level == 3:
         raise PrescriptionRuleError("特殊使用级抗菌药物需会诊审批，暂不允许开立")
+
+    # 过敏史硬拦截：命中必须由医生填写 override 理由，留下操作人
+    allergy_warning = None
+    registration = get_registration(db, encounter.registration_id)
+    patient = get_patient(db, registration.patient_id) if registration else None
+    if patient and patient.allergy_status == "present":
+        conflict = allergy_conflict(patient.allergy_detail, drug.name)
+        if conflict:
+            reason = (data.allergy_override_reason or "").strip()
+            if not reason:
+                raise PrescriptionRuleError(
+                    f"{conflict}。如确认可继续使用，请填写 override 理由后重试"
+                )
+            allergy_warning = conflict
 
     # 医保目录校验：按贯标码/名称+剂型+规格确定甲乙丙类与报销比例
     category, insurance_ratio, catalog_warning = resolve_prescription_insurance(db, drug)
@@ -159,6 +175,11 @@ def add_prescription_item(
         days=data.days,
         insurance_warning="；".join(warnings) or None,
         insurance_category=category,
+        allergy_warning=allergy_warning,
+        allergy_override_reason=(
+            (data.allergy_override_reason or "").strip() if allergy_warning else None
+        ),
+        allergy_override_by=operator if allergy_warning else None,
     )
     db.add(item)
     db.flush()
@@ -332,6 +353,7 @@ def worklist(db: Session) -> list[dict]:
     from app.modules.patient.models import Patient
     from app.modules.registration.models import Registration
     from app.modules.staff.models import Doctor
+    from app.modules.triage.models import TriageTicket
 
     rows = (
         db.query(Registration, Patient, Doctor)
@@ -354,6 +376,11 @@ def worklist(db: Session) -> list[dict]:
         charges = list_charges(db, encounter.id) if encounter else []
         total = round(sum(row.amount for row in charges), 2)
         pending = round(sum(row.amount for row in charges if row.status == "pending"), 2)
+        ticket = (
+            db.query(TriageTicket)
+            .filter(TriageTicket.registration_id == registration.id)
+            .first()
+        )
         result.append(
             {
                 "registration_id": registration.id,
@@ -364,6 +391,16 @@ def worklist(db: Session) -> list[dict]:
                 "age": patient.age,
                 "birth_date": patient.birth_date,
                 "allergy_label": patient.allergy_label,
+                "triage_level": ticket.triage_level if ticket else None,
+                "temperature": ticket.temperature if ticket else None,
+                "pulse": ticket.pulse if ticket else None,
+                "respiration": ticket.respiration if ticket else None,
+                "systolic": ticket.systolic if ticket else None,
+                "diastolic": ticket.diastolic if ticket else None,
+                "spo2": ticket.spo2 if ticket else None,
+                "chief_complaint": ticket.chief_complaint if ticket else "",
+                "isolation": ticket.isolation if ticket else False,
+                "vital_summary": ticket.vital_summary if ticket else "",
                 "doctor_id": doctor.id,
                 "doctor_name": doctor.name,
                 "registration_status": registration.status,

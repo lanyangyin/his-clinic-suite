@@ -20,10 +20,10 @@ router = APIRouter(prefix="/triage", tags=["triage"])
 def new_ticket(
     data: TicketCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("nurse")),
+    user=Depends(require_role("nurse")),
 ):
     try:
-        return create_ticket(db, data.registration_id)
+        return create_ticket(db, data, user.username)
     except ValueError as e:
         code = 404 if str(e) == "挂号记录不存在" else 400
         raise HTTPException(status_code=code, detail=str(e))
