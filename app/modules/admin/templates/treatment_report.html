@@ -1,10 +1,18 @@
 {% extends "base.html" %}
 {% block title %}治疗室日报 · HIS 管理台{% endblock %}
 {% block content %}
+<style>
+@media print {
+  header, form, .no-print { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .panel { border: 0; padding: 0; }
+}
+</style>
 <h2>治疗室日报</h2>
 <form class="inline" method="get" action="/admin/treatment-report">
   <label>日期<input type="date" name="report_date" value="{{ data.date }}"></label>
   <button type="submit">查询</button>
+  <button type="button" onclick="window.print()">打印</button>
   <a href="/treatment-room/report/export.xlsx?report_date={{ data.date }}"><button type="button">导出 Excel</button></a>
 </form>
 

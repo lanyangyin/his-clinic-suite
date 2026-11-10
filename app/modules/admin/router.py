@@ -146,6 +146,7 @@ from app.modules.bi.executive import executive as executive_dashboard
 from app.modules.treatment_room.service import (
     list_followups as treatment_followups,
     list_templates as treatment_templates,
+    reconciliation as treatment_reconciliation,
     report as treatment_report,
     set_template_config,
 )
@@ -2305,3 +2306,24 @@ async def treatment_template_config(
     except Exception as e:  # noqa: BLE001
         msg = f"保存失败：{e}"
     return RedirectResponse(f"/admin/treatment-templates?msg={quote(msg)}", status_code=302)
+
+# ---------- 治疗室收费对账 ----------
+
+@router.get("/treatment-reconciliation", response_class=HTMLResponse)
+def treatment_reconciliation_page(
+    request: Request,
+    report_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        day = date.fromisoformat(report_date) if report_date else date.today()
+    except ValueError:
+        day = date.today()
+    return templates.TemplateResponse(
+        request,
+        "treatment_reconciliation.html",
+        _ctx(request, data=treatment_reconciliation(db, day)),
+    )

@@ -319,6 +319,96 @@ def _followup_row(row: TreatmentFollowUp) -> dict:
     }
 
 
+def reconciliation(db: Session, day: date | None = None) -> dict:
+    day = day or date.today()
+    start = datetime.combine(day, datetime.min.time())
+    end = datetime.combine(day, datetime.max.time())
+    cases = (
+        db.query(TreatmentRoomCase, Patient)
+        .join(Patient, TreatmentRoomCase.patient_id == Patient.id)
+        .filter(
+            TreatmentRoomCase.status == "completed",
+            TreatmentRoomCase.completed_at >= start,
+            TreatmentRoomCase.completed_at <= end,
+        )
+        .order_by(TreatmentRoomCase.id)
+        .all()
+    )
+    rows = []
+    totals = {"fee": 0.0, "material": 0.0, "total": 0.0, "paid": 0.0, "pending": 0.0, "cancelled": 0.0, "refunded": 0.0}
+    for case, patient in cases:
+        material_rows = (
+            db.query(ProcedureMaterial)
+            .filter(
+                ProcedureMaterial.source_type == "treatment_room",
+                ProcedureMaterial.source_id == case.id,
+            )
+            .all()
+        )
+        material_ids = {row.id for row in material_rows}
+        charges = []
+        if case.encounter_id is not None:
+            candidates = (
+                db.query(EncounterCharge)
+                .filter(
+                    EncounterCharge.encounter_id == case.encounter_id,
+                    EncounterCharge.source_type.in_(("treatment_room", "procedure_material")),
+                )
+                .all()
+            )
+            charges = [
+                charge
+                for charge in candidates
+                if (charge.source_type == "treatment_room" and charge.source_id == case.id)
+                or (
+                    charge.source_type == "procedure_material"
+                    and charge.source_id in material_ids
+                )
+            ]
+        fee = round(sum(row.amount for row in charges if row.charge_type == "treatment"), 2)
+        material = round(sum(row.amount for row in charges if row.charge_type == "material"), 2)
+        total = round(fee + material, 2)
+        paid = round(sum(row.amount for row in charges if row.status == "paid"), 2)
+        pending = round(sum(row.amount for row in charges if row.status == "pending"), 2)
+        cancelled = round(sum(row.amount for row in charges if row.status == "cancelled"), 2)
+        refunded = round(sum(row.amount for row in charges if row.status == "refunded"), 2)
+        if not charges:
+            status = "未计费"
+        elif pending > 0:
+            status = "待收费"
+        elif paid >= total > 0:
+            status = "已收费"
+        elif cancelled >= total > 0:
+            status = "已取消"
+        else:
+            status = "部分收费"
+        rows.append(
+            {
+                "case_id": case.id,
+                "case_no": case.case_no,
+                "patient_name": patient.name,
+                "procedure_name": case.procedure_name,
+                "encounter_id": case.encounter_id,
+                "fee": fee,
+                "material": material,
+                "total": total,
+                "paid": paid,
+                "pending": pending,
+                "cancelled": cancelled,
+                "refunded": refunded,
+                "status": status,
+            }
+        )
+        for key in totals:
+            totals[key] = round(totals[key] + ({"fee": fee, "material": material, "total": total, "paid": paid, "pending": pending, "cancelled": cancelled, "refunded": refunded}[key]), 2)
+    return {
+        "date": day,
+        "count": len(rows),
+        "rows": rows,
+        "totals": totals,
+    }
+
+
 def report(db: Session, report_date: date | None = None) -> dict:
     day = report_date or date.today()
     start = datetime.combine(day, datetime.min.time())

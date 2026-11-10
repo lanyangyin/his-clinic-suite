@@ -43,6 +43,7 @@ from .service import (
     list_rooms,
     list_templates,
     report,
+    reconciliation,
     set_template_config,
     start_case,
     workbench,
@@ -299,3 +300,11 @@ def treatment_workbench(
     _: None = Depends(require_role("treatment")),
 ):
     return workbench(db, day)
+
+@router.get("/reconciliation")
+def treatment_reconciliation(
+    day: date | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    return reconciliation(db, day)

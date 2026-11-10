@@ -513,3 +513,53 @@ def test_treatment_room_workbench(client, auth):
         client.get("/treatment-room/workbench", headers=auth["cashier"]).status_code
         == 403
     )
+
+
+def test_treatment_reconciliation_and_print_page(client, auth):
+    from datetime import date
+
+    patient, encounter, _, _, case = _setup(client, auth)
+    client.post(
+        f"/treatment-room/cases/{case['id']}/start",
+        json={"consent": True, "anesthesia": "局麻", "findings": "裂伤"},
+        headers=auth["treatment"],
+    )
+    client.post(
+        f"/treatment-room/cases/{case['id']}/complete",
+        json={"procedure_detail": "清创缝合 2 针"},
+        headers=auth["treatment"],
+    )
+    data = client.get(
+        "/treatment-room/reconciliation", headers=auth["treatment"]
+    ).json()
+    row = next(r for r in data["rows"] if r["case_id"] == case["id"])
+    assert row["fee"] == 80.0
+    assert row["total"] == 80.0
+    assert row["status"] == "待收费"
+    assert data["totals"]["pending"] >= 80.0
+
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"], "channel": "cash"},
+        headers=auth["cashier"],
+    )
+    paid = client.get(
+        "/treatment-room/reconciliation", headers=auth["treatment"]
+    ).json()
+    paid_row = next(r for r in paid["rows"] if r["case_id"] == case["id"])
+    assert paid_row["status"] == "已收费"
+    assert paid_row["paid"] == 80.0
+
+    assert (
+        client.get("/treatment-room/reconciliation", headers=auth["doctor"]).status_code
+        == 403
+    )
+
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/treatment-reconciliation")
+    assert page.status_code == 200
+    assert "治疗室收费对账" in page.text
+    assert "打印" in page.text
