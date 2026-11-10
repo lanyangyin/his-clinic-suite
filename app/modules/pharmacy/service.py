@@ -315,8 +315,24 @@ def deduct_stock(
 ) -> None:
     """按近效期先出扣减库存（不提交事务）；不足抛 ValueError。
 
-    过期批次自然锁定（不在可选范围）。门诊发药与住院摆药共用，每次扣减记流水。
+    过期批次和未完成召回批次自然锁定（不在可选范围）。门诊发药与住院摆药共用。
     """
+    from app.modules.gsp.models import GspRecall
+
+    recalls = (
+        db.query(GspRecall)
+        .filter(
+            GspRecall.drug_name == drug.name,
+            GspRecall.status == "initiated",
+        )
+        .all()
+    )
+
+    def _recalled(batch_no: str) -> bool:
+        return any(
+            (not row.batch_no) or row.batch_no == batch_no for row in recalls
+        )
+
     stock_rows = (
         db.query(DrugStock)
         .filter(
@@ -328,9 +344,13 @@ def deduct_stock(
         .all()
     )
     remaining = quantity
+    blocked = False
     for stock in stock_rows:
         if remaining <= 0:
             break
+        if _recalled(stock.batch_no):
+            blocked = True
+            continue
         take = min(stock.quantity, remaining)
         if take <= 0:
             continue
@@ -362,6 +382,10 @@ def deduct_stock(
         )
         remaining -= take
     if remaining > 0:
+        if blocked:
+            raise ValueError(
+                f"药品「{drug.name}」存在未完成召回批次，禁止发药/出库"
+            )
         raise ValueError(f"库存不足：{drug.name}")
 
 
