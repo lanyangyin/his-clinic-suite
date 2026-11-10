@@ -154,6 +154,19 @@ from app.modules.treatment_room.schemas import TemplateConfigUpdate
 from app.modules.charges.service import list_items as list_charge_items
 from app.modules.materials.service import list_items as list_materials
 from app.modules.cashier.service import daily as cashier_daily
+from app.modules.stocktake.schemas import (
+    StocktakeCounts,
+    StocktakeCreate,
+    StocktakeItemUpdate,
+)
+from app.modules.stocktake.service import (
+    cancel_stocktake,
+    complete_stocktake,
+    create_stocktake,
+    get_stocktake,
+    list_stocktakes,
+    save_counts,
+)
 from app.modules.invoice.schemas import InvoiceBatchCreate
 from app.modules.invoice.service import (
     close_batch as close_invoice_batch,
@@ -2439,3 +2452,117 @@ def invoice_usage_page(
             end_date=end.isoformat() if end else "",
         ),
     )
+
+# ---------- 药品/耗材盘点 ----------
+
+@router.get("/stocktakes", response_class=HTMLResponse)
+def stocktakes_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "stocktakes.html",
+        _ctx(
+            request,
+            takes=list_stocktakes(db),
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/stocktakes")
+async def stocktake_create(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        take = create_stocktake(
+            db,
+            StocktakeCreate(
+                kind=form.get("kind") or "drug",
+                warehouse=(form.get("warehouse") or "总库").strip(),
+                title=(form.get("title") or "").strip(),
+                note=(form.get("note") or "").strip(),
+            ),
+            request.session.get("admin_user", "admin"),
+        )
+        msg = f"盘点单已创建：{take.take_no}"
+    except Exception as e:  # noqa: BLE001
+        msg = f"创建失败：{e}"
+    return RedirectResponse(f"/admin/stocktakes?msg={quote(msg)}", status_code=302)
+
+
+@router.get("/stocktakes/{take_id}", response_class=HTMLResponse)
+def stocktake_detail(request: Request, take_id: int, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    take = get_stocktake(db, take_id)
+    if not take:
+        return RedirectResponse("/admin/stocktakes", status_code=302)
+    return templates.TemplateResponse(
+        request,
+        "stocktake_detail.html",
+        _ctx(
+            request,
+            take=take,
+            msg=request.query_params.get("msg", ""),
+        ),
+    )
+
+
+@router.post("/stocktakes/{take_id}/counts")
+async def stocktake_counts(
+    request: Request, take_id: int, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    items = []
+    for key, value in form.items():
+        if not key.startswith("actual_"):
+            continue
+        try:
+            actual = int(value or 0)
+        except ValueError:
+            actual = 0
+        items.append(
+            StocktakeItemUpdate(
+                item_id=int(key.removeprefix("actual_")), actual_quantity=actual
+            )
+        )
+    try:
+        save_counts(db, take_id, StocktakeCounts(items=items))
+        msg = "实盘数量已保存"
+    except Exception as e:  # noqa: BLE001
+        msg = f"保存失败：{e}"
+    return RedirectResponse(f"/admin/stocktakes/{take_id}?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/stocktakes/{take_id}/complete")
+def stocktake_complete(request: Request, take_id: int, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        complete_stocktake(db, take_id, request.session.get("admin_user", "admin"))
+        msg = "盘点已完成，库存已调整"
+    except Exception as e:  # noqa: BLE001
+        msg = f"完成失败：{e}"
+    return RedirectResponse(f"/admin/stocktakes/{take_id}?msg={quote(msg)}", status_code=302)
+
+
+@router.post("/stocktakes/{take_id}/cancel")
+def stocktake_cancel(request: Request, take_id: int, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        cancel_stocktake(db, take_id)
+        msg = "盘点已取消"
+    except Exception as e:  # noqa: BLE001
+        msg = f"取消失败：{e}"
+    return RedirectResponse(f"/admin/stocktakes/{take_id}?msg={quote(msg)}", status_code=302)

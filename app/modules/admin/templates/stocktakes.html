@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}药品/耗材盘点 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>药品 / 耗材盘点</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<div class="panel">
+  <form class="inline" method="post" action="/admin/stocktakes">
+    <label>类型
+      <select name="kind"><option value="drug">药品</option><option value="material">耗材</option></select>
+    </label>
+    <label>耗材库房<input name="warehouse" value="总库"></label>
+    <label>标题<input name="title" placeholder="如 2026-11 月度盘点"></label>
+    <label>备注<input name="note"></label>
+    <button type="submit">新建盘点单</button>
+  </form>
+</div>
+
+<div class="panel">
+  <table>
+    <tr><th>盘点单</th><th>类型</th><th>库房</th><th>状态</th><th>创建人</th><th>创建时间</th><th>明细</th></tr>
+    {% for row in takes %}
+    <tr>
+      <td><a href="/admin/stocktakes/{{ row.id }}">{{ row.take_no }}</a></td>
+      <td>{{ '药品' if row.kind == 'drug' else '耗材' }}</td>
+      <td>{{ row.warehouse }}</td>
+      <td>{{ {'counting': '盘点中', 'completed': '已完成', 'cancelled': '已取消'}.get(row.status, row.status) }}</td>
+      <td>{{ row.created_by }}</td>
+      <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ row.items|length }}</td>
+    </tr>
+    {% else %}<tr><td colspan="7">暂无盘点单</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}盘点单 {{ take.take_no }} · HIS 管理台{% endblock %}
+{% block content %}
+<style>
+@media print {
+  header, form, .no-print { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .panel { border: 0; padding: 0; }
+}
+</style>
+<h2>盘点单 {{ take.take_no }}</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p>{{ take.title }} · {{ '药品' if take.kind == 'drug' else '耗材' }} · {{ take.warehouse }} · 状态 {{ take.status }}</p>
+<form method="post" action="/admin/stocktakes/{{ take.id }}/counts">
+  <div class="panel">
+    <table>
+      <tr><th>名称</th><th>规格</th><th>批号</th><th>账面</th><th>实盘</th><th>差异</th></tr>
+      {% for item in take.items %}
+      <tr>
+        <td>{{ item.name }}</td><td>{{ item.spec }}</td><td>{{ item.batch_no or '—' }}</td>
+        <td>{{ item.book_quantity }}</td>
+        <td>
+          {% if take.status == 'counting' %}
+          <input name="actual_{{ item.id }}" type="number" min="0" value="{{ item.actual_quantity if item.actual_quantity is not none else item.book_quantity }}">
+          {% else %}
+          {{ item.actual_quantity if item.actual_quantity is not none else '—' }}
+          {% endif %}
+        </td>
+        <td>{{ item.difference if item.difference is not none else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% if take.status == 'counting' %}
+  <button type="submit">保存实盘数</button>
+  </form>
+  <form method="post" action="/admin/stocktakes/{{ take.id }}/complete" style="display:inline">
+    <button type="submit" onclick="return confirm('完成盘点将按实盘数调整库存，确认？')">完成盘点</button>
+  </form>
+  <form method="post" action="/admin/stocktakes/{{ take.id }}/cancel" style="display:inline">
+    <button type="submit">取消盘点</button>
+  </form>
+  {% else %}
+  </form>
+  {% endif %}
+  <button type="button" onclick="window.print()">打印盘点单</button>
+<div class="panel" style="display:flex;justify-content:space-between;margin-top:40px">
+  <div>盘点人：__________</div><div>复核人：__________</div><div>日期：{{ take.created_at.strftime('%Y-%m-%d') }}</div>
+</div>
+{% endblock %}
