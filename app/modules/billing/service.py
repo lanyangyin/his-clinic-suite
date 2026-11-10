@@ -1,4 +1,6 @@
 from datetime import datetime
+import secrets
+import string
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -16,6 +18,26 @@ from app.modules.payment_gateway.service import CHANNELS, charge as charge_payme
 
 from .models import ChargeRefund, Payment
 from .schemas import PaymentCreate
+
+
+def _ensure_pickup_code(db: Session, encounter_id: int) -> None:
+    """收费时预生成取药码，保证首次打印收据就有码；不依赖药房先打开队列。"""
+    from app.modules.pharmacy.models import PharmacyPickupCode
+
+    existing = (
+        db.query(PharmacyPickupCode)
+        .filter(PharmacyPickupCode.encounter_id == encounter_id)
+        .first()
+    )
+    if existing:
+        return
+    alphabet = string.ascii_uppercase + string.digits
+    for _ in range(20):
+        code = "P" + "".join(secrets.choice(alphabet) for _ in range(6))
+        if not db.query(PharmacyPickupCode).filter(PharmacyPickupCode.code == code).first():
+            db.add(PharmacyPickupCode(encounter_id=encounter_id, code=code))
+            db.flush()
+            return
 
 
 def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Payment:
@@ -90,6 +112,8 @@ def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Pa
             payment.invoice_batch_id = batch.id
         else:
             payment.invoice_no = f"INV{datetime.now():%Y%m%d}{payment.id:06d}"
+        if list_prescription_items(db, encounter.id):
+            _ensure_pickup_code(db, encounter.id)
         db.commit()
     except IntegrityError:
         # 并发双收兜底：payments.encounter_id 唯一约束

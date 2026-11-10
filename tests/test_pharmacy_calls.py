@@ -155,3 +155,14 @@ def test_pharmacy_pickup_code_and_signature(client, auth):
     )
     assert used.status_code == 400
     Path(path).unlink(missing_ok=True)
+
+
+def test_pickup_code_generated_at_payment(client, auth):
+    _, encounter, _ = _paid_prescription(client, auth)
+    payments = client.get(
+        "/payments/", params={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    ).json()
+    receipt = client.get(f"/print/receipt/{payments[0]['id']}")
+    assert receipt.status_code == 200
+    assert "取药码" in receipt.text
+    assert "P" in receipt.text
