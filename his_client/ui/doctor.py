@@ -848,7 +848,7 @@ class DoctorWidget(QWidget):
                     f"{e.detail}\n\n如确认可继续使用，请填写 override 理由：",
                 )
                 if not ok or not reason.strip():
-                    self.rx_msg.setText("已取消开方：患者过敏史与药品冲突")
+                    self.rx_msg.setText(f"已取消开方：{e.detail}")
                     return
                 payload["allergy_override_reason"] = reason.strip()
                 try:
