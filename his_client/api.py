@@ -79,20 +79,49 @@ class ApiClient:
         return self._request("GET", "/charges/items/", params=params)
 
     # ---- 患者 ----
-    def list_patients(self, name: str | None = None, id_number: str | None = None) -> list:
+    def list_patients(
+        self, name: str | None = None, id_number: str | None = None, phone: str | None = None
+    ) -> list:
         params = {}
         if name:
             params["name"] = name
         if id_number:
             params["id_number"] = id_number
+        if phone:
+            params["phone"] = phone
         return self._request("GET", "/patients/", params=params)
 
-    def create_patient(self, name: str, id_number: str, phone: str = "") -> dict:
+    def get_patient(self, patient_id: int) -> dict:
+        return self._request("GET", f"/patients/{patient_id}")
+
+    def get_registration(self, registration_id: int) -> dict:
+        return self._request("GET", f"/registrations/{registration_id}")
+
+    def check_patient_duplicates(
+        self, name: str = "", id_number: str = "", phone: str = ""
+    ) -> dict:
         return self._request(
-            "POST",
-            "/patients/",
-            json={"name": name, "id_number": id_number, "phone": phone or None},
+            "GET",
+            "/patients/duplicates",
+            params={"name": name, "id_number": id_number, "phone": phone},
         )
+
+    def create_patient(
+        self,
+        name: str | None = None,
+        id_number: str | None = None,
+        phone: str = "",
+        payload: dict | None = None,
+        **fields,
+    ) -> dict:
+        body = dict(payload or {})
+        if name is not None:
+            body.update({"name": name, "id_number": id_number, "phone": phone or None})
+        body.update(fields)
+        return self._request("POST", "/patients/", json=body)
+
+    def update_patient(self, patient_id: int, payload: dict) -> dict:
+        return self._request("PUT", f"/patients/{patient_id}", json=payload)
 
     # ---- 挂号 / 就诊 ----
     def create_registration(

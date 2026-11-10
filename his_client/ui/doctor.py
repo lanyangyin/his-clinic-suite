@@ -110,9 +110,12 @@ class DoctorWidget(QWidget):
             return
         self.wb_table.setRowCount(len(self.workbench_rows))
         for row, item in enumerate(self.workbench_rows):
+            gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+            age = item.get("age")
+            allergy = item.get("allergy_label") or "不详"
             values = [
                 str(item["registration_id"]),
-                item["patient_name"],
+                f"{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 str(item.get("encounter_id") or "—"),
@@ -128,8 +131,12 @@ class DoctorWidget(QWidget):
             return
         item = self.workbench_rows[row]
         self.wb_current = item
+        gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+        age = item.get("age")
+        allergy = item.get("allergy_label") or "不详"
         self.wb_patient.setText(
-            f"{item['patient_name']} · 挂号 {item['registration_id']} · "
+            f"{item['patient_name']} · {gender}/{age if age is not None else '—'}岁 · "
+            f"过敏：{allergy} · 挂号 {item['registration_id']} · "
             f"就诊 {item.get('encounter_id') or '未接诊'}"
         )
         self.wb_diagnosis.setText(item.get("diagnosis") or "")

@@ -135,8 +135,17 @@ class CashierDemo(QMainWindow):
             self.scene("挂号收费科独立演示：先建档")
             patient_tab = self.tab("患者建档")
             self.widget.p_name.setText(f"收费演示患者{self.suffix}")
+            self.widget.p_gender.setCurrentIndex(self.widget.p_gender.findData("male"))
             self.widget.p_id_number.setText(f"1101011997{self.suffix[-6:]}88")
+            self.widget.p_birth_date.setText("1997-05-20")
             self.widget.p_phone.setText("13800001234")
+            self.widget.p_address.setText("北京市东城区演示街道 1 号")
+            self.widget.p_emergency_name.setText("演示家属")
+            self.widget.p_emergency_relation.setText("配偶")
+            self.widget.p_emergency_phone.setText("13900001234")
+            self.widget.p_insurance.setCurrentIndex(self.widget.p_insurance.findData("employee"))
+            self.widget.p_allergy_status.setCurrentIndex(self.widget.p_allergy_status.findData("none"))
+            self.widget.p_privacy.setChecked(True)
             self.click(patient_tab, "建档")
             found = self.cashier.call(
                 "GET", "/patients/", params={"name": f"收费演示患者{self.suffix}"}

@@ -136,9 +136,23 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
     return {
         "patient": {
             "id": patient.id,
+            "patient_no": patient.patient_no,
             "name": patient.name,
+            "gender": patient.gender,
+            "birth_date": patient.birth_date,
+            "age": patient.age,
             "phone": patient.phone,
+            "id_type": patient.id_type,
             "id_number": patient.id_number,
+            "address": patient.address,
+            "emergency_contact_name": patient.emergency_contact_name,
+            "emergency_contact_relation": patient.emergency_contact_relation,
+            "emergency_contact_phone": patient.emergency_contact_phone,
+            "insurance_type": patient.insurance_type,
+            "allergy_status": patient.allergy_status,
+            "allergy_detail": patient.allergy_detail,
+            "allergy_label": patient.allergy_label,
+            "privacy_consent_at": patient.privacy_consent_at,
         },
         "encounters": encounters,
     }

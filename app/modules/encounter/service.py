@@ -358,7 +358,12 @@ def worklist(db: Session) -> list[dict]:
             {
                 "registration_id": registration.id,
                 "patient_id": patient.id,
+                "patient_no": patient.patient_no,
                 "patient_name": patient.name,
+                "gender": patient.gender,
+                "age": patient.age,
+                "birth_date": patient.birth_date,
+                "allergy_label": patient.allergy_label,
                 "doctor_id": doctor.id,
                 "doctor_name": doctor.name,
                 "registration_status": registration.status,

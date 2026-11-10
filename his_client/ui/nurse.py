@@ -61,7 +61,12 @@ class NurseWidget(QWidget):
 
         self.queue_table = QTableWidget(0, 3)
         self.queue_table.setHorizontalHeaderLabels(["叫号单 ID", "挂号 ID", "状态"])
+        self.queue_table.cellClicked.connect(self._select_ticket_patient)
         layout.addWidget(self.queue_table)
+
+        self.triage_patient = QLabel("")
+        self.triage_patient.setWordWrap(True)
+        layout.addWidget(self.triage_patient)
 
         self.triage_msg = QLabel("")
         self.triage_msg.setWordWrap(True)
@@ -74,6 +79,29 @@ class NurseWidget(QWidget):
             return None
         item = self.queue_table.item(row, 0)
         return int(item.text()) if item else None
+
+    def _select_ticket_patient(self, row: int, _col: int) -> None:
+        reg_item = self.queue_table.item(row, 1)
+        if not reg_item:
+            return
+        try:
+            registration = self.api.get_registration(int(reg_item.text()))
+            patient = self.api.get_patient(registration["patient_id"])
+        except (ApiError, KeyError, ValueError) as e:
+            detail = e.detail if isinstance(e, ApiError) else str(e)
+            self.triage_patient.setText(f"患者信息加载失败：{detail}")
+            return
+        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+        age = patient.get("age")
+        allergy = patient.get("allergy_label") or "不详"
+        self.triage_patient.setText(
+            f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
+            f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
+        )
+        if patient.get("allergy_status") == "present":
+            self.triage_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+        else:
+            self.triage_patient.setStyleSheet("")
 
     def _create_ticket(self) -> None:
         try:

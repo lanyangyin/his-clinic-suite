@@ -3,13 +3,16 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QTableWidget,
@@ -41,17 +44,98 @@ class CashierWidget(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
-        box = QGroupBox("新建档案")
-        form = QFormLayout(box)
+        box = QGroupBox("新建 / 修改患者档案（P0 实名建档）")
+        grid = QGridLayout(box)
         self.p_name = QLineEdit()
+        self.p_gender = QComboBox()
+        for value, label in (("unknown", "不详"), ("male", "男"), ("female", "女")):
+            self.p_gender.addItem(label, value)
+        self.p_id_type = QComboBox()
+        for value, label in (
+            ("id_card", "居民身份证"),
+            ("passport", "护照"),
+            ("hk_macau_taiwan", "港澳台证件"),
+            ("other", "其他证件"),
+            ("none", "无证件 / 无名氏"),
+        ):
+            self.p_id_type.addItem(label, value)
         self.p_id_number = QLineEdit()
+        self.p_id_number.setPlaceholderText("身份证号 / 证件号；无证件可留空")
+        self.p_birth_date = QLineEdit()
+        self.p_birth_date.setPlaceholderText("YYYY-MM-DD，可留空由身份证带出")
         self.p_phone = QLineEdit()
-        form.addRow("姓名", self.p_name)
-        form.addRow("身份证号", self.p_id_number)
-        form.addRow("电话", self.p_phone)
+        self.p_address = QLineEdit()
+        self.p_address.setPlaceholderText("现住址，至少到区/街道")
+        self.p_emergency_name = QLineEdit()
+        self.p_emergency_relation = QLineEdit()
+        self.p_emergency_phone = QLineEdit()
+        self.p_insurance = QComboBox()
+        for value, label in (
+            ("employee", "职工医保"),
+            ("resident", "居民医保"),
+            ("remote", "异地医保"),
+            ("self_pay", "自费"),
+            ("commercial", "商业保险"),
+            ("other", "其他"),
+        ):
+            self.p_insurance.addItem(label, value)
+        self.p_allergy_status = QComboBox()
+        for value, label in (
+            ("unknown", "不详"),
+            ("none", "无过敏史"),
+            ("present", "有过敏史"),
+        ):
+            self.p_allergy_status.addItem(label, value)
+        self.p_allergy_detail = QLineEdit()
+        self.p_allergy_detail.setPlaceholderText("如 青霉素、头孢；无过敏可留空")
+        self.p_privacy = QCheckBox("已向患者告知并取得信息采集授权")
+        self.p_privacy.setChecked(True)
+
+        row = 0
+        grid.addWidget(QLabel("姓名*"), row, 0)
+        grid.addWidget(self.p_name, row, 1)
+        grid.addWidget(QLabel("性别*"), row, 2)
+        grid.addWidget(self.p_gender, row, 3)
+        row += 1
+        grid.addWidget(QLabel("证件类型*"), row, 0)
+        grid.addWidget(self.p_id_type, row, 1)
+        grid.addWidget(QLabel("证件号码"), row, 2)
+        grid.addWidget(self.p_id_number, row, 3)
+        row += 1
+        grid.addWidget(QLabel("出生日期*"), row, 0)
+        grid.addWidget(self.p_birth_date, row, 1)
+        grid.addWidget(QLabel("手机号*"), row, 2)
+        grid.addWidget(self.p_phone, row, 3)
+        row += 1
+        grid.addWidget(QLabel("现住址*"), row, 0)
+        grid.addWidget(self.p_address, row, 1, 1, 3)
+        row += 1
+        grid.addWidget(QLabel("紧急联系人*"), row, 0)
+        grid.addWidget(self.p_emergency_name, row, 1)
+        grid.addWidget(QLabel("关系"), row, 2)
+        grid.addWidget(self.p_emergency_relation, row, 3)
+        row += 1
+        grid.addWidget(QLabel("联系人电话*"), row, 0)
+        grid.addWidget(self.p_emergency_phone, row, 1)
+        grid.addWidget(QLabel("医保类型*"), row, 2)
+        grid.addWidget(self.p_insurance, row, 3)
+        row += 1
+        grid.addWidget(QLabel("过敏史*"), row, 0)
+        grid.addWidget(self.p_allergy_status, row, 1)
+        grid.addWidget(self.p_allergy_detail, row, 2, 1, 2)
+        row += 1
+        grid.addWidget(self.p_privacy, row, 0, 1, 3)
+        buttons = QHBoxLayout()
         create_btn = QPushButton("建档")
         create_btn.clicked.connect(self._create_patient)
-        form.addRow("", create_btn)
+        update_btn = QPushButton("更新选中档案")
+        update_btn.clicked.connect(self._update_patient)
+        clear_btn = QPushButton("清空表单")
+        clear_btn.clicked.connect(self._clear_patient_form)
+        buttons.addWidget(create_btn)
+        buttons.addWidget(update_btn)
+        buttons.addWidget(clear_btn)
+        grid.addLayout(buttons, row, 3)
         layout.addWidget(box)
 
         query_box = QGroupBox("查询患者")
@@ -59,52 +143,241 @@ class CashierWidget(QWidget):
         self.q_name = QLineEdit()
         self.q_name.setPlaceholderText("姓名（可空）")
         self.q_id_number = QLineEdit()
-        self.q_id_number.setPlaceholderText("身份证号（可空）")
+        self.q_id_number.setPlaceholderText("身份证号/证件号（可空）")
+        self.q_phone = QLineEdit()
+        self.q_phone.setPlaceholderText("手机号（可空）")
         query_btn = QPushButton("查询")
         query_btn.clicked.connect(self._query_patients)
         query_layout.addWidget(self.q_name)
         query_layout.addWidget(self.q_id_number)
+        query_layout.addWidget(self.q_phone)
         query_layout.addWidget(query_btn)
         layout.addWidget(query_box)
 
-        self.patient_table = QTableWidget(0, 4)
-        self.patient_table.setHorizontalHeaderLabels(["ID", "姓名", "身份证号", "电话"])
+        self.patient_table = QTableWidget(0, 7)
+        self.patient_table.setHorizontalHeaderLabels(
+            ["ID", "患者编号", "姓名", "性别/年龄", "电话", "医保", "过敏"]
+        )
+        self.patient_table.cellClicked.connect(self._select_patient_row)
         layout.addWidget(self.patient_table)
+        self.patient_rows: list[dict] = []
 
         self.patient_msg = QLabel("")
         self.patient_msg.setWordWrap(True)
         layout.addWidget(self.patient_msg)
+        self.p_id_number.editingFinished.connect(self._derive_patient_fields)
+        self.p_id_type.currentIndexChanged.connect(self._on_id_type_changed)
         return page
 
-    def _create_patient(self) -> None:
-        name = self.p_name.text().strip()
-        id_number = self.p_id_number.text().strip()
-        if not name or not id_number:
-            self.patient_msg.setText("姓名和身份证号必填")
+    def _on_id_type_changed(self) -> None:
+        has_id = self.p_id_type.currentData() != "none"
+        self.p_id_number.setEnabled(has_id)
+        if not has_id:
+            self.p_id_number.clear()
+
+    def _derive_patient_fields(self) -> None:
+        if self.p_id_type.currentData() != "id_card":
+            return
+        digits = self.p_id_number.text().strip()
+        if len(digits) != 18 or not digits[:17].isdigit():
             return
         try:
-            patient = self.api.create_patient(name, id_number, self.p_phone.text().strip())
+            from datetime import date
+
+            date(
+                int(digits[6:10]), int(digits[10:12]), int(digits[12:14])
+            )
+        except ValueError:
+            return
+        if not self.p_birth_date.text().strip():
+            self.p_birth_date.setText(f"{digits[6:10]}-{digits[10:12]}-{digits[12:14]}")
+        if self.p_gender.currentData() == "unknown":
+            self.p_gender.setCurrentIndex(
+                self.p_gender.findData("male" if int(digits[16]) % 2 else "female")
+            )
+
+    def _patient_payload(self) -> dict:
+        return {
+            "name": self.p_name.text().strip(),
+            "id_type": self.p_id_type.currentData(),
+            "id_number": self.p_id_number.text().strip() or None,
+            "gender": self.p_gender.currentData(),
+            "birth_date": self.p_birth_date.text().strip() or None,
+            "phone": self.p_phone.text().strip() or None,
+            "address": self.p_address.text().strip(),
+            "emergency_contact_name": self.p_emergency_name.text().strip(),
+            "emergency_contact_relation": self.p_emergency_relation.text().strip(),
+            "emergency_contact_phone": self.p_emergency_phone.text().strip(),
+            "insurance_type": self.p_insurance.currentData(),
+            "allergy_status": self.p_allergy_status.currentData(),
+            "allergy_detail": self.p_allergy_detail.text().strip(),
+            "privacy_consent": self.p_privacy.isChecked(),
+        }
+
+    def _validate_patient_payload(self, payload: dict) -> str:
+        if not payload["name"]:
+            return "请填写姓名"
+        if payload["id_type"] != "none" and not payload["id_number"]:
+            return "请填写证件号码，或选择无证件"
+        if not payload["birth_date"]:
+            return "请填写出生日期"
+        if not payload["phone"]:
+            return "请填写手机号"
+        if not payload["address"]:
+            return "请填写现住址"
+        if not payload["emergency_contact_name"] or not payload["emergency_contact_phone"]:
+            return "请填写紧急联系人和联系电话"
+        if payload["gender"] == "unknown":
+            return "请选择性别"
+        if payload["allergy_status"] == "present" and not payload["allergy_detail"]:
+            return "有过敏史时请填写过敏原"
+        if not payload["privacy_consent"]:
+            return "请先完成隐私告知并勾选授权"
+        return ""
+
+    def _confirm_duplicate(self, payload: dict) -> dict | None:
+        try:
+            check = self.api.check_patient_duplicates(
+                name=payload["name"],
+                id_number=payload["id_number"] or "",
+                phone=payload["phone"] if payload["phone"] else "",
+            )
+        except ApiError as e:
+            self.patient_msg.setText(f"查重失败（{e.status_code}）：{e.detail}")
+            return None
+        candidates = check.get("candidates") or []
+        if not candidates:
+            return None
+        lines = [
+            f"{row.get('patient_no') or row['id']} {row['name']} "
+            f"{row.get('phone') or '无电话'}"
+            for row in candidates[:5]
+        ]
+        text = "发现已有档案：\n" + "\n".join(lines) + "\n\n是否直接使用第一条档案？"
+        answer = QMessageBox.question(
+            self, "发现重复档案", text, QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+        )
+        if answer == QMessageBox.Yes:
+            return candidates[0]
+        self.patient_msg.setText("已取消建档：请核对重复档案或修改证件信息")
+        return None
+
+    def _create_patient(self) -> None:
+        payload = self._patient_payload()
+        error = self._validate_patient_payload(payload)
+        if error:
+            self.patient_msg.setText(error)
+            return
+        duplicate = self._confirm_duplicate(payload)
+        if duplicate is not None:
+            self.patient_msg.setText(
+                f"使用已有档案：{duplicate.get('patient_no') or duplicate['id']} "
+                f"{duplicate['name']}"
+            )
+            self.q_name.setText(duplicate["name"])
+            self._query_patients()
+            return
+        try:
+            patient = self.api.create_patient(payload=payload)
         except ApiError as e:
             self.patient_msg.setText(f"建档失败（{e.status_code}）：{e.detail}")
             return
-        self.patient_msg.setText(f"建档成功：ID {patient['id']} {patient['name']}")
+        self.patient_msg.setText(
+            f"建档成功：{patient.get('patient_no') or patient['id']} "
+            f"{patient['name']}，年龄 {patient.get('age') if patient.get('age') is not None else '—'}"
+        )
+        self._clear_patient_form(keep_message=True)
         self._query_patients()
+
+    def _update_patient(self) -> None:
+        row = self.patient_table.currentRow()
+        if row < 0 or row >= len(self.patient_rows):
+            self.patient_msg.setText("请先在下方列表选中要修改的档案")
+            return
+        payload = self._patient_payload()
+        error = self._validate_patient_payload(payload)
+        if error:
+            self.patient_msg.setText(error)
+            return
+        try:
+            patient = self.api.update_patient(self.patient_rows[row]["id"], payload)
+        except ApiError as e:
+            self.patient_msg.setText(f"更新失败（{e.status_code}）：{e.detail}")
+            return
+        self.patient_msg.setText(f"已更新档案：{patient.get('patient_no') or patient['id']}")
+        self._query_patients()
+
+    def _clear_patient_form(self, keep_message: bool = False) -> None:
+        for field in (
+            self.p_name, self.p_id_number, self.p_birth_date, self.p_phone,
+            self.p_address, self.p_emergency_name, self.p_emergency_relation,
+            self.p_emergency_phone, self.p_allergy_detail,
+        ):
+            field.clear()
+        self.p_gender.setCurrentIndex(0)
+        self.p_id_type.setCurrentIndex(0)
+        self.p_insurance.setCurrentIndex(3)
+        self.p_allergy_status.setCurrentIndex(0)
+        self.p_privacy.setChecked(True)
+        if not keep_message:
+            self.patient_msg.clear()
+
+    def _select_patient_row(self, row: int, _col: int) -> None:
+        if not (0 <= row < len(self.patient_rows)):
+            return
+        patient = self.patient_rows[row]
+        self.p_name.setText(patient.get("name") or "")
+        index = self.p_gender.findData(patient.get("gender") or "unknown")
+        self.p_gender.setCurrentIndex(max(0, index))
+        index = self.p_id_type.findData(patient.get("id_type") or "id_card")
+        self.p_id_type.setCurrentIndex(max(0, index))
+        self.p_id_number.setText(patient.get("id_number") or "")
+        self.p_birth_date.setText(patient.get("birth_date") or "")
+        self.p_phone.setText(patient.get("phone") or "")
+        self.p_address.setText(patient.get("address") or "")
+        self.p_emergency_name.setText(patient.get("emergency_contact_name") or "")
+        self.p_emergency_relation.setText(patient.get("emergency_contact_relation") or "")
+        self.p_emergency_phone.setText(patient.get("emergency_contact_phone") or "")
+        index = self.p_insurance.findData(patient.get("insurance_type") or "self_pay")
+        self.p_insurance.setCurrentIndex(max(0, index))
+        index = self.p_allergy_status.findData(patient.get("allergy_status") or "unknown")
+        self.p_allergy_status.setCurrentIndex(max(0, index))
+        self.p_allergy_detail.setText(patient.get("allergy_detail") or "")
+        self.p_privacy.setChecked(bool(patient.get("privacy_consent_at")))
+        self.patient_msg.setText(
+            f"当前档案：{patient.get('patient_no') or patient['id']} {patient['name']}"
+        )
 
     def _query_patients(self) -> None:
         try:
             rows = self.api.list_patients(
                 name=self.q_name.text().strip() or None,
                 id_number=self.q_id_number.text().strip() or None,
+                phone=self.q_phone.text().strip() or None,
             )
         except ApiError as e:
             self.patient_msg.setText(f"查询失败：{e.detail}")
             return
+        self.patient_rows = rows
         self.patient_table.setRowCount(len(rows))
         for row, patient in enumerate(rows):
-            self.patient_table.setItem(row, 0, QTableWidgetItem(str(patient["id"])))
-            self.patient_table.setItem(row, 1, QTableWidgetItem(patient["name"]))
-            self.patient_table.setItem(row, 2, QTableWidgetItem(patient.get("id_number") or ""))
-            self.patient_table.setItem(row, 3, QTableWidgetItem(patient.get("phone") or ""))
+            age = patient.get("age")
+            gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+            insurance = {
+                "employee": "职工", "resident": "居民", "remote": "异地",
+                "self_pay": "自费", "commercial": "商保", "other": "其他",
+            }.get(patient.get("insurance_type"), patient.get("insurance_type") or "")
+            values = [
+                str(patient["id"]),
+                patient.get("patient_no") or "—",
+                patient["name"],
+                f"{gender}/{age if age is not None else '—'}",
+                patient.get("phone") or "—",
+                insurance,
+                patient.get("allergy_label") or "不详",
+            ]
+            for col, value in enumerate(values):
+                self.patient_table.setItem(row, col, QTableWidgetItem(str(value)))
 
     # ---------- 挂号 ----------
     def _build_registration_tab(self) -> QWidget:

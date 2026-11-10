@@ -273,6 +273,22 @@ class TreatmentRoomWidget(QWidget):
             f"{case['case_no']} · {case['patient_name']} · {case['procedure_name']} · "
             f"状态 {case['status']} · 费用 {case['price']:.2f} · 模板 {case.get('template_code') or '—'}"
         )
+        try:
+            patient = self.api.get_patient(case["patient_id"])
+        except ApiError:
+            patient = None
+        if patient:
+            gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+            age = patient.get("age")
+            allergy = patient.get("allergy_label") or "不详"
+            self.case_info.setText(
+                self.case_info.text()
+                + f" · {gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
+            )
+            if patient.get("allergy_status") == "present":
+                self.case_info.setStyleSheet("color:#b91c1c;font-weight:bold")
+            else:
+                self.case_info.setStyleSheet("")
         self.consent.setChecked(bool(case.get("consent")))
         self.anesthesia.setText(case.get("anesthesia") or "")
         self.findings.setText(case.get("findings") or "")
