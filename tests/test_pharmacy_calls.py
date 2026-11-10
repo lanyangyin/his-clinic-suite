@@ -97,3 +97,61 @@ def test_pharmacy_call_and_verified_dispense(client, auth):
     assert (
         client.get("/pharmacy/worklist", headers=auth["cashier"]).status_code == 403
     )
+
+
+def test_pharmacy_pickup_code_and_signature(client, auth):
+    from pathlib import Path
+
+    _, encounter, _ = _paid_prescription(client, auth)
+    worklist = client.get("/pharmacy/worklist", headers=auth["pharmacist"]).json()
+    row = next(r for r in worklist if r["encounter_id"] == encounter["id"])
+    code = row["pickup_code"]
+    assert code.startswith("P")
+
+    verified = client.get(
+        f"/pharmacy/pickup-codes/{code}", headers=auth["pharmacist"]
+    )
+    assert verified.status_code == 200
+    assert verified.json()["encounter_id"] == encounter["id"]
+
+    wrong = client.post(
+        "/pharmacy/dispense",
+        json={
+            "encounter_id": encounter["id"],
+            "pickup_code": "P000000",
+            "receiver_name": "张三",
+        },
+        headers=auth["pharmacist"],
+    )
+    assert wrong.status_code == 400
+
+    dispensed = client.post(
+        "/pharmacy/dispense",
+        json={
+            "encounter_id": encounter["id"],
+            "pickup_code": code,
+            "receiver_name": "张三",
+            "receiver_relation": "本人",
+            "note": "扫码核对",
+        },
+        headers=auth["pharmacist"],
+    )
+    assert dispensed.status_code == 201, dispensed.text
+    body = dispensed.json()
+    assert body["receiver_name"] == "张三"
+    assert body["signed_at"] is not None
+
+    signature = client.post(
+        f"/pharmacy/dispense/{body['id']}/signature",
+        files={"file": ("sign.png", b"fake-png", "image/png")},
+        headers=auth["pharmacist"],
+    )
+    assert signature.status_code == 200, signature.text
+    path = signature.json()["signature_path"]
+    assert path.endswith(".png")
+
+    used = client.get(
+        f"/pharmacy/pickup-codes/{code}", headers=auth["pharmacist"]
+    )
+    assert used.status_code == 400
+    Path(path).unlink(missing_ok=True)

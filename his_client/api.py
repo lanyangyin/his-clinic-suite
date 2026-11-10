@@ -675,9 +675,24 @@ class ApiClient:
     def stock_in(self, payload: dict) -> dict:
         return self._request("POST", "/pharmacy/stock-in", json=payload)
 
-    def dispense(self, encounter_id: int, note: str = "") -> dict:
+    def dispense(
+        self,
+        encounter_id: int,
+        note: str = "",
+        pickup_code: str = "",
+        receiver_name: str = "",
+        receiver_relation: str = "本人",
+    ) -> dict:
         return self._request(
-            "POST", "/pharmacy/dispense", json={"encounter_id": encounter_id, "note": note}
+            "POST",
+            "/pharmacy/dispense",
+            json={
+                "encounter_id": encounter_id,
+                "note": note,
+                "pickup_code": pickup_code,
+                "receiver_name": receiver_name,
+                "receiver_relation": receiver_relation,
+            },
         )
 
     def pharmacy_worklist(self) -> list:
@@ -689,6 +704,17 @@ class ApiClient:
             f"/pharmacy/calls/{encounter_id}",
             json={"window_no": window_no, "note": note},
         )
+
+    def verify_pickup_code(self, code: str) -> dict:
+        return self._request("GET", f"/pharmacy/pickup-codes/{code}")
+
+    def upload_dispense_signature(self, dispense_id: int, file_path: str) -> dict:
+        with open(file_path, "rb") as handle:
+            return self._request(
+                "POST",
+                f"/pharmacy/dispense/{dispense_id}/signature",
+                files={"file": (file_path.split("\\")[-1].split("/")[-1], handle)},
+            )
 
     def return_dispense(self, dispense_id: int) -> dict:
         return self._request("POST", f"/pharmacy/dispense/{dispense_id}/return")

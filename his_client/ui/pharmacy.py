@@ -1,6 +1,7 @@
 """药房工作站：入库单（收货/验收/入库）、发药/退药、库存查询、医保目录查询。"""
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -567,12 +568,32 @@ class PharmacyWidget(QWidget):
         list_row.addWidget(refresh)
         list_row.addStretch(1)
         layout.addLayout(list_row)
-        self.worklist_table = QTableWidget(0, 6)
+        self.worklist_table = QTableWidget(0, 7)
         self.worklist_table.setHorizontalHeaderLabels(
-            ["叫号", "患者", "处方数", "药品", "状态", "窗口"]
+            ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
         )
         self.worklist_table.cellClicked.connect(self._select_worklist)
         layout.addWidget(self.worklist_table, 1)
+
+        sign_row = QHBoxLayout()
+        self.pickup_code = QLineEdit()
+        self.pickup_code.setPlaceholderText("扫取药码/输入")
+        verify_btn = QPushButton("核对取药码")
+        verify_btn.clicked.connect(self._verify_code)
+        self.receiver_name = QLineEdit()
+        self.receiver_name.setPlaceholderText("取药人")
+        self.receiver_relation = QLineEdit("本人")
+        self.signature_path = QLineEdit()
+        self.signature_path.setPlaceholderText("签名图片路径（可选）")
+        sign_btn = QPushButton("选择签名")
+        sign_btn.clicked.connect(self._pick_signature)
+        sign_row.addWidget(self.pickup_code)
+        sign_row.addWidget(verify_btn)
+        sign_row.addWidget(self.receiver_name)
+        sign_row.addWidget(self.receiver_relation)
+        sign_row.addWidget(self.signature_path)
+        sign_row.addWidget(sign_btn)
+        layout.addLayout(sign_row)
 
         self.disp_msg = QLabel("")
         self.disp_msg.setWordWrap(True)
@@ -599,13 +620,27 @@ class PharmacyWidget(QWidget):
     def _dispense(self) -> None:
         try:
             record = self.api.dispense(
-                self.disp_encounter_id.value(), self.disp_note.text().strip()
+                self.disp_encounter_id.value(),
+                self.disp_note.text().strip(),
+                self.pickup_code.text().strip(),
+                self.receiver_name.text().strip(),
+                self.receiver_relation.text().strip() or "本人",
             )
         except ApiError as e:
             self.disp_msg.setText(f"发药失败（{e.status_code}）：{e.detail}")
             return
+        if self.signature_path.text().strip():
+            try:
+                self.api.upload_dispense_signature(
+                    record["id"], self.signature_path.text().strip()
+                )
+            except (ApiError, OSError) as e:
+                self.disp_msg.setText(f"已发药，但签名上传失败：{e}")
+                self.return_dispense_id.setValue(record["id"])
+                self._load_worklist()
+                return
         self.disp_msg.setText(
-            f"核对发药成功：记录 {record['id']}，核对人 {record['verified_by']}"
+            f"核对发药成功：记录 {record['id']}，取药人 {record['receiver_name'] or '—'}"
         )
         self.return_dispense_id.setValue(record["id"])
         self._load_worklist()
@@ -620,6 +655,7 @@ class PharmacyWidget(QWidget):
         for row, item in enumerate(self.worklist):
             values = [
                 item["queue_no"] or "—",
+                item.get("pickup_code", ""),
                 item["patient_name"],
                 item["item_count"],
                 item["drugs"],
@@ -632,9 +668,31 @@ class PharmacyWidget(QWidget):
                 self.worklist_table.setItem(row, col, QTableWidgetItem(str(value)))
         self.disp_msg.setText(f"待发药 {len(self.worklist)} 人")
 
+    def _verify_code(self) -> None:
+        code = self.pickup_code.text().strip()
+        if not code:
+            self.disp_msg.setText("请扫描或输入取药码")
+            return
+        try:
+            row = self.api.verify_pickup_code(code)
+        except ApiError as e:
+            self.disp_msg.setText(f"取药码核对失败（{e.status_code}）：{e.detail}")
+            return
+        self.disp_encounter_id.setValue(row["encounter_id"])
+        self.disp_msg.setText(f"取药码核对通过：{row['patient_name']}")
+
+    def _pick_signature(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "选择签名图片", "", "图片 (*.png *.jpg *.jpeg)"
+        )
+        if path:
+            self.signature_path.setText(path)
+
     def _select_worklist(self, row: int, _col: int) -> None:
         if 0 <= row < len(getattr(self, "worklist", [])):
-            self.disp_encounter_id.setValue(self.worklist[row]["encounter_id"])
+            item = self.worklist[row]
+            self.disp_encounter_id.setValue(item["encounter_id"])
+            self.pickup_code.setText(item.get("pickup_code", ""))
 
     def _call(self) -> None:
         try:

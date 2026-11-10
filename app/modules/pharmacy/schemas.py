@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class DispenseRequest(BaseModel):
     encounter_id: int
     note: str = ""
+    pickup_code: str = ""
+    receiver_name: str = ""
+    receiver_relation: str = "本人"
 
 
 class DispenseResponse(DispenseRequest):
@@ -14,7 +17,16 @@ class DispenseResponse(DispenseRequest):
     returned_at: datetime | None = None
     verified_by: str = ""
     verified_at: datetime | None = None
+    signature_path: str = ""
+    signed_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class PickupVerifyResponse(BaseModel):
+    encounter_id: int
+    patient_name: str
+    code: str
+    used: bool
 
 
 class PharmacyCallRequest(BaseModel):

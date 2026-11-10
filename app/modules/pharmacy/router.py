@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from pathlib import Path
 from sqlalchemy.orm import Session
+import uuid
 
 from app.database import get_db
 from app.modules.auth.security import require_role
@@ -9,6 +12,7 @@ from .schemas import (
     DispenseResponse,
     PharmacyCallRequest,
     PharmacyCallResponse,
+    PickupVerifyResponse,
     StockInRequest,
     StockInResponse,
     StockResponse,
@@ -21,6 +25,7 @@ from .service import (
     list_stocks,
     return_dispense,
     stock_in,
+    verify_pickup,
     worklist,
 )
 
@@ -103,3 +108,43 @@ def call(
         return call_patient(db, encounter_id, data.window_no, user.username, data.note)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/pickup-codes/{code}", response_model=PickupVerifyResponse)
+def verify_code(
+    code: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist")),
+):
+    try:
+        return verify_pickup(db, code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+SIGNATURE_DIR = Path("data/pharmacy_signatures")
+
+
+@router.post("/dispense/{dispense_id}/signature")
+async def upload_signature(
+    dispense_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist")),
+):
+    record = get_dispense(db, dispense_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="发药记录不存在")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".jpg", ".jpeg", ".png"}:
+        raise HTTPException(status_code=400, detail="仅支持 jpg/png 签名图片")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="签名图片不能超过 5MB")
+    SIGNATURE_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"{dispense_id}_{uuid.uuid4().hex}{suffix}"
+    path = SIGNATURE_DIR / name
+    path.write_bytes(content)
+    record.signature_path = str(path).replace("\\", "/")
+    record.signed_at = record.signed_at or datetime.now()
+    db.commit()
+    return {"dispense_id": record.id, "signature_path": record.signature_path}

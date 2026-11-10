@@ -21,6 +21,10 @@ class Dispense(Base):
     verified_by: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
+    receiver_name: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
+    receiver_relation: Mapped[str] = mapped_column(String(20), default="本人", server_default="本人", nullable=False)
+    signature_path: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class DrugStock(Base):
@@ -58,3 +62,16 @@ class PharmacyCall(Base):
     called_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
 
+
+class PharmacyPickupCode(Base):
+    """取药码：患者凭码取药，药师扫码核对。"""
+
+    __tablename__ = "pharmacy_pickup_codes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), unique=True, nullable=False, index=True
+    )
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

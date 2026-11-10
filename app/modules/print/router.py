@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.modules.billing.service import get_payment
+from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
 from app.modules.lis.service import get_request
@@ -154,6 +155,7 @@ def render_receipt(data: dict) -> str:
 <div class="divider"></div>
 <p>患者：{escape(p.name)}</p>
 <p>单号：{payment.id}　票据号：{payment.invoice_no or '—'}</p>
+{f'<p class="center">取药码：{escape(data["pickup_code"])}</p>' if data.get("pickup_code") else ''}
 <p>日期：{payment.created_at.strftime('%Y-%m-%d %H:%M') if payment.created_at else ''}</p>
 <div class="divider"></div>
 <table>
@@ -203,6 +205,12 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db)):
             }
         )
     data = {"payment": payment, "patient": patient, "lines": lines}
+    pickup = (
+        db.query(PharmacyPickupCode)
+        .filter(PharmacyPickupCode.encounter_id == encounter.id)
+        .first()
+    )
+    data["pickup_code"] = pickup.code if pickup else ""
     return HTMLResponse(render_receipt(data))
 
 LAB_CSS = """

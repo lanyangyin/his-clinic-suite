@@ -1,4 +1,6 @@
 from datetime import date, datetime
+import secrets
+import string
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -13,7 +15,7 @@ from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
 from app.modules.stock_ledger.service import record_drug
 
-from .models import Dispense, DrugStock, PharmacyCall
+from .models import Dispense, DrugStock, PharmacyCall, PharmacyPickupCode
 from .schemas import DispenseRequest, StockInRequest
 
 
@@ -105,10 +107,28 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
     if existing:
         raise ValueError("该就诊已发药")
 
+    pickup = None
+    if data.pickup_code.strip():
+        pickup = (
+            db.query(PharmacyPickupCode)
+            .filter(PharmacyPickupCode.code == data.pickup_code.strip().upper())
+            .first()
+        )
+        if not pickup:
+            raise ValueError("取药码不存在")
+        if pickup.encounter_id != data.encounter_id:
+            raise ValueError("取药码与就诊不匹配")
+        if pickup.used_at is not None:
+            raise ValueError("取药码已使用")
+
     record = Dispense(encounter_id=data.encounter_id)
     record.verified_by = operator
     record.verified_at = datetime.now()
     record.note = data.note
+    record.receiver_name = data.receiver_name.strip()
+    record.receiver_relation = data.receiver_relation or "本人"
+    if record.receiver_name:
+        record.signed_at = datetime.now()
     db.add(record)
     try:
         db.flush()
@@ -135,6 +155,8 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
     )
     if call:
         call.status = "dispensed"
+    if pickup:
+        pickup.used_at = datetime.now()
 
     db.commit()
     db.refresh(record)
@@ -191,6 +213,52 @@ def call_patient(db: Session, encounter_id: int, window_no: str, operator: str, 
     return call
 
 
+def _ensure_code(db: Session, encounter_id: int) -> PharmacyPickupCode:
+    row = (
+        db.query(PharmacyPickupCode)
+        .filter(PharmacyPickupCode.encounter_id == encounter_id)
+        .first()
+    )
+    if row:
+        return row
+    alphabet = string.ascii_uppercase + string.digits
+    for _ in range(20):
+        code = "P" + "".join(secrets.choice(alphabet) for _ in range(6))
+        if not db.query(PharmacyPickupCode).filter(PharmacyPickupCode.code == code).first():
+            row = PharmacyPickupCode(encounter_id=encounter_id, code=code)
+            db.add(row)
+            db.flush()
+            return row
+    raise ValueError("取药码生成失败")
+
+
+def verify_pickup(db: Session, code: str) -> dict:
+    row = (
+        db.query(PharmacyPickupCode)
+        .filter(PharmacyPickupCode.code == code.strip().upper())
+        .first()
+    )
+    if not row:
+        raise ValueError("取药码不存在")
+    if row.used_at is not None:
+        raise ValueError("取药码已使用")
+    encounter = db.get(Encounter, row.encounter_id)
+    patient = (
+        db.query(Patient)
+        .join(Registration, Registration.patient_id == Patient.id)
+        .filter(Registration.id == encounter.registration_id)
+        .first()
+        if encounter
+        else None
+    )
+    return {
+        "encounter_id": row.encounter_id,
+        "patient_name": patient.name if patient else "",
+        "code": row.code,
+        "used": bool(row.used_at),
+    }
+
+
 def worklist(db: Session) -> list[dict]:
     rows = (
         db.query(Payment, Patient, Registration)
@@ -222,6 +290,7 @@ def worklist(db: Session) -> list[dict]:
             {
                 "encounter_id": payment.encounter_id,
                 "patient_name": patient.name,
+                "pickup_code": _ensure_code(db, payment.encounter_id).code,
                 "queue_no": call.queue_no if call else "",
                 "call_status": call.status if call else "waiting",
                 "window_no": call.window_no if call else "",
@@ -230,6 +299,7 @@ def worklist(db: Session) -> list[dict]:
                 "drugs": "、".join(item.drug_name for item in items[:4]),
             }
         )
+    db.commit()
     return result
 
 
