@@ -183,8 +183,8 @@ def start(db: Session, order_id: int, data: StartRequest, operator: str = "") ->
     order = get_order(db, order_id)
     if not order:
         raise ValueError("执行单不存在")
-    if order.status not in ("pending", "prepared"):
-        raise ValueError("该执行单当前状态不可开始")
+    if order.status != "prepared":
+        raise ValueError("请先完成配药并核对，再开始执行")
     order.status = "executing"
     order.seat_no = data.seat_no
     order.rate_ml_h = data.rate_ml_h

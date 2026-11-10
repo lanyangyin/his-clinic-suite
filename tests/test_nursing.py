@@ -104,6 +104,13 @@ def test_nursing_sync_and_execution(client, auth):
     assert work[0]["patient_name"] == "输液患者"
 
     infusion = next(row for row in orders if row["order_type"] == "infusion")
+    blocked = client.post(
+        f"/nursing/orders/{infusion['id']}/start",
+        json={"seat_no": "输液-01", "rate_ml_h": 60},
+        headers=auth["nurse"],
+    )
+    assert blocked.status_code == 400
+    assert "配药" in blocked.json()["detail"]
     prepared = client.post(
         f"/nursing/orders/{infusion['id']}/prepare",
         json={
