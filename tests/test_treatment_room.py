@@ -486,3 +486,30 @@ def test_treatment_report_excel_export(client, auth):
     assert "按模板" in workbook.sheetnames
     assert "待随访" in workbook.sheetnames
     assert workbook["日报概览"]["A2"].value == "日期"
+
+
+def test_treatment_room_workbench(client, auth):
+    from datetime import date, timedelta
+
+    patient, encounter, _, _, case = _setup(client, auth)
+    overdue = client.post(
+        "/treatment-room/follow-ups",
+        json={
+            "patient_id": patient["id"],
+            "encounter_id": encounter["id"],
+            "due_date": (date.today() - timedelta(days=2)).isoformat(),
+            "purpose": "换药",
+        },
+        headers=auth["treatment"],
+    ).json()
+    data = client.get(
+        "/treatment-room/workbench", headers=auth["treatment"]
+    ).json()
+    assert data["waiting"] >= 1
+    assert data["pending_amount"] >= 80.0
+    assert any(row["id"] == overdue["id"] for row in data["overdue"])
+    assert any(row["id"] == case["id"] for row in data["cases"])
+    assert (
+        client.get("/treatment-room/workbench", headers=auth["cashier"]).status_code
+        == 403
+    )

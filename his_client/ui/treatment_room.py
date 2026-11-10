@@ -30,6 +30,7 @@ class TreatmentRoomWidget(QWidget):
         self.templates: list[dict] = []
         self.template_edits: dict[str, QLineEdit] = {}
         self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_workbench_tab(), "今日工作台")
         self.tabs.addTab(self._build_queue_tab(), "治疗排队")
         self.tabs.addTab(self._build_handle_tab(), "处置记录")
         self.tabs.addTab(self._build_followup_tab(), "换药随访")
@@ -38,6 +39,7 @@ class TreatmentRoomWidget(QWidget):
 
     def _build_queue_tab(self) -> QWidget:
         page = QWidget()
+        self.queue_page = page
         layout = QVBoxLayout(page)
         room_box = QGroupBox("治疗室")
         room_form = QFormLayout(room_box)
@@ -105,6 +107,7 @@ class TreatmentRoomWidget(QWidget):
 
     def _build_handle_tab(self) -> QWidget:
         page = QWidget()
+        self.handle_page = page
         layout = QVBoxLayout(page)
         row = QHBoxLayout()
         self.case_id = QSpinBox()
@@ -257,7 +260,7 @@ class TreatmentRoomWidget(QWidget):
     def _select_case(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.cases):
             self.case_id.setValue(self.cases[row]["id"])
-            self.tabs.setCurrentIndex(1)
+            self.tabs.setCurrentWidget(self.handle_page)
             self._load_case()
 
     def _load_case(self) -> None:
@@ -497,3 +500,91 @@ class TreatmentRoomWidget(QWidget):
             return
         self._load_followups()
 
+
+    def _build_workbench_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        self.wb_summary = QLabel("加载中…")
+        self.wb_summary.setWordWrap(True)
+        self.wb_summary.setStyleSheet("font-size:15px;font-weight:600;color:#0f172a")
+        refresh = QPushButton("刷新工作台")
+        refresh.clicked.connect(self._load_workbench)
+        top.addWidget(self.wb_summary, 1)
+        top.addWidget(refresh)
+        layout.addLayout(top)
+
+        self.wb_alerts = QLabel("")
+        self.wb_alerts.setWordWrap(True)
+        layout.addWidget(self.wb_alerts)
+
+        layout.addWidget(QLabel("今日处置"))
+        self.wb_cases = QTableWidget(0, 6)
+        self.wb_cases.setHorizontalHeaderLabels(
+            ["处置号", "患者", "处置", "状态", "优先级", "费用"]
+        )
+        self.wb_cases.cellClicked.connect(self._select_wb_case)
+        layout.addWidget(self.wb_cases, 1)
+
+        layout.addWidget(QLabel("到期 / 逾期随访"))
+        self.wb_followups = QTableWidget(0, 4)
+        self.wb_followups.setHorizontalHeaderLabels(["患者", "日期", "目的", "类型"])
+        layout.addWidget(self.wb_followups, 1)
+        self.wb_msg = QLabel("")
+        layout.addWidget(self.wb_msg)
+        self._load_workbench()
+        return page
+
+    def _load_workbench(self) -> None:
+        try:
+            data = self.api.treatment_room_workbench()
+        except ApiError as e:
+            self.wb_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.workbench_data = data
+        self.wb_summary.setText(
+            f"候诊 {data['waiting']}　处置中 {data['in_progress']}　"
+            f"今日完成 {data['completed_today']}　待收费 {data['pending_count']} 笔 / "
+            f"{data['pending_amount']:.2f} 元"
+        )
+        alerts = []
+        if data["overdue"]:
+            alerts.append(f"逾期随访 {len(data['overdue'])} 条")
+        if data["due_today"]:
+            alerts.append(f"今日随访 {len(data['due_today'])} 条")
+        if data["low_stock"]:
+            alerts.append(
+                "低库存：" + "、".join(f"{row['name']}({row['quantity']})" for row in data["low_stock"][:5])
+            )
+        self.wb_alerts.setText("　".join(alerts) or "无待办提醒")
+        self.wb_cases.setRowCount(len(data["cases"]))
+        for row, case in enumerate(data["cases"]):
+            values = [
+                case["case_no"],
+                case["patient_name"],
+                case["procedure_name"],
+                {"waiting": "候诊", "in_progress": "处置中", "completed": "已完成"}.get(
+                    case["status"], case["status"]
+                ),
+                "加急" if case["priority"] == "urgent" else "普通",
+                f"{case['price']:.2f}",
+            ]
+            for col, value in enumerate(values):
+                self.wb_cases.setItem(row, col, QTableWidgetItem(str(value)))
+        followups = [(row, "逾期") for row in data["overdue"]] + [
+            (row, "今日") for row in data["due_today"]
+        ]
+        self.wb_followups.setRowCount(len(followups))
+        for index, (row, kind) in enumerate(followups):
+            values = [row["patient_name"], str(row["due_date"]), row["purpose"], kind]
+            for col, value in enumerate(values):
+                self.wb_followups.setItem(index, col, QTableWidgetItem(str(value)))
+        self.wb_msg.setText(f"工作台已刷新（{data['date']}）")
+
+    def _select_wb_case(self, row: int, _col: int) -> None:
+        data = getattr(self, "workbench_data", None)
+        if not data or not (0 <= row < len(data["cases"])):
+            return
+        self.case_id.setValue(data["cases"][row]["id"])
+        self.tabs.setCurrentWidget(self.handle_page)
+        self._load_case()

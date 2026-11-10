@@ -517,6 +517,10 @@ class ApiClient:
     def treatment_room_templates(self) -> list:
         return self._request("GET", "/treatment-room/templates")
 
+    def treatment_room_workbench(self, day: str | None = None) -> dict:
+        params = {"day": day} if day else None
+        return self._request("GET", "/treatment-room/workbench", params=params)
+
     def create_treatment_room(self, payload: dict) -> dict:
         return self._request("POST", "/treatment-room/rooms", json=payload)
 

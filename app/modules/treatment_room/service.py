@@ -214,6 +214,111 @@ _FOLLOWUP_PLAN = {
 }
 
 
+def workbench(db: Session, day: date | None = None) -> dict:
+    day = day or date.today()
+    start = datetime.combine(day, datetime.min.time())
+    end = datetime.combine(day, datetime.max.time())
+    active = (
+        db.query(TreatmentRoomCase)
+        .filter(TreatmentRoomCase.status.in_(("waiting", "in_progress")))
+        .order_by(TreatmentRoomCase.priority.desc(), TreatmentRoomCase.id)
+        .all()
+    )
+    completed_today = (
+        db.query(TreatmentRoomCase)
+        .filter(
+            TreatmentRoomCase.status == "completed",
+            TreatmentRoomCase.completed_at >= start,
+            TreatmentRoomCase.completed_at <= end,
+        )
+        .all()
+    )
+    cases = active + completed_today
+    encounter_ids = [row.encounter_id for row in cases if row.encounter_id]
+    pending_count = 0
+    pending_amount = 0.0
+    if encounter_ids:
+        charges = (
+            db.query(EncounterCharge)
+            .filter(
+                EncounterCharge.encounter_id.in_(encounter_ids),
+                EncounterCharge.status == "pending",
+                EncounterCharge.source_type.in_(("treatment_room", "procedure_material")),
+            )
+            .all()
+        )
+        pending_count = len(charges)
+        pending_amount = round(sum(row.amount for row in charges), 2)
+    overdue = (
+        db.query(TreatmentFollowUp)
+        .filter(TreatmentFollowUp.status == "pending", TreatmentFollowUp.due_date < day)
+        .order_by(TreatmentFollowUp.due_date)
+        .all()
+    )
+    due_today = (
+        db.query(TreatmentFollowUp)
+        .filter(TreatmentFollowUp.status == "pending", TreatmentFollowUp.due_date == day)
+        .order_by(TreatmentFollowUp.id)
+        .all()
+    )
+    kit_material_ids = {
+        row.material_id for row in db.query(TreatmentTemplateMaterial).all()
+    }
+    low_stock = []
+    for material_id in kit_material_ids:
+        material = db.get(MaterialItem, material_id)
+        quantity = (
+            db.query(func.coalesce(func.sum(MaterialStock.quantity), 0))
+            .filter(MaterialStock.item_id == material_id)
+            .scalar()
+            or 0
+        )
+        if quantity <= 10:
+            low_stock.append(
+                {
+                    "material_id": material_id,
+                    "name": material.name if material else f"#{material_id}",
+                    "quantity": int(quantity),
+                }
+            )
+    return {
+        "date": day,
+        "waiting": sum(1 for row in active if row.status == "waiting"),
+        "in_progress": sum(1 for row in active if row.status == "in_progress"),
+        "completed_today": len(completed_today),
+        "pending_count": pending_count,
+        "pending_amount": pending_amount,
+        "overdue": [_followup_row(row) for row in overdue],
+        "due_today": [_followup_row(row) for row in due_today],
+        "low_stock": sorted(low_stock, key=lambda row: row["quantity"]),
+        "cases": [
+            {
+                "id": row.id,
+                "case_no": row.case_no,
+                "patient_name": row.patient_name,
+                "procedure_name": row.procedure_name,
+                "template_code": row.template_code,
+                "status": row.status,
+                "priority": row.priority,
+                "price": row.price,
+                "created_at": row.created_at,
+            }
+            for row in cases
+        ],
+    }
+
+
+def _followup_row(row: TreatmentFollowUp) -> dict:
+    return {
+        "id": row.id,
+        "patient_name": row.patient_name,
+        "due_date": row.due_date,
+        "purpose": row.purpose,
+        "note": row.note,
+        "status": row.status,
+    }
+
+
 def report(db: Session, report_date: date | None = None) -> dict:
     day = report_date or date.today()
     start = datetime.combine(day, datetime.min.time())

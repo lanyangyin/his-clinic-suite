@@ -45,6 +45,7 @@ from .service import (
     report,
     set_template_config,
     start_case,
+    workbench,
 )
 
 router = APIRouter(prefix="/treatment-room", tags=["treatment-room"])
@@ -290,3 +291,11 @@ def export_treatment_report(
             "Content-Disposition": f'attachment; filename="treatment_report_{day}.xlsx"'
         },
     )
+
+@router.get("/workbench")
+def treatment_workbench(
+    day: date | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("treatment")),
+):
+    return workbench(db, day)
