@@ -3,8 +3,8 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Patient
-from .schemas import DuplicateCandidate, PatientCreate, PatientUpdate
+from .models import Patient, PatientClinicalChange
+from .schemas import ClinicalProfileUpdate, DuplicateCandidate, PatientCreate, PatientUpdate
 
 
 def _derive_from_id(id_type: str, id_number: str | None):
@@ -194,7 +194,7 @@ def _card_payload(card, patient) -> dict:
 
 
 def issue_card(db: Session, patient_id: int, card_uid: str, operator: str = "", note: str = "") -> dict:
-    from .models import PatientCard
+    from .models import Patient, PatientCard
 
     patient = get_patient(db, patient_id)
     if not patient:
@@ -226,7 +226,7 @@ def issue_card(db: Session, patient_id: int, card_uid: str, operator: str = "", 
 
 
 def list_cards(db: Session, patient_id: int) -> list[dict]:
-    from .models import PatientCard
+    from .models import Patient, PatientCard
 
     patient = get_patient(db, patient_id)
     if not patient:
@@ -241,7 +241,7 @@ def list_cards(db: Session, patient_id: int) -> list[dict]:
 
 
 def find_by_card(db: Session, card_uid: str) -> dict | None:
-    from .models import PatientCard
+    from .models import Patient, PatientCard
 
     card = (
         db.query(PatientCard)
@@ -260,7 +260,7 @@ def find_by_card(db: Session, card_uid: str) -> dict | None:
 
 
 def mark_card_lost(db: Session, patient_id: int, card_id: int, operator: str = "") -> dict:
-    from .models import PatientCard
+    from .models import Patient, PatientCard
 
     card = db.get(PatientCard, card_id)
     if not card or card.patient_id != patient_id:
@@ -275,7 +275,7 @@ def mark_card_lost(db: Session, patient_id: int, card_id: int, operator: str = "
 
 
 def reissue_card(db: Session, patient_id: int, card_uid: str, operator: str = "", note: str = "") -> dict:
-    from .models import PatientCard
+    from .models import Patient, PatientCard
 
     patient = get_patient(db, patient_id)
     if not patient:
@@ -303,3 +303,80 @@ def reissue_card(db: Session, patient_id: int, card_uid: str, operator: str = ""
     db.commit()
     db.refresh(card)
     return _card_payload(card, patient)
+
+
+
+def update_clinical_profile(
+    db: Session, patient_id: int, data: ClinicalProfileUpdate, operator: str = ""
+) -> Patient:
+    """医生接诊时修改患者级过敏史/现存疾病，并记录修改前值。"""
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise ValueError("患者不存在")
+    reason = (data.reason or "").strip()
+    if not reason:
+        raise ValueError("请填写修改原因")
+
+    new_allergy_status = (
+        patient.allergy_status if data.allergy_status is None else data.allergy_status
+    )
+    new_allergy_detail = (
+        patient.allergy_detail
+        if data.allergy_detail is None
+        else (data.allergy_detail or "").strip()
+    )
+    if new_allergy_status != "present":
+        new_allergy_detail = ""
+    if new_allergy_status == "present" and not new_allergy_detail:
+        raise ValueError("有过敏史时必须填写过敏原")
+    new_special_history = (
+        patient.special_history
+        if data.special_history is None
+        else (data.special_history or "").strip()
+    )
+
+    changes = []
+    if new_allergy_status != patient.allergy_status or new_allergy_detail != patient.allergy_detail:
+        changes.append(
+            (
+                "allergy",
+                f"{patient.allergy_label}",
+                "有过敏史：" + new_allergy_detail
+                if new_allergy_status == "present"
+                else ("无过敏史" if new_allergy_status == "none" else "过敏史不详"),
+            )
+        )
+    if new_special_history != patient.special_history:
+        changes.append(("special_history", patient.special_history, new_special_history))
+
+    if not changes:
+        return patient
+
+    patient.allergy_status = new_allergy_status
+    patient.allergy_detail = new_allergy_detail
+    patient.special_history = new_special_history
+    patient.updated_by = operator
+    patient.updated_at = datetime.now()
+    for field, old_value, new_value in changes:
+        db.add(
+            PatientClinicalChange(
+                patient_id=patient.id,
+                field=field,
+                old_value=old_value or "",
+                new_value=new_value or "",
+                reason=reason,
+                changed_by=operator,
+            )
+        )
+    db.commit()
+    db.refresh(patient)
+    return patient
+
+
+def list_clinical_changes(db: Session, patient_id: int) -> list[PatientClinicalChange]:
+    return (
+        db.query(PatientClinicalChange)
+        .filter(PatientClinicalChange.patient_id == patient_id)
+        .order_by(PatientClinicalChange.id.desc())
+        .all()
+    )

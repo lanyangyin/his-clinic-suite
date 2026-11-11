@@ -7,6 +7,8 @@ from app.modules.auth.security import require_role
 from .history import get_patient_history
 from .profile import patient_profile
 from .schemas import (
+    ClinicalChangeResponse,
+    ClinicalProfileUpdate,
     DuplicateCheckResponse,
     PatientCardCreate,
     PatientCardResponse,
@@ -15,6 +17,8 @@ from .schemas import (
     PatientUpdate,
 )
 from .service import (
+    list_clinical_changes,
+    update_clinical_profile,
     create_patient,
     find_by_card,
     find_duplicates,
@@ -75,6 +79,31 @@ def update_one(
     if not patient:
         raise HTTPException(status_code=404, detail="患者不存在")
     return patient
+
+
+@router.put("/{patient_id}/clinical-profile", response_model=PatientResponse)
+def update_clinical(
+    patient_id: int,
+    data: ClinicalProfileUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return update_clinical_profile(db, patient_id, data, user.username)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/{patient_id}/clinical-changes",
+    response_model=list[ClinicalChangeResponse],
+)
+def clinical_changes(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor", "admin")),
+):
+    return list_clinical_changes(db, patient_id)
 
 
 @router.get("/by-card/{card_uid}")

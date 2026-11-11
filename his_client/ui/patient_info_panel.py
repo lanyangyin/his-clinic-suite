@@ -1,7 +1,8 @@
 """患者信息侧卡：基本信息、就诊信息、过敏史、现存疾病各自独立成框。"""
 import re
 
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
 from his_client.ui.theme import colors
 
@@ -33,7 +34,9 @@ def condition_names(text: str) -> list[str]:
 
 
 class PatientInfoPanel(QFrame):
-    def __init__(self, parent=None):
+    edit_requested = Signal()
+
+    def __init__(self, parent=None, editable: bool = False):
         super().__init__(parent)
         self.setObjectName("patientInfoPanel")
         self.setMinimumWidth(210)
@@ -136,6 +139,10 @@ class PatientInfoPanel(QFrame):
         history_layout.addWidget(self.history)
         outer.addWidget(history_card)
         self.history_card = history_card
+        self.edit_button = QPushButton("修改过敏史 / 现存疾病")
+        self.edit_button.setVisible(editable)
+        self.edit_button.clicked.connect(self.edit_requested.emit)
+        outer.addWidget(self.edit_button)
 
         outer.addStretch(1)
         self.patient_id = 0

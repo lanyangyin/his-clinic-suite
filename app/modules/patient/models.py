@@ -109,3 +109,23 @@ class PatientCard(Base):
     note: Mapped[str] = mapped_column(
         String(200), default="", server_default="", nullable=False
     )
+
+
+
+class PatientClinicalChange(Base):
+    """医生修改患者级过敏史/现存疾病的审计记录。"""
+
+    __tablename__ = "patient_clinical_changes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("patients.id"), nullable=False, index=True
+    )
+    field: Mapped[str] = mapped_column(String(30), nullable=False)
+    old_value: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    new_value: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    reason: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )

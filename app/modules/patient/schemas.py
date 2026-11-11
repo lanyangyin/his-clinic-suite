@@ -116,3 +116,23 @@ class PatientCardResponse(BaseModel):
     issued_at: datetime
     issued_by: str
     note: str
+
+
+
+class ClinicalProfileUpdate(BaseModel):
+    allergy_status: AllergyStatus | None = None
+    allergy_detail: str | None = Field(default=None, max_length=200)
+    special_history: str | None = Field(default=None, max_length=500)
+    reason: str = Field(min_length=1, max_length=300)
+
+
+class ClinicalChangeResponse(BaseModel):
+    id: int
+    patient_id: int
+    field: str
+    old_value: str
+    new_value: str
+    reason: str
+    changed_by: str
+    changed_at: datetime
+    model_config = ConfigDict(from_attributes=True)

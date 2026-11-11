@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QGroupBox,
     QHBoxLayout,
+    QDialog,
     QInputDialog,
     QLabel,
     QMessageBox,
@@ -36,6 +37,7 @@ from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
 from his_client.ui.patient_info_panel import PatientInfoPanel
+from his_client.ui.patient_clinical_dialog import PatientClinicalDialog
 from his_client.ui.payment import PaymentPanel
 
 _RECORD_FIELDS = [
@@ -76,7 +78,9 @@ class DoctorWidget(QWidget):
         self.side_panel.setFixedWidth(300)
         side_layout = QVBoxLayout(self.side_panel)
         side_layout.setContentsMargins(0, 0, 8, 0)
-        self.side_info = PatientInfoPanel()
+        self.side_info = PatientInfoPanel(editable=True)
+        self.side_info.edit_requested.connect(self._edit_patient_clinical)
+        self.patient_info.edit_requested.connect(self._edit_patient_clinical)
         side_layout.addWidget(self.side_info)
         history_row = QHBoxLayout()
         history_title = QLabel("历史就诊")
@@ -199,7 +203,7 @@ class DoctorWidget(QWidget):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        self.patient_info = PatientInfoPanel()
+        self.patient_info = PatientInfoPanel(editable=True)
         self.patient_info.setMaximumWidth(16777215)
         self.patient_info.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         right_layout.addWidget(self.patient_info)
@@ -308,6 +312,39 @@ class DoctorWidget(QWidget):
         )
         if code and target is not None:
             target.setText(name)
+
+    def _edit_patient_clinical(self) -> None:
+        current = getattr(self, "wb_current", None)
+        patient_id = current.get("patient_id") if current else None
+        if not patient_id:
+            patient_id = getattr(self, "side_info", None).patient_id
+        if not patient_id:
+            self.wb_summary.setText("请先选择患者")
+            return
+        try:
+            patient = self.api.get_patient(patient_id)
+        except ApiError as e:
+            self.wb_summary.setText(f"加载患者失败（{e.status_code}）：{e.detail}")
+            return
+        dialog = PatientClinicalDialog(patient, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            updated = self.api.update_patient_clinical(patient_id, dialog.payload())
+        except ApiError as e:
+            QMessageBox.warning(self, "保存失败", f"{e.status_code}：{e.detail}")
+            return
+        registration_id = current.get("registration_id") if current else None
+        self._load_workbench()
+        if registration_id:
+            for index, row in enumerate(getattr(self, "workbench_rows", [])):
+                if row.get("registration_id") == registration_id:
+                    self.wb_table.selectRow(index)
+                    self._select_workbench(index, 0)
+                    break
+        self.wb_summary.setText(
+            f"患者史已更新并留痕：{updated.get('allergy_label') or '过敏不详'}"
+        )
 
     def _load_workbench(self) -> None:
         try:

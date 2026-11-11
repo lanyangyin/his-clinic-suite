@@ -171,6 +171,16 @@ class ApiClient:
     def update_patient(self, patient_id: int, payload: dict) -> dict:
         return self._request("PUT", f"/patients/{patient_id}", json=payload)
 
+    def update_patient_clinical(self, patient_id: int, payload: dict) -> dict:
+        return self._request(
+            "PUT", f"/patients/{patient_id}/clinical-profile", json=payload
+        )
+
+    def patient_clinical_changes(self, patient_id: int) -> list:
+        return self._request(
+            "GET", f"/patients/{patient_id}/clinical-changes"
+        )
+
     # ---- 挂号 / 就诊 ----
     def create_registration(
         self, patient_id: int, doctor_id: int, schedule_id: int | None = None
