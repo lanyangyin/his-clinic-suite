@@ -28,6 +28,7 @@ from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_info_panel import PatientInfoPanel
 
 
 class CashierWidget(QWidget):
@@ -760,7 +761,11 @@ class CashierWidget(QWidget):
         self.charge_msg = QLabel("")
         self.charge_msg.setWordWrap(True)
         box_layout.addWidget(self.charge_msg)
-        layout.addWidget(box)
+        self.charge_info = PatientInfoPanel()
+        body = QHBoxLayout()
+        body.addWidget(self.charge_info)
+        body.addWidget(box, 1)
+        layout.addLayout(body)
 
         refund_box = QGroupBox("按明细退费（可只退一种药/一颗药）")
         refund_layout = QVBoxLayout(refund_box)
@@ -845,6 +850,8 @@ class CashierWidget(QWidget):
             )
 
     def _show_encounter_patient(self, encounter_id: int, label: QLabel) -> None:
+        if hasattr(self, "charge_info") and label is self.c_patient_label:
+            self.charge_info.clear()
         try:
             encounter = self.api.get_encounter(encounter_id)
             registration = self.api.get_registration(encounter["registration_id"])
@@ -861,6 +868,12 @@ class CashierWidget(QWidget):
             f"{patient['name']} · {gender}/{age if age is not None else '—'}岁 · "
             f"过敏：{allergy} · 电话：{patient.get('phone') or '—'}"
         )
+        if hasattr(self, "charge_info") and label is self.c_patient_label:
+            self.charge_info.set_patient(
+                patient,
+                encounter_id,
+                "收费窗口",
+            )
         label.setStyleSheet(
             "font-weight:bold;color:#f87171"
             if allergy not in ("无过敏史", "不详", "过敏史不详")

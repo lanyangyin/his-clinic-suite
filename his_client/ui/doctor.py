@@ -28,6 +28,7 @@ from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.payment import PaymentPanel
 
 _RECORD_FIELDS = [
@@ -137,6 +138,8 @@ class DoctorWidget(QWidget):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
+        self.patient_info = PatientInfoPanel()
+        right_layout.addWidget(self.patient_info)
         self.wb_patient = QLabel("请选择患者")
         self.wb_patient.setWordWrap(True)
         self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
@@ -358,17 +361,23 @@ class DoctorWidget(QWidget):
             return
         item = self.workbench_rows[row]
         self.wb_current = item
-        self.banner.set_patient(
-            {
-                "id": item.get("patient_id"),
-                "patient_no": item.get("patient_no"),
-                "name": item.get("patient_name"),
-                "gender": item.get("gender"),
-                "age": item.get("age"),
-                "allergy_label": item.get("allergy_label"),
-            },
+        patient = {
+            "id": item.get("patient_id"),
+            "patient_no": item.get("patient_no"),
+            "name": item.get("patient_name"),
+            "gender": item.get("gender"),
+            "age": item.get("age"),
+            "allergy_label": item.get("allergy_label"),
+            "phone": item.get("phone"),
+        }
+        status = "已接诊" if item.get("encounter_id") else "待接诊"
+        self.banner.set_patient(patient, item.get("encounter_id"), status)
+        self.patient_info.set_patient(
+            patient,
             item.get("encounter_id"),
-            "已接诊" if item.get("encounter_id") else "待接诊",
+            status,
+            f"分诊：{item.get('triage_level') or '—'} 级\n"
+            f"生命体征：{item.get('vital_summary') or '未测'}",
         )
         gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
         age = item.get("age")
@@ -454,17 +463,18 @@ class DoctorWidget(QWidget):
                 break
         self.wb_summary.setText(f"接诊成功：就诊 ID {encounter['id']}")
         self._set_encounter_everywhere(encounter["id"])
-        self.banner.set_patient(
-            {
-                "id": item.get("patient_id"),
-                "patient_no": item.get("patient_no"),
-                "name": item.get("patient_name"),
-                "gender": item.get("gender"),
-                "age": item.get("age"),
-                "allergy_label": item.get("allergy_label"),
-            },
-            encounter["id"],
-            "已接诊",
+        patient = {
+            "id": item.get("patient_id"),
+            "patient_no": item.get("patient_no"),
+            "name": item.get("patient_name"),
+            "gender": item.get("gender"),
+            "age": item.get("age"),
+            "allergy_label": item.get("allergy_label"),
+            "phone": item.get("phone"),
+        }
+        self.banner.set_patient(patient, encounter["id"], "已接诊")
+        self.patient_info.set_patient(
+            patient, encounter["id"], "已接诊", f"诊断：{self.wb_diagnosis.text().strip() or '—'}"
         )
 
     def _switch_tab(self, text: str) -> None:

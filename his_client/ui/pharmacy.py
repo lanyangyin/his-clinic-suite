@@ -24,6 +24,7 @@ from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.payment import PaymentPanel
 
 ORDER_TYPES = [
@@ -663,7 +664,11 @@ class PharmacyWidget(QWidget):
         row.addWidget(call_btn)
         row.addWidget(submit)
         row.addWidget(self.print_dispense_label_btn)
-        layout.addWidget(box)
+        self.disp_info = PatientInfoPanel()
+        body = QHBoxLayout()
+        body.addWidget(self.disp_info)
+        body.addWidget(box, 1)
+        layout.addLayout(body)
         self.disp_patient_label = QLabel("当前患者：—")
         self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
         layout.addWidget(self.disp_patient_label)
@@ -798,6 +803,11 @@ class PharmacyWidget(QWidget):
         self.disp_patient_label.setText(
             f"当前患者：{row['patient_name']} · 取药码核对通过"
         )
+        self.disp_info.set_patient(
+            {"name": row["patient_name"]},
+            row["encounter_id"],
+            "取药码核对通过",
+        )
         self.disp_msg.setText(f"取药码核对通过：{row['patient_name']}")
 
     def _scan_dispense_barcode(self) -> None:
@@ -822,6 +832,14 @@ class PharmacyWidget(QWidget):
         self.disp_patient_label.setText(
             f"当前患者：{lookup.get('patient_name') or '—'} · "
             f"就诊 {lookup['encounter_id']} · {lookup.get('status_text') or ''}"
+        )
+        self.disp_info.set_patient(
+            {
+                "id": lookup.get("patient_id"),
+                "name": lookup.get("patient_name"),
+            },
+            lookup["encounter_id"],
+            lookup.get("status_text") or "",
         )
         if not lookup["is_paid"]:
             self.disp_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
@@ -870,6 +888,16 @@ class PharmacyWidget(QWidget):
             self.disp_patient_label.setText(
                 f"当前患者：{item.get('patient_name') or '—'} · "
                 f"就诊 {item['encounter_id']} · 取药码 {item.get('pickup_code') or '—'}"
+            )
+            self.disp_info.set_patient(
+                {
+                    "id": item.get("patient_id"),
+                    "name": item.get("patient_name"),
+                    "allergy_label": item.get("allergy_label"),
+                },
+                item["encounter_id"],
+                "已收费，可发药",
+                f"取药码：{item.get('pickup_code') or '—'}",
             )
 
     def _call_row(self, row: int, _col: int) -> None:
