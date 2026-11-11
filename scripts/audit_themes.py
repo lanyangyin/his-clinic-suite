@@ -1,4 +1,4 @@
-"""主题完整性审计：遍历全部工作站页签和弹窗。
+r"""主题完整性审计：递归遍历全部工作站页签和弹窗。
 
 用法：
     $env:HIS_THEME="dark"; .venv\Scripts\python.exe scripts\audit_themes.py
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QInputDialog,
     QMessageBox,
+    QTabWidget,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -80,13 +81,21 @@ def walk_tabs(name: str, widget) -> None:
     widget.resize(1366, 768)
     widget.show()
     app.processEvents()
-    tabs = getattr(widget, "tabs", None)
-    count = tabs.count() if tabs is not None else 1
-    for index in range(count):
-        if tabs is not None:
+    tabwidgets = widget.findChildren(QTabWidget)
+    if not tabwidgets:
+        capture(name, widget)
+        return
+    for tw_index, tabs in enumerate(tabwidgets):
+        if tabs.count() == 0:
+            continue
+        tabs.setCurrentIndex(0)
+        app.processEvents()
+        for index in range(tabs.count()):
             tabs.setCurrentIndex(index)
-        label = tabs.tabText(index) if tabs is not None else ""
-        capture(f"{name}_{index}_{label}".replace("/", "_").replace("\\", "_"), widget)
+            app.processEvents()
+            label = tabs.tabText(index) or f"tab{index}"
+            safe = f"{name}_{tw_index}_{label}".replace("/", "_").replace("\\", "_")
+            capture(safe, widget)
 
 
 specs = [
@@ -98,7 +107,7 @@ specs = [
     ("Treatment", lambda: TreatmentRoomWidget(api("treatment", "treatment123"))),
     ("Archive", lambda: ArchiveWidget(api("archive", "archive123"))),
     ("Director", lambda: DirectorWidget(api("director", "director123"))),
-    ("Tcm", lambda: TcmWidget(api("doctor", "doctor123"), role="doctor")),
+    ("Tcm", lambda: TcmWidget(api("admin", "admin123"), role="admin")),
     ("Patient360", lambda: Patient360Widget(api("doctor", "doctor123"))),
     ("Surgery", lambda: SurgeryWidget(api("doctor", "doctor123"))),
 ]
