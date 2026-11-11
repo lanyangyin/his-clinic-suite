@@ -13,6 +13,10 @@ class DrugCreate(BaseModel):
     high_alert: bool = False
     # 非处方药：允许零售
     is_otc: bool = False
+    # 主要成分/复方成分
+    ingredient: str = ""
+    # 药品条码
+    barcode: str = ""
     # 医保贯标与生产信息
     insurance_code: str = ""
     approval_no: str = ""
@@ -24,4 +28,17 @@ class DrugResponse(DrugCreate):
     id: int
     insurance_category: str = ""
     insurance_match_status: str = "unmatched"
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DrugInteractionCreate(BaseModel):
+    drug_a_id: int
+    drug_b_id: int
+    severity: str = Field(default="block", pattern="^(block|warn)$")
+    note: str = ""
+
+
+class DrugInteractionResponse(DrugInteractionCreate):
+    id: int
+    active: bool
     model_config = ConfigDict(from_attributes=True)

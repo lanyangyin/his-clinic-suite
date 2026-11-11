@@ -72,6 +72,9 @@ class ApiClient:
     def list_drugs(self) -> list:
         return self._request("GET", "/drugs/")
 
+    def get_drug_by_barcode(self, barcode: str) -> dict:
+        return self._request("GET", f"/drugs/by-barcode/{barcode}")
+
     def list_schedules(self, doctor_id: int) -> list:
         return self._request("GET", f"/doctors/{doctor_id}/schedules")
 

@@ -157,6 +157,42 @@ def add_prescription_item(
     if existing_item:
         raise PrescriptionRuleError("该药品已在处方中，请勿重复开立")
 
+    # 用药安全：成分重复 / 已维护的相互作用规则（规则为空时不拦截）
+    from app.modules.drug.models import DrugInteraction
+
+    existing_items = (
+        db.query(PrescriptionItem)
+        .filter(PrescriptionItem.encounter_id == encounter_id)
+        .all()
+    )
+    for row in existing_items:
+        other = get_drug(db, row.drug_id)
+        if not other:
+            continue
+        if (
+            drug.ingredient.strip()
+            and other.ingredient.strip()
+            and drug.ingredient.strip() == other.ingredient.strip()
+        ):
+            raise PrescriptionRuleError(
+                f"成分重复：{drug.name} 与 {other.name} 均含「{drug.ingredient}」"
+            )
+        rule = (
+            db.query(DrugInteraction)
+            .filter(
+                DrugInteraction.active.is_(True),
+                (
+                    ((DrugInteraction.drug_a_id == drug.id) & (DrugInteraction.drug_b_id == other.id))
+                    | ((DrugInteraction.drug_a_id == other.id) & (DrugInteraction.drug_b_id == drug.id))
+                ),
+            )
+            .first()
+        )
+        if rule and rule.severity == "block":
+            raise PrescriptionRuleError(
+                f"相互作用禁止同方：{drug.name} + {other.name}；{rule.note or '请核对'}"
+            )
+
     # 合理用药：特殊使用级抗菌药物需会诊审批
     if drug.antibiotic_level == 3:
         raise PrescriptionRuleError("特殊使用级抗菌药物需会诊审批，暂不允许开立")

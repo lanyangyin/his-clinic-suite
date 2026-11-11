@@ -398,6 +398,8 @@ def drugs_create(
     antibiotic_level: int = Form(0),
     high_alert: bool = Form(False),
     is_otc: bool = Form(False),
+    ingredient: str = Form(""),
+    barcode: str = Form(""),
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -415,6 +417,8 @@ def drugs_create(
                 antibiotic_level=antibiotic_level,
                 high_alert=high_alert,
                 is_otc=is_otc,
+                ingredient=ingredient.strip(),
+                barcode=barcode.strip(),
             ),
         )
     except (ValueError, IntegrityError) as e:
@@ -2578,3 +2582,155 @@ def stocktake_cancel(request: Request, take_id: int, db: Session = Depends(get_d
     except Exception as e:  # noqa: BLE001
         msg = f"取消失败：{e}"
     return RedirectResponse(f"/admin/stocktakes/{take_id}?msg={quote(msg)}", status_code=302)
+
+
+@router.get("/drug-interactions", response_class=HTMLResponse)
+def drug_interactions_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from app.modules.drug.models import DrugInteraction
+    from app.modules.drug.service import list_drugs
+
+    rows = db.query(DrugInteraction).order_by(DrugInteraction.id.desc()).all()
+    return templates.TemplateResponse(
+        request,
+        "drug_interactions.html",
+        _ctx(request, rows=rows, drugs=list_drugs(db)),
+    )
+
+
+@router.post("/drug-interactions", response_class=HTMLResponse)
+def drug_interactions_create(
+    request: Request,
+    drug_a_id: int = Form(...),
+    drug_b_id: int = Form(...),
+    severity: str = Form("block"),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from app.modules.drug.models import DrugInteraction
+
+    if drug_a_id == drug_b_id:
+        error = "药品 A/B 不能相同"
+    else:
+        existing = (
+            db.query(DrugInteraction)
+            .filter(
+                ((DrugInteraction.drug_a_id == drug_a_id) & (DrugInteraction.drug_b_id == drug_b_id))
+                | ((DrugInteraction.drug_a_id == drug_b_id) & (DrugInteraction.drug_b_id == drug_a_id))
+            )
+            .first()
+        )
+        if existing:
+            error = "该药品对已配置"
+        else:
+            db.add(
+                DrugInteraction(
+                    drug_a_id=drug_a_id,
+                    drug_b_id=drug_b_id,
+                    severity=severity if severity in ("block", "warn") else "block",
+                    note=note.strip(),
+                    active=True,
+                )
+            )
+            db.commit()
+            return RedirectResponse("/admin/drug-interactions?ok=1", status_code=302)
+    from app.modules.drug.service import list_drugs
+
+    rows = db.query(DrugInteraction).order_by(DrugInteraction.id.desc()).all()
+    return templates.TemplateResponse(
+        request,
+        "drug_interactions.html",
+        _ctx(request, rows=rows, drugs=list_drugs(db), error=error),
+        status_code=400,
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from datetime import date, datetime, time
+
+    from sqlalchemy import func
+
+    from app.modules.billing.models import Payment
+    from app.modules.charges.models import EncounterCharge
+    from app.modules.encounter.models import Encounter
+    from app.modules.lis.models import LabRequest
+    from app.modules.pharmacy.models import Dispense, DrugStock
+
+    start = datetime.combine(date.today(), time.min)
+    registrations = (
+        db.query(func.count(func.distinct(Encounter.registration_id)))
+        .filter(Encounter.created_at >= start)
+        .scalar()
+        or 0
+    )
+    encounters = (
+        db.query(func.count(Encounter.id))
+        .filter(Encounter.created_at >= start)
+        .scalar()
+        or 0
+    )
+    revenue = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .filter(Payment.status == "paid", Payment.created_at >= start)
+        .scalar()
+        or 0
+    )
+    pending_charges = (
+        db.query(func.coalesce(func.sum(EncounterCharge.amount), 0))
+        .filter(EncounterCharge.status == "pending")
+        .scalar()
+        or 0
+    )
+    paid_today = (
+        db.query(Payment.encounter_id)
+        .filter(Payment.status == "paid", Payment.created_at >= start)
+        .all()
+    )
+    waiting = 0
+    for (encounter_id,) in paid_today:
+        if not db.query(Dispense).filter(Dispense.encounter_id == encounter_id).first():
+            waiting += 1
+    low_stock = (
+        db.query(func.count(DrugStock.id))
+        .filter(DrugStock.quantity <= 5)
+        .scalar()
+        or 0
+    )
+    critical = (
+        db.query(func.count(LabRequest.id))
+        .filter(
+            LabRequest.critical_flag.is_(True),
+            LabRequest.critical_ack_at.is_(None),
+        )
+        .scalar()
+        or 0
+    )
+    stats = {
+        "registrations": registrations,
+        "encounters": encounters,
+        "revenue": float(revenue),
+        "pending_charges": float(pending_charges),
+        "waiting_dispense": waiting,
+        "low_stock": low_stock,
+        "critical": critical,
+    }
+    return templates.TemplateResponse(
+        request, "operations_dashboard.html", _ctx(request, stats=stats)
+    )
+
+
+@router.get("/print-center", response_class=HTMLResponse)
+def print_center_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(request, "print_center.html", _ctx(request))

@@ -152,6 +152,16 @@ class PharmacyWidget(QWidget):
         items_layout.addWidget(QLabel("药品行：来源 / 药品 / 批号 / 效期 / 数量 / 单价 / 储存 / 货位"))
         items_layout.addLayout(drug_row)
 
+        scan_row = QHBoxLayout()
+        self.in_scan_barcode = QLineEdit()
+        self.in_scan_barcode.setPlaceholderText("扫药品条码，自动选中药品")
+        self.in_scan_barcode.returnPressed.connect(self._scan_inbound_drug)
+        scan_btn = QPushButton("扫码收货")
+        scan_btn.clicked.connect(self._scan_inbound_drug)
+        scan_row.addWidget(self.in_scan_barcode)
+        scan_row.addWidget(scan_btn)
+        items_layout.addLayout(scan_row)
+
         insurance_row = QHBoxLayout()
         self.in_insurance_code = QLineEdit()
         self.in_insurance_code.setPlaceholderText("医保编码（可空，空则取目录）")
@@ -352,6 +362,28 @@ class PharmacyWidget(QWidget):
                 f"{item['name']}（{item.get('category')}）", item["id"]
             )
         self.in_msg.setText(f"本店物资 {len(items)} 条")
+
+    def _scan_inbound_drug(self) -> None:
+        barcode = self.in_scan_barcode.text().strip()
+        if not barcode:
+            self.in_msg.setText("请扫药品条码")
+            return
+        try:
+            drug = self.api.get_drug_by_barcode(barcode)
+        except ApiError as e:
+            self.in_msg.setText(f"扫码失败（{e.status_code}）：{e.detail}")
+            return
+        index = self.in_drug_source.findData("local")
+        if index >= 0:
+            self.in_drug_source.setCurrentIndex(index)
+        index = self.in_drug.findData(drug["id"])
+        if index < 0:
+            self.in_msg.setText("本店药品目录没有该药品，请先维护")
+            return
+        self.in_drug.setCurrentIndex(index)
+        if not self.in_price.text().strip():
+            self.in_price.setText(f"{drug['base_price']:.2f}")
+        self.in_msg.setText(f"已扫描：{drug['name']} {drug.get('spec') or ''}")
 
     def _add_drug_item(self) -> None:
         source = (
@@ -616,6 +648,8 @@ class PharmacyWidget(QWidget):
         self.disp_scan_status.setWordWrap(True)
         submit = QPushButton("核对发药")
         submit.clicked.connect(self._dispense)
+        self.print_dispense_label_btn = QPushButton("打印上次发药袋标签")
+        self.print_dispense_label_btn.clicked.connect(self._print_dispense_label)
         call_btn = QPushButton("叫号")
         call_btn.clicked.connect(self._call)
         row.addWidget(QLabel("就诊"))
@@ -628,6 +662,7 @@ class PharmacyWidget(QWidget):
         row.addWidget(self.disp_scan_status)
         row.addWidget(call_btn)
         row.addWidget(submit)
+        row.addWidget(self.print_dispense_label_btn)
         layout.addWidget(box)
         self.disp_patient_label = QLabel("当前患者：—")
         self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
@@ -714,6 +749,7 @@ class PharmacyWidget(QWidget):
         self.disp_msg.setText(
             f"核对发药成功：记录 {record['id']}，取药人 {record['receiver_name'] or '—'}"
         )
+        self.disp_last_id = record["id"]
         self.return_dispense_id.setValue(record["id"])
         self._load_worklist()
 
@@ -739,6 +775,14 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.worklist_table.setItem(row, col, QTableWidgetItem(str(value)))
         self.disp_msg.setText(f"待发药 {len(self.worklist)} 人")
+
+    def _print_dispense_label(self) -> None:
+        if not getattr(self, "disp_last_id", None):
+            self.disp_msg.setText("还没有可打印的发药记录")
+            return
+        QDesktopServices.openUrl(
+            QUrl(f"{self.api.base_url}/print/dispense-label/{self.disp_last_id}")
+        )
 
     def _verify_code(self) -> None:
         code = self.pickup_code.text().strip()

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}用药安全规则 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>用药安全规则</h2>
+<p class="muted">系统不预置临床结论。请按药品说明书/药师审核结果维护；规则为空时不会拦截。</p>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/drug-interactions">
+    <label>药品 A
+      <select name="drug_a_id" required>
+        {% for drug in drugs %}<option value="{{ drug.id }}">{{ drug.name }} {{ drug.spec }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>药品 B
+      <select name="drug_b_id" required>
+        {% for drug in drugs %}<option value="{{ drug.id }}">{{ drug.name }} {{ drug.spec }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>级别
+      <select name="severity">
+        <option value="block">禁止同方</option>
+        <option value="warn">仅提示</option>
+      </select>
+    </label>
+    <label>说明 <input type="text" name="note" maxlength="200" placeholder="如 出血风险增加"></label>
+    <button type="submit">新增规则</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>药品 A</th><th>药品 B</th><th>级别</th><th>说明</th><th>启用</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.drug_a.name if row.drug_a else row.drug_a_id }}</td>
+      <td>{{ row.drug_b.name if row.drug_b else row.drug_b_id }}</td>
+      <td>{{ '禁止同方' if row.severity == 'block' else '仅提示' }}</td>
+      <td>{{ row.note }}</td>
+      <td>{{ '是' if row.active else '否' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">暂无规则</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

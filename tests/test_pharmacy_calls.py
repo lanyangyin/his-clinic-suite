@@ -166,3 +166,56 @@ def test_pickup_code_generated_at_payment(client, auth):
     assert receipt.status_code == 200
     assert "取药码" in receipt.text
     assert "P" in receipt.text
+
+
+def test_dispense_label_contains_patient_and_usage(client, auth):
+    patient, encounter, drug = _paid_prescription(client, auth)
+    dispensed = client.post(
+        "/pharmacy/dispense",
+        json={"encounter_id": encounter["id"], "note": "标签测试"},
+        headers=auth["pharmacist"],
+    )
+    assert dispensed.status_code == 201, dispensed.text
+    label = client.get(f"/print/dispense-label/{dispensed.json()['id']}")
+    assert label.status_code == 200
+    assert "发药袋标签" in label.text
+    assert "叫号患者" in label.text
+    assert drug["name"] in label.text
+    assert "请核对" in label.text
+
+
+def test_nursing_label_contains_patient_and_route(client, auth):
+    dept = client.post("/departments/", json={"name": "瓶签科"}, headers=auth["admin"]).json()
+    doctor = client.post(
+        "/doctors/", json={"name": "瓶签医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    patient = client.post(
+        "/patients/", json={"name": "瓶签患者", "id_number": "110101199901018888"},
+        headers=auth["cashier"],
+    ).json()
+    reg = client.post(
+        "/registrations/", json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
+        headers=auth["cashier"],
+    ).json()
+    enc = client.post(
+        "/encounters/", json={"registration_id": reg["id"]}, headers=auth["doctor"]
+    ).json()
+    drug = client.post(
+        "/drugs/", json={"name": "瓶签药", "base_price": 1}, headers=auth["admin"]
+    ).json()
+    client.post(
+        f"/encounters/{enc['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1, "dosage": "1g", "route": "静滴", "frequency": "qd"},
+        headers=auth["doctor"],
+    )
+    sync = client.post(f"/nursing/encounters/{enc['id']}/sync", headers=auth["nurse"])
+    assert sync.status_code == 200, sync.text
+    orders = client.get("/nursing/orders", params={"encounter_id": enc["id"]}, headers=auth["nurse"])
+    assert orders.status_code == 200
+    order = orders.json()[0]
+    label = client.get(f"/print/nursing-label/{order['id']}")
+    assert label.status_code == 200
+    assert "瓶签患者" in label.text
+    assert "瓶签药" in label.text
+    assert "静滴" in label.text

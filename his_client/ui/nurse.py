@@ -1,5 +1,6 @@
 """护士工作站：门诊分诊叫号、治疗执行。"""
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -408,10 +409,13 @@ class NurseWidget(QWidget):
         complete.clicked.connect(self._complete_nursing)
         skip = QPushButton("跳过")
         skip.clicked.connect(self._skip_nursing)
+        print_label = QPushButton("打印瓶签")
+        print_label.clicked.connect(self._print_nursing_label)
         buttons.addWidget(start)
         buttons.addWidget(observe)
         buttons.addWidget(complete)
         buttons.addWidget(skip)
+        buttons.addWidget(print_label)
         form.addRow(buttons)
         layout.addWidget(exec_box)
 
@@ -500,6 +504,14 @@ class NurseWidget(QWidget):
             return
         self.nursing_msg.setText("配药完成")
         self._load_nursing()
+
+    def _print_nursing_label(self) -> None:
+        order = self._selected_nursing()
+        if not order:
+            return
+        QDesktopServices.openUrl(
+            QUrl(f"{self.api.base_url}/print/nursing-label/{order['id']}")
+        )
 
     def _rate_value(self) -> float | None:
         text = self.rate.text().strip()

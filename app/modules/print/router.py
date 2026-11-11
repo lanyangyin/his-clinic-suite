@@ -17,6 +17,8 @@ from app.modules.print.documents import (
 from app.modules.print.barcode import code128_svg
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.pharmacy.retail_service import get_retail_sale
+from app.modules.pharmacy.service import get_dispense
+from app.modules.nursing.models import NursingOrder
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
 from app.modules.lis.service import get_request
@@ -398,6 +400,73 @@ def print_retail(sale_id: int, db: Session = Depends(get_db)):
 <p class="center">打印时间：{datetime.now():%Y-%m-%d %H:%M}</p>
 </body></html>"""
     )
+
+
+@router.get("/dispense-label/{dispense_id}", response_class=HTMLResponse)
+def print_dispense_label(dispense_id: int, db: Session = Depends(get_db)):
+    dispense = get_dispense(db, dispense_id)
+    if not dispense:
+        raise HTTPException(status_code=404, detail="发药记录不存在")
+    encounter = get_encounter(db, dispense.encounter_id)
+    registration = get_registration(db, encounter.registration_id) if encounter else None
+    patient = get_patient(db, registration.patient_id) if registration else None
+    items = list_prescription_items(db, dispense.encounter_id) if encounter else []
+    rows = "".join(
+        f"<tr><td>{escape(item.drug_name)}</td><td>{item.quantity}</td>"
+        f"<td>{escape(' '.join(x for x in (item.dosage, item.frequency, item.route) if x))}</td></tr>"
+        for item in items
+    )
+    meta = _clinic_meta()
+    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>发药袋标签</title><style>{RECEIPT_CSS}</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])}</h2>
+<p class="center big">发药袋标签</p>
+<div class="divider"></div>
+<p>患者：{escape(patient.name if patient else '—')}　
+   {escape({'male':'男','female':'女'}.get(patient.gender if patient else '', '不详'))} /
+   {patient.age if patient and patient.age is not None else '—'}岁</p>
+<p>就诊：{dispense.encounter_id}　取药人：{escape(dispense.receiver_name or '—')}</p>
+<div class="divider"></div>
+<table><tr><th>药品</th><th>数量</th><th>用法</th></tr>{rows}</table>
+<div class="divider"></div>
+<p>发药人：{escape(dispense.verified_by or '—')}　
+   时间：{dispense.verified_at.strftime('%Y-%m-%d %H:%M') if dispense.verified_at else '—'}</p>
+<p class="center">请核对姓名、药名、用法；有疑问请咨询药师</p>
+</body></html>""")
+
+
+@router.get("/nursing-label/{order_id}", response_class=HTMLResponse)
+def print_nursing_label(order_id: int, db: Session = Depends(get_db)):
+    order = db.get(NursingOrder, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="护理执行单不存在")
+    encounter = get_encounter(db, order.encounter_id)
+    registration = get_registration(db, encounter.registration_id) if encounter else None
+    patient = get_patient(db, registration.patient_id) if registration else None
+    preparation = order.preparations[-1] if order.preparations else None
+    meta = _clinic_meta()
+    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>输液瓶签</title><style>{RECEIPT_CSS}</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])}</h2>
+<p class="center big">输液 / 注射瓶签</p>
+<div class="divider"></div>
+<p>患者：{escape(patient.name if patient else '—')}　
+   {escape({'male':'男','female':'女'}.get(patient.gender if patient else '', '不详'))} /
+   {patient.age if patient and patient.age is not None else '—'}岁</p>
+<p>座位：{escape(order.seat_no or '—')}　执行单：{order.id}</p>
+<div class="divider"></div>
+<p class="big">药品：{escape(order.item_name)}</p>
+<p>剂量：{escape(order.dosage or '—')}　途径：{escape(order.route or '—')}　
+   频次：{escape(order.frequency or '—')}</p>
+<p>溶媒：{escape(preparation.solvent if preparation else '—')}　
+   批号：{escape(preparation.batch_no if preparation else '—')}</p>
+<p>配药：{escape(preparation.prepared_by if preparation else '—')}　
+   核对：{escape(preparation.checked_by if preparation else '—')}</p>
+<div class="divider"></div>
+<p class="center">执行前请核对患者姓名、药名、剂量、途径、时间</p>
+</body></html>""")
 
 
 LAB_CSS = """

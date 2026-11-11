@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}运营看板 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>今日运营看板</h2>
+<div class="cards">
+  <div class="card"><div class="num">{{ stats.registrations }}</div><div>今日挂号</div></div>
+  <div class="card"><div class="num">{{ stats.encounters }}</div><div>今日就诊</div></div>
+  <div class="card"><div class="num">¥{{ '%.2f'|format(stats.revenue) }}</div><div>今日实收</div></div>
+  <div class="card"><div class="num">¥{{ '%.2f'|format(stats.pending_charges) }}</div><div>待收费用</div></div>
+  <div class="card"><div class="num">{{ stats.waiting_dispense }}</div><div>待发药</div></div>
+  <div class="card"><div class="num">{{ stats.low_stock }}</div><div>低库存批次</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">{{ stats.critical }}</div><div>未确认危急值</div></div>
+</div>
+<div class="panel">
+  <h3>快速入口</h3>
+  <p>
+    <a href="/admin/print-center">打印中心</a> ·
+    <a href="/admin/drug-interactions">用药规则</a> ·
+    <a href="/admin/purchase-requests">采购审批</a> ·
+    <a href="/admin/archive">病案档案</a>
+  </p>
+</div>
+<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;text-align:center}
+.card .num{font-size:26px;font-weight:bold;color:#1e293b;margin-bottom:6px}
+</style>
+{% endblock %}

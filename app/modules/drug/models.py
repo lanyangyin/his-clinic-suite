@@ -1,5 +1,5 @@
-from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
@@ -27,6 +27,14 @@ class Drug(Base):
     is_otc: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", nullable=False
     )
+    # 主要成分/复方成分，用于成分重复提醒；可空
+    ingredient: Mapped[str] = mapped_column(
+        String(100), default="", server_default="", nullable=False
+    )
+    # 药品条码（扫码收货/扫码选药），可空
+    barcode: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
     # 医保贯标：国家医保药品代码（与医保目录对应）
     insurance_code: Mapped[str] = mapped_column(
         String(40), default="", server_default="", nullable=False
@@ -47,3 +55,26 @@ class Drug(Base):
     dosage_form: Mapped[str] = mapped_column(
         String(30), default="", server_default="", nullable=False
     )
+
+
+class DrugInteraction(Base):
+    """药品相互作用规则：由管理员维护，不由系统编造临床结论。"""
+
+    __tablename__ = "drug_interactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    drug_a_id: Mapped[int] = mapped_column(ForeignKey("drugs.id"), nullable=False)
+    drug_b_id: Mapped[int] = mapped_column(ForeignKey("drugs.id"), nullable=False)
+    # block 禁止同方 / warn 仅提示
+    severity: Mapped[str] = mapped_column(
+        String(10), default="block", server_default="block", nullable=False
+    )
+    note: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+
+    drug_a = relationship("Drug", foreign_keys=[drug_a_id])
+    drug_b = relationship("Drug", foreign_keys=[drug_b_id])

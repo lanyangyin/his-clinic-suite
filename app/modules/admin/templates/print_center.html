@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}打印中心 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>打印中心</h2>
+<div class="panel">
+  <p>输入业务单号后打开对应打印页。打印页可直接浏览器打印。</p>
+  <table>
+    <tr><th>类型</th><th>单号</th><th>打开</th></tr>
+    <tr><td>门诊病历 / 处方笺</td><td><input id="enc" type="number" min="1" placeholder="就诊 ID"></td>
+        <td><button onclick="openPrint('prescription', 'enc')">打开</button></td></tr>
+    <tr><td>收费收据</td><td><input id="pay" type="number" min="1" placeholder="收费单 ID"></td>
+        <td><button onclick="openPrint('receipt', 'pay')">打开</button></td></tr>
+    <tr><td>检验报告</td><td><input id="lab" type="number" min="1" placeholder="检验申请 ID"></td>
+        <td><button onclick="openPrint('lab-report', 'lab')">打开</button></td></tr>
+    <tr><td>药房零售小票</td><td><input id="retail" type="number" min="1" placeholder="零售单 ID"></td>
+        <td><button onclick="openPrint('retail', 'retail')">打开</button></td></tr>
+    <tr><td>发药袋标签</td><td><input id="disp" type="number" min="1" placeholder="发药记录 ID"></td>
+        <td><button onclick="openPrint('dispense-label', 'disp')">打开</button></td></tr>
+    <tr><td>输液 / 注射瓶签</td><td><input id="nurse" type="number" min="1" placeholder="护理执行单 ID"></td>
+        <td><button onclick="openPrint('nursing-label', 'nurse')">打开</button></td></tr>
+  </table>
+</div>
+<script>
+function openPrint(kind, inputId) {
+  const value = document.getElementById(inputId).value.trim();
+  if (!value) { alert('请输入单号'); return; }
+  window.open('/print/' + kind + '/' + encodeURIComponent(value), '_blank');
+}
+</script>
+{% endblock %}
