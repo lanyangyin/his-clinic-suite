@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.payment import PaymentPanel
 
@@ -43,7 +45,7 @@ class DoctorWidget(QWidget):
         self.api = api
         self.insurance_enabled = load_config().insurance_enabled
         self.banner = PatientBanner()
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_workbench_tab(), "门诊工作台")
         self.tabs.addTab(self._build_register_tab(), "挂号")
         self.tabs.addTab(self._build_reception_tab(), "接诊")
@@ -113,9 +115,13 @@ class DoctorWidget(QWidget):
         refresh.clicked.connect(self._load_workbench)
         top.addWidget(self.wb_search, 1)
         top.addWidget(refresh)
-        top.addStretch(1)
         layout.addLayout(top)
 
+        splitter = QSplitter(Qt.Horizontal)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         self.wb_table = QTableWidget(0, 7)
         self.wb_table.setHorizontalHeaderLabels(
             ["挂号", "患者", "医生", "挂号状态", "就诊", "诊断", "待缴"]
@@ -124,10 +130,17 @@ class DoctorWidget(QWidget):
         self.wb_table.cellDoubleClicked.connect(
             lambda row, _col: self._start_workbench_row(row)
         )
+        self.wb_table.setAlternatingRowColors(True)
+        left_layout.addWidget(self.wb_table, 1)
+        splitter.addWidget(left)
 
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         self.wb_patient = QLabel("请选择患者")
+        self.wb_patient.setWordWrap(True)
         self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
-        layout.addWidget(self.wb_patient)
+        right_layout.addWidget(self.wb_patient)
 
         critical_box = QGroupBox("危急值待确认")
         critical_layout = QVBoxLayout(critical_box)
@@ -135,7 +148,7 @@ class DoctorWidget(QWidget):
         self.critical_table.setHorizontalHeaderLabels(
             ["患者", "项目", "结果", "报告时间", "超时"]
         )
-        self.critical_table.setMaximumHeight(120)
+        self.critical_table.setMaximumHeight(90)
         self.critical_table.cellClicked.connect(self._select_critical)
         critical_layout.addWidget(self.critical_table)
         critical_row = QHBoxLayout()
@@ -148,7 +161,7 @@ class DoctorWidget(QWidget):
         critical_layout.addLayout(critical_row)
         self.critical_msg = QLabel("")
         critical_layout.addWidget(self.critical_msg)
-        layout.addWidget(critical_box)
+        right_layout.addWidget(critical_box)
 
         row = QHBoxLayout()
         self.wb_diagnosis_code = QComboBox()
@@ -160,29 +173,36 @@ class DoctorWidget(QWidget):
         self.wb_start.clicked.connect(self._start_workbench)
         row.addWidget(QLabel("诊断"))
         row.addWidget(self.wb_diagnosis_code)
-        row.addWidget(self.wb_diagnosis)
+        row.addWidget(self.wb_diagnosis, 1)
         row.addWidget(self.wb_start)
-        layout.addLayout(row)
+        right_layout.addLayout(row)
 
-        actions = QHBoxLayout()
-        for text, handler in [
-            ("写病历", self._wb_record),
-            ("开方", self._wb_prescribe),
-            ("开检验", self._wb_exam),
-            ("开治疗", self._wb_treat),
-            ("历史诊疗", self._wb_history),
-        ]:
+        actions = QGridLayout()
+        for index, (text, handler) in enumerate(
+            [
+                ("写病历", self._wb_record),
+                ("开方", self._wb_prescribe),
+                ("开检验", self._wb_exam),
+                ("开治疗", self._wb_treat),
+                ("历史诊疗", self._wb_history),
+            ]
+        ):
             button = QPushButton(text)
             button.clicked.connect(handler)
-            actions.addWidget(button)
-        layout.addLayout(actions)
+            actions.addWidget(button, index // 3, index % 3)
+        right_layout.addLayout(actions)
 
         self.wb_summary = QLabel("")
         self.wb_summary.setWordWrap(True)
-        layout.addWidget(self.wb_summary)
+        right_layout.addWidget(self.wb_summary)
         self.wb_fee_table = QTableWidget(0, 4)
         self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
-        layout.addWidget(self.wb_fee_table, 1)
+        right_layout.addWidget(self.wb_fee_table, 1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([620, 500])
+        layout.addWidget(splitter, 1)
         return page
 
     def _load_diagnoses(self) -> None:

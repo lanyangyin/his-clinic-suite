@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 
 
@@ -35,7 +36,7 @@ class CashierWidget(QWidget):
         self.api = api
         self.insurance_enabled = load_config().insurance_enabled
         self.banner = PatientBanner()
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_patient_tab(), "患者建档 / 查询")
         self.tabs.addTab(self._build_registration_tab(), "挂号")
         self.tabs.addTab(self._build_charge_tab(), "收费 / 退费")

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 SPECIAL = {
     "none": "常规",
@@ -50,7 +51,7 @@ class TcmWidget(QWidget):
         self.api = api
         self.role = role
         self.items: list[dict] = []
-        tabs = QTabWidget()
+        tabs = SidebarTabs()
         if role in ("doctor", "admin"):
             tabs.addTab(self._build_prescribe_tab(), "开中药方")
         if role in ("pharmacist", "admin"):

@@ -6,6 +6,7 @@ from his_client.api import ApiClient
 from his_client.ui.cashier import CashierWidget
 from his_client.ui.doctor import DoctorWidget
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.archive import ArchiveWidget
 from his_client.ui.director import DirectorWidget
 from his_client.ui.lab import LabWidget
@@ -26,7 +27,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1200, 700)
 
         role = user.get("role", "")
-        tabs = QTabWidget()
+        tabs = SidebarTabs()
         if role in ("cashier", "admin"):
             tabs.addTab(CashierWidget(api), "收费员工作站")
         if role in ("doctor", "admin"):

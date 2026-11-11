@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 
 class Patient360Widget(QWidget):
@@ -50,7 +51,7 @@ class Patient360Widget(QWidget):
         self.stats.setWordWrap(True)
         layout.addWidget(self.stats)
 
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         self.enc_table = QTableWidget(0, 6)
         self.enc_table.setHorizontalHeaderLabels(
             ["就诊", "时间", "诊断", "医生", "处方", "检验"]

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 
 class TreatmentRoomWidget(QWidget):
@@ -29,7 +30,7 @@ class TreatmentRoomWidget(QWidget):
         self.cases: list[dict] = []
         self.templates: list[dict] = []
         self.template_edits: dict[str, QLineEdit] = {}
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_workbench_tab(), "今日工作台")
         self.tabs.addTab(self._build_queue_tab(), "治疗排队")
         self.tabs.addTab(self._build_handle_tab(), "处置记录")

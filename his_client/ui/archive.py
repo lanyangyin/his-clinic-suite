@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 STATUS = {
     "draft": "已建档",
@@ -36,7 +37,7 @@ class ArchiveWidget(QWidget):
         self.api = api
         self.rows: list[dict] = []
         self.current: dict | None = None
-        tabs = QTabWidget()
+        tabs = SidebarTabs()
         tabs.addTab(self._build_record_tab(), "病案建档 / 归档")
         tabs.addTab(self._build_borrow_tab(), "借阅 / 复印")
         tabs.addTab(self._build_seal_tab(), "封存 / 销毁")

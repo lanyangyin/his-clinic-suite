@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 
 
@@ -29,7 +30,7 @@ class NurseWidget(QWidget):
         super().__init__(parent)
         self.api = api
         self.banner = PatientBanner()
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_triage_tab(), "分诊叫号")
         self.tabs.addTab(self._build_treatment_tab(), "治疗执行")
         self.tabs.addTab(self._build_nursing_tab(), "输液执行")

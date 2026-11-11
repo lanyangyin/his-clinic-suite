@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.payment import PaymentPanel
 
@@ -48,7 +49,7 @@ class PharmacyWidget(QWidget):
         self.handle_order: dict | None = None
         self.banner = PatientBanner()
 
-        self.tabs = QTabWidget()
+        self.tabs = SidebarTabs()
         tabs = self.tabs
         # 库房：入库 / 出库审核 / 总库库存
         if role in ("warehouse", "admin"):

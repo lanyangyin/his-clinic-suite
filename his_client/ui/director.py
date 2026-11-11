@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 ARCHIVE_STATUS = {
     "pending": "待审批",
@@ -34,7 +35,7 @@ class DirectorWidget(QWidget):
         self.api = api
         self.archive_rows: list[dict] = []
         self.purchase_rows: list[dict] = []
-        tabs = QTabWidget()
+        tabs = SidebarTabs()
         tabs.addTab(self._build_archive_tab(), "病案销毁审批")
         tabs.addTab(self._build_purchase_tab(), "采购申请审批")
         layout = QVBoxLayout(self)

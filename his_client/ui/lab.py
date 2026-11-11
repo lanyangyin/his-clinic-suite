@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.sidebar_tabs import SidebarTabs
 
 
 class LabWidget(QWidget):
@@ -29,7 +30,7 @@ class LabWidget(QWidget):
         self.rows: list[dict] = []
         self.current: dict | None = None
 
-        tabs = QTabWidget()
+        tabs = SidebarTabs()
         tabs.addTab(self._build_work_tab(), "检验工作台")
         tabs.addTab(self._build_query_tab(), "报告查询")
         layout = QVBoxLayout(self)
