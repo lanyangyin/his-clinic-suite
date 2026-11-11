@@ -2,6 +2,7 @@
 MODERN_QSS = """
 QWidget { color: #1e293b; font-family: "Microsoft YaHei"; font-size: 13px; }
 QWidget#workstationRoot { background: #f4f8fd; }
+QMainWindow, QDialog { background: #f4f8fd; }
 QGroupBox {
     border: 1px solid #dbe7f3;
     border-radius: 8px;

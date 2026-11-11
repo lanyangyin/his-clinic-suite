@@ -339,6 +339,8 @@ class DemoController:
             json={"result": "血压相关指标正常"},
         )
         self.nurse_api.call("POST", f"/treatments/{treatment['id']}/execute")
+        # 历史就诊挂起，避免占用医生“当前就诊”互斥位
+        self.doctor_api.call("POST", f"/encounters/{enc['id']}/pause")
         self.prior_encounter_id = enc["id"]
 
     # ---------- 演示流程 ----------
@@ -350,8 +352,15 @@ class DemoController:
         self.scene("① 收费员窗口：患者建档", self.cashier)
         patient_tab = self.switch_inner(self.cashier, "患者建档")
         self.cashier.p_name.setText(f"演示患者{self.suffix}")
+        self.cashier.p_gender.setCurrentIndex(self.cashier.p_gender.findData("male"))
         self.cashier.p_id_number.setText(f"1101011996{self.suffix[-8:]}")
+        self.cashier.p_birth_date.setText("1996-05-20")
         self.cashier.p_phone.setText("13800000000")
+        self.cashier.p_address.setText("北京市东城区演示街道 1 号")
+        self.cashier.p_emergency_name.setText("演示家属")
+        self.cashier.p_emergency_relation.setText("配偶")
+        self.cashier.p_emergency_phone.setText("13900001234")
+        self.cashier.p_privacy.setChecked(True)
         self.click(patient_tab, "建档")
         patients = self.cashier_api.call(
             "GET", "/patients/", params={"id_number": f"1101011996{self.suffix[-8:]}"}
@@ -510,6 +519,11 @@ class DemoController:
         self.scene("⑨ 治疗室窗口：知情同意 → 开始 → 完成处置", self.treatment)
         handle_tab = self.switch_inner(self.treatment, "处置记录")
         self.treatment.consent.setChecked(True)
+        self.treatment.consent_signer.setText(f"演示患者{self.suffix}")
+        self.treatment.consent_relation.setText("本人")
+        signature_file = str(ROOT / "docs" / "dept_preview" / "signature_demo.png")
+        self.treatment.consent_signature_local = signature_file
+        self.treatment.consent_signature_path.setText(signature_file)
         self.treatment.anesthesia.setText("利多卡因局麻")
         self.treatment.findings.setText("右手掌 3cm 裂伤")
         self.click(handle_tab, "开始")

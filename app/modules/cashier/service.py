@@ -97,6 +97,21 @@ def list_shifts(db: Session, day: date | None = None, cashier: str | None = None
     return query.order_by(CashierShift.id.desc()).all()
 
 
+def _daily_shifts(db: Session, day: date, cashier: str | None) -> list[CashierShift]:
+    """日结列表：当天记录 + 跨天仍未交班的当前开班记录。"""
+    rows = list_shifts(db, day, cashier)
+    if day != date.today():
+        return rows
+    query = db.query(CashierShift).filter(CashierShift.status == "open")
+    if cashier:
+        query = query.filter(CashierShift.cashier == cashier)
+    existing = {row.id for row in rows}
+    for row in query.order_by(CashierShift.id.desc()).all():
+        if row.id not in existing:
+            rows.insert(0, row)
+    return rows
+
+
 def daily(db: Session, day: date | None = None, cashier: str | None = None) -> dict:
     day = day or date.today()
     start = datetime.combine(day, time.min)
@@ -152,6 +167,6 @@ def daily(db: Session, day: date | None = None, cashier: str | None = None) -> d
         "refund_amount": round(sum(row.amount for row in refunds), 2),
         "pending_amount": round(float(pending_amount), 2),
         "channels": sorted(channels.values(), key=lambda row: row["amount"], reverse=True),
-        "shifts": list_shifts(db, day, cashier),
+        "shifts": _daily_shifts(db, day, cashier),
         "scope": cashier or "all",
     }

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import ClientConfig
 from his_client.ui.theme import apply_theme
+from his_client.ui.window_theme import apply_light_titlebar
 
 
 class LoginDialog(QDialog):
@@ -52,6 +53,12 @@ class LoginDialog(QDialog):
         buttons.accepted.connect(self._try_login)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_light_title_done", False):
+            self._light_title_done = True
+            apply_light_titlebar(self)
 
     def _try_login(self) -> None:
         server = self.server_edit.text().strip()

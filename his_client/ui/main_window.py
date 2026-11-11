@@ -16,6 +16,7 @@ from his_client.ui.tcm import TcmWidget
 from his_client.ui.treatment_room import TreatmentRoomWidget
 from his_client.ui.pharmacy import PharmacyWidget
 from his_client.ui.theme import apply_theme
+from his_client.ui.window_theme import apply_light_titlebar
 
 
 class MainWindow(QMainWindow):
@@ -28,6 +29,7 @@ class MainWindow(QMainWindow):
         self.resize(1366, 768)
         self.setMinimumSize(1200, 700)
 
+        self._light_title_done = False
         role = user.get("role", "")
         tabs = SidebarTabs()
         if role in ("cashier", "admin"):
@@ -66,6 +68,13 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             f"服务器 {api.base_url} · 用户 {name}（{zh('role', role)}）· 客户端 v{CLIENT_VERSION}"
         )
+
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_light_title_done", False):
+            self._light_title_done = True
+            apply_light_titlebar(self)
 
 
 def _placeholder(text: str) -> QWidget:
