@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QHeaderView,
+    QSizePolicy,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -66,28 +67,52 @@ class DoctorWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
         body = QHBoxLayout()
-        body.addWidget(self.tabs, 1)
+        self.side_panel = QWidget()
+        self.side_panel.setFixedWidth(300)
+        side_layout = QVBoxLayout(self.side_panel)
+        side_layout.setContentsMargins(0, 0, 8, 0)
+        side_layout.addWidget(QLabel("当前患者"))
         self.side_info = PatientInfoPanel()
-        self.side_info.setFixedWidth(235)
-        body.addWidget(self.side_info)
+        side_layout.addWidget(self.side_info)
+        history_row = QHBoxLayout()
+        history_title = QLabel("历史就诊")
+        history_title.setStyleSheet("font-weight:bold;color:#cbd5e1;margin-top:6px")
+        history_refresh = QPushButton("刷新")
+        history_refresh.clicked.connect(self._refresh_side_history)
+        history_row.addWidget(history_title)
+        history_row.addStretch(1)
+        history_row.addWidget(history_refresh)
+        side_layout.addLayout(history_row)
+        self.side_history = QTableWidget(0, 3)
+        self.side_history.setHorizontalHeaderLabels(["日期", "诊断", "医生"])
+        self.side_history.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.side_history.verticalHeader().setVisible(False)
+        self.side_history.cellDoubleClicked.connect(self._open_side_history)
+        side_layout.addWidget(self.side_history, 1)
+        self.side_history_msg = QLabel("")
+        self.side_history_msg.setWordWrap(True)
+        self.side_history_msg.setStyleSheet("color:#94a3b8")
+        side_layout.addWidget(self.side_history_msg)
+        body.addWidget(self.side_panel)
+        body.addWidget(self.tabs, 1)
         layout.addLayout(body)
         self._load_diagnoses()
         self._install_shortcuts()
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._auto_refresh)
         self.auto_timer.start(15000)
-        self.side_info.setFixedWidth(0)
-        self.side_info.setVisible(False)
+        self.side_panel.setFixedWidth(0)
+        self.side_panel.setVisible(False)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
     def _on_tab_changed(self, _index: int) -> None:
-        if hasattr(self, "side_info"):
+        if hasattr(self, "side_panel"):
             if _index == 0:
-                self.side_info.setFixedWidth(0)
-                self.side_info.setVisible(False)
+                self.side_panel.setFixedWidth(0)
+                self.side_panel.setVisible(False)
             else:
-                self.side_info.setFixedWidth(235)
-                self.side_info.setVisible(True)
+                self.side_panel.setFixedWidth(300)
+                self.side_panel.setVisible(True)
         if "开方" in self.tabs.tabText(self.tabs.currentIndex()) and not hasattr(self, "drug_rows"):
             self._load_drugs()
 
@@ -180,6 +205,8 @@ class DoctorWidget(QWidget):
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
         self.patient_info = PatientInfoPanel()
+        self.patient_info.setMaximumWidth(16777215)
+        self.patient_info.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         right_layout.addWidget(self.patient_info)
         self.wb_patient = QLabel("请选择患者")
         self.wb_patient.setWordWrap(True)
@@ -192,6 +219,7 @@ class DoctorWidget(QWidget):
             ["患者", "项目", "结果", "报告时间", "超时"]
         )
         self.critical_table.setMaximumHeight(90)
+        self.critical_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.critical_table.cellClicked.connect(self._select_critical)
         critical_layout.addWidget(self.critical_table)
         critical_row = QHBoxLayout()
@@ -235,6 +263,7 @@ class DoctorWidget(QWidget):
             ]
         ):
             button = QPushButton(text)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             button.clicked.connect(handler)
             self.wb_action_buttons[text] = button
             actions.addWidget(button, index // 3, index % 3)
@@ -245,6 +274,7 @@ class DoctorWidget(QWidget):
         right_layout.addWidget(self.wb_summary)
         self.wb_fee_table = QTableWidget(0, 4)
         self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
+        self.wb_fee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         right_layout.addWidget(self.wb_fee_table, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 0)
@@ -466,6 +496,7 @@ class DoctorWidget(QWidget):
             f"分诊：{item.get('triage_level') or '—'} 级\n"
             f"生命体征：{item.get('vital_summary') or '未测'}",
         )
+        self._load_side_history(item.get("patient_id"))
         gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
         age = item.get("age")
         allergy = item.get("allergy_label") or "不详"
@@ -575,6 +606,7 @@ class DoctorWidget(QWidget):
         self.side_info.set_patient(
             patient, encounter["id"], "已接诊", f"诊断：{self.wb_diagnosis.text().strip() or '—'}"
         )
+        self._load_side_history(item.get("patient_id"))
 
     def _pause_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
@@ -640,6 +672,52 @@ class DoctorWidget(QWidget):
                 self.tabs.setCurrentIndex(index)
                 return
 
+    def _load_side_history(self, patient_id: int | None) -> None:
+        if not patient_id:
+            self.side_history.setRowCount(0)
+            self.side_history_msg.setText("")
+            self._side_history_patient_id = None
+            return
+        if getattr(self, "_side_history_patient_id", None) == patient_id:
+            return
+        self._side_history_patient_id = patient_id
+        try:
+            data = self.api.get_patient_history(patient_id)
+        except ApiError as e:
+            self.side_history.setRowCount(0)
+            self.side_history_msg.setText(f"历史加载失败：{e.detail}")
+            return
+        encounters = data.get("encounters") or []
+        self.side_history_data = encounters
+        self.side_history.setRowCount(len(encounters))
+        for row, encounter in enumerate(encounters):
+            values = [
+                str(encounter.get("visited_at") or "")[:10],
+                f"{encounter.get('diagnosis_code') or ''} {encounter.get('diagnosis') or ''}".strip() or "—",
+                encounter.get("doctor_name") or "—",
+            ]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                item.setToolTip(str(value))
+                self.side_history.setItem(row, col, item)
+        self.side_history_msg.setText(
+            f"共 {len(encounters)} 次；双击一行查看完整历史"
+        )
+
+    def _refresh_side_history(self) -> None:
+        self._side_history_patient_id = None
+        patient_id = getattr(self, "side_info", None).patient_id
+        if patient_id:
+            self._load_side_history(patient_id)
+
+    def _open_side_history(self, row: int, _col: int) -> None:
+        if not getattr(self, "side_history_data", None):
+            return
+        self._switch_tab("历史诊疗")
+        patient_id = getattr(self, "side_info", None).patient_id
+        if patient_id:
+            self._load_history(patient_id)
+
     def _set_encounter_everywhere(self, encounter_id: int | None) -> None:
         for attr in (
             "mr_encounter_id",
@@ -673,6 +751,7 @@ class DoctorWidget(QWidget):
                 summary.get("status") or "", summary.get("status") or ""
             ),
         )
+        self._load_side_history(summary.get("patient_id"))
 
     def _wb_record(self) -> None:
         self._switch_tab("病历")
