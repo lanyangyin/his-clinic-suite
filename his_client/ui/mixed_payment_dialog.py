@@ -10,9 +10,14 @@ from PySide6.QtWidgets import (
 )
 
 
+from his_client.ui.theme import apply_theme
+from his_client.ui.window_theme import apply_light_titlebar
+
+
 class MixedPaymentDialog(QDialog):
     def __init__(self, total: float, can_discount: bool, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.total = round(total, 2)
         self.setWindowTitle("混合支付 / 折扣")
         self.resize(420, 320)
@@ -61,6 +66,12 @@ class MixedPaymentDialog(QDialog):
         self.remain.setText(
             f"应收 {target:.2f}，已分配 {paid:.2f}，差额 {target - paid:.2f}"
         )
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_light_title_done", False):
+            self._light_title_done = True
+            apply_light_titlebar(self)
 
     def payload(self) -> dict:
         allocations = []

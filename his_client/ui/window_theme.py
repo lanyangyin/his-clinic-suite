@@ -2,6 +2,9 @@
 import ctypes
 import sys
 
+from PySide6.QtCore import QEvent, QObject
+from PySide6.QtWidgets import QDialog, QMainWindow
+
 
 def apply_light_titlebar(widget) -> None:
     if sys.platform != "win32":
@@ -32,3 +35,19 @@ def apply_light_titlebar(widget) -> None:
             dwm.DwmSetWindowAttribute(hwnd, attribute, ctypes.byref(c), ctypes.sizeof(c))
     except (AttributeError, OSError):
         return
+
+
+class _LightTitleBarFilter(QObject):
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Show and isinstance(obj, (QMainWindow, QDialog)):
+            apply_light_titlebar(obj)
+        return False
+
+
+def install_light_titlebars(app) -> None:
+    """应用级：所有后续弹出的 QDialog/QMainWindow 都用浅色标题栏。"""
+    if sys.platform != "win32":
+        return
+    if getattr(app, "_light_titlebar_filter", None) is None:
+        app._light_titlebar_filter = _LightTitleBarFilter(app)
+        app.installEventFilter(app._light_titlebar_filter)

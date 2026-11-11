@@ -10,9 +10,14 @@ from PySide6.QtWidgets import (
 )
 
 
+from his_client.ui.theme import apply_theme
+from his_client.ui.window_theme import apply_light_titlebar
+
+
 class AdverseReactionDialog(QDialog):
     def __init__(self, patient_name: str, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.setWindowTitle(f"药物反应 / 换药 · {patient_name}")
         self.resize(520, 420)
         layout = QVBoxLayout(self)
@@ -44,6 +49,12 @@ class AdverseReactionDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_light_title_done", False):
+            self._light_title_done = True
+            apply_light_titlebar(self)
 
     def payload(self) -> dict:
         return {

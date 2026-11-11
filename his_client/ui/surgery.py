@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 
@@ -26,6 +27,7 @@ from his_client.ui.sidebar_tabs import SidebarTabs
 class SurgeryWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_schedule_tab(), "手术排班")
