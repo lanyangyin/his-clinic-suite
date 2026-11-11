@@ -931,12 +931,20 @@ class ApiClient:
         channel: str = "cash",
         auth_code: str = "",
         card_no: str = "",
+        allocations: list | None = None,
+        discount_amount: float = 0,
+        discount_reason: str = "",
     ) -> dict:
         payload = {"encounter_id": encounter_id, "channel": channel}
         if auth_code:
             payload["auth_code"] = auth_code
         if card_no:
             payload["card_no"] = card_no
+        if allocations:
+            payload["allocations"] = allocations
+        if discount_amount:
+            payload["discount_amount"] = discount_amount
+            payload["discount_reason"] = discount_reason
         return self._request("POST", "/payments/", json=payload)
 
     def refund_payment(

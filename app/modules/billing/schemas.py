@@ -3,8 +3,24 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PaymentAllocationCreate(BaseModel):
+    channel: str
+    amount: float = Field(gt=0)
+
+
+class PaymentAllocationResponse(BaseModel):
+    channel: str
+    amount: float
+    trade_no: str = ""
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PaymentCreate(BaseModel):
     encounter_id: int
+    # 混合支付时使用；为空则走单渠道 channel
+    allocations: list[PaymentAllocationCreate] = Field(default_factory=list)
+    discount_amount: float = Field(default=0, ge=0)
+    discount_reason: str = Field(default="", max_length=200)
     # cash / wechat / alipay / pos / insurance_card
     channel: str = "cash"
     # 微信/支付宝付款码
@@ -38,6 +54,10 @@ class PaymentResponse(BaseModel):
     refunded_self_pay_amount: float = 0
     net_amount: float = 0
     net_self_pay_amount: float = 0
+    discount_amount: float = 0
+    discount_reason: str = ""
+    discount_by: str = ""
+    allocations: list[PaymentAllocationResponse] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
 
 

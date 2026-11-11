@@ -277,10 +277,12 @@ def render_receipt(data: dict) -> str:
 <div class="divider"></div>
 <p class="right big">应收：{payment.amount:.2f} 元</p>
 {f'<p class="right">医保支付：{payment.insurance_amount:.2f} 元</p>' if settings.INSURANCE_ENABLED else ''}
+{f'<p class="right">优惠/减免：{payment.discount_amount:.2f} 元（{escape(payment.discount_reason or "")}）</p>' if payment.discount_amount else ''}
 <p class="right">自费：{payment.self_pay_amount:.2f} 元</p>
+{f'<p class="right">分渠道：{ " / ".join(f"{escape(a.channel)} {a.amount:.2f}" for a in payment.allocations) }</p>' if payment.allocations else ''}
 {f'<p class="right">累计已退：{payment.refunded_amount:.2f} 元</p>' if payment.refunded_amount else ''}
 <p class="right">实收（扣除退款）：{payment.net_amount:.2f} 元</p>
-<p class="right">支付方式：{ {'cash':'现金','wechat':'微信支付','alipay':'支付宝','pos':'POS 刷卡','insurance_card':'医保卡'}.get(payment.channel, payment.channel) }</p>
+<p class="right">支付方式：{ {'cash':'现金','wechat':'微信支付','alipay':'支付宝','pos':'POS 刷卡','insurance_card':'医保卡','mixed':'混合支付'}.get(payment.channel, payment.channel) }</p>
 <p class="right">状态：{ {'paid':'已支付','partially_refunded':'部分退费','refunded':'已退费'}.get(payment.status, payment.status) }</p>
 <div class="divider"></div>
 <p class="center">打印时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>

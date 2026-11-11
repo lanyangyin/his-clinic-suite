@@ -29,12 +29,14 @@ from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.patient_info_panel import PatientInfoPanel
+from his_client.ui.mixed_payment_dialog import MixedPaymentDialog
 
 
 class CashierWidget(QWidget):
-    def __init__(self, api: ApiClient, parent=None):
+    def __init__(self, api: ApiClient, role: str = "cashier", parent=None):
         super().__init__(parent)
         self.api = api
+        self.role = role
         self.insurance_enabled = load_config().insurance_enabled
         self.banner = PatientBanner()
         self.tabs = SidebarTabs()
@@ -722,10 +724,13 @@ class CashierWidget(QWidget):
         query_btn.clicked.connect(self._load_charges)
         pay_btn = QPushButton("收费")
         pay_btn.clicked.connect(self._pay)
+        mixed_btn = QPushButton("混合支付 / 折扣")
+        mixed_btn.clicked.connect(self._mixed_pay)
         row.addWidget(QLabel("就诊"))
         row.addWidget(self.c_encounter_id)
         row.addWidget(query_btn)
         row.addWidget(pay_btn)
+        row.addWidget(mixed_btn)
         self.c_patient_label = QLabel("当前患者：—")
         self.c_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
         box_layout.addLayout(row)
@@ -879,6 +884,49 @@ class CashierWidget(QWidget):
             if allergy not in ("无过敏史", "不详", "过敏史不详")
             else "font-weight:bold;color:#e2e8f0"
         )
+
+    def _mixed_pay(self) -> None:
+        encounter_id = self.c_encounter_id.value()
+        if not encounter_id:
+            self.charge_msg.setText("请先扫码带出就诊")
+            return
+        try:
+            summary = self.api.get_charge_summary(encounter_id)
+        except ApiError as e:
+            self.charge_msg.setText(f"查询失败（{e.status_code}）：{e.detail}")
+            return
+        total = round(summary.get("total_pending", 0), 2)
+        if total <= 0:
+            self.charge_msg.setText("没有待收费用")
+            return
+        dialog = MixedPaymentDialog(total, self.role in ("admin", "director"), self)
+        if dialog.exec() != dialog.Accepted:
+            return
+        payload = dialog.payload()
+        allocations = payload["allocations"]
+        discount = payload["discount_amount"]
+        try:
+            if len(allocations) == 1 and not discount:
+                payment = self.api.create_payment(
+                    encounter_id, channel=allocations[0]["channel"]
+                )
+            else:
+                payment = self.api.create_payment(
+                    encounter_id,
+                    allocations=allocations,
+                    discount_amount=discount,
+                    discount_reason=payload["discount_reason"],
+                )
+        except ApiError as e:
+            self.charge_msg.setText(f"收费失败（{e.status_code}）：{e.detail}")
+            return
+        self.charge_msg.setText(
+            f"收费成功：单号 {payment['id']}，应收 {payment['amount']:.2f}，"
+            f"优惠 {payment.get('discount_amount', 0):.2f}，"
+            f"实收自费 {payment['self_pay_amount']:.2f}"
+        )
+        self.refund_payment_id.setValue(payment["id"])
+        self._load_charges()
 
     def _load_charges(self) -> None:
         encounter_id = self.c_encounter_id.value()

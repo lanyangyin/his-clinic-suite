@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
@@ -61,11 +61,24 @@ class Payment(Base):
     refunded_insurance_amount: Mapped[float] = mapped_column(
         default=0.0, server_default="0", nullable=False
     )
+    discount_amount: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+    discount_reason: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    discount_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+
+    allocations: Mapped[list["PaymentAllocation"]] = relationship(
+        cascade="all, delete-orphan"
+    )
 
     @property
     def self_pay_amount(self) -> float:
-        """原始自费金额 = 总金额 - 医保支付金额。"""
-        return round(self.amount - self.insurance_amount, 2)
+        """原始自费金额 = 总金额 - 医保支付 - 折扣。"""
+        return round(self.amount - self.insurance_amount - self.discount_amount, 2)
 
     @property
     def refunded_self_pay_amount(self) -> float:
@@ -112,4 +125,21 @@ class ChargeRefund(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
+    )
+
+
+
+class PaymentAllocation(Base):
+    """混合支付分渠道金额。"""
+
+    __tablename__ = "payment_allocations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id"), nullable=False, index=True
+    )
+    channel: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[float] = mapped_column(nullable=False)
+    trade_no: Mapped[str] = mapped_column(
+        String(64), default="", server_default="", nullable=False
     )

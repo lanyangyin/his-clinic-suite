@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         role = user.get("role", "")
         tabs = SidebarTabs()
         if role in ("cashier", "admin"):
-            tabs.addTab(CashierWidget(api), "收费员工作站")
+            tabs.addTab(CashierWidget(api, role=role), "收费员工作站")
         if role in ("doctor", "admin"):
             tabs.addTab(DoctorWidget(api), "医生工作站")
         if role in ("doctor", "admin"):

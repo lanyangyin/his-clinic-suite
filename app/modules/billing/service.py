@@ -17,7 +17,7 @@ from app.modules.encounter.service import (
 from app.modules.insurance.adapter import InsuranceUnavailable, settle_payment
 from app.modules.payment_gateway.service import CHANNELS, charge as charge_payment, refund
 
-from .models import ChargeRefund, Payment
+from .models import ChargeRefund, Payment, PaymentAllocation
 from .schemas import PaymentCreate
 
 
@@ -41,7 +41,9 @@ def _ensure_pickup_code(db: Session, encounter_id: int) -> None:
             return
 
 
-def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Payment:
+def create_payment(
+    db: Session, data: PaymentCreate, created_by: str = "", allow_discount: bool = False
+) -> Payment:
     """收费：汇总就诊全部待收费用明细，医保按明细比例结算，关闭就诊。"""
     encounter = get_encounter(db, data.encounter_id)
     if not encounter:
@@ -82,28 +84,84 @@ def create_payment(db: Session, data: PaymentCreate, created_by: str = "") -> Pa
         except InsuranceUnavailable:
             insurance_amount = 0.0
 
-    self_pay = round(amount - insurance_amount, 2)
-    result = charge_payment(
-        db,
-        channel,
-        self_pay,
-        auth_code=data.auth_code,
-        card_no=data.card_no,
-        subject=f"门诊收费 就诊{data.encounter_id}",
-    )
-    if result["status"] != "success":
-        raise ValueError(f"支付失败：{result['message']}")
+    discount = round(data.discount_amount or 0, 2)
+    if discount < 0:
+        raise ValueError("折扣金额不能为负")
+    if discount > round(amount - insurance_amount, 2):
+        raise ValueError("折扣不能超过自费金额")
+    if discount > 0:
+        if not allow_discount:
+            raise ValueError("当前账号无折扣权限")
+        if not (data.discount_reason or "").strip():
+            raise ValueError("折扣必须填写原因")
+
+    self_pay = round(amount - insurance_amount - discount, 2)
+    allocations = list(data.allocations or [])
+    if allocations:
+        if len(allocations) < 2:
+            raise ValueError("混合支付至少需要两个支付渠道")
+        total_alloc = round(sum(row.amount for row in allocations), 2)
+        if total_alloc != self_pay:
+            raise ValueError(
+                f"分渠道金额合计 {total_alloc:.2f} 必须等于自费金额 {self_pay:.2f}"
+            )
+        trade_nos = []
+        for row in allocations:
+            if row.channel not in CHANNELS:
+                raise ValueError(f"未知支付通道：{row.channel}")
+            if row.channel == "insurance_card" and not settings.INSURANCE_ENABLED:
+                raise ValueError("医保功能未启用，不能使用医保卡支付")
+            result = charge_payment(
+                db,
+                row.channel,
+                row.amount,
+                auth_code=data.auth_code,
+                card_no=data.card_no,
+                subject=f"门诊收费 就诊{data.encounter_id}",
+            )
+            if result["status"] != "success":
+                raise ValueError(f"支付失败：{result['message']}")
+            trade_nos.append(result.get("trade_no", ""))
+        channel = "mixed"
+        channel_trade_no = ",".join(trade_nos)
+        channel_status = "success"
+    else:
+        result = charge_payment(
+            db,
+            channel,
+            self_pay,
+            auth_code=data.auth_code,
+            card_no=data.card_no,
+            subject=f"门诊收费 就诊{data.encounter_id}",
+        )
+        if result["status"] != "success":
+            raise ValueError(f"支付失败：{result['message']}")
+        channel_trade_no = result.get("trade_no", "")
+        channel_status = result.get("channel_status", "success")
 
     payment = Payment(
         encounter_id=data.encounter_id,
         amount=amount,
         insurance_amount=insurance_amount,
+        discount_amount=discount,
+        discount_reason=(data.discount_reason or "").strip() if discount else "",
+        discount_by=created_by if discount else "",
         channel=channel,
-        channel_trade_no=result.get("trade_no", ""),
-        channel_status=result.get("channel_status", "success"),
+        channel_trade_no=channel_trade_no,
+        channel_status=channel_status,
         created_by=created_by,
     )
     db.add(payment)
+    if allocations:
+        db.flush()
+        for row in allocations:
+            db.add(
+                PaymentAllocation(
+                    payment_id=payment.id,
+                    channel=row.channel,
+                    amount=row.amount,
+                )
+            )
     for charge in charges:
         charge.status = "paid"
     close_encounter(db, encounter)
@@ -152,7 +210,7 @@ def list_payments(
 
 
 def refund_payment(
-    db: Session, payment_id: int, items=None, operator: str = ""
+    db: Session, payment_id: int, items=None, operator: str = "", reason: str = ""
 ) -> Payment:
     """退费：支持按费用明细/数量部分退费（可只退 1 颗药）。"""
     payment = get_payment(db, payment_id)
@@ -244,6 +302,7 @@ def refund_payment(
                 channel=payment.channel or "cash",
                 channel_trade_no=payment.channel_trade_no or "",
                 operator=operator,
+                reason=reason,
             )
         )
 

@@ -14,10 +14,13 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 def pay(
     data: PaymentCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("cashier", "doctor", "pharmacist")),
+    user=Depends(require_role("cashier", "doctor", "pharmacist", "admin", "director")),
 ):
     try:
-        return create_payment(db, data, created_by=user.username)
+        return create_payment(
+            db, data, created_by=user.username,
+            allow_discount=user.role in ("admin", "director"),
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -49,6 +52,7 @@ def refund(
             payment_id,
             items=data.items if data else None,
             operator=user.username,
+            reason=data.reason if data else "",
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
