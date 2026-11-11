@@ -4,8 +4,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.auth.security import require_role
 from app.modules.insurance.adapter import InsuranceForbiddenError
+from app.modules.patient.models import Patient
+from app.modules.registration.models import Registration
+from app.modules.tcm.models import TcmPrescription
 
 from .schemas import (
+    BarcodeLookup,
     DiagnosisUpdate,
     EncounterCreate,
     EncounterResponse,
@@ -62,6 +66,50 @@ def get_worklist(
 ):
     """医生门诊工作台队列：待接诊 + 今日已接诊。"""
     return worklist(db)
+
+
+@router.get("/by-barcode/{code}", response_model=BarcodeLookup)
+def lookup_by_barcode(
+    code: str,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("cashier", "pharmacist", "doctor", "nurse", "admin")),
+):
+    """扫码枪解析处方条码：RX000201 / TCM2026... / 就诊ID。"""
+    normalized = code.strip().upper()
+    encounter_id = None
+    code_type = ""
+    if normalized.startswith("RX") and normalized[2:].isdigit():
+        encounter_id = int(normalized[2:])
+        code_type = "western"
+    elif normalized.startswith("TCM"):
+        rx = (
+            db.query(TcmPrescription)
+            .filter(TcmPrescription.prescription_no == normalized)
+            .first()
+        )
+        if rx:
+            encounter_id = rx.encounter_id
+            code_type = "tcm"
+    elif normalized.startswith("ENC") and normalized[3:].isdigit():
+        encounter_id = int(normalized[3:])
+        code_type = "encounter"
+    elif normalized.isdigit():
+        encounter_id = int(normalized)
+        code_type = "encounter"
+    if not encounter_id:
+        raise HTTPException(status_code=404, detail="条码格式不正确或处方不存在")
+    encounter = get_encounter(db, encounter_id)
+    if not encounter:
+        raise HTTPException(status_code=404, detail="条码对应就诊不存在")
+    registration = db.get(Registration, encounter.registration_id)
+    patient = db.get(Patient, registration.patient_id) if registration else None
+    return BarcodeLookup(
+        encounter_id=encounter.id,
+        patient_id=patient.id if patient else 0,
+        patient_name=patient.name if patient else "",
+        code=normalized,
+        code_type=code_type,
+    )
 
 
 @router.put("/{encounter_id}/diagnosis", response_model=EncounterResponse)

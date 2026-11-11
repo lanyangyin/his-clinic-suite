@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import requests
+from urllib.parse import quote
 
 
 class ApiError(Exception):
@@ -880,6 +881,9 @@ class ApiClient:
     # ---- 费用 / 收费 / 退费 ----
     def get_charges(self, encounter_id: int) -> list:
         return self._request("GET", f"/charges/encounters/{encounter_id}")
+
+    def resolve_prescription_barcode(self, code: str) -> dict:
+        return self._request("GET", f"/encounters/by-barcode/{quote(code.strip())}")
 
     def get_charge_summary(self, encounter_id: int) -> dict:
         return self._request("GET", f"/charges/encounters/{encounter_id}/summary")

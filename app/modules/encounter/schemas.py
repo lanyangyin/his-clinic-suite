@@ -15,6 +15,14 @@ class EncounterResponse(EncounterCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BarcodeLookup(BaseModel):
+    encounter_id: int
+    patient_id: int
+    patient_name: str
+    code: str
+    code_type: str
+
+
 class DiagnosisUpdate(BaseModel):
     diagnosis_code: str = ""
     diagnosis: str = ""

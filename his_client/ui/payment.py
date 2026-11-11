@@ -27,6 +27,16 @@ class PaymentPanel(QWidget):
 
         box = QGroupBox("就诊费用")
         box_layout = QVBoxLayout(box)
+        scan_row = QHBoxLayout()
+        self.scan_code = QLineEdit()
+        self.scan_code.setPlaceholderText("扫处方条码（RX.../中药处方码），回车带出")
+        self.scan_code.returnPressed.connect(self._scan_barcode)
+        scan_btn = QPushButton("扫码带出")
+        scan_btn.clicked.connect(self._scan_barcode)
+        scan_row.addWidget(self.scan_code)
+        scan_row.addWidget(scan_btn)
+        box_layout.addLayout(scan_row)
+
         row = QHBoxLayout()
         self.encounter_id = QSpinBox()
         self.encounter_id.setRange(1, 10_000_000)
@@ -77,6 +87,20 @@ class PaymentPanel(QWidget):
         channel = self.channel.currentData() if hasattr(self, "channel") else "cash"
         self.auth_code.setEnabled(channel in ("wechat", "alipay"))
         self.card_no.setEnabled(channel in ("pos", "insurance_card"))
+
+    def _scan_barcode(self) -> None:
+        code = self.scan_code.text().strip()
+        if not code:
+            self.message.setText("请扫描处方条码")
+            return
+        try:
+            row = self.api.resolve_prescription_barcode(code)
+        except ApiError as e:
+            self.message.setText(f"条码解析失败（{e.status_code}）：{e.detail}")
+            return
+        self.encounter_id.setValue(row["encounter_id"])
+        self._load_charges()
+        self.message.setText(f"扫码带出：{row['patient_name']}（就诊 {row['encounter_id']}）")
 
     def _load_charges(self) -> None:
         encounter_id = self.encounter_id.value()

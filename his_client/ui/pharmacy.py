@@ -576,6 +576,11 @@ class PharmacyWidget(QWidget):
         self.disp_window.setMaximumWidth(90)
         self.disp_note = QLineEdit()
         self.disp_note.setPlaceholderText("核对备注")
+        self.disp_scan = QLineEdit()
+        self.disp_scan.setPlaceholderText("扫处方条码定位")
+        self.disp_scan.returnPressed.connect(self._scan_dispense_barcode)
+        scan_btn = QPushButton("扫码定位")
+        scan_btn.clicked.connect(self._scan_dispense_barcode)
         submit = QPushButton("核对发药")
         submit.clicked.connect(self._dispense)
         call_btn = QPushButton("叫号")
@@ -585,6 +590,8 @@ class PharmacyWidget(QWidget):
         row.addWidget(QLabel("窗口"))
         row.addWidget(self.disp_window)
         row.addWidget(self.disp_note)
+        row.addWidget(self.disp_scan)
+        row.addWidget(scan_btn)
         row.addWidget(call_btn)
         row.addWidget(submit)
         layout.addWidget(box)
@@ -707,6 +714,27 @@ class PharmacyWidget(QWidget):
             return
         self.disp_encounter_id.setValue(row["encounter_id"])
         self.disp_msg.setText(f"取药码核对通过：{row['patient_name']}")
+
+    def _scan_dispense_barcode(self) -> None:
+        code = self.disp_scan.text().strip()
+        if not code:
+            self.disp_msg.setText("请扫描处方条码")
+            return
+        try:
+            lookup = self.api.resolve_prescription_barcode(code)
+        except ApiError as e:
+            self.disp_msg.setText(f"条码解析失败（{e.status_code}）：{e.detail}")
+            return
+        self.disp_encounter_id.setValue(lookup["encounter_id"])
+        for index, item in enumerate(getattr(self, "worklist", [])):
+            if item.get("encounter_id") == lookup["encounter_id"]:
+                self.worklist_table.selectRow(index)
+                self._select_worklist(index, 0)
+                self.disp_msg.setText(f"扫码定位：{lookup['patient_name']}")
+                return
+        self.disp_msg.setText(
+            f"已解析 {lookup['patient_name']}，但不在待发药队列"
+        )
 
     def _pick_signature(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

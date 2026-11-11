@@ -172,9 +172,11 @@ class PharmacyDemo(QMainWindow):
                     target = row
                     break
             assert target >= 0, "待发药队列没有本次患者"
-            self.widget.worklist_table.selectRow(target)
-            self.widget._select_worklist(target, 0)
-            self.scene("药房演示：待发药队列选中本次患者", disp)
+            self.widget.disp_scan.setText(f"RX{self.encounter['id']:06d}")
+            self.click(disp, "扫码定位")
+            assert self.widget.disp_encounter_id.value() == self.encounter["id"]
+            assert "扫码定位" in self.widget.disp_msg.text()
+            self.scene("药房演示：扫码定位本次患者", disp)
             self.scene("先叫号，窗口 2 号")
             self.widget.disp_window.setText("2号窗")
             self.click(disp, "叫号")

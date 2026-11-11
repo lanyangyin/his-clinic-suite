@@ -182,9 +182,12 @@ class CashierDemo(QMainWindow):
                 "POST", f"/encounters/{enc['id']}/prescriptions",
                 json={"drug_id": self.drug["id"], "quantity": 2},
             )
-            self.scene("回到收费窗口：查询费用并收费", self.tab("收费"))
+            self.scene("回到收费窗口：扫处方条码带出费用", self.tab("收费"))
             charge_tab = self.tab("收费")
-            self.widget.c_encounter_id.setValue(enc["id"])
+            self.widget.c_scan_code.setText(f"RX{enc['id']:06d}")
+            self.click(charge_tab, "扫码带出")
+            assert self.widget.c_encounter_id.value() == enc["id"]
+            assert "扫码带出" in self.widget.charge_msg.text()
             self.click(charge_tab, "查询费用")
             self.click(charge_tab, "收费")
             payments = self.cashier.call("GET", "/payments/", params={"encounter_id": enc["id"]})

@@ -160,6 +160,26 @@ def test_print_record_and_tcm_pages(client, auth):
     assert "血府逐瘀汤" in tcm.text
     assert "桃仁" in tcm.text
 
+    western_code = f"RX{encounter['id']:06d}"
+    lookup = client.get(
+        f"/encounters/by-barcode/{western_code}", headers=auth["cashier"]
+    )
+    assert lookup.status_code == 200, lookup.text
+    assert lookup.json()["encounter_id"] == encounter["id"]
+    assert lookup.json()["patient_name"] == "打印患者"
+    tcm_code = tcm_created.json()["prescription_no"]
+    tcm_lookup = client.get(
+        f"/encounters/by-barcode/{tcm_code}", headers=auth["pharmacist"]
+    )
+    assert tcm_lookup.status_code == 200
+    assert tcm_lookup.json()["code_type"] == "tcm"
+    assert client.get(
+        "/encounters/by-barcode/BAD-CODE", headers=auth["cashier"]
+    ).status_code == 404
+    assert client.get(
+        f"/encounters/by-barcode/{western_code}", headers=auth["lab"]
+    ).status_code == 403
+
 
 def test_print_receipt(client, auth):
     encounter, payment = setup_paid_encounter(client, auth)
