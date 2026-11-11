@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
 
 SPECIAL = {
@@ -48,6 +49,7 @@ D_STATUS = {
 class TcmWidget(QWidget):
     def __init__(self, api: ApiClient, role: str = "doctor", parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.role = role
         self.items: list[dict] = []

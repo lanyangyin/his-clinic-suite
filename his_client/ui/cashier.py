@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
@@ -35,6 +36,7 @@ from his_client.ui.mixed_payment_dialog import MixedPaymentDialog
 class CashierWidget(QWidget):
     def __init__(self, api: ApiClient, role: str = "cashier", parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.role = role
         self.insurance_enabled = load_config().insurance_enabled

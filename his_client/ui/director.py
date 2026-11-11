@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
 
 ARCHIVE_STATUS = {
@@ -32,6 +33,7 @@ PURCHASE_STATUS = {
 class DirectorWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.archive_rows: list[dict] = []
         self.purchase_rows: list[dict] = []

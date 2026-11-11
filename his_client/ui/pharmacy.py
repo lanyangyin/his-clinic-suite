@@ -1,5 +1,5 @@
 """药房工作站：入库单（收货/验收/入库）、发药/退药、零售、库存查询、医保目录查询。"""
-from PySide6.QtCore import QUrl, QTimer
+from PySide6.QtCore import Qt, QUrl, QTimer
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
@@ -41,6 +43,7 @@ CATALOG_CATEGORIES = [("", "全部"), ("甲", "甲类"), ("乙", "乙类"), ("�
 class PharmacyWidget(QWidget):
     def __init__(self, api: ApiClient, role: str = "pharmacist", parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.role = role
         self.insurance_enabled = load_config().insurance_enabled
@@ -628,9 +631,46 @@ class PharmacyWidget(QWidget):
     def _build_dispense_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
 
-        box = QGroupBox("门诊发药")
-        row = QHBoxLayout(box)
+        # 左侧：窗口待发药队列
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_title = QLabel("待发药队列")
+        left_title.setStyleSheet("font-size:15px;font-weight:bold;color:#f8fafc;")
+        left_layout.addWidget(left_title)
+        left_row = QHBoxLayout()
+        refresh = QPushButton("刷新队列")
+        refresh.clicked.connect(self._load_worklist)
+        self.disp_search = QLineEdit()
+        self.disp_search.setPlaceholderText("搜索患者/取药码")
+        self.disp_search.setClearButtonEnabled(True)
+        self.disp_search.textChanged.connect(self._filter_worklist)
+        left_row.addWidget(self.disp_search, 1)
+        left_row.addWidget(refresh)
+        left_layout.addLayout(left_row)
+        self.worklist_table = QTableWidget(0, 7)
+        self.worklist_table.setHorizontalHeaderLabels(
+            ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
+        )
+        self.worklist_table.cellClicked.connect(self._select_worklist)
+        self.worklist_table.cellDoubleClicked.connect(self._call_row)
+        left_layout.addWidget(self.worklist_table, 1)
+        splitter.addWidget(left)
+
+        # 右侧：患者 + 核对 + 发药 + 退药
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        self.disp_info = PatientInfoPanel()
+        right_layout.addWidget(self.disp_info)
+        self.disp_patient_label = QLabel("当前患者：—")
+        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
+        right_layout.addWidget(self.disp_patient_label)
+
+        form_box = QGroupBox("核对发药")
+        form = QFormLayout(form_box)
         self.disp_encounter_id = QSpinBox()
         self.disp_encounter_id.setRange(0, 10_000_000)
         self.disp_encounter_id.setSpecialValueText("扫码/队列选择")
@@ -653,45 +693,32 @@ class PharmacyWidget(QWidget):
         self.print_dispense_label_btn.clicked.connect(self._print_dispense_label)
         call_btn = QPushButton("叫号")
         call_btn.clicked.connect(self._call)
-        row.addWidget(QLabel("就诊"))
-        row.addWidget(self.disp_encounter_id)
-        row.addWidget(QLabel("窗口"))
-        row.addWidget(self.disp_window)
-        row.addWidget(self.disp_note)
-        row.addWidget(self.disp_scan)
-        row.addWidget(scan_btn)
-        row.addWidget(self.disp_scan_status)
-        row.addWidget(call_btn)
-        row.addWidget(submit)
-        row.addWidget(self.print_dispense_label_btn)
-        self.disp_info = PatientInfoPanel()
-        body = QHBoxLayout()
-        body.addWidget(self.disp_info)
-        body.addWidget(box, 1)
-        layout.addLayout(body)
-        self.disp_patient_label = QLabel("当前患者：—")
-        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
-        layout.addWidget(self.disp_patient_label)
+        scan_row = QHBoxLayout()
+        scan_row.addWidget(self.disp_scan, 1)
+        scan_row.addWidget(scan_btn)
+        form.addRow("扫码", scan_row)
+        form.addRow("状态", self.disp_scan_status)
+        window_row = QHBoxLayout()
+        window_row.addWidget(self.disp_window)
+        window_row.addWidget(self.disp_note, 1)
+        form.addRow("窗口 / 备注", window_row)
+        form.addRow("就诊", self.disp_encounter_id)
+        action_row = QHBoxLayout()
+        action_row.addWidget(call_btn)
+        action_row.addWidget(submit)
+        action_row.addWidget(self.print_dispense_label_btn)
+        form.addRow("", action_row)
+        right_layout.addWidget(form_box)
 
-        list_row = QHBoxLayout()
-        refresh = QPushButton("刷新待发药队列")
-        refresh.clicked.connect(self._load_worklist)
-        list_row.addWidget(refresh)
-        list_row.addStretch(1)
-        layout.addLayout(list_row)
-        self.worklist_table = QTableWidget(0, 7)
-        self.worklist_table.setHorizontalHeaderLabels(
-            ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
-        )
-        self.worklist_table.cellClicked.connect(self._select_worklist)
-        self.worklist_table.cellDoubleClicked.connect(self._call_row)
-        layout.addWidget(self.worklist_table, 1)
-
-        sign_row = QHBoxLayout()
+        sign_box = QGroupBox("取药人 / 签名")
+        sign_layout = QFormLayout(sign_box)
         self.pickup_code = QLineEdit()
         self.pickup_code.setPlaceholderText("扫取药码/输入")
         verify_btn = QPushButton("核对取药码")
         verify_btn.clicked.connect(self._verify_code)
+        code_row = QHBoxLayout()
+        code_row.addWidget(self.pickup_code, 1)
+        code_row.addWidget(verify_btn)
         self.receiver_name = QLineEdit()
         self.receiver_name.setPlaceholderText("取药人")
         self.receiver_relation = QLineEdit("本人")
@@ -699,17 +726,20 @@ class PharmacyWidget(QWidget):
         self.signature_path.setPlaceholderText("签名图片路径（可选）")
         sign_btn = QPushButton("选择签名")
         sign_btn.clicked.connect(self._pick_signature)
-        sign_row.addWidget(self.pickup_code)
-        sign_row.addWidget(verify_btn)
-        sign_row.addWidget(self.receiver_name)
-        sign_row.addWidget(self.receiver_relation)
-        sign_row.addWidget(self.signature_path)
+        receiver_row = QHBoxLayout()
+        receiver_row.addWidget(self.receiver_name)
+        receiver_row.addWidget(self.receiver_relation)
+        sign_row = QHBoxLayout()
+        sign_row.addWidget(self.signature_path, 1)
         sign_row.addWidget(sign_btn)
-        layout.addLayout(sign_row)
+        sign_layout.addRow("取药码", code_row)
+        sign_layout.addRow("取药人 / 关系", receiver_row)
+        sign_layout.addRow("签名", sign_row)
+        right_layout.addWidget(sign_box)
 
         self.disp_msg = QLabel("")
         self.disp_msg.setWordWrap(True)
-        layout.addWidget(self.disp_msg)
+        right_layout.addWidget(self.disp_msg)
 
         return_box = QGroupBox("退药")
         return_row = QHBoxLayout(return_box)
@@ -720,12 +750,16 @@ class PharmacyWidget(QWidget):
         return_row.addWidget(QLabel("发药记录"))
         return_row.addWidget(self.return_dispense_id)
         return_row.addWidget(return_btn)
-        layout.addWidget(return_box)
-
+        right_layout.addWidget(return_box)
         self.return_msg = QLabel("")
         self.return_msg.setWordWrap(True)
-        layout.addWidget(self.return_msg)
-        layout.addStretch(1)
+        right_layout.addWidget(self.return_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([700, 500])
+        layout.addWidget(splitter, 1)
         self._load_worklist()
         return page
 
@@ -760,12 +794,24 @@ class PharmacyWidget(QWidget):
 
     def _load_worklist(self) -> None:
         try:
-            self.worklist = self.api.pharmacy_worklist()
+            self.worklist_all = self.api.pharmacy_worklist()
         except ApiError as e:
             self.disp_msg.setText(f"队列加载失败（{e.status_code}）：{e.detail}")
             return
-        self.worklist_table.setRowCount(len(self.worklist))
-        for row, item in enumerate(self.worklist):
+        self._filter_worklist()
+
+    def _filter_worklist(self) -> None:
+        term = self.disp_search.text().strip().lower() if hasattr(self, "disp_search") else ""
+        rows = getattr(self, "worklist_all", [])
+        if term:
+            rows = [
+                item for item in rows
+                if term in str(item.get("patient_name", "")).lower()
+                or term in str(item.get("pickup_code", "")).lower()
+            ]
+        self.worklist = rows
+        self.worklist_table.setRowCount(len(rows))
+        for row, item in enumerate(rows):
             values = [
                 item["queue_no"] or "—",
                 item.get("pickup_code", ""),
@@ -779,7 +825,9 @@ class PharmacyWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.worklist_table.setItem(row, col, QTableWidgetItem(str(value)))
-        self.disp_msg.setText(f"待发药 {len(self.worklist)} 人")
+        self.disp_msg.setText(
+            f"待发药 {len(rows)} 人" + (f"（筛选：{term}）" if term else "")
+        )
 
     def _print_dispense_label(self) -> None:
         if not getattr(self, "disp_last_id", None):

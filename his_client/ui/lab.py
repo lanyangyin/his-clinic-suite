@@ -1,5 +1,5 @@
 """检验科工作站：标本签收/拒收、结果录入、审核、危急值、报告打印。"""
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 
@@ -26,6 +28,7 @@ from his_client.ui.sidebar_tabs import SidebarTabs
 class LabWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.rows: list[dict] = []
         self.current: dict | None = None
@@ -69,7 +72,15 @@ class LabWidget(QWidget):
             ["申请", "标本号", "患者", "项目", "状态", "加急", "申请时间", "结果"]
         )
         self.table.cellClicked.connect(self._select_row)
-        layout.addWidget(self.table, 1)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self.table, 1)
+        splitter.addWidget(left)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
         actions = QHBoxLayout()
         for text, handler in [
@@ -82,7 +93,7 @@ class LabWidget(QWidget):
             button = QPushButton(text)
             button.clicked.connect(handler)
             actions.addWidget(button)
-        layout.addLayout(actions)
+        right_layout.addLayout(actions)
 
         result_box = QGroupBox("结果 / 审核")
         form = QFormLayout(result_box)
@@ -138,7 +149,12 @@ class LabWidget(QWidget):
         buttons.addWidget(review)
         buttons.addWidget(critical)
         form.addRow(buttons)
-        layout.addWidget(result_box, 0)
+        right_layout.addWidget(result_box, 1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([700, 520])
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_query_tab(self) -> QWidget:

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
@@ -29,6 +31,7 @@ from his_client.ui.patient_banner import PatientBanner
 class NurseWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.banner = PatientBanner()
         self.tabs = SidebarTabs()
@@ -361,7 +364,15 @@ class NurseWidget(QWidget):
             ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单", "高危"]
         )
         self.nursing_table.cellClicked.connect(self._select_nursing)
-        layout.addWidget(self.nursing_table, 1)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self.nursing_table, 1)
+        splitter.addWidget(left)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
         prep_box = QGroupBox("配药")
         prep = QFormLayout(prep_box)
@@ -380,7 +391,7 @@ class NurseWidget(QWidget):
         prep.addRow("批号", self.batch_no)
         prep.addRow("核对人", self.checked_by)
         prep.addRow("", prep_btn)
-        layout.addWidget(prep_box)
+        right_layout.addWidget(prep_box)
 
         exec_box = QGroupBox("执行 / 巡视")
         form = QFormLayout(exec_box)
@@ -417,11 +428,16 @@ class NurseWidget(QWidget):
         buttons.addWidget(skip)
         buttons.addWidget(print_label)
         form.addRow(buttons)
-        layout.addWidget(exec_box)
-
+        right_layout.addWidget(exec_box)
         self.nursing_msg = QLabel("")
         self.nursing_msg.setWordWrap(True)
-        layout.addWidget(self.nursing_msg)
+        right_layout.addWidget(self.nursing_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([700, 500])
+        layout.addWidget(splitter, 1)
         return page
 
     def _sync_nursing(self) -> None:
