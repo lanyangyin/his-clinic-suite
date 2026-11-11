@@ -18,19 +18,46 @@
 
 Python 3.12 · FastAPI · SQLAlchemy 2 · SQLite（可迁移 PostgreSQL）· Alembic · Jinja2 · PySide6 · PyInstaller · pytest
 
-## 快速开始（源码运行，Windows）
+## 快速开始（源码运行，Windows，不打包 exe）
+
+### 1. 服务端
+
+第一个 PowerShell / CMD 窗口：
 
 ```powershell
-uv sync --extra client          # 服务端依赖 + 客户端 PySide6
-uv run python scripts/init_db.py     # 新库初始化；存量库增量升级
-uv run python scripts/seed_demo.py   # 演示账号与基础数据
-.\start.bat                          # 启动服务，自动打开管理台
+cd /d D:\Documents\PycharmProjects\HIS
+.\.venv\Scripts\python.exe scripts\init_db.py
+.\.venv\Scripts\python.exe scripts\seed_demo.py
+.\dev_server.bat
+```
+
+等价于直接运行：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_server.py
+```
+
+### 2. 桌面客户端
+
+第二个窗口：
+
+```powershell
+cd /d D:\Documents\PycharmProjects\HIS
+.\dev_client.bat
+```
+
+等价于：
+
+```powershell
+.\.venv\Scripts\python.exe -m his_client
 ```
 
 浏览器访问：
 
-- 管理台：<http://127.0.0.1:8000/admin>
-- API 文档：<http://127.0.0.1:8000/docs>
+- 管理台：<http://127.0.0.1:8001/admin>
+- API 文档：<http://127.0.0.1:8001/docs>
+
+> 本机使用 `config.local.ini` 把端口覆盖为 8001；没有 `.venv` 时先执行 `py -3.12 -m venv .venv`，再 `uv sync --extra client`。
 
 ### Linux（Ubuntu/Debian）
 
