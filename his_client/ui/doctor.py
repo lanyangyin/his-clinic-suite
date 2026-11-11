@@ -76,7 +76,7 @@ class DoctorWidget(QWidget):
         side_layout.addWidget(self.side_info)
         history_row = QHBoxLayout()
         history_title = QLabel("历史就诊")
-        history_title.setStyleSheet("font-weight:bold;color:#475569;margin-top:6px")
+        history_title.setStyleSheet("font-weight:bold;margin-top:6px")
         history_refresh = QPushButton("刷新")
         history_refresh.clicked.connect(self._refresh_side_history)
         history_row.addWidget(history_title)
@@ -91,7 +91,7 @@ class DoctorWidget(QWidget):
         side_layout.addWidget(self.side_history, 1)
         self.side_history_msg = QLabel("")
         self.side_history_msg.setWordWrap(True)
-        self.side_history_msg.setStyleSheet("color:#64748b")
+        self.side_history_msg.setStyleSheet("")
         side_layout.addWidget(self.side_history_msg)
         body.addWidget(self.side_panel)
         body.addWidget(self.tabs, 1)
@@ -160,7 +160,7 @@ class DoctorWidget(QWidget):
         queue_layout.setContentsMargins(0, 0, 0, 0)
         top = QHBoxLayout()
         queue_title = QLabel(f"门诊队列 · {datetime.now():%Y-%m-%d}")
-        queue_title.setStyleSheet("font-size:15px;font-weight:bold;color:#0f172a;")
+        queue_title.setStyleSheet("font-size:15px;font-weight:bold;")
         self.wb_search = QLineEdit()
         self.wb_search.setPlaceholderText("F2 搜索姓名/电话/挂号号")
         self.wb_search.setClearButtonEnabled(True)
@@ -425,7 +425,7 @@ class DoctorWidget(QWidget):
             self.critical_msg.setText(
                 f"待确认 {len(alerts)} 条；超时 {sum(1 for x in alerts if x.get('critical_overdue'))} 条"
             )
-            self.critical_msg.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.critical_msg.setStyleSheet("color:#ef4444;font-weight:bold")
         else:
             self.critical_msg.setText("暂无未确认危急值")
             self.critical_msg.setStyleSheet("")
@@ -497,9 +497,9 @@ class DoctorWidget(QWidget):
         )
         if item.get("isolation"):
             self.wb_patient.setText(self.wb_patient.text() + " · 隔离提示")
-            self.wb_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.wb_patient.setStyleSheet("color:#ef4444;font-weight:bold")
         elif item.get("allergy_label") not in (None, "", "无过敏史", "过敏史不详"):
-            self.wb_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.wb_patient.setStyleSheet("color:#ef4444;font-weight:bold")
         else:
             self.wb_patient.setStyleSheet("")
         self.wb_diagnosis.setText(item.get("diagnosis") or "")
@@ -1130,7 +1130,7 @@ class DoctorWidget(QWidget):
         layout.addWidget(self.history_patient_table)
 
         self.history_patient_label = QLabel("请选择患者查看历史诊疗")
-        self.history_patient_label.setStyleSheet("font-weight:bold;color:#0f172a")
+        self.history_patient_label.setStyleSheet("font-weight:bold")
         layout.addWidget(self.history_patient_label)
         self.history_msg = QLabel("")
         self.history_msg.setWordWrap(True)
@@ -1382,7 +1382,7 @@ class DoctorWidget(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 16, 0)
         left_title = QLabel("药品目录")
-        left_title.setStyleSheet("font-weight:bold;color:#475569")
+        left_title.setStyleSheet("font-weight:bold")
         left_layout.addWidget(left_title)
         self.drug_table = QTableWidget(0, 8)
         self.drug_table.setHorizontalHeaderLabels(
@@ -1436,7 +1436,7 @@ class DoctorWidget(QWidget):
         right_layout.addWidget(self.rx_msg)
 
         rx_title = QLabel("本次处方")
-        rx_title.setStyleSheet("font-weight:bold;color:#475569")
+        rx_title.setStyleSheet("font-weight:bold")
         right_layout.addWidget(rx_title)
         self.rx_table = QTableWidget(0, 5)
         self.rx_table.setHorizontalHeaderLabels(["药品", "数量", "单价", "用法", "金额"])
@@ -1478,7 +1478,7 @@ class DoctorWidget(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 16, 0)
         left_title = QLabel("中药饮片目录（双击加入）")
-        left_title.setStyleSheet("font-weight:bold;color:#475569")
+        left_title.setStyleSheet("font-weight:bold")
         left_layout.addWidget(left_title)
         self.herb_table = QTableWidget(0, 5)
         self.herb_table.setHorizontalHeaderLabels(["ID", "饮片", "单价/g", "毒性", "备注"])
@@ -1515,7 +1515,7 @@ class DoctorWidget(QWidget):
         right_layout.addWidget(form_box)
 
         selected_title = QLabel("本方饮片（剂量可改）")
-        selected_title.setStyleSheet("font-weight:bold;color:#475569")
+        selected_title.setStyleSheet("font-weight:bold")
         right_layout.addWidget(selected_title)
         self.tcm_table = QTableWidget(0, 4)
         self.tcm_table.setHorizontalHeaderLabels(["ID", "饮片", "剂量g", "煎法"])

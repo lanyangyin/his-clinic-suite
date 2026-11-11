@@ -305,7 +305,7 @@ class TreatmentRoomWidget(QWidget):
                 + f" · {gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
             )
             if patient.get("allergy_status") == "present":
-                self.case_info.setStyleSheet("color:#b91c1c;font-weight:bold")
+                self.case_info.setStyleSheet("color:#ef4444;font-weight:bold")
             else:
                 self.case_info.setStyleSheet("")
         self.consent.setChecked(bool(case.get("consent")))
@@ -580,7 +580,7 @@ class TreatmentRoomWidget(QWidget):
         top = QHBoxLayout()
         self.wb_summary = QLabel("加载中…")
         self.wb_summary.setWordWrap(True)
-        self.wb_summary.setStyleSheet("font-size:15px;font-weight:600;color:#0f172a")
+        self.wb_summary.setStyleSheet("font-size:15px;font-weight:600")
         refresh = QPushButton("刷新工作台")
         refresh.clicked.connect(self._load_workbench)
         top.addWidget(self.wb_summary, 1)

@@ -2,6 +2,8 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
+from his_client.ui.theme import colors
+
 
 class PatientInfoPanel(QFrame):
     def __init__(self, parent=None):
@@ -9,12 +11,13 @@ class PatientInfoPanel(QFrame):
         self.setObjectName("patientInfoPanel")
         self.setMinimumWidth(210)
         self.setMaximumWidth(280)
+        c = colors()
         self.setStyleSheet(
-            "#patientInfoPanel{background:#ffffff;border:1px solid #dbe7f3;border-radius:8px;}"
-            "#patientInfoPanel QLabel{color:#334155;font-size:12px;}"
-            "#patientInfoPanel QLabel#title{font-size:15px;font-weight:bold;color:#1e3a5f;}"
-            "#patientInfoPanel QLabel#allergy{color:#dc2626;font-weight:bold;}"
-            "#patientInfoPanel QLabel#history{color:#b45309;font-weight:bold;}"
+            f"#patientInfoPanel{{background:{c['card']};border:1px solid {c['border']};border-radius:8px;}}"
+            f"#patientInfoPanel QLabel{{color:{c['text']};font-size:12px;}}"
+            f"#patientInfoPanel QLabel#title{{font-size:15px;font-weight:bold;color:{c['title']};}}"
+            f"#patientInfoPanel QLabel#allergy{{color:{c['danger']};font-weight:bold;}}"
+            f"#patientInfoPanel QLabel#history{{color:{c['warning']};font-weight:bold;}}"
         )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -22,7 +25,7 @@ class PatientInfoPanel(QFrame):
         self.title = QLabel("当前患者")
         self.title.setObjectName("title")
         self.name = QLabel("未选择")
-        self.name.setStyleSheet("font-size:16px;font-weight:bold;color:#0f172a;")
+        self.name.setStyleSheet(f"font-size:16px;font-weight:bold;color:{c['title']};")
         self.demo = QLabel("")
         self.allergy = QLabel("")
         self.allergy.setObjectName("allergy")

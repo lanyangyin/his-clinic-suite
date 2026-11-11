@@ -2,23 +2,27 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel
 
+from his_client.ui.theme import colors
+
 
 class PatientBanner(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("patientBanner")
+        c = colors()
         self.setStyleSheet(
-            "#patientBanner{background:#eef2ff;border-bottom:2px solid #6366f1;}"
-            "#patientBanner QLabel{font-size:13px;color:#1e293b;}"
+            f"#patientBanner{{background:{c['card']};border-bottom:2px solid #6366f1;}}"
+            f"#patientBanner QLabel{{font-size:13px;color:{c['text']};}}"
+            f"#patientBanner QLabel#patientName{{font-weight:bold;font-size:15px;color:{c['title']};}}"
         )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(16)
         self.name = QLabel("未选择患者")
-        self.name.setStyleSheet("font-weight:bold;font-size:15px;color:#0f172a;")
+        self.name.setObjectName("patientName")
         self.demo = QLabel("")
         self.allergy = QLabel("")
-        self.allergy.setStyleSheet("color:#b91c1c;font-weight:bold;")
+        self.allergy.setStyleSheet(f"color:{c['danger']};font-weight:bold;")
         self.encounter = QLabel("")
         self.status = QLabel("")
         self.status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -30,6 +34,7 @@ class PatientBanner(QFrame):
         self.encounter_id = 0
 
     def set_patient(self, patient: dict | None, encounter_id: int | None = None, status: str = "") -> None:
+        c = colors()
         if not patient:
             self.clear()
             return
@@ -50,9 +55,9 @@ class PatientBanner(QFrame):
         self.encounter.setText(f"就诊 {self.encounter_id}" if self.encounter_id else "未接诊")
         self.status.setText(status)
         self.status.setStyleSheet(
-            "color:#15803d;font-weight:bold" if "可" in status or "已收费" in status
-            else "color:#b91c1c;font-weight:bold" if status and ("未" in status or "禁" in status)
-            else "color:#475569"
+            f"color:{c['success']};font-weight:bold" if "可" in status or "已收费" in status
+            else f"color:{c['danger']};font-weight:bold" if status and ("未" in status or "禁" in status)
+            else f"color:{c['muted']}"
         )
 
     def set_status(self, status: str) -> None:

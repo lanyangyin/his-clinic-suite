@@ -173,7 +173,7 @@ class NurseWidget(QWidget):
             f"SpO2 {self.queue_table.item(row, 5).text()}"
         )
         if patient.get("allergy_status") == "present":
-            self.triage_patient.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.triage_patient.setStyleSheet("color:#ef4444;font-weight:bold")
         else:
             self.triage_patient.setStyleSheet("")
 

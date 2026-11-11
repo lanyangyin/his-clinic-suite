@@ -47,7 +47,7 @@ class Patient360Widget(QWidget):
         layout.addWidget(self.patient_table)
 
         self.header = QLabel("请选择患者")
-        self.header.setStyleSheet("font-size:16px;font-weight:bold;color:#0f172a")
+        self.header.setStyleSheet("font-size:16px;font-weight:bold")
         layout.addWidget(self.header)
         self.stats = QLabel("")
         self.stats.setWordWrap(True)

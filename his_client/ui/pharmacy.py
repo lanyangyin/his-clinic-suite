@@ -638,7 +638,7 @@ class PharmacyWidget(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_title = QLabel("待发药队列")
-        left_title.setStyleSheet("font-size:15px;font-weight:bold;color:#0f172a;")
+        left_title.setStyleSheet("font-size:15px;font-weight:bold;")
         left_layout.addWidget(left_title)
         left_row = QHBoxLayout()
         refresh = QPushButton("刷新队列")
@@ -666,7 +666,7 @@ class PharmacyWidget(QWidget):
         self.disp_info = PatientInfoPanel()
         right_layout.addWidget(self.disp_info)
         self.disp_patient_label = QLabel("当前患者：—")
-        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#334155")
+        self.disp_patient_label.setStyleSheet("font-weight:bold")
         right_layout.addWidget(self.disp_patient_label)
 
         form_box = QGroupBox("核对发药")
@@ -890,12 +890,12 @@ class PharmacyWidget(QWidget):
             lookup.get("status_text") or "",
         )
         if not lookup["is_paid"]:
-            self.disp_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
+            self.disp_scan_status.setStyleSheet("color:#ef4444;font-weight:bold")
             self.disp_scan_status.setText(
                 f"未收费：{lookup['patient_name']}，不能发药"
             )
         elif lookup["is_dispensed"]:
-            self.disp_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
+            self.disp_scan_status.setStyleSheet("color:#ef4444;font-weight:bold")
             self.disp_scan_status.setText(f"已发药：{lookup['patient_name']}")
         else:
             self.disp_scan_status.setStyleSheet("color:#86efac;font-weight:bold")

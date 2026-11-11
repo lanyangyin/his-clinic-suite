@@ -78,7 +78,7 @@ class PaymentPanel(QWidget):
         self._update_payment_inputs()
 
         self.charge_empty = QLabel("暂无费用明细；开方/开单后这里显示")
-        self.charge_empty.setStyleSheet("color:#64748b;padding:6px")
+        self.charge_empty.setStyleSheet("padding:6px")
         box_layout.addWidget(self.charge_empty)
         self.charge_table = QTableWidget(0, 5)
         self.charge_table.setHorizontalHeaderLabels(["类型", "项目", "数量", "金额", "状态"])
@@ -113,7 +113,7 @@ class PaymentPanel(QWidget):
         self.encounter_id.setValue(row["encounter_id"])
         self._load_charges()
         if row["is_paid"]:
-            self.scan_status.setStyleSheet("color:#f87171;font-weight:bold")
+            self.scan_status.setStyleSheet("color:#ef4444;font-weight:bold")
             self.scan_status.setText(f"已收费：{row['patient_name']}，不能重复收费")
         else:
             self.scan_status.setStyleSheet("color:#86efac;font-weight:bold")

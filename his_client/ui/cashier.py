@@ -400,9 +400,9 @@ class CashierWidget(QWidget):
             f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
         )
         self.r_patient_label.setStyleSheet(
-            "font-weight:bold;color:#f87171"
+            "font-weight:bold;color:#ef4444"
             if allergy not in ("无过敏史", "不详", "过敏史不详")
-            else "font-weight:bold;color:#334155"
+            else "font-weight:bold"
         )
 
     def _bind_patient_card(self) -> None:
@@ -551,7 +551,7 @@ class CashierWidget(QWidget):
         self.r_doctor_search.setClearButtonEnabled(True)
         self.r_doctor_search.textChanged.connect(self._filter_doctors)
         self.r_doctor_label = QLabel("已选医生：—")
-        self.r_doctor_label.setStyleSheet("font-weight:bold;color:#334155")
+        self.r_doctor_label.setStyleSheet("font-weight:bold")
         refresh_btn = QPushButton("刷新医生列表")
         refresh_btn.clicked.connect(self._load_doctors)
         doctor_box = QWidget()
@@ -563,7 +563,7 @@ class CashierWidget(QWidget):
         row.addWidget(doctor_box)
         form.addRow("患者", self.r_patient_id)
         self.r_patient_label = QLabel("患者：—")
-        self.r_patient_label.setStyleSheet("font-weight:bold;color:#334155")
+        self.r_patient_label.setStyleSheet("font-weight:bold")
         form.addRow("", self.r_patient_label)
         self.r_card_uid = QLineEdit()
         self.r_card_uid.setPlaceholderText("NFC 就诊卡号")
@@ -741,7 +741,7 @@ class CashierWidget(QWidget):
         row.addWidget(pay_btn)
         row.addWidget(mixed_btn)
         self.c_patient_label = QLabel("当前患者：—")
-        self.c_patient_label.setStyleSheet("font-weight:bold;color:#334155")
+        self.c_patient_label.setStyleSheet("font-weight:bold")
         box_layout.addLayout(row)
         box_layout.addWidget(self.c_patient_label)
 
@@ -796,7 +796,7 @@ class CashierWidget(QWidget):
         refund_top.addWidget(refund_all)
         refund_layout.addLayout(refund_top)
         self.refund_patient_label = QLabel("当前患者：—")
-        self.refund_patient_label.setStyleSheet("font-weight:bold;color:#334155")
+        self.refund_patient_label.setStyleSheet("font-weight:bold")
         refund_layout.addWidget(self.refund_patient_label)
 
         refund_row = QHBoxLayout()
@@ -853,7 +853,7 @@ class CashierWidget(QWidget):
         )
         self._load_charges()
         if row["is_paid"]:
-            self.c_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
+            self.c_scan_status.setStyleSheet("color:#ef4444;font-weight:bold")
             self.c_scan_status.setText(
                 f"已收费：{row['patient_name']}，不能重复收费"
             )
@@ -889,9 +889,9 @@ class CashierWidget(QWidget):
                 "收费窗口",
             )
         label.setStyleSheet(
-            "font-weight:bold;color:#f87171"
+            "font-weight:bold;color:#ef4444"
             if allergy not in ("无过敏史", "不详", "过敏史不详")
-            else "font-weight:bold;color:#334155"
+            else "font-weight:bold"
         )
 
     def _mixed_pay(self) -> None:
