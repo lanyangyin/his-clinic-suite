@@ -42,6 +42,7 @@ from .service import (
     list_followups,
     list_rooms,
     list_templates,
+    repeat_case,
     report,
     reconciliation,
     set_template_config,
@@ -92,6 +93,18 @@ def cases(
     _: None = Depends(require_role("treatment")),
 ):
     return list_cases(db, status)
+
+
+@router.post("/cases/{case_id}/repeat", response_model=CaseResponse, status_code=201)
+def repeat(
+    case_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("treatment", "doctor", "admin")),
+):
+    try:
+        return repeat_case(db, case_id, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/cases/{case_id}", response_model=CaseResponse)

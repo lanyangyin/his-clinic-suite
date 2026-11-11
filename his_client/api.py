@@ -694,6 +694,9 @@ class ApiClient:
         params = {"status": status} if status else None
         return self._request("GET", "/treatment-room/cases", params=params)
 
+    def repeat_treatment_case(self, case_id: int) -> dict:
+        return self._request("POST", f"/treatment-room/cases/{case_id}/repeat")
+
     def create_treatment_room_case(self, payload: dict) -> dict:
         return self._request("POST", "/treatment-room/cases", json=payload)
 

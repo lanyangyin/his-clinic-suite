@@ -85,6 +85,8 @@ class CaseResponse(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     note: str
+    visit_type: str = "initial"
+    repeat_of_case_id: int | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

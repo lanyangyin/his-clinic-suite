@@ -54,10 +54,13 @@ class TreatmentRoomWidget(QWidget):
         left_layout.setContentsMargins(0, 0, 8, 0)
         refresh = QPushButton("刷新排队")
         refresh.clicked.connect(self._load_cases)
+        repeat = QPushButton("按上次治疗复诊")
+        repeat.clicked.connect(self._repeat_case)
         left_layout.addWidget(refresh)
-        self.table = QTableWidget(0, 7)
+        left_layout.addWidget(repeat)
+        self.table = QTableWidget(0, 8)
         self.table.setHorizontalHeaderLabels(
-            ["处置号", "患者", "处置", "治疗室", "优先级", "状态", "费用"]
+            ["处置号", "患者", "类型", "处置", "治疗室", "优先级", "状态", "费用"]
         )
         self.table.cellClicked.connect(self._select_case)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -284,6 +287,7 @@ class TreatmentRoomWidget(QWidget):
             values = [
                 case["case_no"],
                 case["patient_name"],
+                "复诊" if case.get("visit_type") == "follow_up" else "初诊",
                 case["procedure_name"],
                 case.get("room_name") or "—",
                 "加急" if case["priority"] == "urgent" else "普通",
@@ -295,6 +299,25 @@ class TreatmentRoomWidget(QWidget):
             for col, value in enumerate(values):
                 self.table.setItem(row, col, QTableWidgetItem(str(value)))
         self.queue_msg.setText(f"处置 {len(self.cases)} 条")
+
+    def _repeat_case(self) -> None:
+        row = self.table.currentRow()
+        if not (0 <= row < len(self.cases)):
+            self.queue_msg.setText("请先选择一条已完成的处置")
+            return
+        case = self.cases[row]
+        if case.get("status") != "completed":
+            self.queue_msg.setText("只能按已完成的治疗复诊")
+            return
+        try:
+            new_case = self.api.repeat_treatment_case(case["id"])
+        except ApiError as e:
+            self.queue_msg.setText(f"复诊失败（{e.status_code}）：{e.detail}")
+            return
+        self.queue_msg.setText(
+            f"已按上次治疗生成复诊处置 {new_case['case_no']}，未新建挂号"
+        )
+        self._load_cases()
 
     def _select_case(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.cases):

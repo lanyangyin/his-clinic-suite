@@ -564,3 +564,49 @@ def test_treatment_reconciliation_and_print_page(client, auth):
     assert "治疗室收费对账" in page.text
     assert "打印" in page.text
 
+
+
+def test_repeat_treatment_without_new_registration(client, auth):
+    patient, encounter, room, item, case = _setup(client, auth)
+    client.post(
+        f"/treatment-room/cases/{case['id']}/start",
+        json={
+            "consent": True,
+            "consent_signer": "患者本人",
+            "consent_relation": "本人",
+            "consent_signature_path": "data/test_consent.png",
+            "anesthesia": "利多卡因局麻",
+            "findings": "掌侧 3cm 裂伤",
+        },
+        headers=auth["treatment"],
+    )
+    completed = client.post(
+        f"/treatment-room/cases/{case['id']}/complete",
+        json={"procedure_detail": "清创缝合 4 针"},
+        headers=auth["treatment"],
+    )
+    assert completed.status_code == 200
+
+    before = client.get(
+        f"/registrations/?patient_id={patient['id']}", headers=auth["cashier"]
+    ).json()
+    repeat = client.post(
+        f"/treatment-room/cases/{case['id']}/repeat", headers=auth["treatment"]
+    )
+    assert repeat.status_code == 201, repeat.text
+    body = repeat.json()
+    assert body["visit_type"] == "follow_up"
+    assert body["repeat_of_case_id"] == case["id"]
+    assert body["encounter_id"] == encounter["id"]
+    assert body["status"] == "waiting"
+
+    after = client.get(
+        f"/registrations/?patient_id={patient['id']}", headers=auth["cashier"]
+    ).json()
+    assert len(after) == len(before)
+
+    duplicate = client.post(
+        f"/treatment-room/cases/{case['id']}/repeat", headers=auth["treatment"]
+    )
+    assert duplicate.status_code == 400
+    assert "未完成" in duplicate.json()["detail"]

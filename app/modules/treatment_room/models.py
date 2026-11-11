@@ -65,6 +65,11 @@ class TreatmentRoomCase(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    # initial 初诊 / follow_up 按上次治疗复诊
+    visit_type: Mapped[str] = mapped_column(
+        String(20), default="initial", server_default="initial", nullable=False
+    )
+    repeat_of_case_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     patient = relationship("Patient")

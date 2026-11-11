@@ -542,6 +542,66 @@ def create_case(db: Session, data: CaseCreate, requested_by: str = "") -> Treatm
     return case
 
 
+def repeat_case(
+    db: Session, case_id: int, requested_by: str = ""
+) -> TreatmentRoomCase:
+    """按上一次治疗复诊：复制处置，不新建挂号/就诊，仍生成收费。"""
+    original = get_case(db, case_id)
+    if not original:
+        raise ValueError("原处置不存在")
+    if original.status != "completed":
+        raise ValueError("只能按已完成的治疗复诊")
+    pending = (
+        db.query(TreatmentRoomCase)
+        .filter(
+            TreatmentRoomCase.repeat_of_case_id == case_id,
+            TreatmentRoomCase.status.in_(("waiting", "in_progress")),
+        )
+        .first()
+    )
+    if pending:
+        raise ValueError(f"该治疗已有未完成的复诊处置 {pending.case_no}")
+    case = TreatmentRoomCase(
+        case_no=_next_no(db),
+        patient_id=original.patient_id,
+        encounter_id=original.encounter_id,
+        room_id=original.room_id,
+        procedure_name=original.procedure_name,
+        template_code=original.template_code,
+        template_data=original.template_data,
+        diagnosis=original.diagnosis,
+        priority="routine",
+        charge_item_id=original.charge_item_id,
+        price=original.price,
+        requested_by=requested_by,
+        note=f"按上次治疗复诊：{original.case_no}",
+        visit_type="follow_up",
+        repeat_of_case_id=original.id,
+    )
+    db.add(case)
+    db.flush()
+    if case.encounter_id is not None and case.price > 0:
+        insurance_ratio = 0.0
+        if case.charge_item_id is not None:
+            item = db.get(ChargeItem, case.charge_item_id)
+            insurance_ratio = item.insurance_ratio if item else 0.0
+        add_charge(
+            db,
+            encounter_id=case.encounter_id,
+            source_type="treatment_room",
+            source_id=case.id,
+            charge_type="treatment",
+            charge_item_id=case.charge_item_id,
+            item_name=f"治疗室复诊：{case.procedure_name}",
+            quantity=1,
+            unit_price=case.price,
+            insurance_ratio=insurance_ratio,
+        )
+    db.commit()
+    db.refresh(case)
+    return case
+
+
 def list_cases(db: Session, status: str | None = None) -> list[dict]:
     query = db.query(TreatmentRoomCase, Patient).join(
         Patient, TreatmentRoomCase.patient_id == Patient.id
@@ -569,6 +629,8 @@ def list_cases(db: Session, status: str | None = None) -> list[dict]:
             "operator": case.operator,
             "started_at": case.started_at,
             "completed_at": case.completed_at,
+            "visit_type": case.visit_type,
+            "repeat_of_case_id": case.repeat_of_case_id,
         }
         for case, patient in rows
     ]
