@@ -478,6 +478,26 @@ class CashierWidget(QWidget):
         page = QWidget()
         layout = QVBoxLayout(page)
 
+        quick = QGroupBox("快速挂号（姓名/性别/电话先挂号，证件地址后补）")
+        quick_row = QHBoxLayout(quick)
+        self.qr_name = QLineEdit()
+        self.qr_name.setPlaceholderText("姓名*")
+        self.qr_gender = QComboBox()
+        self.qr_gender.addItem("男", "male")
+        self.qr_gender.addItem("女", "female")
+        self.qr_phone = QLineEdit()
+        self.qr_phone.setPlaceholderText("手机号*")
+        self.qr_id_number = QLineEdit()
+        self.qr_id_number.setPlaceholderText("身份证号（可空，后补）")
+        quick_btn = QPushButton("快速建档并挂号")
+        quick_btn.clicked.connect(self._quick_register)
+        quick_row.addWidget(self.qr_name)
+        quick_row.addWidget(self.qr_gender)
+        quick_row.addWidget(self.qr_phone)
+        quick_row.addWidget(self.qr_id_number)
+        quick_row.addWidget(quick_btn)
+        layout.addWidget(quick)
+
         box = QGroupBox("现场挂号")
         form = QFormLayout(box)
         self.r_patient_id = QSpinBox()
@@ -551,6 +571,50 @@ class CashierWidget(QWidget):
         self.reg_msg.setText(
             f"已带出患者：{patient.get('patient_no') or patient['id']} {patient['name']}"
         )
+
+    def _quick_register(self) -> None:
+        name = self.qr_name.text().strip()
+        phone = self.qr_phone.text().strip()
+        if not name or not phone:
+            self.reg_msg.setText("快速挂号至少填写姓名和手机号")
+            return
+        try:
+            doctor_id = int(self.r_doctor_combo.text())
+        except ValueError:
+            self.reg_msg.setText("请先在下方刷新医生列表并选择医生")
+            return
+        payload = {
+            "name": name,
+            "gender": self.qr_gender.currentData(),
+            "phone": phone,
+            "id_type": "id_card" if self.qr_id_number.text().strip() else "none",
+            "id_number": self.qr_id_number.text().strip() or None,
+            "address": "待补录",
+            "emergency_contact_name": "",
+            "emergency_contact_relation": "",
+            "emergency_contact_phone": "",
+            "insurance_type": "self_pay",
+            "allergy_status": "unknown",
+            "allergy_detail": "",
+            "privacy_consent": True,
+        }
+        try:
+            patient = self.api.create_patient(payload=payload)
+            registration = self.api.create_registration(
+                patient["id"], doctor_id, self.r_schedule_id.value() or None
+            )
+        except ApiError as e:
+            self.reg_msg.setText(f"快速挂号失败（{e.status_code}）：{e.detail}")
+            return
+        self.r_patient_id.setValue(patient["id"])
+        self.banner.set_patient(patient)
+        self.reg_msg.setText(
+            f"快速挂号成功：{patient['name']}，挂号 ID {registration['id']}；"
+            "证件/地址/紧急联系人请后补"
+        )
+        self.qr_name.clear()
+        self.qr_phone.clear()
+        self.qr_id_number.clear()
 
     def _create_registration(self) -> None:
         try:
@@ -725,6 +789,7 @@ class CashierWidget(QWidget):
             self.charge_table.setItem(row, 4, QTableWidgetItem(zh('charge_status', charge["status"])))
         self.charge_msg.setText(
             f"待收 {summary['total_pending']:.2f} 元；已收 {summary['total_paid']:.2f} 元"
+            + ("；当前按全自费" if not self.insurance_enabled else "")
         )
 
     def _pay(self) -> None:
