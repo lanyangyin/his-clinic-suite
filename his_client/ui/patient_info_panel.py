@@ -1,7 +1,35 @@
-"""患者信息侧卡：基本信息、就诊信息、过敏史、特殊既往史各自独立成框。"""
+"""患者信息侧卡：基本信息、就诊信息、过敏史、现存疾病各自独立成框。"""
+import re
+
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from his_client.ui.theme import colors
+
+_TIME_PATTERN = re.compile(
+    r"(约|大约|近|余|多)?\s*\d+(?:\.\d+)?\s*(?:余)?\s*"
+    r"(?:年|个月|月|周|天|日|小时|分钟|h|岁)"
+)
+_DATE_PATTERN = re.compile(r"\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]?\s*\d{0,2}\s*日?")
+_PREFIX_PATTERN = re.compile(r"^(?:既往|现患|患有|有|发现|诊断|病史[:：]?)")
+
+
+def condition_names(text: str) -> list[str]:
+    """从自由文本中提取现存疾病名，去掉时间/年限/约数。"""
+    names: list[str] = []
+    for raw in re.split(r"[；;、,，\n]+", text or ""):
+        value = _DATE_PATTERN.sub("", raw.strip())
+        value = _TIME_PATTERN.sub("", value)
+        value = re.sub(r"^前", "", value.strip())
+        value = _PREFIX_PATTERN.sub("", value)
+        value = re.sub(r"(?:史|病史)$", "", value.strip())
+        value = re.sub(r"(?:前|余|左右|多)$", "", value).strip(" ：:，,。")
+        value = re.sub(r"\s+", "", value)
+        if value in ("吸烟", "饮酒", "冶游", "旅游", "旅居", "疫区接触"):
+            continue
+        if value and value not in ("无", "无特殊", "不详", "无病史"):
+            if value not in names:
+                names.append(value)
+    return names
 
 
 class PatientInfoPanel(QFrame):
@@ -99,7 +127,7 @@ class PatientInfoPanel(QFrame):
         history_layout = QVBoxLayout(history_card)
         history_layout.setContentsMargins(10, 7, 10, 7)
         history_layout.setSpacing(2)
-        history_title = QLabel("特殊既往史")
+        history_title = QLabel("现存疾病")
         history_title.setObjectName("cardTitle")
         self.history = QLabel("无特殊")
         self.history.setObjectName("historyValue")
@@ -107,6 +135,7 @@ class PatientInfoPanel(QFrame):
         history_layout.addWidget(history_title)
         history_layout.addWidget(self.history)
         outer.addWidget(history_card)
+        self.history_card = history_card
 
         outer.addStretch(1)
         self.patient_id = 0
@@ -133,8 +162,9 @@ class PatientInfoPanel(QFrame):
         )
         allergy = patient.get("allergy_label") or "过敏史不详"
         self.allergy.setText(allergy)
-        special = (patient.get("special_history") or "").strip()
-        self.history.setText(special or "无特殊")
+        conditions = condition_names(patient.get("special_history") or "")
+        self.history.setText("、".join(conditions))
+        self.history_card.setVisible(bool(conditions))
         self.encounter.setText(
             f"就诊：{self.encounter_id}" if self.encounter_id else "就诊：未接诊"
         )
@@ -149,7 +179,8 @@ class PatientInfoPanel(QFrame):
         self.name.setText("未选择")
         self.demo.setText("")
         self.allergy.setText("过敏史不详")
-        self.history.setText("无特殊")
+        self.history.setText("")
+        self.history_card.setVisible(False)
         self.encounter.setText("")
         self.status.setText("")
         self.phone.setText("")
