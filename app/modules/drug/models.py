@@ -23,6 +23,10 @@ class Drug(Base):
     high_alert: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", nullable=False
     )
+    # 非处方药：允许药房直接零售；处方药必须凭处方
+    is_otc: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
     # 医保贯标：国家医保药品代码（与医保目录对应）
     insurance_code: Mapped[str] = mapped_column(
         String(40), default="", server_default="", nullable=False

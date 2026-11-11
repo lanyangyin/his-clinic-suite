@@ -397,6 +397,7 @@ def drugs_create(
     insurance_ratio: float = Form(0.7),
     antibiotic_level: int = Form(0),
     high_alert: bool = Form(False),
+    is_otc: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -413,6 +414,7 @@ def drugs_create(
                 insurance_ratio=insurance_ratio,
                 antibiotic_level=antibiotic_level,
                 high_alert=high_alert,
+                is_otc=is_otc,
             ),
         )
     except (ValueError, IntegrityError) as e:

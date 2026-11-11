@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,4 +66,53 @@ class StockResponse(BaseModel):
     expiry: date
     location: str
     quantity: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RetailItemCreate(BaseModel):
+    kind: Literal["drug", "material"]
+    drug_id: int | None = None
+    material_id: int | None = None
+    quantity: int = Field(gt=0)
+    unit_price: float | None = Field(default=None, ge=0)
+    warehouse: str = Field(default="药房", max_length=30)
+
+
+class RetailSaleCreate(BaseModel):
+    customer_name: str = Field(default="", max_length=50)
+    phone: str = Field(default="", max_length=20)
+    channel: Literal["cash", "wechat", "alipay"] = "cash"
+    items: list[RetailItemCreate] = Field(min_length=1)
+
+
+class RetailItemResponse(BaseModel):
+    id: int
+    kind: str
+    drug_id: int | None
+    material_id: int | None
+    name: str
+    spec: str
+    unit: str
+    batch_no: str
+    expiry: date | None
+    warehouse: str
+    quantity: int
+    unit_price: float
+    amount: float
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RetailSaleResponse(BaseModel):
+    id: int
+    sale_no: str
+    customer_name: str
+    phone: str
+    channel: str
+    total_amount: float
+    status: str
+    sold_by: str
+    refunded_by: str
+    refunded_at: datetime | None
+    created_at: datetime
+    items: list[RetailItemResponse]
     model_config = ConfigDict(from_attributes=True)

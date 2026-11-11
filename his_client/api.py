@@ -850,6 +850,21 @@ class ApiClient:
     def verify_pickup_code(self, code: str) -> dict:
         return self._request("GET", f"/pharmacy/pickup-codes/{code}")
 
+    def retail_catalog(self) -> dict:
+        return self._request("GET", "/pharmacy/retail-catalog")
+
+    def create_retail_sale(self, payload: dict) -> dict:
+        return self._request("POST", "/pharmacy/retail-sales", json=payload)
+
+    def list_retail_sales(self) -> list:
+        return self._request("GET", "/pharmacy/retail-sales")
+
+    def refund_retail_sale(self, sale_id: int) -> dict:
+        return self._request("POST", f"/pharmacy/retail-sales/{sale_id}/refund")
+
+    def retail_print_url(self, sale_id: int) -> str:
+        return f"{self.base_url}/print/retail/{sale_id}"
+
     def upload_dispense_signature(self, dispense_id: int, file_path: str) -> dict:
         with open(file_path, "rb") as handle:
             return self._request(

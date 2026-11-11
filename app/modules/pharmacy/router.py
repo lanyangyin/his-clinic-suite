@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -6,6 +6,15 @@ import uuid
 
 from app.database import get_db
 from app.modules.auth.security import require_role
+from app.modules.drug.models import Drug
+from app.modules.materials.models import MaterialItem, MaterialStock
+from app.modules.pharmacy.models import DrugStock
+from .retail_service import (
+    create_retail_sale,
+    get_retail_sale,
+    list_retail_sales,
+    refund_retail_sale,
+)
 
 from .schemas import (
     DispenseRequest,
@@ -13,6 +22,8 @@ from .schemas import (
     PharmacyCallRequest,
     PharmacyCallResponse,
     PickupVerifyResponse,
+    RetailSaleCreate,
+    RetailSaleResponse,
     StockInRequest,
     StockInResponse,
     StockResponse,
@@ -88,6 +99,115 @@ def get_stock_one(stock_id: int, db: Session = Depends(get_db)):
     if not stock:
         raise HTTPException(status_code=404, detail="库存记录不存在")
     return stock
+
+@router.get("/retail-catalog")
+def retail_catalog(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist", "admin")),
+):
+    drugs = (
+        db.query(Drug, DrugStock)
+        .join(DrugStock, DrugStock.drug_id == Drug.id)
+        .filter(
+            Drug.is_otc.is_(True),
+            DrugStock.quantity > 0,
+            DrugStock.expiry >= date.today(),
+        )
+        .order_by(Drug.name, DrugStock.expiry)
+        .all()
+    )
+    drug_rows = {}
+    for drug, stock in drugs:
+        row = drug_rows.setdefault(
+            drug.id,
+            {
+                "kind": "drug",
+                "id": drug.id,
+                "name": drug.name,
+                "spec": drug.spec,
+                "unit": drug.unit,
+                "price": drug.base_price,
+                "stock": 0,
+            },
+        )
+        row["stock"] += stock.quantity
+    materials = (
+        db.query(MaterialItem, MaterialStock)
+        .join(MaterialStock, MaterialStock.item_id == MaterialItem.id)
+        .filter(MaterialStock.quantity > 0)
+        .order_by(MaterialItem.name)
+        .all()
+    )
+    material_rows = {}
+    for item, stock in materials:
+        key = (item.id, stock.warehouse)
+        row = material_rows.setdefault(
+            key,
+            {
+                "kind": "material",
+                "id": item.id,
+                "name": item.name,
+                "spec": item.spec,
+                "unit": item.unit,
+                "price": item.price,
+                "warehouse": stock.warehouse,
+                "stock": 0,
+            },
+        )
+        row["stock"] += stock.quantity
+    return {
+        "drugs": list(drug_rows.values()),
+        "materials": list(material_rows.values()),
+    }
+
+
+@router.post(
+    "/retail-sales", response_model=RetailSaleResponse, status_code=201
+)
+def create_retail(
+    data: RetailSaleCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist", "admin")),
+):
+    try:
+        return create_retail_sale(db, data, sold_by=user.username)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/retail-sales", response_model=list[RetailSaleResponse])
+def retail_sales(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist", "admin")),
+):
+    return list_retail_sales(db)
+
+
+@router.get("/retail-sales/{sale_id}", response_model=RetailSaleResponse)
+def retail_sale_detail(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist", "admin")),
+):
+    sale = get_retail_sale(db, sale_id)
+    if not sale:
+        raise HTTPException(status_code=404, detail="零售单不存在")
+    return sale
+
+
+@router.post("/retail-sales/{sale_id}/refund", response_model=RetailSaleResponse)
+def retail_sale_refund(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist", "admin")),
+):
+    try:
+        return refund_retail_sale(db, sale_id, operator=user.username)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.get("/worklist")
 def pharmacy_worklist(

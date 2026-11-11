@@ -1,4 +1,6 @@
-"""药房工作站：入库单（收货/验收/入库）、发药/退药、库存查询、医保目录查询。"""
+"""药房工作站：入库单（收货/验收/入库）、发药/退药、零售、库存查询、医保目录查询。"""
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -55,6 +57,7 @@ class PharmacyWidget(QWidget):
             tabs.addTab(self._build_dispense_tab(), "发药 / 退药")
             tabs.addTab(PaymentPanel(api), "收费")
             tabs.addTab(self._build_stock_tab(), "库存查询")
+            tabs.addTab(self._build_retail_tab(), "零售")
             if self.insurance_enabled:
                 tabs.addTab(self._build_catalog_tab(), "医保目录")
         tabs.addTab(self._build_expiry_tab(), "效期预警")
@@ -64,6 +67,8 @@ class PharmacyWidget(QWidget):
         if role in ("warehouse", "admin"):
             self._load_drugs()  # 入库药品下拉默认加载医保目录
             self._load_materials()  # 入库物资下拉默认加载医保耗材目录
+        if role in ("pharmacist", "admin"):
+            self._load_retail_catalog()
 
     # ---------- 入库单 ----------
     def _build_inbound_tab(self) -> QWidget:
@@ -1469,6 +1474,229 @@ class PharmacyWidget(QWidget):
             for col, value in enumerate(values):
                 self.trace_result_table.setItem(row, col, QTableWidgetItem(value))
         self.trace_query_msg.setText(f"共 {len(rows)} 条")
+
+    # ---------- 药房零售 ----------
+    def _build_retail_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        box = QGroupBox("零售（非处方药 / 口罩 / 创可贴等耗材）")
+        form = QFormLayout(box)
+        self.retail_catalog: dict = {}
+        self.retail_pending: list[dict] = []
+        self.retail_last_sale_id = 0
+        self.retail_type = QComboBox()
+        self.retail_type.addItem("非处方药", "drug")
+        self.retail_type.addItem("耗材", "material")
+        self.retail_item = QComboBox()
+        self.retail_type.currentIndexChanged.connect(self._fill_retail_items)
+        self.retail_item.currentIndexChanged.connect(self._select_retail_item)
+        self.retail_stock = QLabel("—")
+        self.retail_qty = QSpinBox()
+        self.retail_qty.setRange(1, 999)
+        self.retail_price = QLineEdit()
+        self.retail_customer = QLineEdit("散客")
+        self.retail_phone = QLineEdit()
+        self.retail_channel = QComboBox()
+        for label, value in [("现金", "cash"), ("微信", "wechat"), ("支付宝", "alipay")]:
+            self.retail_channel.addItem(label, value)
+        add_btn = QPushButton("加入零售单")
+        add_btn.clicked.connect(self._add_retail_item)
+        form.addRow("类型", self.retail_type)
+        form.addRow("商品", self.retail_item)
+        form.addRow("库存", self.retail_stock)
+        form.addRow("数量 / 单价", self._pair(self.retail_qty, self.retail_price))
+        form.addRow("顾客 / 电话", self._pair(self.retail_customer, self.retail_phone))
+        form.addRow("支付方式", self.retail_channel)
+        form.addRow("", add_btn)
+        layout.addWidget(box)
+
+        self.retail_table = QTableWidget(0, 5)
+        self.retail_table.setHorizontalHeaderLabels(["类型", "商品", "数量", "单价", "金额"])
+        layout.addWidget(self.retail_table)
+        self.retail_total = QLabel("合计：0.00 元")
+        layout.addWidget(self.retail_total)
+        actions = QHBoxLayout()
+        submit = QPushButton("收款并打印小票")
+        submit.clicked.connect(self._submit_retail)
+        print_last = QPushButton("打印上次小票")
+        print_last.clicked.connect(self._print_last_retail)
+        refresh = QPushButton("刷新零售目录")
+        refresh.clicked.connect(self._load_retail_catalog)
+        actions.addWidget(refresh)
+        actions.addWidget(submit)
+        actions.addWidget(print_last)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+
+        sales_box = QGroupBox("最近零售单 / 退货")
+        sales_layout = QVBoxLayout(sales_box)
+        self.retail_sales_table = QTableWidget(0, 4)
+        self.retail_sales_table.setHorizontalHeaderLabels(["单号", "金额", "状态", "时间"])
+        sales_layout.addWidget(self.retail_sales_table)
+        refund_row = QHBoxLayout()
+        self.retail_refund_id = QSpinBox()
+        self.retail_refund_id.setRange(0, 10_000_000)
+        self.retail_refund_id.setSpecialValueText("零售单 ID")
+        refund_btn = QPushButton("原单退货（库存回补）")
+        refund_btn.clicked.connect(self._refund_retail)
+        refund_row.addWidget(self.retail_refund_id)
+        refund_row.addWidget(refund_btn)
+        refund_row.addStretch(1)
+        sales_layout.addLayout(refund_row)
+        layout.addWidget(sales_box)
+        self.retail_msg = QLabel("")
+        self.retail_msg.setWordWrap(True)
+        layout.addWidget(self.retail_msg)
+        return page
+
+    @staticmethod
+    def _pair(left: QWidget, right: QWidget) -> QWidget:
+        holder = QWidget()
+        row = QHBoxLayout(holder)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(left)
+        row.addWidget(right)
+        return holder
+
+    def _load_retail_catalog(self) -> None:
+        try:
+            self.retail_catalog = self.api.retail_catalog()
+        except ApiError as e:
+            self.retail_msg.setText(f"零售目录失败（{e.status_code}）：{e.detail}")
+            return
+        self._fill_retail_items()
+        self._load_retail_sales()
+
+    def _fill_retail_items(self) -> None:
+        kind = self.retail_type.currentData()
+        rows = self.retail_catalog.get("drugs" if kind == "drug" else "materials", [])
+        self.retail_item.clear()
+        for row in rows:
+            label = f"{row['name']} {row.get('spec') or ''}（库存 {row['stock']}）"
+            self.retail_item.addItem(label, row)
+        if rows:
+            self._select_retail_item()
+        else:
+            self.retail_stock.setText("无库存")
+            self.retail_price.clear()
+
+    def _select_retail_item(self) -> None:
+        row = self.retail_item.currentData()
+        if not row:
+            return
+        self.retail_stock.setText(
+            f"{row['stock']} {row.get('unit') or ''}（{row.get('warehouse') or '药房'}）"
+        )
+        self.retail_price.setText(f"{row['price']:.2f}")
+
+    def _add_retail_item(self) -> None:
+        row = self.retail_item.currentData()
+        if not row:
+            self.retail_msg.setText("没有可零售的商品")
+            return
+        qty = self.retail_qty.value()
+        if qty > row["stock"]:
+            self.retail_msg.setText(f"库存不足：{row['name']} 只剩 {row['stock']}")
+            return
+        price = float(self.retail_price.text().strip() or row["price"])
+        self.retail_pending.append(
+            {
+                "kind": row["kind"],
+                "id": row["id"],
+                "name": row["name"],
+                "quantity": qty,
+                "unit_price": price,
+                "warehouse": row.get("warehouse") or "药房",
+            }
+        )
+        self._refresh_retail_pending()
+        self.retail_msg.setText("已加入零售单")
+
+    def _refresh_retail_pending(self) -> None:
+        self.retail_table.setRowCount(len(self.retail_pending))
+        total = 0.0
+        for index, item in enumerate(self.retail_pending):
+            amount = item["quantity"] * item["unit_price"]
+            total += amount
+            for col, value in enumerate(
+                [
+                    "药品" if item["kind"] == "drug" else "耗材",
+                    item["name"],
+                    str(item["quantity"]),
+                    f"{item['unit_price']:.2f}",
+                    f"{amount:.2f}",
+                ]
+            ):
+                self.retail_table.setItem(index, col, QTableWidgetItem(value))
+        self.retail_total.setText(f"合计：{total:.2f} 元")
+
+    def _submit_retail(self) -> None:
+        if not self.retail_pending:
+            self.retail_msg.setText("零售单为空")
+            return
+        payload = {
+            "customer_name": self.retail_customer.text().strip() or "散客",
+            "phone": self.retail_phone.text().strip(),
+            "channel": self.retail_channel.currentData(),
+            "items": [
+                {
+                    "kind": item["kind"],
+                    "drug_id": item["id"] if item["kind"] == "drug" else None,
+                    "material_id": item["id"] if item["kind"] == "material" else None,
+                    "quantity": item["quantity"],
+                    "unit_price": item["unit_price"],
+                    "warehouse": item["warehouse"],
+                }
+                for item in self.retail_pending
+            ],
+        }
+        try:
+            sale = self.api.create_retail_sale(payload)
+        except ApiError as e:
+            self.retail_msg.setText(f"零售失败（{e.status_code}）：{e.detail}")
+            return
+        self.retail_last_sale_id = sale["id"]
+        self.retail_msg.setText(
+            f"零售成功：{sale['sale_no']}，合计 {sale['total_amount']:.2f} 元"
+        )
+        self.retail_pending = []
+        self._refresh_retail_pending()
+        self._load_retail_catalog()
+
+    def _print_last_retail(self) -> None:
+        if not self.retail_last_sale_id:
+            self.retail_msg.setText("还没有可打印的零售单")
+            return
+        QDesktopServices.openUrl(QUrl(self.api.retail_print_url(self.retail_last_sale_id)))
+
+    def _load_retail_sales(self) -> None:
+        try:
+            sales = self.api.list_retail_sales()
+        except ApiError:
+            return
+        self.retail_sales_table.setRowCount(len(sales))
+        for row, sale in enumerate(sales):
+            values = [
+                sale["sale_no"],
+                f"{sale['total_amount']:.2f}",
+                "已退货" if sale["status"] == "refunded" else "已完成",
+                sale["created_at"][:16].replace("T", " "),
+            ]
+            for col, value in enumerate(values):
+                self.retail_sales_table.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def _refund_retail(self) -> None:
+        sale_id = self.retail_refund_id.value()
+        if not sale_id:
+            self.retail_msg.setText("请填写零售单 ID")
+            return
+        try:
+            sale = self.api.refund_retail_sale(sale_id)
+        except ApiError as e:
+            self.retail_msg.setText(f"退货失败（{e.status_code}）：{e.detail}")
+            return
+        self.retail_msg.setText(f"已退货：{sale['sale_no']}，库存已回补")
+        self._load_retail_catalog()
 
     # ---------- 库存查询 ----------
     def _build_stock_tab(self) -> QWidget:

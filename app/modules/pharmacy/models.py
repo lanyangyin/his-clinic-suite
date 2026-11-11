@@ -75,3 +75,80 @@ class PharmacyPickupCode(Base):
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RetailSale(Base):
+    """药房零售：OTC 药品/耗材直接销售，不建就诊。"""
+
+    __tablename__ = "retail_sales"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sale_no: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    customer_name: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    phone: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
+    channel: Mapped[str] = mapped_column(
+        String(20), default="cash", server_default="cash", nullable=False
+    )
+    total_amount: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+    # completed 已完成 / refunded 已退货
+    status: Mapped[str] = mapped_column(
+        String(20), default="completed", server_default="completed", nullable=False
+    )
+    sold_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    refunded_by: Mapped[str] = mapped_column(
+        String(50), default="", server_default="", nullable=False
+    )
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )
+
+    items: Mapped[list["RetailSaleItem"]] = relationship(
+        back_populates="sale", cascade="all, delete-orphan"
+    )
+
+
+class RetailSaleItem(Base):
+    __tablename__ = "retail_sale_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    sale_id: Mapped[int] = mapped_column(
+        ForeignKey("retail_sales.id"), nullable=False, index=True
+    )
+    # drug 药品 / material 耗材
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_items.id"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    spec: Mapped[str] = mapped_column(
+        String(60), default="", server_default="", nullable=False
+    )
+    unit: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
+    batch_no: Mapped[str] = mapped_column(
+        String(30), default="", server_default="", nullable=False
+    )
+    expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
+    warehouse: Mapped[str] = mapped_column(
+        String(30), default="药房", server_default="药房", nullable=False
+    )
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    unit_price: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+    amount: Mapped[float] = mapped_column(
+        default=0.0, server_default="0", nullable=False
+    )
+
+    sale: Mapped[RetailSale] = relationship(back_populates="items")

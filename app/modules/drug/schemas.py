@@ -11,6 +11,8 @@ class DrugCreate(BaseModel):
     antibiotic_level: int = Field(default=0, ge=0, le=3)
     # 高危药品：配药需要第二人核对
     high_alert: bool = False
+    # 非处方药：允许零售
+    is_otc: bool = False
     # 医保贯标与生产信息
     insurance_code: str = ""
     approval_no: str = ""

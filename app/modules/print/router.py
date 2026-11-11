@@ -16,6 +16,7 @@ from app.modules.print.documents import (
 )
 from app.modules.print.barcode import code128_svg
 from app.modules.pharmacy.models import PharmacyPickupCode
+from app.modules.pharmacy.retail_service import get_retail_sale
 from app.modules.charges.service import list_charges
 from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
 from app.modules.lis.service import get_request
@@ -358,6 +359,46 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db)):
     )
     data["pickup_code"] = pickup.code if pickup else ""
     return HTMLResponse(render_receipt(data))
+
+@router.get("/retail/{sale_id}", response_class=HTMLResponse)
+def print_retail(sale_id: int, db: Session = Depends(get_db)):
+    sale = get_retail_sale(db, sale_id)
+    if not sale:
+        raise HTTPException(status_code=404, detail="零售单不存在")
+    rows = "".join(
+        f"<tr><td>{escape(item.name)}</td>"
+        f"<td class=\"right\">{item.quantity}×{item.unit_price:.2f}</td>"
+        f"<td class=\"right\">{item.amount:.2f}</td></tr>"
+        for item in sale.items
+    )
+    channel = {"cash": "现金", "wechat": "微信", "alipay": "支付宝"}.get(
+        sale.channel, sale.channel
+    )
+    meta = _clinic_meta()
+    status = "已退货" if sale.status == "refunded" else "已完成"
+    return HTMLResponse(
+        f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>零售小票</title><style>{RECEIPT_CSS}</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])}</h2>
+<p class="center">零售小票</p>
+<div class="divider"></div>
+<p>单号：{escape(sale.sale_no)}</p>
+<p>日期：{sale.created_at:%Y-%m-%d %H:%M}</p>
+<p>顾客：{escape(sale.customer_name or "散客")}</p>
+<div class="divider"></div>
+<table>{rows}</table>
+<div class="divider"></div>
+<p class="right big">合计：{sale.total_amount:.2f} 元</p>
+<p class="right">支付方式：{channel}</p>
+<p class="right">状态：{status}</p>
+<p class="right">销售员：{escape(sale.sold_by or "—")}</p>
+<div class="divider"></div>
+<p class="center">非医保零售，请保留小票</p>
+<p class="center">打印时间：{datetime.now():%Y-%m-%d %H:%M}</p>
+</body></html>"""
+    )
+
 
 LAB_CSS = """
     @page { size: A5; margin: 10mm; }
