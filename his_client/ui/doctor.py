@@ -142,8 +142,7 @@ class DoctorWidget(QWidget):
         right_layout.addWidget(self.patient_info)
         self.wb_patient = QLabel("请选择患者")
         self.wb_patient.setWordWrap(True)
-        self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
-        right_layout.addWidget(self.wb_patient)
+        self.wb_patient.setVisible(False)
 
         critical_box = QGroupBox("危急值待确认")
         critical_layout = QVBoxLayout(critical_box)
