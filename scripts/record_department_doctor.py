@@ -86,6 +86,21 @@ class DoctorDemo(QMainWindow):
                 return
         raise RuntimeError(f"找不到按钮：{text}")
 
+    def double_click_cell(self, table, row, col):
+        item = table.item(row, col)
+        if item is None:
+            raise RuntimeError("目标单元格为空")
+        table.setFocus()
+        table.selectRow(row)
+        self.wait(0.3)
+        rect = table.visualItemRect(item)
+        pos = rect.center()
+        self.point = table.viewport().mapToGlobal(pos)
+        self.point_until = time.time() + 1.2
+        QTest.mouseClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, pos)
+        QTest.mouseDClick(table.viewport(), Qt.LeftButton, Qt.NoModifier, pos, 50)
+        self.wait(1.8)
+
     def select_combo(self, combo, contains):
         for index in range(combo.count()):
             if contains in combo.itemText(index):
@@ -246,6 +261,11 @@ class DoctorDemo(QMainWindow):
             self.widget.treat_quantity.setValue(1)
             self.click(treat_tab, "开治疗单")
             self.scene("处方/检验/治疗已开，最后查看历史诊疗", self.tab("历史诊疗"))
+            self.scene("左侧历史就诊：双击一行跳转", self.tab("病历"))
+            assert self.widget.side_history.rowCount() >= 1, "左侧没有历史就诊"
+            self.double_click_cell(self.widget.side_history, 0, 1)
+            assert "历史诊疗" in self.tabs.tabText(self.tabs.currentIndex())
+            self.scene("已从左侧历史跳转到历史诊疗")
             history_tab = self.tab("历史诊疗")
             self.widget.history_name.setText(self.patient["name"])
             self.click(history_tab, "查询患者")

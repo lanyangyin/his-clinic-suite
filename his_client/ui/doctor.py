@@ -594,6 +594,7 @@ class DoctorWidget(QWidget):
         self.side_info.set_patient(
             patient, encounter["id"], "已接诊", f"诊断：{self.wb_diagnosis.text().strip() or '—'}"
         )
+        self._side_history_patient_id = None
         self._load_side_history(item.get("patient_id"))
 
     def _pause_workbench(self) -> None:
@@ -699,12 +700,20 @@ class DoctorWidget(QWidget):
             self._load_side_history(patient_id)
 
     def _open_side_history(self, row: int, _col: int) -> None:
-        if not getattr(self, "side_history_data", None):
+        data = getattr(self, "side_history_data", None)
+        if not data or not (0 <= row < len(data)):
             return
+        target_id = data[row].get("id")
         self._switch_tab("历史诊疗")
         patient_id = getattr(self, "side_info", None).patient_id
-        if patient_id:
-            self._load_history(patient_id)
+        if not patient_id:
+            return
+        self._load_history(patient_id)
+        for index, encounter in enumerate(getattr(self, "history_data", {}).get("encounters", [])):
+            if encounter.get("id") == target_id:
+                self.history_enc_table.selectRow(index)
+                self._history_select(index, 0)
+                break
 
     def _set_encounter_everywhere(self, encounter_id: int | None) -> None:
         for attr in (
@@ -727,6 +736,7 @@ class DoctorWidget(QWidget):
             return
         self.side_info.set_patient(
             {
+                "id": summary.get("patient_id"),
                 "patient_no": summary.get("patient_no"),
                 "name": summary.get("patient_name"),
                 "gender": summary.get("gender"),
