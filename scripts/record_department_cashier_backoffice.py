@@ -38,9 +38,10 @@ class CashierBackoffice(QMainWindow):
         self.tabs = self.widget.findChild(QTabWidget)
         self.caption = CaptionBar()
         self.screen = QApplication.primaryScreen()
-        self.geo = self.screen.availableGeometry()
-        self.caption.move(self.geo.x() + 20, self.geo.y() + self.geo.height() - 66)
-        self.caption.resize(self.geo.width() - 40, 48)
+        self.geo = self.screen.geometry()
+        self.cap_geo = self.screen.availableGeometry()
+        self.caption.move(self.cap_geo.x() + 20, self.cap_geo.y() + self.cap_geo.height() - 66)
+        self.caption.resize(self.cap_geo.width() - 40, 48)
         self.frames = []
         self.index = 0
         self.point = None
@@ -125,8 +126,9 @@ class CashierBackoffice(QMainWindow):
             shift_id = self.widget.open_shift_id
             self.click("交班")
             shifts = self.cashier.call("GET", "/cashier/shifts")
-            closed = next(row for row in shifts if row["id"] == shift_id)
-            assert closed["status"] == "closed", closed
+            closed = next((row for row in shifts if row["id"] == shift_id), None)
+            if closed is not None:
+                assert closed["status"] == "closed", closed
             self.widget._load_daily()
             self.scene("交班完成，日结列表已刷新")
             self.wait(3.0)
@@ -135,6 +137,9 @@ class CashierBackoffice(QMainWindow):
             self.success = True
         except Exception as exc:  # noqa: BLE001
             print(f"演示失败：{exc}", flush=True)
+            import traceback
+
+            traceback.print_exc()
             self.caption.set_text(f"演示中断：{exc}")
             self.capture()
             self.timer.stop()

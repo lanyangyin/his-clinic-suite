@@ -98,6 +98,9 @@ class ApiClient:
     def get_registration(self, registration_id: int) -> dict:
         return self._request("GET", f"/registrations/{registration_id}")
 
+    def get_encounter(self, encounter_id: int) -> dict:
+        return self._request("GET", f"/encounters/{encounter_id}")
+
     def get_patient_by_card(self, card_uid: str) -> dict:
         return self._request("GET", f"/patients/by-card/{card_uid}")
 

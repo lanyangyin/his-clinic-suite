@@ -125,9 +125,10 @@ class DemoController:
         }
         self.caption = CaptionBar()
         self.screen = QApplication.primaryScreen()
-        self.geo = self.screen.availableGeometry()
-        self.caption.move(self.geo.x() + 20, self.geo.y() + 34)
-        self.caption.resize(self.geo.width() - 40, 48)
+        self.geo = self.screen.geometry()
+        self.cap_geo = self.screen.availableGeometry()
+        self.caption.move(self.cap_geo.x() + 20, self.cap_geo.y() + 34)
+        self.caption.resize(self.cap_geo.width() - 40, 48)
 
         self.frame_index = 0
         self.point: QPoint | None = None
@@ -140,15 +141,15 @@ class DemoController:
 
     # ---------- 窗口/录制 ----------
     def tile_windows(self) -> None:
-        width = self.geo.width() // 4
-        height = self.geo.height() // 2
+        width = self.cap_geo.width() // 4
+        height = self.cap_geo.height() // 2
         positions = [
             (0, 0), (width, 0), (width * 2, 0), (width * 3, 0),
             (0, height), (width, height), (width * 2, height),
         ]
         for window, (x, y) in zip(self.windows.values(), positions):
             window.showNormal()
-            window.setGeometry(self.geo.x() + x, self.geo.y() + y, width, height)
+            window.setGeometry(self.cap_geo.x() + x, self.cap_geo.y() + y, width, height)
             window.show()
         self.caption.show()
         self.caption.raise_()

@@ -104,10 +104,10 @@ class PaymentPanel(QWidget):
         self.encounter_id.setValue(row["encounter_id"])
         self._load_charges()
         if row["is_paid"]:
-            self.scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.scan_status.setStyleSheet("color:#f87171;font-weight:bold")
             self.scan_status.setText(f"已收费：{row['patient_name']}，不能重复收费")
         else:
-            self.scan_status.setStyleSheet("color:#15803d;font-weight:bold")
+            self.scan_status.setStyleSheet("color:#86efac;font-weight:bold")
             self.scan_status.setText(
                 f"未收费：{row['patient_name']}，待收 {row['pending_amount']:.2f} 元"
             )

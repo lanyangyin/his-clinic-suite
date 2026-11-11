@@ -2,6 +2,7 @@
 from PySide6.QtCore import QUrl, QTimer
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -597,7 +598,10 @@ class PharmacyWidget(QWidget):
         box = QGroupBox("门诊发药")
         row = QHBoxLayout(box)
         self.disp_encounter_id = QSpinBox()
-        self.disp_encounter_id.setRange(1, 10_000_000)
+        self.disp_encounter_id.setRange(0, 10_000_000)
+        self.disp_encounter_id.setSpecialValueText("扫码/队列选择")
+        self.disp_encounter_id.setReadOnly(True)
+        self.disp_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.disp_window = QLineEdit("1号窗")
         self.disp_window.setMaximumWidth(90)
         self.disp_note = QLineEdit()
@@ -613,7 +617,7 @@ class PharmacyWidget(QWidget):
         submit.clicked.connect(self._dispense)
         call_btn = QPushButton("叫号")
         call_btn.clicked.connect(self._call)
-        row.addWidget(QLabel("就诊 ID"))
+        row.addWidget(QLabel("就诊"))
         row.addWidget(self.disp_encounter_id)
         row.addWidget(QLabel("窗口"))
         row.addWidget(self.disp_window)
@@ -624,6 +628,9 @@ class PharmacyWidget(QWidget):
         row.addWidget(call_btn)
         row.addWidget(submit)
         layout.addWidget(box)
+        self.disp_patient_label = QLabel("当前患者：—")
+        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
+        layout.addWidget(self.disp_patient_label)
 
         list_row = QHBoxLayout()
         refresh = QPushButton("刷新待发药队列")
@@ -669,7 +676,7 @@ class PharmacyWidget(QWidget):
         self.return_dispense_id.setRange(1, 10_000_000)
         return_btn = QPushButton("退药（库存回补）")
         return_btn.clicked.connect(self._return_dispense)
-        return_row.addWidget(QLabel("发药记录 ID"))
+        return_row.addWidget(QLabel("发药记录"))
         return_row.addWidget(self.return_dispense_id)
         return_row.addWidget(return_btn)
         layout.addWidget(return_box)
@@ -743,6 +750,9 @@ class PharmacyWidget(QWidget):
             self.disp_msg.setText(f"取药码核对失败（{e.status_code}）：{e.detail}")
             return
         self.disp_encounter_id.setValue(row["encounter_id"])
+        self.disp_patient_label.setText(
+            f"当前患者：{row['patient_name']} · 取药码核对通过"
+        )
         self.disp_msg.setText(f"取药码核对通过：{row['patient_name']}")
 
     def _scan_dispense_barcode(self) -> None:
@@ -764,16 +774,20 @@ class PharmacyWidget(QWidget):
             lookup["encounter_id"],
             lookup.get("status_text") or "",
         )
+        self.disp_patient_label.setText(
+            f"当前患者：{lookup.get('patient_name') or '—'} · "
+            f"就诊 {lookup['encounter_id']} · {lookup.get('status_text') or ''}"
+        )
         if not lookup["is_paid"]:
-            self.disp_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.disp_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
             self.disp_scan_status.setText(
                 f"未收费：{lookup['patient_name']}，不能发药"
             )
         elif lookup["is_dispensed"]:
-            self.disp_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.disp_scan_status.setStyleSheet("color:#f87171;font-weight:bold")
             self.disp_scan_status.setText(f"已发药：{lookup['patient_name']}")
         else:
-            self.disp_scan_status.setStyleSheet("color:#15803d;font-weight:bold")
+            self.disp_scan_status.setStyleSheet("color:#86efac;font-weight:bold")
             self.disp_scan_status.setText(
                 f"已收费，可发药：{lookup['patient_name']}"
             )
@@ -807,6 +821,10 @@ class PharmacyWidget(QWidget):
                 },
                 item["encounter_id"],
                 "已收费，可发药",
+            )
+            self.disp_patient_label.setText(
+                f"当前患者：{item.get('patient_name') or '—'} · "
+                f"就诊 {item['encounter_id']} · 取药码 {item.get('pickup_code') or '—'}"
             )
 
     def _call_row(self, row: int, _col: int) -> None:

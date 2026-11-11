@@ -42,9 +42,10 @@ class ArchiveDemo(QMainWindow):
         self.tabs = self.widget.findChild(QTabWidget)
         self.caption = CaptionBar()
         self.screen = QApplication.primaryScreen()
-        self.geo = self.screen.availableGeometry()
-        self.caption.move(self.geo.x() + 20, self.geo.y() + self.geo.height() - 66)
-        self.caption.resize(self.geo.width() - 40, 48)
+        self.geo = self.screen.geometry()
+        self.cap_geo = self.screen.availableGeometry()
+        self.caption.move(self.cap_geo.x() + 20, self.cap_geo.y() + self.cap_geo.height() - 66)
+        self.caption.resize(self.cap_geo.width() - 40, 48)
         self.frames = []
         self.index = 0
         self.point = None
