@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运营看板 · HIS 管理台</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e3e8f0;--text:#1f2937;--muted:#6b7280;--brand:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+header{background:#111827;color:#fff;display:flex;align-items:center;gap:18px;padding:10px 20px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:#d1d5db;text-decoration:none;padding:4px 8px;border-radius:6px}
+nav a:hover{background:#374151;color:#fff}
+.who{margin-left:auto;color:#9ca3af}
+.who a{color:#93c5fd}
+main{padding:20px;max-width:1200px;margin:0 auto}
+h2{font-size:18px;margin:0 0 14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card .num{font-size:24px;font-weight:700;color:var(--brand)}
+.card .label{color:var(--muted);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr:hover td{background:#f9fafb}
+form.inline{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px;min-width:120px}
+button{padding:8px 14px;border:0;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer;font-size:14px}
+button:hover{background:#1d4ed8}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#111827}
+.login-card{background:#fff;border-radius:12px;padding:28px;width:340px}
+.login-card h1{font-size:18px;margin:0 0 18px;text-align:center}
+.login-card label{margin-bottom:10px}
+.login-card button{width:100%;margin-top:8px}
+.hint{color:var(--muted);font-size:12px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HIS 门诊部管理台</h1>
+  <nav>
+    <a href="/admin">仪表盘</a>
+    <a href="/admin/dashboard">运营看板</a>
+    <a href="/admin/print-center">打印中心</a>
+    <a href="/admin/executive">院长驾驶舱</a>
+    <a href="/admin/treatment-report">治疗室日报</a>
+    <a href="/admin/treatment-reconciliation">治疗室对账</a>
+    <a href="/admin/cashier-daily">收费日结</a>
+    <a href="/admin/invoice-batches">发票号段</a>
+    <a href="/admin/invoice-usage">发票明细</a>
+    <a href="/admin/treatment-templates">治疗室模板</a>
+    <a href="/admin/master/departments">科室</a>
+    <a href="/admin/master/doctors">医生</a>
+    <a href="/admin/master/drugs">药品</a>
+    <a href="/admin/drug-interactions">用药规则</a>
+    <a href="/admin/master/charge-items">收费项目</a>
+    <a href="/admin/lab-items">检验项目</a>
+    <a href="/admin/tcm-herbs">中药饮片</a>
+    <a href="/admin/archive">病案档案</a>
+    <a href="/admin/inbound">入库</a>
+    <a href="/admin/purchase-requests">采购申请</a>
+    <a href="/admin/warehouse">库房</a>
+    <a href="/admin/stock-ledger">库存流水</a>
+    <a href="/admin/stocktakes">盘点</a>
+    <a href="/admin/expiry-alerts">效期预警</a>
+    <a href="/admin/gsp">GSP</a>
+    <a href="/admin/linen">被服洗涤</a>
+    <a href="/admin/cssd">器械灭菌</a>
+    <a href="/admin/trace-codes">追溯码</a>
+    <a href="/admin/payment-channels">支付配置</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/reports">报表</a>
+    <a href="/download/client">客户端下载</a>
+    <a href="/docs" target="_blank">API 文档</a>
+  </nav>
+  <div class="who">管理员 · <a href="/admin/logout">退出</a></div>
+</header>
+<main>
+
+
+
+<h2>今日运营看板</h2>
+<div class="cards">
+  <div class="card"><div class="num">36</div><div>今日挂号</div></div>
+  <div class="card"><div class="num">36</div><div>今日就诊</div></div>
+  <div class="card"><div class="num">¥859.00</div><div>今日实收</div></div>
+  <div class="card"><div class="num">¥3920.60</div><div>待收费用</div></div>
+  <div class="card"><div class="num">8</div><div>待发药</div></div>
+  <div class="card"><div class="num">52</div><div>低库存批次</div></div>
+  <div class="card"><div class="num" style="color:#b91c1c">6</div><div>未确认危急值</div></div>
+</div>
+<div class="panel">
+  <h3>快速入口</h3>
+  <p>
+    <a href="/admin/print-center">打印中心</a> ·
+    <a href="/admin/drug-interactions">用药规则</a> ·
+    <a href="/admin/purchase-requests">采购审批</a> ·
+    <a href="/admin/archive">病案档案</a>
+  </p>
+</div>
+<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px;text-align:center}
+.card .num{font-size:26px;font-weight:bold;color:#1e293b;margin-bottom:6px}
+</style>
+
+</main>
+
+</body>
+</html>

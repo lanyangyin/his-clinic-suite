@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用药安全规则 · HIS 管理台</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--line:#e3e8f0;--text:#1f2937;--muted:#6b7280;--brand:#2563eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+header{background:#111827;color:#fff;display:flex;align-items:center;gap:18px;padding:10px 20px;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:#d1d5db;text-decoration:none;padding:4px 8px;border-radius:6px}
+nav a:hover{background:#374151;color:#fff}
+.who{margin-left:auto;color:#9ca3af}
+.who a{color:#93c5fd}
+main{padding:20px;max-width:1200px;margin:0 auto}
+h2{font-size:18px;margin:0 0 14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card .num{font-size:24px;font-weight:700;color:var(--brand)}
+.card .label{color:var(--muted);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:13px}
+tr:hover td{background:#f9fafb}
+form.inline{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:14px;min-width:120px}
+button{padding:8px 14px;border:0;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer;font-size:14px}
+button:hover{background:#1d4ed8}
+.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:10px 14px;border-radius:8px;margin-bottom:14px}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#111827}
+.login-card{background:#fff;border-radius:12px;padding:28px;width:340px}
+.login-card h1{font-size:18px;margin:0 0 18px;text-align:center}
+.login-card label{margin-bottom:10px}
+.login-card button{width:100%;margin-top:8px}
+.hint{color:var(--muted);font-size:12px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HIS 门诊部管理台</h1>
+  <nav>
+    <a href="/admin">仪表盘</a>
+    <a href="/admin/dashboard">运营看板</a>
+    <a href="/admin/print-center">打印中心</a>
+    <a href="/admin/executive">院长驾驶舱</a>
+    <a href="/admin/treatment-report">治疗室日报</a>
+    <a href="/admin/treatment-reconciliation">治疗室对账</a>
+    <a href="/admin/cashier-daily">收费日结</a>
+    <a href="/admin/invoice-batches">发票号段</a>
+    <a href="/admin/invoice-usage">发票明细</a>
+    <a href="/admin/treatment-templates">治疗室模板</a>
+    <a href="/admin/master/departments">科室</a>
+    <a href="/admin/master/doctors">医生</a>
+    <a href="/admin/master/drugs">药品</a>
+    <a href="/admin/drug-interactions">用药规则</a>
+    <a href="/admin/master/charge-items">收费项目</a>
+    <a href="/admin/lab-items">检验项目</a>
+    <a href="/admin/tcm-herbs">中药饮片</a>
+    <a href="/admin/archive">病案档案</a>
+    <a href="/admin/inbound">入库</a>
+    <a href="/admin/purchase-requests">采购申请</a>
+    <a href="/admin/warehouse">库房</a>
+    <a href="/admin/stock-ledger">库存流水</a>
+    <a href="/admin/stocktakes">盘点</a>
+    <a href="/admin/expiry-alerts">效期预警</a>
+    <a href="/admin/gsp">GSP</a>
+    <a href="/admin/linen">被服洗涤</a>
+    <a href="/admin/cssd">器械灭菌</a>
+    <a href="/admin/trace-codes">追溯码</a>
+    <a href="/admin/payment-channels">支付配置</a>
+    <a href="/admin/users">用户</a>
+    <a href="/admin/audit">审计日志</a>
+    <a href="/admin/reports">报表</a>
+    <a href="/download/client">客户端下载</a>
+    <a href="/docs" target="_blank">API 文档</a>
+  </nav>
+  <div class="who">管理员 · <a href="/admin/logout">退出</a></div>
+</header>
+<main>
+
+
+
+<h2>用药安全规则</h2>
+<p class="muted">系统不预置临床结论。请按药品说明书/药师审核结果维护；规则为空时不会拦截。</p>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/drug-interactions">
+    <label>药品 A
+      <select name="drug_a_id" required>
+        <option value="1">头孢克肟胶囊 </option><option value="2">布洛芬片 </option><option value="3">蒲地蓝口服液 </option><option value="4">阿莫西林胶囊 </option><option value="5">维生素C片 100mg*100片</option><option value="6">演示药(维生素D滴剂) 400IU*30粒</option><option value="7">演示自费药(进口钙片) 60片</option><option value="8">演示抗菌药(万古霉素) 0.5g</option><option value="9">演示抗菌药(阿莫西林) 0.25g</option><option value="10">演示药2(维生素D滴剂) 400IU*30粒</option><option value="11">演示药3(蒙脱石散) 3g*10袋</option><option value="12">两级库存药142943 </option><option value="13">效期验证药46516 </option><option value="14">甲类验证药47465 0.5g*10片</option><option value="15">丙类验证药47465 1g*10片</option><option value="16">甲类验证药47473 0.5g*10片</option><option value="17">丙类验证药47473 1g*10片</option><option value="18">甲类验证药47486 0.5g*10片</option><option value="19">丙类验证药47486 1g*10片</option><option value="20">追溯验证药51701 </option><option value="21">支付验证药164969 </option><option value="22">收费入口药4194668314 </option><option value="23">收费入口药4194669017 </option><option value="24">A药2580 </option><option value="25">B药2580 </option><option value="26">医保退费药1601 </option><option value="27">医保退费药2419 </option><option value="28">全流程A药1109135658 </option><option value="29">全流程B药1109135658 </option><option value="30">近效期药1109135658 </option><option value="31">全流程C药1109135658 0.5g*10片</option><option value="32">全流程A药1109135711 </option><option value="33">全流程B药1109135711 </option><option value="34">近效期药1109135711 </option><option value="35">全流程C药1109135711 0.5g*10片</option><option value="36">全流程A药1109135726 </option><option value="37">全流程B药1109135726 </option><option value="38">近效期药1109135726 </option><option value="39">全流程C药1109135726 0.5g*10片</option><option value="40">全流程A药1109135750 </option><option value="41">全流程B药1109135750 </option><option value="42">近效期药1109135750 </option><option value="43">全流程C药1109135750 0.5g*10片</option><option value="44">全流程A药1109135810 </option><option value="45">全流程B药1109135810 </option><option value="46">近效期药1109135810 </option><option value="47">全流程C药1109135810 0.5g*10片</option><option value="48">全流程A药1109135845 </option><option value="49">全流程B药1109135845 </option><option value="50">近效期药1109135845 </option><option value="51">全流程C药1109135845 0.5g*10片</option><option value="52">全流程A药1109140903 </option><option value="53">全流程B药1109140903 </option><option value="54">近效期药1109140903 </option><option value="55">全流程C药1109140903 0.5g*10片</option><option value="56">全流程A药1109140947 </option><option value="57">全流程B药1109140947 </option><option value="58">近效期药1109140947 </option><option value="59">全流程C药1109140947 0.5g*10片</option><option value="60">全流程A药1109141117 </option><option value="61">全流程B药1109141117 </option><option value="62">近效期药1109141117 </option><option value="63">全流程C药1109141117 0.5g*10片</option><option value="64">全流程A药1109141356 </option><option value="65">全流程B药1109141356 </option><option value="66">近效期药1109141356 </option><option value="67">全流程C药1109141356 0.5g*10片</option><option value="68">全流程A药1109141416 </option><option value="69">全流程B药1109141416 </option><option value="70">近效期药1109141416 </option><option value="71">全流程C药1109141416 0.5g*10片</option><option value="72">全流程A药1109141514 </option><option value="73">全流程B药1109141514 </option><option value="74">近效期药1109141514 </option><option value="75">全流程C药1109141514 0.5g*10片</option><option value="76">演示阿莫西林1109143019 </option><option value="77">演示阿莫西林1109143028 </option><option value="78">演示阿莫西林1109144102 </option><option value="79">演示阿莫西林1109145843 </option><option value="80">演示阿莫西林1109155713 </option><option value="81">演示阿莫西林1109155847 </option><option value="82">演示阿莫西林1109160137 </option><option value="83">输液用抗生素0000 </option><option value="84">工作台药品0000 </option><option value="85">全景降压药0000 </option><option value="86">演示阿莫西林1110142439 </option><option value="87">全流程A药1110143028 </option><option value="88">全流程B药1110143028 </option><option value="89">近效期药1110143028 </option><option value="90">全流程C药1110143028 0.5g*10片</option><option value="91">演示阿莫西林1110143115 </option><option value="92">演示阿莫西林1110143513 </option><option value="93">演示阿莫西林1110143756 </option><option value="94">演示阿莫西林1110144352 </option><option value="95">盘点页面药1110000000 </option><option value="96">盘点页面药1110144958 </option><option value="97">盘点页面药1110145018 </option><option value="98">盘点页面药1110145049 </option><option value="99">后台未对码药1110150117 </option><option value="100">后台未对码药1110150132 </option><option value="101">A药1110152213 </option><option value="102">盘点模拟药1110152213 </option><option value="103">A药1110152251 </option><option value="104">盘点模拟药1110152251 </option><option value="105">A药1110152347 </option><option value="106">A药1110152407 </option><option value="107">盘点模拟药1110152407 </option><option value="108">A药1110152439 </option><option value="109">盘点模拟药1110152439 </option><option value="110">医保匹配药1110152439 </option><option value="111">A药1110152459 </option><option value="112">盘点模拟药1110152459 </option><option value="113">医保匹配药1110152459 </option><option value="114">A药1110152516 </option><option value="115">盘点模拟药1110152516 </option><option value="116">医保匹配药1110152516 </option><option value="117">A药1110152530 </option><option value="118">盘点模拟药1110152530 </option><option value="119">医保匹配药1110152530 </option><option value="120">演示收费药152935 </option><option value="121">演示收费药153043 </option><option value="122">医生演示药153349 </option><option value="123">医生演示药153425 </option><option value="124">护理演示药153657 </option><option value="125">护理演示药153851 </option><option value="126">药房演示药155449 </option><option value="127">库房演示药155706 </option><option value="128">库房演示药155726 </option><option value="129">医保后台匹配药1110160828 </option><option value="130">演示收费药171648 </option><option value="131">护理演示药190843 </option><option value="132">阿莫西林胶囊191713 </option><option value="133">阿莫西林胶囊191726 </option><option value="134">阿莫西林胶囊191952 </option><option value="135">阿莫西林胶囊192000 </option><option value="136">医生演示药193117 </option><option value="137">医生演示药193145 </option><option value="138">A药1110204431 </option><option value="139">盘点模拟药1110204431 </option><option value="140">医保匹配药1110204431 </option><option value="141">演示收费药204452 </option><option value="142">医生演示药204555 </option><option value="143">护理演示药204702 </option><option value="144">院长采购药214826 </option><option value="145">院长采购药214852 </option><option value="146">院长采购药214909 </option><option value="147">院长采购药214934 </option><option value="148">演示收费药223613 </option><option value="149">库房演示药223740 </option><option value="150">护理演示药223918 </option><option value="151">医生演示药224058 </option><option value="152">院长采购药224236 </option><option value="153">院长采购药224304 </option><option value="154">院长采购药224339 </option><option value="155">药房演示药224429 </option><option value="156">院长采购药233841 </option><option value="157">院长采购药233905 </option><option value="158">院长采购药233916 </option><option value="159">院长采购药233938 </option><option value="160">自费验收药235000 </option><option value="161">院长采购药235526 </option><option value="162">辛伐他汀分散片 10mg</option><option value="163">扫码药100112 </option><option value="164">演示收费药100125 </option><option value="165">演示收费药100232 </option><option value="166">药房演示药100347 </option><option value="167">状态药101619 </option><option value="168">演示收费药101633 </option><option value="169">药房演示药101755 </option><option value="170">零售创可贴110334 100片</option><option value="171">零售创可贴110357 100片</option><option value="172">医生演示药115835 </option><option value="173">演示收费药120242 </option><option value="174">护理演示药120242 </option><option value="175">药房演示药120413 </option><option value="176">演示收费药121319 </option><option value="177">演示收费药122343 </option><option value="178">演示收费药122646 </option><option value="179">演示收费药122914 </option><option value="180">医生演示药123047 </option><option value="181">护理演示药123201 </option><option value="182">药房演示药123313 </option><option value="183">库房演示药123549 </option><option value="184">院长采购药124035 </option><option value="185">零售创可贴124129 100片</option><option value="186">医生演示药125417 </option><option value="187">演示收费药125551 </option><option value="188">护理演示药125720 </option><option value="189">药房演示药125930 </option><option value="190">库房演示药130029 </option><option value="191">院长采购药130548 </option><option value="192">零售创可贴130642 100片</option>
+      </select>
+    </label>
+    <label>药品 B
+      <select name="drug_b_id" required>
+        <option value="1">头孢克肟胶囊 </option><option value="2">布洛芬片 </option><option value="3">蒲地蓝口服液 </option><option value="4">阿莫西林胶囊 </option><option value="5">维生素C片 100mg*100片</option><option value="6">演示药(维生素D滴剂) 400IU*30粒</option><option value="7">演示自费药(进口钙片) 60片</option><option value="8">演示抗菌药(万古霉素) 0.5g</option><option value="9">演示抗菌药(阿莫西林) 0.25g</option><option value="10">演示药2(维生素D滴剂) 400IU*30粒</option><option value="11">演示药3(蒙脱石散) 3g*10袋</option><option value="12">两级库存药142943 </option><option value="13">效期验证药46516 </option><option value="14">甲类验证药47465 0.5g*10片</option><option value="15">丙类验证药47465 1g*10片</option><option value="16">甲类验证药47473 0.5g*10片</option><option value="17">丙类验证药47473 1g*10片</option><option value="18">甲类验证药47486 0.5g*10片</option><option value="19">丙类验证药47486 1g*10片</option><option value="20">追溯验证药51701 </option><option value="21">支付验证药164969 </option><option value="22">收费入口药4194668314 </option><option value="23">收费入口药4194669017 </option><option value="24">A药2580 </option><option value="25">B药2580 </option><option value="26">医保退费药1601 </option><option value="27">医保退费药2419 </option><option value="28">全流程A药1109135658 </option><option value="29">全流程B药1109135658 </option><option value="30">近效期药1109135658 </option><option value="31">全流程C药1109135658 0.5g*10片</option><option value="32">全流程A药1109135711 </option><option value="33">全流程B药1109135711 </option><option value="34">近效期药1109135711 </option><option value="35">全流程C药1109135711 0.5g*10片</option><option value="36">全流程A药1109135726 </option><option value="37">全流程B药1109135726 </option><option value="38">近效期药1109135726 </option><option value="39">全流程C药1109135726 0.5g*10片</option><option value="40">全流程A药1109135750 </option><option value="41">全流程B药1109135750 </option><option value="42">近效期药1109135750 </option><option value="43">全流程C药1109135750 0.5g*10片</option><option value="44">全流程A药1109135810 </option><option value="45">全流程B药1109135810 </option><option value="46">近效期药1109135810 </option><option value="47">全流程C药1109135810 0.5g*10片</option><option value="48">全流程A药1109135845 </option><option value="49">全流程B药1109135845 </option><option value="50">近效期药1109135845 </option><option value="51">全流程C药1109135845 0.5g*10片</option><option value="52">全流程A药1109140903 </option><option value="53">全流程B药1109140903 </option><option value="54">近效期药1109140903 </option><option value="55">全流程C药1109140903 0.5g*10片</option><option value="56">全流程A药1109140947 </option><option value="57">全流程B药1109140947 </option><option value="58">近效期药1109140947 </option><option value="59">全流程C药1109140947 0.5g*10片</option><option value="60">全流程A药1109141117 </option><option value="61">全流程B药1109141117 </option><option value="62">近效期药1109141117 </option><option value="63">全流程C药1109141117 0.5g*10片</option><option value="64">全流程A药1109141356 </option><option value="65">全流程B药1109141356 </option><option value="66">近效期药1109141356 </option><option value="67">全流程C药1109141356 0.5g*10片</option><option value="68">全流程A药1109141416 </option><option value="69">全流程B药1109141416 </option><option value="70">近效期药1109141416 </option><option value="71">全流程C药1109141416 0.5g*10片</option><option value="72">全流程A药1109141514 </option><option value="73">全流程B药1109141514 </option><option value="74">近效期药1109141514 </option><option value="75">全流程C药1109141514 0.5g*10片</option><option value="76">演示阿莫西林1109143019 </option><option value="77">演示阿莫西林1109143028 </option><option value="78">演示阿莫西林1109144102 </option><option value="79">演示阿莫西林1109145843 </option><option value="80">演示阿莫西林1109155713 </option><option value="81">演示阿莫西林1109155847 </option><option value="82">演示阿莫西林1109160137 </option><option value="83">输液用抗生素0000 </option><option value="84">工作台药品0000 </option><option value="85">全景降压药0000 </option><option value="86">演示阿莫西林1110142439 </option><option value="87">全流程A药1110143028 </option><option value="88">全流程B药1110143028 </option><option value="89">近效期药1110143028 </option><option value="90">全流程C药1110143028 0.5g*10片</option><option value="91">演示阿莫西林1110143115 </option><option value="92">演示阿莫西林1110143513 </option><option value="93">演示阿莫西林1110143756 </option><option value="94">演示阿莫西林1110144352 </option><option value="95">盘点页面药1110000000 </option><option value="96">盘点页面药1110144958 </option><option value="97">盘点页面药1110145018 </option><option value="98">盘点页面药1110145049 </option><option value="99">后台未对码药1110150117 </option><option value="100">后台未对码药1110150132 </option><option value="101">A药1110152213 </option><option value="102">盘点模拟药1110152213 </option><option value="103">A药1110152251 </option><option value="104">盘点模拟药1110152251 </option><option value="105">A药1110152347 </option><option value="106">A药1110152407 </option><option value="107">盘点模拟药1110152407 </option><option value="108">A药1110152439 </option><option value="109">盘点模拟药1110152439 </option><option value="110">医保匹配药1110152439 </option><option value="111">A药1110152459 </option><option value="112">盘点模拟药1110152459 </option><option value="113">医保匹配药1110152459 </option><option value="114">A药1110152516 </option><option value="115">盘点模拟药1110152516 </option><option value="116">医保匹配药1110152516 </option><option value="117">A药1110152530 </option><option value="118">盘点模拟药1110152530 </option><option value="119">医保匹配药1110152530 </option><option value="120">演示收费药152935 </option><option value="121">演示收费药153043 </option><option value="122">医生演示药153349 </option><option value="123">医生演示药153425 </option><option value="124">护理演示药153657 </option><option value="125">护理演示药153851 </option><option value="126">药房演示药155449 </option><option value="127">库房演示药155706 </option><option value="128">库房演示药155726 </option><option value="129">医保后台匹配药1110160828 </option><option value="130">演示收费药171648 </option><option value="131">护理演示药190843 </option><option value="132">阿莫西林胶囊191713 </option><option value="133">阿莫西林胶囊191726 </option><option value="134">阿莫西林胶囊191952 </option><option value="135">阿莫西林胶囊192000 </option><option value="136">医生演示药193117 </option><option value="137">医生演示药193145 </option><option value="138">A药1110204431 </option><option value="139">盘点模拟药1110204431 </option><option value="140">医保匹配药1110204431 </option><option value="141">演示收费药204452 </option><option value="142">医生演示药204555 </option><option value="143">护理演示药204702 </option><option value="144">院长采购药214826 </option><option value="145">院长采购药214852 </option><option value="146">院长采购药214909 </option><option value="147">院长采购药214934 </option><option value="148">演示收费药223613 </option><option value="149">库房演示药223740 </option><option value="150">护理演示药223918 </option><option value="151">医生演示药224058 </option><option value="152">院长采购药224236 </option><option value="153">院长采购药224304 </option><option value="154">院长采购药224339 </option><option value="155">药房演示药224429 </option><option value="156">院长采购药233841 </option><option value="157">院长采购药233905 </option><option value="158">院长采购药233916 </option><option value="159">院长采购药233938 </option><option value="160">自费验收药235000 </option><option value="161">院长采购药235526 </option><option value="162">辛伐他汀分散片 10mg</option><option value="163">扫码药100112 </option><option value="164">演示收费药100125 </option><option value="165">演示收费药100232 </option><option value="166">药房演示药100347 </option><option value="167">状态药101619 </option><option value="168">演示收费药101633 </option><option value="169">药房演示药101755 </option><option value="170">零售创可贴110334 100片</option><option value="171">零售创可贴110357 100片</option><option value="172">医生演示药115835 </option><option value="173">演示收费药120242 </option><option value="174">护理演示药120242 </option><option value="175">药房演示药120413 </option><option value="176">演示收费药121319 </option><option value="177">演示收费药122343 </option><option value="178">演示收费药122646 </option><option value="179">演示收费药122914 </option><option value="180">医生演示药123047 </option><option value="181">护理演示药123201 </option><option value="182">药房演示药123313 </option><option value="183">库房演示药123549 </option><option value="184">院长采购药124035 </option><option value="185">零售创可贴124129 100片</option><option value="186">医生演示药125417 </option><option value="187">演示收费药125551 </option><option value="188">护理演示药125720 </option><option value="189">药房演示药125930 </option><option value="190">库房演示药130029 </option><option value="191">院长采购药130548 </option><option value="192">零售创可贴130642 100片</option>
+      </select>
+    </label>
+    <label>级别
+      <select name="severity">
+        <option value="block">禁止同方</option>
+        <option value="warn">仅提示</option>
+      </select>
+    </label>
+    <label>说明 <input type="text" name="note" maxlength="200" placeholder="如 出血风险增加"></label>
+    <button type="submit">新增规则</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>药品 A</th><th>药品 B</th><th>级别</th><th>说明</th><th>启用</th></tr>
+    
+    <tr><td colspan="6">暂无规则</td></tr>
+    
+  </table>
+</div>
+
+</main>
+
+</body>
+</html>
