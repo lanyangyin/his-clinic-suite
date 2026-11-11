@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
+from his_client.ui.patient_banner import PatientBanner
 
 SPECIAL = {
     "none": "常规",
@@ -53,6 +54,7 @@ class TcmWidget(QWidget):
         self.api = api
         self.role = role
         self.items: list[dict] = []
+        self.banner = PatientBanner()
         tabs = SidebarTabs()
         if role in ("doctor", "admin"):
             tabs.addTab(self._build_prescribe_tab(), "开中药方")
@@ -61,7 +63,34 @@ class TcmWidget(QWidget):
         if role in ("pharmacist", "decoction", "admin"):
             tabs.addTab(self._build_decoction_tab(), "煎药室")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(tabs)
+
+    def _load_encounter_context(self) -> None:
+        encounter_id = self.encounter_id.value()
+        if not encounter_id:
+            self.banner.clear()
+            return
+        try:
+            summary = self.api.encounter_summary(encounter_id)
+        except ApiError:
+            self.banner.clear()
+            return
+        self.banner.set_patient(
+            {
+                "id": summary.get("patient_id"),
+                "patient_no": summary.get("patient_no"),
+                "name": summary.get("patient_name"),
+                "gender": summary.get("gender"),
+                "age": summary.get("age"),
+                "allergy_label": summary.get("allergy_label"),
+                "phone": summary.get("phone"),
+            },
+            encounter_id,
+            {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
+                summary.get("status") or "", summary.get("status") or ""
+            ),
+        )
 
     # ---------- 医生开方 ----------
     def _build_prescribe_tab(self) -> QWidget:
@@ -84,6 +113,7 @@ class TcmWidget(QWidget):
         self.service.addItem("自煎", "self")
         self.method = QLineEdit("常规煎煮")
         self.presc_note = QLineEdit()
+        self.encounter_id.editingFinished.connect(self._load_encounter_context)
         form.addRow("就诊 ID", self.encounter_id)
         form.addRow("方名", self.formula)
         form.addRow("用法", self.usage)

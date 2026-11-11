@@ -15,6 +15,7 @@ from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
+from his_client.ui.patient_banner import PatientBanner
 
 
 class Patient360Widget(QWidget):
@@ -25,7 +26,9 @@ class Patient360Widget(QWidget):
         self.patients: list[dict] = []
         self.profile: dict | None = None
 
+        self.banner = PatientBanner()
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         search = QHBoxLayout()
         self.name = QLineEdit()
         self.name.setPlaceholderText("姓名")
@@ -107,6 +110,11 @@ class Patient360Widget(QWidget):
         data = self.profile
         info = data["patient"]
         stats = data["stats"]
+        self.banner.set_patient(
+            info,
+            None,
+            f"就诊 {stats['visit_count']} 次",
+        )
         self.header.setText(f"{info['name']}（ID {info['id']}）· {info.get('phone') or '无电话'}")
         self.stats.setText(
             f"就诊 {stats['visit_count']} 次　预约 {stats['appointment_count']} 次　"

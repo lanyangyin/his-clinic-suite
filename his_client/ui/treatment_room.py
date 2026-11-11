@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
+from his_client.ui.patient_banner import PatientBanner
 
 
 class TreatmentRoomWidget(QWidget):
@@ -32,12 +33,14 @@ class TreatmentRoomWidget(QWidget):
         self.cases: list[dict] = []
         self.templates: list[dict] = []
         self.template_edits: dict[str, QLineEdit] = {}
+        self.banner = PatientBanner()
         self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_workbench_tab(), "今日工作台")
         self.tabs.addTab(self._build_queue_tab(), "治疗排队")
         self.tabs.addTab(self._build_handle_tab(), "处置记录")
         self.tabs.addTab(self._build_followup_tab(), "换药随访")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(self.tabs)
 
     def _build_queue_tab(self) -> QWidget:
@@ -297,6 +300,7 @@ class TreatmentRoomWidget(QWidget):
         except ApiError:
             patient = None
         if patient:
+            self.banner.set_patient(patient, case.get("encounter_id"), case.get("status") or "")
             gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
             age = patient.get("age")
             allergy = patient.get("allergy_label") or "不详"
