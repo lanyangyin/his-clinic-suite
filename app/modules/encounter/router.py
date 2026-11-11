@@ -7,6 +7,10 @@ from app.modules.insurance.adapter import InsuranceForbiddenError
 from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
 from app.modules.tcm.models import TcmPrescription
+from app.modules.billing.models import Payment
+from app.modules.pharmacy.models import Dispense
+from app.modules.charges.models import EncounterCharge
+from sqlalchemy import func
 
 from .schemas import (
     BarcodeLookup,
@@ -103,12 +107,39 @@ def lookup_by_barcode(
         raise HTTPException(status_code=404, detail="条码对应就诊不存在")
     registration = db.get(Registration, encounter.registration_id)
     patient = db.get(Patient, registration.patient_id) if registration else None
+    payment = (
+        db.query(Payment).filter(Payment.encounter_id == encounter.id).first()
+    )
+    is_paid = bool(payment and payment.status == "paid")
+    dispense = (
+        db.query(Dispense).filter(Dispense.encounter_id == encounter.id).first()
+    )
+    is_dispensed = bool(dispense and dispense.status == "dispensed")
+    pending_amount = float(
+        db.query(func.coalesce(func.sum(EncounterCharge.amount), 0))
+        .filter(
+            EncounterCharge.encounter_id == encounter.id,
+            EncounterCharge.status == "pending",
+        )
+        .scalar()
+        or 0
+    )
+    if not is_paid:
+        status_text = "未收费，不能发药"
+    elif is_dispensed:
+        status_text = "已发药"
+    else:
+        status_text = "已收费，可发药"
     return BarcodeLookup(
         encounter_id=encounter.id,
         patient_id=patient.id if patient else 0,
         patient_name=patient.name if patient else "",
         code=normalized,
         code_type=code_type,
+        is_paid=is_paid,
+        is_dispensed=is_dispensed,
+        pending_amount=round(pending_amount, 2),
+        status_text=status_text,
     )
 
 

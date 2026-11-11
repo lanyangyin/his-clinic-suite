@@ -187,13 +187,16 @@ class CashierDemo(QMainWindow):
             self.widget.c_scan_code.setText(f"RX{enc['id']:06d}")
             self.click(charge_tab, "扫码带出")
             assert self.widget.c_encounter_id.value() == enc["id"]
-            assert "扫码带出" in self.widget.charge_msg.text()
+            assert "未收费" in self.widget.c_scan_status.text()
             self.click(charge_tab, "查询费用")
             self.click(charge_tab, "收费")
             payments = self.cashier.call("GET", "/payments/", params={"encounter_id": enc["id"]})
             payment = payments[0]
             assert payment["status"] == "paid"
-            self.scene(f"收费成功：{payment['amount']:.2f} 元；重复收费应报错")
+            self.scene(f"收费成功：{payment['amount']:.2f} 元；再扫条码应提示已收费")
+            self.widget.c_scan_code.setText(f"RX{enc['id']:06d}")
+            self.click(charge_tab, "扫码带出")
+            assert "已收费" in self.widget.c_scan_status.text()
             self.click(charge_tab, "收费")
             assert "已收费" in self.widget.charge_msg.text()
             self.scene("重复收费被拦截，进入打印页作废发票", self.tab("打印"))

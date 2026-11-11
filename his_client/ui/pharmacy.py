@@ -581,6 +581,8 @@ class PharmacyWidget(QWidget):
         self.disp_scan.returnPressed.connect(self._scan_dispense_barcode)
         scan_btn = QPushButton("扫码定位")
         scan_btn.clicked.connect(self._scan_dispense_barcode)
+        self.disp_scan_status = QLabel("")
+        self.disp_scan_status.setWordWrap(True)
         submit = QPushButton("核对发药")
         submit.clicked.connect(self._dispense)
         call_btn = QPushButton("叫号")
@@ -592,6 +594,7 @@ class PharmacyWidget(QWidget):
         row.addWidget(self.disp_note)
         row.addWidget(self.disp_scan)
         row.addWidget(scan_btn)
+        row.addWidget(self.disp_scan_status)
         row.addWidget(call_btn)
         row.addWidget(submit)
         layout.addWidget(box)
@@ -726,6 +729,19 @@ class PharmacyWidget(QWidget):
             self.disp_msg.setText(f"条码解析失败（{e.status_code}）：{e.detail}")
             return
         self.disp_encounter_id.setValue(lookup["encounter_id"])
+        if not lookup["is_paid"]:
+            self.disp_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.disp_scan_status.setText(
+                f"未收费：{lookup['patient_name']}，不能发药"
+            )
+        elif lookup["is_dispensed"]:
+            self.disp_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.disp_scan_status.setText(f"已发药：{lookup['patient_name']}")
+        else:
+            self.disp_scan_status.setStyleSheet("color:#15803d;font-weight:bold")
+            self.disp_scan_status.setText(
+                f"已收费，可发药：{lookup['patient_name']}"
+            )
         for index, item in enumerate(getattr(self, "worklist", [])):
             if item.get("encounter_id") == lookup["encounter_id"]:
                 self.worklist_table.selectRow(index)

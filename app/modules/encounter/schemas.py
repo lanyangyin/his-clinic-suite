@@ -21,6 +21,10 @@ class BarcodeLookup(BaseModel):
     patient_name: str
     code: str
     code_type: str
+    is_paid: bool
+    is_dispensed: bool
+    pending_amount: float
+    status_text: str
 
 
 class DiagnosisUpdate(BaseModel):

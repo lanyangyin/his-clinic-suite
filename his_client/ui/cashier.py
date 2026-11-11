@@ -552,6 +552,9 @@ class CashierWidget(QWidget):
         scan_btn.clicked.connect(self._scan_barcode)
         scan_row.addWidget(self.c_scan_code)
         scan_row.addWidget(scan_btn)
+        self.c_scan_status = QLabel("")
+        self.c_scan_status.setWordWrap(True)
+        scan_row.addWidget(self.c_scan_status)
         box_layout.addLayout(scan_row)
 
         row = QHBoxLayout()
@@ -661,9 +664,16 @@ class CashierWidget(QWidget):
             return
         self.c_encounter_id.setValue(row["encounter_id"])
         self._load_charges()
-        self.charge_msg.setText(
-            f"扫码带出：{row['patient_name']}（就诊 {row['encounter_id']}）"
-        )
+        if row["is_paid"]:
+            self.c_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
+            self.c_scan_status.setText(
+                f"已收费：{row['patient_name']}，不能重复收费"
+            )
+        else:
+            self.c_scan_status.setStyleSheet("color:#15803d;font-weight:bold")
+            self.c_scan_status.setText(
+                f"未收费：{row['patient_name']}，待收 {row['pending_amount']:.2f} 元"
+            )
 
     def _load_charges(self) -> None:
         encounter_id = self.c_encounter_id.value()

@@ -167,6 +167,9 @@ def test_print_record_and_tcm_pages(client, auth):
     assert lookup.status_code == 200, lookup.text
     assert lookup.json()["encounter_id"] == encounter["id"]
     assert lookup.json()["patient_name"] == "打印患者"
+    assert lookup.json()["is_paid"] is False
+    assert lookup.json()["is_dispensed"] is False
+    assert "未收费" in lookup.json()["status_text"]
     tcm_code = tcm_created.json()["prescription_no"]
     tcm_lookup = client.get(
         f"/encounters/by-barcode/{tcm_code}", headers=auth["pharmacist"]
@@ -212,3 +215,15 @@ def test_barcode_svg(client):
 def test_barcode_rejects_non_ascii(client):
     response = client.get("/print/barcode/处方.svg")
     assert response.status_code == 400
+
+
+def test_barcode_status_paid(client, auth):
+    encounter, _payment = setup_paid_encounter(client, auth)
+    code = f"RX{encounter['id']:06d}"
+    lookup = client.get(f"/encounters/by-barcode/{code}", headers=auth["cashier"])
+    assert lookup.status_code == 200
+    body = lookup.json()
+    assert body["is_paid"] is True
+    assert body["is_dispensed"] is False
+    assert body["pending_amount"] == 0
+    assert body["status_text"] == "已收费，可发药"
