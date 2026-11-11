@@ -1,8 +1,8 @@
 {
   "summary": {
-    "suffix": "1111191709",
+    "suffix": "1111215548",
     "server": "http://127.0.0.1:8001",
-    "version": "0.84.0",
+    "version": "0.88.0",
     "roles": {
       "管理员": "admin",
       "收费员": "cashier",
@@ -12,39 +12,39 @@
       "库房": "warehouse",
       "检验": "lab"
     },
-    "patient_id": 288,
-    "registration_id": 369,
-    "encounter_id": 298,
-    "payment_id": 182,
+    "patient_id": 313,
+    "registration_id": 394,
+    "encounter_id": 319,
+    "payment_id": 192,
     "payment_amount": 196.0,
     "insurance_amount": 0.0,
     "self_pay_amount": 196.0,
-    "dispense_id": 79,
+    "dispense_id": 83,
     "outbound_orders": [
-      93,
-      94
+      101,
+      102
     ],
-    "lab_request_id": 111,
-    "treatment_id": 112,
+    "lab_request_id": 123,
+    "treatment_id": 121,
     "warehouse_stocks": {
-      "247": 25,
-      "248": 17,
-      "250": 8,
-      "249": 3
+      "269": 25,
+      "270": 17,
+      "272": 8,
+      "271": 3
     },
     "pharmacy_stocks": {
-      "247": 3,
-      "248": 3,
-      "250": 2
+      "269": 3,
+      "270": 3,
+      "272": 2
     },
     "material_stocks": {
       "总库": 35,
       "护士站": 9,
-      "全流程内科1111191709": 5
+      "全流程内科1111215548": 5
     },
     "ledger_rows": 500,
-    "inventory_upload": "INV202611110019",
-    "inventory_skipped": 109
+    "inventory_upload": "INV202611110020",
+    "inventory_skipped": 123
   },
   "steps": [
     {
@@ -52,104 +52,104 @@
       "role": "管理员",
       "action": "POST /suppliers/",
       "status": 201,
-      "elapsed_ms": 78,
-      "detail": "{\"code\": \"SUP-FLOW-1111191709\", \"name\": \"全流程供应商1111191709\", \"contact\": \"\", \"phone\": \"\", \"address\": \"\", \"id\": 67}"
+      "elapsed_ms": 69,
+      "detail": "{\"code\": \"SUP-FLOW-1111215548\", \"name\": \"全流程供应商1111215548\", \"contact\": \"\", \"phone\": \"\", \"address\": \"\", \"id\": 71}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /departments/",
       "status": 201,
-      "elapsed_ms": 71,
-      "detail": "{\"name\": \"全流程内科1111191709\", \"id\": 213}"
+      "elapsed_ms": 64,
+      "detail": "{\"name\": \"全流程内科1111215548\", \"id\": 229}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /doctors/",
       "status": 201,
-      "elapsed_ms": 69,
-      "detail": "{\"name\": \"全流程医生1111191709\", \"department_id\": 213, \"id\": 216}"
+      "elapsed_ms": 72,
+      "detail": "{\"name\": \"全流程医生1111215548\", \"department_id\": 229, \"id\": 232}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /charges/items/",
       "status": 201,
-      "elapsed_ms": 74,
-      "detail": "{\"code\": \"TRT-1111191709\", \"name\": \"雾化治疗1111191709\", \"category\": \"treatment\", \"price\": 30.0, \"insurance_ratio\": 0.0, \"insurance_code\": \"\", \"insurance_name\": \"\", \"insurance_category\": \"未对码\", \"insurance_match_status\": \"unmatched\", \"unit\": \"次\", \"reimbursement_not"
+      "elapsed_ms": 70,
+      "detail": "{\"code\": \"TRT-1111215548\", \"name\": \"雾化治疗1111215548\", \"category\": \"treatment\", \"price\": 30.0, \"insurance_ratio\": 0.0, \"insurance_code\": \"\", \"insurance_name\": \"\", \"insurance_category\": \"未对码\", \"insurance_match_status\": \"unmatched\", \"unit\": \"次\", \"reimbursement_not"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /lab/items/",
       "status": 201,
-      "elapsed_ms": 77,
-      "detail": "{\"code\": \"LAB-1111191709\", \"name\": \"血常规1111191709\", \"price\": 20.0, \"specimen_type\": \"血液\", \"unit\": \"\", \"reference_low\": null, \"reference_high\": null, \"method\": \"\", \"tat_minutes\": 60, \"insurance_ratio\": 0.7, \"result_kind\": \"numeric\", \"id\": 78}"
+      "elapsed_ms": 70,
+      "detail": "{\"code\": \"LAB-1111215548\", \"name\": \"血常规1111215548\", \"price\": 20.0, \"specimen_type\": \"血液\", \"unit\": \"\", \"reference_low\": null, \"reference_high\": null, \"method\": \"\", \"tat_minutes\": 60, \"insurance_ratio\": 0.7, \"result_kind\": \"numeric\", \"id\": 86}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /materials/items/",
       "status": 201,
-      "elapsed_ms": 74,
-      "detail": "{\"code\": \"MAT-1111191709\", \"name\": \"一次性敷料1111191709\", \"spec\": \"10cm\", \"unit\": \"片\", \"price\": 5.0, \"is_high_value\": true, \"category\": \"consumable\", \"manufacturer\": \"演示医疗\", \"registration_no\": \"械注准1111191709\", \"insurance_code\": \"\", \"insurance_name\": \"\", \"insurance"
+      "elapsed_ms": 68,
+      "detail": "{\"code\": \"MAT-1111215548\", \"name\": \"一次性敷料1111215548\", \"spec\": \"10cm\", \"unit\": \"片\", \"price\": 5.0, \"is_high_value\": true, \"category\": \"consumable\", \"manufacturer\": \"演示医疗\", \"registration_no\": \"械注准1111215548\", \"insurance_code\": \"\", \"insurance_name\": \"\", \"insurance"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /drugs/",
       "status": 201,
-      "elapsed_ms": 78,
-      "detail": "{\"name\": \"全流程A药1111191709\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 12.5, \"insurance_ratio\": 0.8, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_f"
+      "elapsed_ms": 70,
+      "detail": "{\"name\": \"全流程A药1111215548\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 12.5, \"insurance_ratio\": 0.8, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_f"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /drugs/",
       "status": 201,
-      "elapsed_ms": 76,
-      "detail": "{\"name\": \"全流程B药1111191709\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 8.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_fo"
+      "elapsed_ms": 70,
+      "detail": "{\"name\": \"全流程B药1111215548\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 8.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_fo"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /drugs/",
       "status": 201,
-      "elapsed_ms": 78,
-      "detail": "{\"name\": \"近效期药1111191709\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 3.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_for"
+      "elapsed_ms": 70,
+      "detail": "{\"name\": \"近效期药1111215548\", \"spec\": \"\", \"unit\": \"\", \"base_price\": 3.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"\", \"approval_no\": \"\", \"manufacturer\": \"\", \"dosage_for"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /insurance/catalog/import",
       "status": 200,
-      "elapsed_ms": 83,
-      "detail": "{\"status\": \"created\", \"version\": \"V0026\", \"inserted\": 4, \"updated\": 0, \"skipped\": 0, \"row_count\": 4, \"checksum\": \"34c78cfff27e560b208468ffb7c5938748e3ea03ced1385dfb5a0a3a0ef4ad77\"}"
+      "elapsed_ms": 76,
+      "detail": "{\"status\": \"created\", \"version\": \"V0027\", \"inserted\": 4, \"updated\": 0, \"skipped\": 0, \"row_count\": 4, \"checksum\": \"d3742f2301272d23c9183198bd5aa9ba249c14ba242824aa68e9438a18e3d1ea\"}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /drugs/",
       "status": 201,
-      "elapsed_ms": 76,
-      "detail": "{\"name\": \"全流程C药1111191709\", \"spec\": \"0.5g*10片\", \"unit\": \"\", \"base_price\": 6.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"FLOWC1111191709\", \"approval_no\": \"\", \"manufa"
+      "elapsed_ms": 71,
+      "detail": "{\"name\": \"全流程C药1111215548\", \"spec\": \"0.5g*10片\", \"unit\": \"\", \"base_price\": 6.0, \"insurance_ratio\": 0.7, \"antibiotic_level\": 0, \"high_alert\": false, \"is_otc\": false, \"ingredient\": \"\", \"barcode\": \"\", \"insurance_code\": \"FLOWC1111215548\", \"approval_no\": \"\", \"manufa"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
       "action": "POST /insurance/catalog/match",
       "status": 200,
-      "elapsed_ms": 316,
-      "detail": "{\"total\": 205, \"matched\": 4, \"ambiguous\": 0, \"unmatched\": 201}"
+      "elapsed_ms": 318,
+      "detail": "{\"total\": 223, \"matched\": 4, \"ambiguous\": 0, \"unmatched\": 219}"
     },
     {
       "phase": "0 基础数据",
       "role": "管理员",
-      "action": "GET /insurance/catalog/resolve/250",
+      "action": "GET /insurance/catalog/resolve/272",
       "status": 200,
-      "elapsed_ms": 6,
-      "detail": "{\"drug_id\": 250, \"name\": \"全流程C药1111191709\", \"insurance_code\": \"FLOWC1111191709\", \"insurance_match_status\": \"matched\", \"category\": \"丙\", \"ratio\": 0.0, \"warning\": \"医保目录：丙类（自费）\"}"
+      "elapsed_ms": 4,
+      "detail": "{\"drug_id\": 272, \"name\": \"全流程C药1111215548\", \"insurance_code\": \"FLOWC1111215548\", \"insurance_match_status\": \"matched\", \"category\": \"丙\", \"ratio\": 0.0, \"warning\": \"医保目录：丙类（自费）\"}"
     },
     {
       "phase": "0 基础数据",
@@ -163,32 +163,32 @@
       "role": "库房",
       "action": "POST /inbound/orders",
       "status": 201,
-      "elapsed_ms": 89,
-      "detail": "{\"id\": 85, \"order_no\": \"IN202611110085\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"随货-A-1111191709\", \"invoice_no\": \"发票-A-1111191709\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-"
+      "elapsed_ms": 73,
+      "detail": "{\"id\": 91, \"order_no\": \"IN202611110091\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"随货-A-1111215548\", \"invoice_no\": \"发票-A-1111215548\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/85/check",
+      "action": "POST /inbound/orders/91/check",
       "status": 200,
-      "elapsed_ms": 76,
-      "detail": "{\"id\": 85, \"order_no\": \"IN202611110085\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"随货-A-1111191709\", \"invoice_no\": \"发票-A-1111191709\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\""
+      "elapsed_ms": 78,
+      "detail": "{\"id\": 91, \"order_no\": \"IN202611110091\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"随货-A-1111215548\", \"invoice_no\": \"发票-A-1111215548\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\""
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/85/stock",
+      "action": "POST /inbound/orders/91/stock",
       "status": 200,
-      "elapsed_ms": 82,
-      "detail": "{\"id\": 85, \"order_no\": \"IN202611110085\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"随货-A-1111191709\", \"invoice_no\": \"发票-A-1111191709\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\""
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 91, \"order_no\": \"IN202611110091\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"随货-A-1111215548\", \"invoice_no\": \"发票-A-1111215548\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\""
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=247",
+      "action": "GET /warehouse/stocks?drug_id=269",
       "status": 200,
-      "elapsed_ms": 5,
-      "detail": "[{\"id\": 98, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 28}]"
+      "elapsed_ms": 3,
+      "detail": "[{\"id\": 104, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 28}]"
     },
     {
       "phase": "1 库房入库",
@@ -202,87 +202,87 @@
       "role": "库房",
       "action": "POST /inbound/orders",
       "status": 201,
-      "elapsed_ms": 79,
-      "detail": "{\"id\": 86, \"order_no\": \"IN202611110086\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T19:17:11.267731\", \"check"
+      "elapsed_ms": 73,
+      "detail": "{\"id\": 92, \"order_no\": \"IN202611110092\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T21:55:49.641749\", \"check"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/86/check",
+      "action": "POST /inbound/orders/92/check",
       "status": 200,
-      "elapsed_ms": 79,
-      "detail": "{\"id\": 86, \"order_no\": \"IN202611110086\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.267731\""
+      "elapsed_ms": 73,
+      "detail": "{\"id\": 92, \"order_no\": \"IN202611110092\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:49.641749\""
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/86/stock",
+      "action": "POST /inbound/orders/92/stock",
       "status": 200,
-      "elapsed_ms": 117,
-      "detail": "{\"id\": 86, \"order_no\": \"IN202611110086\", \"order_type\": \"drug\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.267731\""
+      "elapsed_ms": 73,
+      "detail": "{\"id\": 92, \"order_no\": \"IN202611110092\", \"order_type\": \"drug\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:49.641749\""
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "POST /inbound/orders",
       "status": 201,
-      "elapsed_ms": 90,
-      "detail": "{\"id\": 87, \"order_no\": \"IN202611110087\", \"order_type\": \"consumable\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T19:17:11.553503\", "
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 93, \"order_no\": \"IN202611110093\", \"order_type\": \"consumable\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T21:55:49.862775\", "
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/87/check",
+      "action": "POST /inbound/orders/93/check",
+      "status": 200,
+      "elapsed_ms": 103,
+      "detail": "{\"id\": 93, \"order_no\": \"IN202611110093\", \"order_type\": \"consumable\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:49.8"
+    },
+    {
+      "phase": "1 库房入库",
+      "role": "库房",
+      "action": "POST /inbound/orders/93/stock",
       "status": 200,
       "elapsed_ms": 86,
-      "detail": "{\"id\": 87, \"order_no\": \"IN202611110087\", \"order_type\": \"consumable\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.5"
+      "detail": "{\"id\": 93, \"order_no\": \"IN202611110093\", \"order_type\": \"consumable\", \"supplier_id\": 71, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:49.8"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/87/stock",
-      "status": 200,
-      "elapsed_ms": 90,
-      "detail": "{\"id\": 87, \"order_no\": \"IN202611110087\", \"order_type\": \"consumable\", \"supplier_id\": 67, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.5"
-    },
-    {
-      "phase": "1 库房入库",
-      "role": "库房",
-      "action": "GET /materials/stocks?item_id=47",
+      "action": "GET /materials/stocks?item_id=50",
       "status": 200,
       "elapsed_ms": 5,
-      "detail": "[{\"id\": 65, \"item_id\": 47, \"item_name\": \"一次性敷料1111191709\", \"warehouse\": \"总库\", \"quantity\": 50}]"
+      "detail": "[{\"id\": 70, \"item_id\": 50, \"item_name\": \"一次性敷料1111215548\", \"warehouse\": \"总库\", \"quantity\": 50}]"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "POST /inbound/orders",
       "status": 201,
-      "elapsed_ms": 85,
-      "detail": "{\"id\": 88, \"order_no\": \"IN202611110088\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T19:17:11.824404\", \"che"
+      "elapsed_ms": 77,
+      "detail": "{\"id\": 94, \"order_no\": \"IN202611110094\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"received\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"\", \"received_at\": \"2026-11-11T21:55:50.139000\", \"che"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/88/check",
+      "action": "POST /inbound/orders/94/check",
       "status": 200,
-      "elapsed_ms": 85,
-      "detail": "{\"id\": 88, \"order_no\": \"IN202611110088\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.82440"
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 94, \"order_no\": \"IN202611110094\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"checked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:50.13900"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /inbound/orders/88/stock",
+      "action": "POST /inbound/orders/94/stock",
       "status": 200,
-      "elapsed_ms": 85,
-      "detail": "{\"id\": 88, \"order_no\": \"IN202611110088\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T19:17:11.82440"
+      "elapsed_ms": 78,
+      "detail": "{\"id\": 94, \"order_no\": \"IN202611110094\", \"order_type\": \"drug\", \"supplier_id\": null, \"source\": \"purchase\", \"status\": \"stocked\", \"delivery_no\": \"\", \"invoice_no\": \"\", \"received_by\": \"warehouse\", \"checked_by\": \"warehouse\", \"received_at\": \"2026-11-11T21:55:50.13900"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "GET /warehouse/expiry-alerts?days=90",
       "status": 200,
-      "elapsed_ms": 79,
+      "elapsed_ms": 73,
       "detail": "{\"days\": 90, \"expired\": [{\"warehouse\": \"总库\", \"drug_id\": 13, \"name\": \"效期验证药46516\", \"spec\": \"\", \"unit\": \"\", \"batch_no\": \"OLD-46516\", \"expiry\": \"2026-11-03\", \"quantity\": 2, \"days_left\": -8, \"status\": \"expired\"}], \"near_expiry\": [{\"warehouse\": \"总库\", \"drug_id\": 30,"
     },
     {
@@ -290,62 +290,62 @@
       "role": "库房",
       "action": "近效期预警",
       "status": "OK",
-      "detail": "近效期批次 17 个，含 D 药"
+      "detail": "近效期批次 18 个，含 D 药"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
-      "elapsed_ms": 82,
-      "detail": "{\"id\": 92, \"outbound_no\": \"OUT202611110092\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:12.157909\", \"appro"
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 100, \"outbound_no\": \"OUT202611110100\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:50.446105\", \"appr"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/92/approve",
+      "action": "POST /warehouse/outbound-orders/100/approve",
       "status": 200,
-      "elapsed_ms": 81,
-      "detail": "{\"id\": 92, \"outbound_no\": \"OUT202611110092\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:12.157909\""
+      "elapsed_ms": 78,
+      "detail": "{\"id\": 100, \"outbound_no\": \"OUT202611110100\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:50.446105"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/92/issue",
+      "action": "POST /warehouse/outbound-orders/100/issue",
       "status": 200,
-      "elapsed_ms": 84,
-      "detail": "{\"id\": 92, \"outbound_no\": \"OUT202611110092\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:12."
+      "elapsed_ms": 78,
+      "detail": "{\"id\": 100, \"outbound_no\": \"OUT202611110100\", \"outbound_type\": \"scrap\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"warehouse\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:50"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "POST /warehouse/check",
       "status": 200,
-      "elapsed_ms": 99,
-      "detail": "{\"id\": 11, \"drug_id\": 249, \"batch_no\": \"FLOW-D-1111191709\", \"expected_quantity\": 4, \"actual_quantity\": 3, \"diff\": -1, \"checked_at\": \"2026-11-11T19:17:12.416978\", \"checked_by\": \"warehouse\"}"
+      "elapsed_ms": 81,
+      "detail": "{\"id\": 12, \"drug_id\": 271, \"batch_no\": \"FLOW-D-1111215548\", \"expected_quantity\": 4, \"actual_quantity\": 3, \"diff\": -1, \"checked_at\": \"2026-11-11T21:55:50.680704\", \"checked_by\": \"warehouse\"}"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "GET /warehouse/adjustments",
       "status": 200,
-      "elapsed_ms": 79,
-      "detail": "[{\"id\": 10, \"adjust_no\": \"AJ202611110011\", \"kind\": \"drug\", \"drug_id\": 249, \"material_id\": null, \"name\": \"近效期药1111191709\", \"batch_no\": \"FLOW-D-1111191709\", \"expected_quantity\": 4, \"actual_quantity\": 3, \"diff\": -1, \"direction\": \"out\", \"quantity\": 1, \"operator\": "
+      "elapsed_ms": 67,
+      "detail": "[{\"id\": 11, \"adjust_no\": \"AJ202611110012\", \"kind\": \"drug\", \"drug_id\": 271, \"material_id\": null, \"name\": \"近效期药1111215548\", \"batch_no\": \"FLOW-D-1111215548\", \"expected_quantity\": 4, \"actual_quantity\": 3, \"diff\": -1, \"direction\": \"out\", \"quantity\": 1, \"operator\": "
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "报损 1 + 盘点差异调整",
       "status": "OK",
-      "detail": "D 药 5→4→实盘3，调整单 AJ202611110011"
+      "detail": "D 药 5→4→实盘3，调整单 AJ202611110012"
     },
     {
       "phase": "1 库房入库",
       "role": "库房",
       "action": "POST /trace/scan/inbound",
       "status": 200,
-      "elapsed_ms": 89,
-      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"入库扫码成功，4 个码登记到总库\", \"codes\": [\"TRC-1111191709-1\", \"TRC-1111191709-2\", \"TRC-1111191709-3\", \"TRC-1111191709-4\"]}"
+      "elapsed_ms": 79,
+      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"入库扫码成功，4 个码登记到总库\", \"codes\": [\"TRC-1111215548-1\", \"TRC-1111215548-2\", \"TRC-1111215548-3\", \"TRC-1111215548-4\"]}"
     },
     {
       "phase": "1 库房入库",
@@ -359,153 +359,153 @@
       "role": "收费员",
       "action": "POST /patients/",
       "status": 201,
-      "elapsed_ms": 83,
-      "detail": "{\"id\": 288, \"patient_no\": \"P00000288\", \"name\": \"全流程患者1111191709\", \"id_type\": \"id_card\", \"id_number\": \"110101199211191709\", \"gender\": \"female\", \"birth_date\": \"1992-11-19\", \"age\": 33, \"phone\": \"13800000000\", \"address\": \"\", \"emergency_contact_name\": \"\", \"emergenc"
+      "elapsed_ms": 72,
+      "detail": "{\"id\": 313, \"patient_no\": \"P00000313\", \"name\": \"全流程患者1111215548\", \"id_type\": \"id_card\", \"id_number\": \"110101199211215548\", \"gender\": \"female\", \"birth_date\": \"1992-11-21\", \"age\": 33, \"phone\": \"13800000000\", \"address\": \"\", \"emergency_contact_name\": \"\", \"emergenc"
     },
     {
       "phase": "2 门诊",
       "role": "管理员",
       "action": "POST /schedules/",
       "status": 201,
-      "elapsed_ms": 82,
-      "detail": "{\"doctor_id\": 216, \"schedule_date\": \"2026-11-11\", \"period\": \"morning\", \"capacity\": 5, \"room_id\": null, \"id\": 20, \"booked\": 0}"
+      "elapsed_ms": 76,
+      "detail": "{\"doctor_id\": 232, \"schedule_date\": \"2026-11-11\", \"period\": \"morning\", \"capacity\": 5, \"room_id\": null, \"id\": 21, \"booked\": 0}"
     },
     {
       "phase": "2 门诊",
       "role": "收费员",
       "action": "POST /appointments/",
       "status": 201,
-      "elapsed_ms": 93,
-      "detail": "{\"id\": 11, \"patient_id\": 288, \"doctor_id\": 216, \"schedule_id\": 20, \"registration_id\": null, \"status\": \"booked\", \"created_by\": \"cashier\", \"created_at\": \"2026-11-11T19:17:12.844871\", \"checked_in_at\": null}"
+      "elapsed_ms": 87,
+      "detail": "{\"id\": 12, \"patient_id\": 313, \"doctor_id\": 232, \"schedule_id\": 21, \"registration_id\": null, \"status\": \"booked\", \"created_by\": \"cashier\", \"created_at\": \"2026-11-11T21:55:51.060164\", \"checked_in_at\": null}"
     },
     {
       "phase": "2 门诊",
       "role": "收费员",
-      "action": "POST /appointments/11/check-in",
+      "action": "POST /appointments/12/check-in",
       "status": 200,
-      "elapsed_ms": 82,
-      "detail": "{\"id\": 11, \"patient_id\": 288, \"doctor_id\": 216, \"schedule_id\": 20, \"registration_id\": 369, \"status\": \"checked_in\", \"created_by\": \"cashier\", \"created_at\": \"2026-11-11T19:17:12.844871\", \"checked_in_at\": \"2026-11-11T19:17:12.932682\"}"
+      "elapsed_ms": 75,
+      "detail": "{\"id\": 12, \"patient_id\": 313, \"doctor_id\": 232, \"schedule_id\": 21, \"registration_id\": 394, \"status\": \"checked_in\", \"created_by\": \"cashier\", \"created_at\": \"2026-11-11T21:55:51.060164\", \"checked_in_at\": \"2026-11-11T21:55:51.140336\"}"
     },
     {
       "phase": "2 门诊",
       "role": "收费员",
-      "action": "GET /registrations/369",
+      "action": "GET /registrations/394",
       "status": 200,
       "elapsed_ms": 3,
-      "detail": "{\"patient_id\": 288, \"doctor_id\": 216, \"schedule_id\": 20, \"id\": 369, \"status\": \"registered\"}"
+      "detail": "{\"patient_id\": 313, \"doctor_id\": 232, \"schedule_id\": 21, \"id\": 394, \"status\": \"registered\"}"
     },
     {
       "phase": "2 门诊",
       "role": "管理员/收费员",
       "action": "排班→预约→取号（生成挂号）",
       "status": "OK",
-      "detail": "排班 20，预约 11，挂号 369"
+      "detail": "排班 21，预约 12，挂号 394"
     },
     {
       "phase": "2 门诊",
       "role": "护士",
       "action": "POST /triage/tickets",
       "status": 201,
-      "elapsed_ms": 82,
-      "detail": "{\"registration_id\": 369, \"triage_level\": 4, \"chief_complaint\": \"\", \"temperature\": null, \"pulse\": null, \"respiration\": null, \"systolic\": null, \"diastolic\": null, \"spo2\": null, \"pain_score\": null, \"isolation\": false, \"id\": 44, \"status\": \"waiting\", \"assessed_by\":"
+      "elapsed_ms": 89,
+      "detail": "{\"registration_id\": 394, \"triage_level\": 4, \"chief_complaint\": \"\", \"temperature\": null, \"pulse\": null, \"respiration\": null, \"systolic\": null, \"diastolic\": null, \"spo2\": null, \"pain_score\": null, \"isolation\": false, \"id\": 46, \"status\": \"waiting\", \"assessed_by\":"
     },
     {
       "phase": "2 门诊",
       "role": "护士",
-      "action": "POST /triage/tickets/44/call",
+      "action": "POST /triage/tickets/46/call",
       "status": 200,
-      "elapsed_ms": 75,
-      "detail": "{\"registration_id\": 369, \"triage_level\": 4, \"chief_complaint\": \"\", \"temperature\": null, \"pulse\": null, \"respiration\": null, \"systolic\": null, \"diastolic\": null, \"spo2\": null, \"pain_score\": null, \"isolation\": false, \"id\": 44, \"status\": \"called\", \"assessed_by\": "
+      "elapsed_ms": 69,
+      "detail": "{\"registration_id\": 394, \"triage_level\": 4, \"chief_complaint\": \"\", \"temperature\": null, \"pulse\": null, \"respiration\": null, \"systolic\": null, \"diastolic\": null, \"spo2\": null, \"pain_score\": null, \"isolation\": false, \"id\": 46, \"status\": \"called\", \"assessed_by\": "
     },
     {
       "phase": "2 门诊",
       "role": "护士",
       "action": "分诊叫号",
       "status": "OK",
-      "detail": "叫号单 44"
+      "detail": "叫号单 46"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
       "action": "POST /encounters/",
       "status": 201,
-      "elapsed_ms": 105,
-      "detail": "{\"registration_id\": 369, \"diagnosis\": \"上呼吸道感染\", \"diagnosis_code\": \"\", \"id\": 298, \"status\": \"open\"}"
+      "elapsed_ms": 79,
+      "detail": "{\"registration_id\": 394, \"diagnosis\": \"上呼吸道感染\", \"diagnosis_code\": \"\", \"id\": 319, \"status\": \"open\"}"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/medical-record",
+      "action": "POST /encounters/319/medical-record",
       "status": 201,
-      "elapsed_ms": 79,
-      "detail": "{\"chief_complaint\": \"发热咳嗽 2 天\", \"present_illness\": \"2 天前受凉后发热，最高 38.5℃\", \"past_history\": \"无\", \"physical_exam\": \"咽充血，双肺呼吸音清\", \"treatment_advice\": \"抗感染、对症治疗\", \"id\": 115, \"encounter_id\": 298, \"written_by\": \"doctor\", \"created_at\": \"2026-11-11T19:17:13.284352\", \"up"
+      "elapsed_ms": 69,
+      "detail": "{\"chief_complaint\": \"发热咳嗽 2 天\", \"present_illness\": \"2 天前受凉后发热，最高 38.5℃\", \"past_history\": \"无\", \"personal_history\": \"\", \"marital_history\": \"\", \"family_history\": \"\", \"physical_exam\": \"咽充血，双肺呼吸音清\", \"auxiliary_exam\": \"\", \"treatment_advice\": \"抗感染、对症治疗\", \"id\": 123, \""
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/medical-record/sign",
+      "action": "POST /encounters/319/medical-record/sign",
       "status": 200,
-      "elapsed_ms": 79,
-      "detail": "{\"chief_complaint\": \"发热咳嗽 2 天\", \"present_illness\": \"2 天前受凉后发热，最高 38.5℃\", \"past_history\": \"无\", \"physical_exam\": \"咽充血，双肺呼吸音清\", \"treatment_advice\": \"抗感染、对症治疗\", \"id\": 115, \"encounter_id\": 298, \"written_by\": \"doctor\", \"created_at\": \"2026-11-11T19:17:13.284352\", \"up"
+      "elapsed_ms": 70,
+      "detail": "{\"chief_complaint\": \"发热咳嗽 2 天\", \"present_illness\": \"2 天前受凉后发热，最高 38.5℃\", \"past_history\": \"无\", \"personal_history\": \"\", \"marital_history\": \"\", \"family_history\": \"\", \"physical_exam\": \"咽充血，双肺呼吸音清\", \"auxiliary_exam\": \"\", \"treatment_advice\": \"抗感染、对症治疗\", \"id\": 123, \""
     },
     {
       "phase": "2 门诊",
       "role": "医生",
       "action": "接诊/病历/签名",
       "status": "OK",
-      "detail": "就诊 298"
+      "detail": "就诊 319"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/prescriptions",
+      "action": "POST /encounters/319/prescriptions",
       "status": 201,
-      "elapsed_ms": 153,
-      "detail": "{\"id\": 245, \"encounter_id\": 298, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"quantity\": 4, \"unit_price\": 12.5, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null"
+      "elapsed_ms": 143,
+      "detail": "{\"id\": 263, \"encounter_id\": 319, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"quantity\": 4, \"unit_price\": 12.5, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/prescriptions",
+      "action": "POST /encounters/319/prescriptions",
       "status": 201,
-      "elapsed_ms": 150,
-      "detail": "{\"id\": 246, \"encounter_id\": 298, \"drug_id\": 248, \"drug_name\": \"全流程B药1111191709\", \"quantity\": 3, \"unit_price\": 8.0, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null,"
+      "elapsed_ms": 138,
+      "detail": "{\"id\": 264, \"encounter_id\": 319, \"drug_id\": 270, \"drug_name\": \"全流程B药1111215548\", \"quantity\": 3, \"unit_price\": 8.0, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null,"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/prescriptions",
+      "action": "POST /encounters/319/prescriptions",
       "status": 201,
-      "elapsed_ms": 150,
-      "detail": "{\"id\": 247, \"encounter_id\": 298, \"drug_id\": 250, \"drug_name\": \"全流程C药1111191709\", \"quantity\": 2, \"unit_price\": 6.0, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：丙类（自费）\", \"insurance_category\": \"丙\", \"allergy_warning\": n"
+      "elapsed_ms": 138,
+      "detail": "{\"id\": 265, \"encounter_id\": 319, \"drug_id\": 272, \"drug_name\": \"全流程C药1111215548\", \"quantity\": 2, \"unit_price\": 6.0, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：丙类（自费）\", \"insurance_category\": \"丙\", \"allergy_warning\": n"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /lab/encounters/298/lab-requests",
+      "action": "POST /lab/encounters/319/lab-requests",
       "status": 201,
-      "elapsed_ms": 81,
-      "detail": "{\"id\": 111, \"encounter_id\": 298, \"item_id\": 78, \"item_name\": \"血常规1111191709\", \"status\": \"pending\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100111\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T19:17:13.896239\", \"collect"
+      "elapsed_ms": 72,
+      "detail": "{\"id\": 123, \"encounter_id\": 319, \"item_id\": 86, \"item_name\": \"血常规1111215548\", \"status\": \"pending\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100123\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T21:55:52.018415\", \"collect"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /treatments/encounters/298",
+      "action": "POST /treatments/encounters/319",
       "status": 201,
-      "elapsed_ms": 79,
-      "detail": "{\"id\": 112, \"encounter_id\": 298, \"charge_item_id\": 111, \"item_name\": \"雾化治疗1111191709\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"pending\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T19:17:13.978025\", \"executed_by\": null, \"executed_at\": null}"
+      "elapsed_ms": 71,
+      "detail": "{\"id\": 121, \"encounter_id\": 319, \"charge_item_id\": 121, \"item_name\": \"雾化治疗1111215548\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"pending\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T21:55:52.090030\", \"executed_by\": null, \"executed_at\": null}"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
       "action": "开方/检验/治疗",
       "status": "OK",
-      "detail": "处方3张，检验 111，治疗 112"
+      "detail": "处方3张，检验 123，治疗 121"
     },
     {
       "phase": "2 门诊",
       "role": "医生",
-      "action": "POST /encounters/298/prescriptions（预期失败）",
+      "action": "POST /encounters/319/prescriptions（预期失败）",
       "status": 400,
       "detail": "该药品已在处方中，请勿重复开立"
     },
@@ -518,51 +518,51 @@
     },
     {
       "phase": "3 并发收费",
-      "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=247",
+      "role": "护士",
+      "action": "GET /triage/queue",
       "status": 200,
-      "elapsed_ms": 15,
-      "detail": "[{\"id\": 98, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 28}]"
+      "elapsed_ms": 17,
+      "detail": "[{\"registration_id\": 212, \"triage_level\": 2, \"chief_complaint\": \"胸闷\", \"temperature\": 38.5, \"pulse\": 110, \"respiration\": 24, \"systolic\": 95, \"diastolic\": 60, \"spo2\": 93, \"pain_score\": 5, \"isolation\": true, \"id\": 32, \"status\": \"waiting\", \"assessed_by\": \"nurse\", "
     },
     {
       "phase": "3 并发收费",
       "role": "医生",
       "action": "GET /registrations/",
       "status": 200,
-      "elapsed_ms": 23,
-      "detail": "[{\"patient_id\": 288, \"doctor_id\": 216, \"schedule_id\": 20, \"id\": 369, \"status\": \"visited\"}, {\"patient_id\": 1, \"doctor_id\": 1, \"schedule_id\": null, \"id\": 368, \"status\": \"visited\"}, {\"patient_id\": 1, \"doctor_id\": 1, \"schedule_id\": null, \"id\": 367, \"status\": \"regi"
-    },
-    {
-      "phase": "3 并发收费",
-      "role": "检验",
-      "action": "GET /lab/encounters/298/lab-requests",
-      "status": 200,
-      "elapsed_ms": 72,
-      "detail": "[{\"id\": 111, \"encounter_id\": 298, \"item_id\": 78, \"item_name\": \"血常规1111191709\", \"status\": \"pending\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100111\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T19:17:13.896239\", \"collec"
+      "elapsed_ms": 21,
+      "detail": "[{\"patient_id\": 313, \"doctor_id\": 232, \"schedule_id\": 21, \"id\": 394, \"status\": \"visited\"}, {\"patient_id\": 312, \"doctor_id\": 231, \"schedule_id\": null, \"id\": 393, \"status\": \"visited\"}, {\"patient_id\": 311, \"doctor_id\": 230, \"schedule_id\": null, \"id\": 392, \"status"
     },
     {
       "phase": "3 并发收费",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
-      "elapsed_ms": 71,
+      "elapsed_ms": 73,
       "detail": "[]"
     },
     {
       "phase": "3 并发收费",
-      "role": "护士",
-      "action": "GET /triage/queue",
+      "role": "检验",
+      "action": "GET /lab/encounters/319/lab-requests",
       "status": 200,
-      "elapsed_ms": 72,
-      "detail": "[{\"registration_id\": 212, \"triage_level\": 2, \"chief_complaint\": \"胸闷\", \"temperature\": 38.5, \"pulse\": 110, \"respiration\": 24, \"systolic\": 95, \"diastolic\": 60, \"spo2\": 93, \"pain_score\": 5, \"isolation\": true, \"id\": 32, \"status\": \"waiting\", \"assessed_by\": \"nurse\", "
+      "elapsed_ms": 77,
+      "detail": "[{\"id\": 123, \"encounter_id\": 319, \"item_id\": 86, \"item_name\": \"血常规1111215548\", \"status\": \"pending\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100123\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T21:55:52.018415\", \"collec"
+    },
+    {
+      "phase": "3 并发收费",
+      "role": "库房",
+      "action": "GET /warehouse/stocks?drug_id=269",
+      "status": 200,
+      "elapsed_ms": 74,
+      "detail": "[{\"id\": 104, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 28}]"
     },
     {
       "phase": "3 并发收费",
       "role": "收费员",
       "action": "POST /payments/",
       "status": 201,
-      "elapsed_ms": 155,
-      "detail": "{\"encounter_id\": 298, \"id\": 182, \"amount\": 196.0, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 196.0, \"invoice_no\": \"NB443100000011\", \"invoice_batch_id\": 6, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"inv"
+      "elapsed_ms": 146,
+      "detail": "{\"encounter_id\": 319, \"id\": 192, \"amount\": 196.0, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 196.0, \"invoice_no\": \"CF445200000001\", \"invoice_batch_id\": 7, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"inv"
     },
     {
       "phase": "3 并发收费",
@@ -574,34 +574,34 @@
     {
       "phase": "4 检验/治疗",
       "role": "检验",
-      "action": "POST /lab/requests/111/report",
+      "action": "POST /lab/requests/123/report",
       "status": 200,
-      "elapsed_ms": 82,
-      "detail": "{\"id\": 111, \"encounter_id\": 298, \"item_id\": 78, \"item_name\": \"血常规1111191709\", \"status\": \"reported\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100111\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T19:17:13.896239\", \"collec"
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 123, \"encounter_id\": 319, \"item_id\": 86, \"item_name\": \"血常规1111215548\", \"status\": \"reported\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100123\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T21:55:52.018415\", \"collec"
     },
     {
       "phase": "4 检验/治疗",
       "role": "检验",
-      "action": "GET /lab/requests/111",
-      "status": 200,
-      "elapsed_ms": 4,
-      "detail": "{\"id\": 111, \"encounter_id\": 298, \"item_id\": 78, \"item_name\": \"血常规1111191709\", \"status\": \"reported\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100111\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T19:17:13.896239\", \"collec"
-    },
-    {
-      "phase": "4 检验/治疗",
-      "role": "护士",
-      "action": "POST /treatments/112/execute",
-      "status": 200,
-      "elapsed_ms": 77,
-      "detail": "{\"id\": 112, \"encounter_id\": 298, \"charge_item_id\": 111, \"item_name\": \"雾化治疗1111191709\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T19:17:13.978025\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T19:17"
-    },
-    {
-      "phase": "4 检验/治疗",
-      "role": "护士",
-      "action": "GET /treatments/112",
+      "action": "GET /lab/requests/123",
       "status": 200,
       "elapsed_ms": 5,
-      "detail": "{\"id\": 112, \"encounter_id\": 298, \"charge_item_id\": 111, \"item_name\": \"雾化治疗1111191709\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T19:17:13.978025\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T19:17"
+      "detail": "{\"id\": 123, \"encounter_id\": 319, \"item_id\": 86, \"item_name\": \"血常规1111215548\", \"status\": \"reported\", \"priority\": \"routine\", \"specimen_no\": \"LAB2026111100123\", \"specimen_type\": \"血液\", \"requested_by\": \"doctor\", \"requested_at\": \"2026-11-11T21:55:52.018415\", \"collec"
+    },
+    {
+      "phase": "4 检验/治疗",
+      "role": "护士",
+      "action": "POST /treatments/121/execute",
+      "status": 200,
+      "elapsed_ms": 70,
+      "detail": "{\"id\": 121, \"encounter_id\": 319, \"charge_item_id\": 121, \"item_name\": \"雾化治疗1111215548\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T21:55:52.090030\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T21:55"
+    },
+    {
+      "phase": "4 检验/治疗",
+      "role": "护士",
+      "action": "GET /treatments/121",
+      "status": 200,
+      "elapsed_ms": 4,
+      "detail": "{\"id\": 121, \"encounter_id\": 319, \"charge_item_id\": 121, \"item_name\": \"雾化治疗1111215548\", \"quantity\": 2, \"note\": \"每日一次\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T21:55:52.090030\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T21:55"
     },
     {
       "phase": "4 检验/治疗",
@@ -613,17 +613,17 @@
     {
       "phase": "4 检验/治疗",
       "role": "收费员",
-      "action": "GET /print/receipt/182",
+      "action": "GET /print/receipt/192",
       "status": 200,
-      "elapsed_ms": 7,
+      "elapsed_ms": 6,
       "detail": "<!doctype html>\n<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>收费收据</title>\n<style>\n    @page { size: 58mm auto; margin: 3mm; }\n    body { font-family: \"Microsoft YaHei\", monospace; font-size: "
     },
     {
       "phase": "4 检验/治疗",
       "role": "医生",
-      "action": "GET /print/prescription/298",
+      "action": "GET /print/prescription/319",
       "status": 200,
-      "elapsed_ms": 12,
+      "elapsed_ms": 11,
       "detail": "<!doctype html>\n<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><title>门诊病历 / 处方笺</title>\n<style>\n@page { size: A4; margin: 12mm; }\n* { box-sizing: border-box; }\nbody { font-family: \"Microsoft YaHei\", "
     },
     {
@@ -636,25 +636,25 @@
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
-      "status": 200,
-      "elapsed_ms": 4,
-      "detail": "[]"
-    },
-    {
-      "phase": "5 药房",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=248",
-      "status": 200,
-      "elapsed_ms": 4,
-      "detail": "[]"
-    },
-    {
-      "phase": "5 药房",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=250",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
       "elapsed_ms": 3,
+      "detail": "[]"
+    },
+    {
+      "phase": "5 药房",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=270",
+      "status": 200,
+      "elapsed_ms": 2,
+      "detail": "[]"
+    },
+    {
+      "phase": "5 药房",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=272",
+      "status": 200,
+      "elapsed_ms": 4,
       "detail": "[]"
     },
     {
@@ -669,7 +669,7 @@
       "role": "药师",
       "action": "POST /pharmacy/dispense（预期失败）",
       "status": 400,
-      "detail": "库存不足：全流程A药1111191709"
+      "detail": "库存不足：全流程A药1111215548"
     },
     {
       "phase": "5 药房",
@@ -683,62 +683,62 @@
       "role": "药师",
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
+      "elapsed_ms": 72,
+      "detail": "{\"id\": 101, \"outbound_no\": \"OUT202611110101\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:52.636131\""
+    },
+    {
+      "phase": "5 药房",
+      "role": "库房",
+      "action": "POST /warehouse/outbound-orders/101/approve",
+      "status": 200,
+      "elapsed_ms": 69,
+      "detail": "{\"id\": 101, \"outbound_no\": \"OUT202611110101\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:52"
+    },
+    {
+      "phase": "5 药房",
+      "role": "库房",
+      "action": "POST /warehouse/outbound-orders/101/issue",
+      "status": 200,
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 101, \"outbound_no\": \"OUT202611110101\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"partially_issued\", \"note\": \"\", \"created_at\": \"20"
+    },
+    {
+      "phase": "5 药房",
+      "role": "库房",
+      "action": "POST /warehouse/outbound-orders/101/issue",
+      "status": 200,
       "elapsed_ms": 79,
-      "detail": "{\"id\": 93, \"outbound_no\": \"OUT202611110093\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:14.575910\","
-    },
-    {
-      "phase": "5 药房",
-      "role": "库房",
-      "action": "POST /warehouse/outbound-orders/93/approve",
-      "status": 200,
-      "elapsed_ms": 77,
-      "detail": "{\"id\": 93, \"outbound_no\": \"OUT202611110093\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:14."
-    },
-    {
-      "phase": "5 药房",
-      "role": "库房",
-      "action": "POST /warehouse/outbound-orders/93/issue",
-      "status": 200,
-      "elapsed_ms": 86,
-      "detail": "{\"id\": 93, \"outbound_no\": \"OUT202611110093\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"partially_issued\", \"note\": \"\", \"created_at\": \"202"
-    },
-    {
-      "phase": "5 药房",
-      "role": "库房",
-      "action": "POST /warehouse/outbound-orders/93/issue",
-      "status": 200,
-      "elapsed_ms": 86,
-      "detail": "{\"id\": 93, \"outbound_no\": \"OUT202611110093\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T19"
+      "detail": "{\"id\": 101, \"outbound_no\": \"OUT202611110101\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T2"
     },
     {
       "phase": "5 药房",
       "role": "药师→库房",
       "action": "A/C 药领用出库（先部分 2，再出剩余）",
       "status": "OK",
-      "detail": "申请单 93 已全部出库"
+      "detail": "申请单 101 已全部出库"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
-      "elapsed_ms": 90,
-      "detail": "{\"id\": 94, \"outbound_no\": \"OUT202611110094\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:14.915151\","
+      "elapsed_ms": 75,
+      "detail": "{\"id\": 102, \"outbound_no\": \"OUT202611110102\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:52.937669\""
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/94/approve",
+      "action": "POST /warehouse/outbound-orders/102/approve",
       "status": 200,
-      "elapsed_ms": 78,
-      "detail": "{\"id\": 94, \"outbound_no\": \"OUT202611110094\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:14."
+      "elapsed_ms": 72,
+      "detail": "{\"id\": 102, \"outbound_no\": \"OUT202611110102\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:52"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/94/issue（预期失败）",
+      "action": "POST /warehouse/outbound-orders/102/issue（预期失败）",
       "status": 400,
-      "detail": "总库库存不足：全流程B药1111191709（批次 FLOW-B-1111191709）"
+      "detail": "总库库存不足：全流程B药1111215548（批次 FLOW-B-1111215548）"
     },
     {
       "phase": "5 药房",
@@ -752,23 +752,23 @@
       "role": "护士",
       "action": "GET /triage/queue",
       "status": 200,
-      "elapsed_ms": 13,
+      "elapsed_ms": 12,
       "detail": "[{\"registration_id\": 212, \"triage_level\": 2, \"chief_complaint\": \"胸闷\", \"temperature\": 38.5, \"pulse\": 110, \"respiration\": 24, \"systolic\": 95, \"diastolic\": 60, \"spo2\": 93, \"pain_score\": 5, \"isolation\": true, \"id\": 32, \"status\": \"waiting\", \"assessed_by\": \"nurse\", "
     },
     {
       "phase": "5 药房",
       "role": "医生",
-      "action": "GET /encounters/298/prescriptions",
+      "action": "GET /encounters/319/prescriptions",
       "status": 200,
-      "elapsed_ms": 20,
-      "detail": "[{\"id\": 245, \"encounter_id\": 298, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"quantity\": 4, \"unit_price\": 12.5, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": nul"
+      "elapsed_ms": 17,
+      "detail": "[{\"id\": 263, \"encounter_id\": 319, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"quantity\": 4, \"unit_price\": 12.5, \"dosage\": \"1片\", \"frequency\": \"tid\", \"route\": \"口服\", \"days\": 3, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": nul"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "GET /pharmacy/stocks",
       "status": 200,
-      "elapsed_ms": 28,
+      "elapsed_ms": 23,
       "detail": "[{\"id\": 1, \"drug_id\": 1, \"batch_no\": \"P20261101\", \"expiry\": \"2027-06-30\", \"location\": \"A-01\", \"quantity\": 4}, {\"id\": 5, \"drug_id\": 1, \"batch_no\": \"W-2026-11\", \"expiry\": \"2027-09-30\", \"location\": \"\", \"quantity\": 40}, {\"id\": 8, \"drug_id\": 1, \"batch_no\": \"SMOKE-9"
     },
     {
@@ -776,7 +776,7 @@
       "role": "库房",
       "action": "GET /warehouse/stocks",
       "status": 200,
-      "elapsed_ms": 51,
+      "elapsed_ms": 45,
       "detail": "[{\"id\": 1, \"drug_id\": 1, \"drug_name\": \"头孢克肟胶囊\", \"batch_no\": \"W-2026-11\", \"expiry\": \"2027-09-30\", \"quantity\": 107}, {\"id\": 2, \"drug_id\": 1, \"drug_name\": \"头孢克肟胶囊\", \"batch_no\": \"SUP-B001\", \"expiry\": \"2028-03-31\", \"quantity\": 80}, {\"id\": 3, \"drug_id\": 12, \"drug_na"
     },
     {
@@ -784,8 +784,8 @@
       "role": "管理员",
       "action": "POST /warehouse/purchase",
       "status": 201,
-      "elapsed_ms": 99,
-      "detail": "{\"id\": 101, \"drug_id\": 248, \"drug_name\": \"全流程B药1111191709\", \"batch_no\": \"FLOW-B-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 20}"
+      "elapsed_ms": 88,
+      "detail": "{\"id\": 107, \"drug_id\": 270, \"drug_name\": \"全流程B药1111215548\", \"batch_no\": \"FLOW-B-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 20}"
     },
     {
       "phase": "5 药房",
@@ -797,10 +797,10 @@
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/94/issue",
+      "action": "POST /warehouse/outbound-orders/102/issue",
       "status": 200,
-      "elapsed_ms": 110,
-      "detail": "{\"id\": 94, \"outbound_no\": \"OUT202611110094\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T19"
+      "elapsed_ms": 79,
+      "detail": "{\"id\": 102, \"outbound_no\": \"OUT202611110102\", \"outbound_type\": \"requisition\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T2"
     },
     {
       "phase": "5 药房",
@@ -814,24 +814,24 @@
       "role": "药师",
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
-      "elapsed_ms": 94,
-      "detail": "{\"id\": 95, \"outbound_no\": \"OUT202611110095\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:15.37557"
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 103, \"outbound_no\": \"OUT202611110103\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:53.3200"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/95/approve",
+      "action": "POST /warehouse/outbound-orders/103/approve",
       "status": 200,
-      "elapsed_ms": 86,
-      "detail": "{\"id\": 95, \"outbound_no\": \"OUT202611110095\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:"
+      "elapsed_ms": 69,
+      "detail": "{\"id\": 103, \"outbound_no\": \"OUT202611110103\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/95/issue",
+      "action": "POST /warehouse/outbound-orders/103/issue",
       "status": 200,
-      "elapsed_ms": 93,
-      "detail": "{\"id\": 95, \"outbound_no\": \"OUT202611110095\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11"
+      "elapsed_ms": 77,
+      "detail": "{\"id\": 103, \"outbound_no\": \"OUT202611110103\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"护士站\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-1"
     },
     {
       "phase": "5 药房",
@@ -845,29 +845,29 @@
       "role": "药师",
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
-      "elapsed_ms": 85,
-      "detail": "{\"id\": 96, \"outbound_no\": \"OUT202611110096\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111191709\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19"
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 104, \"outbound_no\": \"OUT202611110104\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111215548\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T2"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/96/approve",
+      "action": "POST /warehouse/outbound-orders/104/approve",
       "status": 200,
-      "elapsed_ms": 84,
-      "detail": "{\"id\": 96, \"outbound_no\": \"OUT202611110096\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111191709\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-"
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 104, \"outbound_no\": \"OUT202611110104\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111215548\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/96/issue",
+      "action": "POST /warehouse/outbound-orders/104/issue",
       "status": 200,
-      "elapsed_ms": 88,
-      "detail": "{\"id\": 96, \"outbound_no\": \"OUT202611110096\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111191709\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\":"
+      "elapsed_ms": 81,
+      "detail": "{\"id\": 104, \"outbound_no\": \"OUT202611110104\", \"outbound_type\": \"requisition\", \"target_type\": \"department\", \"target_name\": \"全流程内科1111215548\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\""
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "物资出库→全流程内科1111191709",
+      "action": "物资出库→全流程内科1111215548",
       "status": "OK",
       "detail": "5 片"
     },
@@ -876,70 +876,70 @@
       "role": "护士",
       "action": "POST /materials/usages",
       "status": 201,
-      "elapsed_ms": 87,
-      "detail": "{\"id\": 12, \"item_id\": 47, \"item_name\": \"一次性敷料1111191709\", \"serial_no\": \"SN-1111191709\", \"encounter_id\": 298, \"warehouse\": \"护士站\", \"used_at\": \"2026-11-11T19:17:15.900075\", \"used_by\": \"nurse\"}"
+      "elapsed_ms": 83,
+      "detail": "{\"id\": 13, \"item_id\": 50, \"item_name\": \"一次性敷料1111215548\", \"serial_no\": \"SN-1111215548\", \"encounter_id\": 319, \"warehouse\": \"护士站\", \"used_at\": \"2026-11-11T21:55:53.778795\", \"used_by\": \"nurse\"}"
     },
     {
       "phase": "5 药房",
       "role": "护士",
       "action": "高值耗材使用追溯",
       "status": "OK",
-      "detail": "序列号 SN-1111191709"
+      "detail": "序列号 SN-1111215548"
     },
     {
       "phase": "5 药房",
       "role": "库房",
       "action": "POST /trace/scan/outbound",
       "status": 200,
-      "elapsed_ms": 83,
-      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"出库扫码成功，4 个码移至药房\", \"codes\": [\"TRC-1111191709-1\", \"TRC-1111191709-2\", \"TRC-1111191709-3\", \"TRC-1111191709-4\"]}"
+      "elapsed_ms": 73,
+      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"出库扫码成功，4 个码移至药房\", \"codes\": [\"TRC-1111215548-1\", \"TRC-1111215548-2\", \"TRC-1111215548-3\", \"TRC-1111215548-4\"]}"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "POST /pharmacy/dispense",
       "status": 201,
-      "elapsed_ms": 91,
-      "detail": "{\"encounter_id\": 298, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 79, \"status\": \"dispensed\", \"returned_at\": null, \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T19:17:16.070078\", \"signature_path\": \"\", \"signed_a"
+      "elapsed_ms": 84,
+      "detail": "{\"encounter_id\": 319, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 83, \"status\": \"dispensed\", \"returned_at\": null, \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T21:55:53.930296\", \"signature_path\": \"\", \"signed_a"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "发药（A/B/C）",
       "status": "OK",
-      "detail": "发药单 79"
+      "detail": "发药单 83"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "POST /trace/scan/dispense",
       "status": 200,
-      "elapsed_ms": 78,
-      "detail": "{\"accepted\": 4, \"status\": \"used\", \"message\": \"发药扫码成功，4 个码已核销\", \"codes\": [\"TRC-1111191709-1\", \"TRC-1111191709-2\", \"TRC-1111191709-3\", \"TRC-1111191709-4\"]}"
+      "elapsed_ms": 80,
+      "detail": "{\"accepted\": 4, \"status\": \"used\", \"message\": \"发药扫码成功，4 个码已核销\", \"codes\": [\"TRC-1111215548-1\", \"TRC-1111215548-2\", \"TRC-1111215548-3\", \"TRC-1111215548-4\"]}"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
-      "status": 200,
-      "elapsed_ms": 5,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
-    },
-    {
-      "phase": "5 药房",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=248",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
       "elapsed_ms": 4,
-      "detail": "[{\"id\": 103, \"drug_id\": 248, \"batch_no\": \"FLOW-B-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=250",
+      "action": "GET /pharmacy/stocks?drug_id=270",
+      "status": 200,
+      "elapsed_ms": 2,
+      "detail": "[{\"id\": 110, \"drug_id\": 270, \"batch_no\": \"FLOW-B-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
+    },
+    {
+      "phase": "5 药房",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=272",
       "status": 200,
       "elapsed_ms": 3,
-      "detail": "[{\"id\": 102, \"drug_id\": 250, \"batch_no\": \"FLOW-C-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
+      "detail": "[{\"id\": 109, \"drug_id\": 272, \"batch_no\": \"FLOW-C-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 0}]"
     },
     {
       "phase": "5 药房",
@@ -951,10 +951,10 @@
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "POST /pharmacy/dispense/79/return",
+      "action": "POST /pharmacy/dispense/83/return",
       "status": 200,
-      "elapsed_ms": 84,
-      "detail": "{\"encounter_id\": 298, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 79, \"status\": \"returned\", \"returned_at\": \"2026-11-11T19:17:16.248576\", \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T19:17:16.070078\", \"signatu"
+      "elapsed_ms": 82,
+      "detail": "{\"encounter_id\": 319, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 83, \"status\": \"returned\", \"returned_at\": \"2026-11-11T21:55:54.107429\", \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T21:55:53.930296\", \"signatu"
     },
     {
       "phase": "5 药房",
@@ -962,31 +962,31 @@
       "action": "POST /trace/scan/return",
       "status": 200,
       "elapsed_ms": 78,
-      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"退药扫码成功，4 个码回到药房\", \"codes\": [\"TRC-1111191709-1\", \"TRC-1111191709-2\", \"TRC-1111191709-3\", \"TRC-1111191709-4\"]}"
+      "detail": "{\"accepted\": 4, \"status\": \"in_stock\", \"message\": \"退药扫码成功，4 个码回到药房\", \"codes\": [\"TRC-1111215548-1\", \"TRC-1111215548-2\", \"TRC-1111215548-3\", \"TRC-1111215548-4\"]}"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
+      "action": "GET /pharmacy/stocks?drug_id=269",
+      "status": 200,
+      "elapsed_ms": 2,
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 4}]"
+    },
+    {
+      "phase": "5 药房",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=270",
       "status": 200,
       "elapsed_ms": 4,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 4}]"
+      "detail": "[{\"id\": 110, \"drug_id\": 270, \"batch_no\": \"FLOW-B-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=248",
+      "action": "GET /pharmacy/stocks?drug_id=272",
       "status": 200,
-      "elapsed_ms": 4,
-      "detail": "[{\"id\": 103, \"drug_id\": 248, \"batch_no\": \"FLOW-B-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
-    },
-    {
-      "phase": "5 药房",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=250",
-      "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 102, \"drug_id\": 250, \"batch_no\": \"FLOW-C-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
+      "elapsed_ms": 2,
+      "detail": "[{\"id\": 109, \"drug_id\": 272, \"batch_no\": \"FLOW-C-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
     },
     {
       "phase": "5 药房",
@@ -1001,149 +1001,149 @@
       "action": "POST /warehouse/outbound-orders",
       "status": 201,
       "elapsed_ms": 80,
-      "detail": "{\"id\": 97, \"outbound_no\": \"OUT202611110097\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:16.427583\", \"app"
+      "detail": "{\"id\": 105, \"outbound_no\": \"OUT202611110105\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"\", \"issuer\": \"\", \"status\": \"submitted\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:54.281169\", \"ap"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/97/approve",
+      "action": "POST /warehouse/outbound-orders/105/approve",
       "status": 200,
-      "elapsed_ms": 77,
-      "detail": "{\"id\": 97, \"outbound_no\": \"OUT202611110097\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:16.42758"
+      "elapsed_ms": 76,
+      "detail": "{\"id\": 105, \"outbound_no\": \"OUT202611110105\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"\", \"status\": \"approved\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:54.2811"
     },
     {
       "phase": "5 药房",
       "role": "库房",
-      "action": "POST /warehouse/outbound-orders/97/issue",
+      "action": "POST /warehouse/outbound-orders/105/issue",
       "status": 200,
-      "elapsed_ms": 82,
-      "detail": "{\"id\": 97, \"outbound_no\": \"OUT202611110097\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T19:17:1"
+      "elapsed_ms": 81,
+      "detail": "{\"id\": 105, \"outbound_no\": \"OUT202611110105\", \"outbound_type\": \"return\", \"target_type\": \"pharmacy\", \"target_name\": \"药房\", \"applicant\": \"pharmacist\", \"approver\": \"warehouse\", \"issuer\": \"warehouse\", \"status\": \"issued\", \"note\": \"\", \"created_at\": \"2026-11-11T21:55:"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
       "elapsed_ms": 4,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
     },
     {
       "phase": "5 药房",
       "role": "药师→库房",
       "action": "药房退库 A 药 1 盒",
       "status": "OK",
-      "detail": "退库单 97，药房 A 药 4→3"
+      "detail": "退库单 105，药房 A 药 4→3"
     },
     {
       "phase": "5 药房",
       "role": "收费员",
       "action": "POST /patients/",
       "status": 201,
-      "elapsed_ms": 76,
-      "detail": "{\"id\": 289, \"patient_no\": \"P00000289\", \"name\": \"直接发药患者1111191709\", \"id_type\": \"id_card\", \"id_number\": \"110101199411191709\", \"gender\": \"female\", \"birth_date\": \"1994-11-19\", \"age\": 31, \"phone\": null, \"address\": \"\", \"emergency_contact_name\": \"\", \"emergency_contac"
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 314, \"patient_no\": \"P00000314\", \"name\": \"直接发药患者1111215548\", \"id_type\": \"id_card\", \"id_number\": \"110101199411215548\", \"gender\": \"female\", \"birth_date\": \"1994-11-21\", \"age\": 31, \"phone\": null, \"address\": \"\", \"emergency_contact_name\": \"\", \"emergency_contac"
     },
     {
       "phase": "5 药房",
       "role": "收费员",
       "action": "POST /registrations/",
       "status": 201,
-      "elapsed_ms": 76,
-      "detail": "{\"patient_id\": 289, \"doctor_id\": 216, \"schedule_id\": null, \"id\": 370, \"status\": \"registered\"}"
+      "elapsed_ms": 74,
+      "detail": "{\"patient_id\": 314, \"doctor_id\": 232, \"schedule_id\": null, \"id\": 395, \"status\": \"registered\"}"
     },
     {
       "phase": "5 药房",
       "role": "医生",
       "action": "POST /encounters/",
       "status": 201,
-      "elapsed_ms": 82,
-      "detail": "{\"registration_id\": 370, \"diagnosis\": \"复诊\", \"diagnosis_code\": \"\", \"id\": 299, \"status\": \"open\"}"
+      "elapsed_ms": 75,
+      "detail": "{\"registration_id\": 395, \"diagnosis\": \"复诊\", \"diagnosis_code\": \"\", \"id\": 320, \"status\": \"open\"}"
     },
     {
       "phase": "5 药房",
       "role": "医生",
-      "action": "POST /encounters/299/prescriptions",
+      "action": "POST /encounters/320/prescriptions",
       "status": 201,
-      "elapsed_ms": 151,
-      "detail": "{\"id\": 248, \"encounter_id\": 299, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"quantity\": 1, \"unit_price\": 12.5, \"dosage\": \"\", \"frequency\": \"\", \"route\": \"\", \"days\": 1, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null, \"alle"
+      "elapsed_ms": 141,
+      "detail": "{\"id\": 266, \"encounter_id\": 320, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"quantity\": 1, \"unit_price\": 12.5, \"dosage\": \"\", \"frequency\": \"\", \"route\": \"\", \"days\": 1, \"insurance_warning\": \"医保目录：乙类\", \"insurance_category\": \"乙\", \"allergy_warning\": null, \"alle"
     },
     {
       "phase": "5 药房",
       "role": "收费员",
       "action": "POST /payments/",
       "status": 201,
-      "elapsed_ms": 80,
-      "detail": "{\"encounter_id\": 299, \"id\": 183, \"amount\": 42.5, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 42.5, \"invoice_no\": \"NB443100000012\", \"invoice_batch_id\": 6, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"invoi"
+      "elapsed_ms": 82,
+      "detail": "{\"encounter_id\": 320, \"id\": 193, \"amount\": 42.5, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 42.5, \"invoice_no\": \"CF445200000002\", \"invoice_batch_id\": 7, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"invoi"
     },
     {
       "phase": "5 药房",
       "role": "药师",
       "action": "POST /pharmacy/dispense",
       "status": 201,
-      "elapsed_ms": 78,
-      "detail": "{\"encounter_id\": 299, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 80, \"status\": \"dispensed\", \"returned_at\": null, \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T19:17:17.134086\", \"signature_path\": \"\", \"signed_a"
+      "elapsed_ms": 76,
+      "detail": "{\"encounter_id\": 320, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 84, \"status\": \"dispensed\", \"returned_at\": null, \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T21:55:54.973432\", \"signature_path\": \"\", \"signed_a"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "POST /pharmacy/dispense/80/return",
+      "action": "POST /pharmacy/dispense/84/return",
       "status": 200,
-      "elapsed_ms": 75,
-      "detail": "{\"encounter_id\": 299, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 80, \"status\": \"returned\", \"returned_at\": \"2026-11-11T19:17:17.213850\", \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T19:17:17.134086\", \"signatu"
+      "elapsed_ms": 76,
+      "detail": "{\"encounter_id\": 320, \"note\": \"\", \"pickup_code\": \"\", \"receiver_name\": \"\", \"receiver_relation\": \"本人\", \"id\": 84, \"status\": \"returned\", \"returned_at\": \"2026-11-11T21:55:55.056653\", \"verified_by\": \"pharmacist\", \"verified_at\": \"2026-11-11T21:55:54.973432\", \"signatu"
     },
     {
       "phase": "5 药房",
       "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
+      "action": "GET /pharmacy/stocks?drug_id=269",
       "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
     },
     {
       "phase": "5 药房",
       "role": "收费员/医生/药师",
       "action": "药房有药直接发药（POS）",
       "status": "OK",
-      "detail": "收费单 183，发药单 80，A药 3→2→退回 3"
+      "detail": "收费单 193，发药单 84，A药 3→2→退回 3"
     },
     {
       "phase": "6 退费",
       "role": "收费员",
       "action": "POST /patients/",
       "status": 201,
-      "elapsed_ms": 77,
-      "detail": "{\"id\": 290, \"patient_no\": \"P00000290\", \"name\": \"退费患者1111191709\", \"id_type\": \"id_card\", \"id_number\": \"110101199311191709\", \"gender\": \"female\", \"birth_date\": \"1993-11-19\", \"age\": 32, \"phone\": null, \"address\": \"\", \"emergency_contact_name\": \"\", \"emergency_contact_"
+      "elapsed_ms": 74,
+      "detail": "{\"id\": 315, \"patient_no\": \"P00000315\", \"name\": \"退费患者1111215548\", \"id_type\": \"id_card\", \"id_number\": \"110101199311215548\", \"gender\": \"female\", \"birth_date\": \"1993-11-21\", \"age\": 32, \"phone\": null, \"address\": \"\", \"emergency_contact_name\": \"\", \"emergency_contact_"
     },
     {
       "phase": "6 退费",
       "role": "收费员",
       "action": "POST /registrations/",
       "status": 201,
-      "elapsed_ms": 71,
-      "detail": "{\"patient_id\": 290, \"doctor_id\": 216, \"schedule_id\": null, \"id\": 371, \"status\": \"registered\"}"
+      "elapsed_ms": 72,
+      "detail": "{\"patient_id\": 315, \"doctor_id\": 232, \"schedule_id\": null, \"id\": 396, \"status\": \"registered\"}"
     },
     {
       "phase": "6 退费",
       "role": "医生",
       "action": "POST /encounters/",
       "status": 201,
-      "elapsed_ms": 80,
-      "detail": "{\"registration_id\": 371, \"diagnosis\": \"咽炎\", \"diagnosis_code\": \"\", \"id\": 300, \"status\": \"open\"}"
+      "elapsed_ms": 79,
+      "detail": "{\"registration_id\": 396, \"diagnosis\": \"咽炎\", \"diagnosis_code\": \"\", \"id\": 321, \"status\": \"open\"}"
     },
     {
       "phase": "6 退费",
       "role": "医生",
-      "action": "POST /treatments/encounters/300",
+      "action": "POST /treatments/encounters/321",
       "status": 201,
-      "elapsed_ms": 74,
-      "detail": "{\"id\": 113, \"encounter_id\": 300, \"charge_item_id\": 111, \"item_name\": \"雾化治疗1111191709\", \"quantity\": 2, \"note\": \"\", \"status\": \"pending\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T19:17:17.526695\", \"executed_by\": null, \"executed_at\": null}"
+      "elapsed_ms": 77,
+      "detail": "{\"id\": 122, \"encounter_id\": 321, \"charge_item_id\": 121, \"item_name\": \"雾化治疗1111215548\", \"quantity\": 2, \"note\": \"\", \"status\": \"pending\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T21:55:55.365265\", \"executed_by\": null, \"executed_at\": null}"
     },
     {
       "phase": "6 退费",
@@ -1151,23 +1151,23 @@
       "action": "POST /payments/",
       "status": 201,
       "elapsed_ms": 80,
-      "detail": "{\"encounter_id\": 300, \"id\": 184, \"amount\": 90.0, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 90.0, \"invoice_no\": \"NB443100000013\", \"invoice_batch_id\": 6, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"invoi"
+      "detail": "{\"encounter_id\": 321, \"id\": 194, \"amount\": 90.0, \"status\": \"paid\", \"insurance_amount\": 0.0, \"self_pay_amount\": 90.0, \"invoice_no\": \"CF445200000003\", \"invoice_batch_id\": 7, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"invoi"
     },
     {
       "phase": "6 退费",
       "role": "护士",
-      "action": "POST /treatments/113/execute",
+      "action": "POST /treatments/122/execute",
       "status": 200,
-      "elapsed_ms": 77,
-      "detail": "{\"id\": 113, \"encounter_id\": 300, \"charge_item_id\": 111, \"item_name\": \"雾化治疗1111191709\", \"quantity\": 2, \"note\": \"\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T19:17:17.526695\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T19:17:17."
+      "elapsed_ms": 73,
+      "detail": "{\"id\": 122, \"encounter_id\": 321, \"charge_item_id\": 121, \"item_name\": \"雾化治疗1111215548\", \"quantity\": 2, \"note\": \"\", \"status\": \"done\", \"ordered_by\": \"doctor\", \"ordered_at\": \"2026-11-11T21:55:55.365265\", \"executed_by\": \"nurse\", \"executed_at\": \"2026-11-11T21:55:55."
     },
     {
       "phase": "6 退费",
       "role": "收费员",
-      "action": "POST /payments/184/refund",
+      "action": "POST /payments/194/refund",
       "status": 200,
-      "elapsed_ms": 77,
-      "detail": "{\"encounter_id\": 300, \"id\": 184, \"amount\": 90.0, \"status\": \"refunded\", \"insurance_amount\": 0.0, \"self_pay_amount\": 90.0, \"invoice_no\": \"NB443100000013\", \"invoice_batch_id\": 6, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"i"
+      "elapsed_ms": 75,
+      "detail": "{\"encounter_id\": 321, \"id\": 194, \"amount\": 90.0, \"status\": \"refunded\", \"insurance_amount\": 0.0, \"self_pay_amount\": 90.0, \"invoice_no\": \"CF445200000003\", \"invoice_batch_id\": 7, \"invoice_status\": \"normal\", \"invoice_print_count\": 0, \"invoice_printed_at\": null, \"i"
     },
     {
       "phase": "6 退费",
@@ -1179,81 +1179,81 @@
     {
       "phase": "7 对账",
       "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=247",
-      "status": 200,
-      "elapsed_ms": 6,
-      "detail": "[{\"id\": 98, \"drug_id\": 247, \"drug_name\": \"全流程A药1111191709\", \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 25}]"
-    },
-    {
-      "phase": "7 对账",
-      "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=248",
+      "action": "GET /warehouse/stocks?drug_id=269",
       "status": 200,
       "elapsed_ms": 4,
-      "detail": "[{\"id\": 101, \"drug_id\": 248, \"drug_name\": \"全流程B药1111191709\", \"batch_no\": \"FLOW-B-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 17}]"
+      "detail": "[{\"id\": 104, \"drug_id\": 269, \"drug_name\": \"全流程A药1111215548\", \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 25}]"
     },
     {
       "phase": "7 对账",
       "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=250",
+      "action": "GET /warehouse/stocks?drug_id=270",
       "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 99, \"drug_id\": 250, \"drug_name\": \"全流程C药1111191709\", \"batch_no\": \"FLOW-C-1111191709\", \"expiry\": \"2029-04-29\", \"quantity\": 8}]"
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 107, \"drug_id\": 270, \"drug_name\": \"全流程B药1111215548\", \"batch_no\": \"FLOW-B-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 17}]"
     },
     {
       "phase": "7 对账",
       "role": "库房",
-      "action": "GET /warehouse/stocks?drug_id=249",
+      "action": "GET /warehouse/stocks?drug_id=272",
       "status": 200,
       "elapsed_ms": 5,
-      "detail": "[{\"id\": 100, \"drug_id\": 249, \"drug_name\": \"近效期药1111191709\", \"batch_no\": \"FLOW-D-1111191709\", \"expiry\": \"2026-12-11\", \"quantity\": 3}]"
-    },
-    {
-      "phase": "7 对账",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=247",
-      "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 101, \"drug_id\": 247, \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
-    },
-    {
-      "phase": "7 对账",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=248",
-      "status": 200,
-      "elapsed_ms": 3,
-      "detail": "[{\"id\": 103, \"drug_id\": 248, \"batch_no\": \"FLOW-B-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
-    },
-    {
-      "phase": "7 对账",
-      "role": "药师",
-      "action": "GET /pharmacy/stocks?drug_id=250",
-      "status": 200,
-      "elapsed_ms": 2,
-      "detail": "[{\"id\": 102, \"drug_id\": 250, \"batch_no\": \"FLOW-C-1111191709\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
+      "detail": "[{\"id\": 105, \"drug_id\": 272, \"drug_name\": \"全流程C药1111215548\", \"batch_no\": \"FLOW-C-1111215548\", \"expiry\": \"2029-04-29\", \"quantity\": 8}]"
     },
     {
       "phase": "7 对账",
       "role": "库房",
-      "action": "GET /materials/stocks?item_id=47",
+      "action": "GET /warehouse/stocks?drug_id=271",
+      "status": 200,
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 106, \"drug_id\": 271, \"drug_name\": \"近效期药1111215548\", \"batch_no\": \"FLOW-D-1111215548\", \"expiry\": \"2026-12-11\", \"quantity\": 3}]"
+    },
+    {
+      "phase": "7 对账",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=269",
+      "status": 200,
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 108, \"drug_id\": 269, \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
+    },
+    {
+      "phase": "7 对账",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=270",
+      "status": 200,
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 110, \"drug_id\": 270, \"batch_no\": \"FLOW-B-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 3}]"
+    },
+    {
+      "phase": "7 对账",
+      "role": "药师",
+      "action": "GET /pharmacy/stocks?drug_id=272",
       "status": 200,
       "elapsed_ms": 5,
-      "detail": "[{\"id\": 65, \"item_id\": 47, \"item_name\": \"一次性敷料1111191709\", \"warehouse\": \"总库\", \"quantity\": 35}, {\"id\": 66, \"item_id\": 47, \"item_name\": \"一次性敷料1111191709\", \"warehouse\": \"护士站\", \"quantity\": 9}, {\"id\": 67, \"item_id\": 47, \"item_name\": \"一次性敷料1111191709\", \"warehouse\": "
+      "detail": "[{\"id\": 109, \"drug_id\": 272, \"batch_no\": \"FLOW-C-1111215548\", \"expiry\": \"2029-04-29\", \"location\": \"\", \"quantity\": 2}]"
+    },
+    {
+      "phase": "7 对账",
+      "role": "库房",
+      "action": "GET /materials/stocks?item_id=50",
+      "status": 200,
+      "elapsed_ms": 4,
+      "detail": "[{\"id\": 70, \"item_id\": 50, \"item_name\": \"一次性敷料1111215548\", \"warehouse\": \"总库\", \"quantity\": 35}, {\"id\": 71, \"item_id\": 50, \"item_name\": \"一次性敷料1111215548\", \"warehouse\": \"护士站\", \"quantity\": 9}, {\"id\": 72, \"item_id\": 50, \"item_name\": \"一次性敷料1111215548\", \"warehouse\": "
     },
     {
       "phase": "7 对账",
       "role": "库房/药师",
       "action": "库存结存核对",
       "status": "OK",
-      "detail": "总库 {247: 25, 248: 17, 250: 8, 249: 3}；药房 {247: 3, 248: 3, 250: 2}；物资 {'总库': 35, '护士站': 9, '全流程内科1111191709': 5}"
+      "detail": "总库 {269: 25, 270: 17, 272: 8, 271: 3}；药房 {269: 3, 270: 3, 272: 2}；物资 {'总库': 35, '护士站': 9, '全流程内科1111215548': 5}"
     },
     {
       "phase": "7 对账",
       "role": "管理员",
       "action": "GET /stock/ledger?limit=500",
       "status": 200,
-      "elapsed_ms": 82,
-      "detail": "[{\"id\": 654, \"kind\": \"drug\", \"drug_id\": 247, \"material_id\": null, \"name\": \"全流程A药1111191709\", \"spec\": \"\", \"unit\": \"\", \"batch_no\": \"FLOW-A-1111191709\", \"expiry\": \"2029-04-29\", \"warehouse\": \"药房\", \"direction\": \"in\", \"quantity\": 1, \"unit_price\": 12.5, \"amount\": 12."
+      "elapsed_ms": 84,
+      "detail": "[{\"id\": 703, \"kind\": \"drug\", \"drug_id\": 269, \"material_id\": null, \"name\": \"全流程A药1111215548\", \"spec\": \"\", \"unit\": \"\", \"batch_no\": \"FLOW-A-1111215548\", \"expiry\": \"2029-04-29\", \"warehouse\": \"药房\", \"direction\": \"in\", \"quantity\": 1, \"unit_price\": 12.5, \"amount\": 12."
     },
     {
       "phase": "7 对账",
@@ -1267,38 +1267,38 @@
       "role": "管理员",
       "action": "POST /insurance/inventory/preview",
       "status": 200,
-      "elapsed_ms": 87,
-      "detail": "{\"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 159, \"total_amount\": 29696.0, \"unmatched_count\": 109, \"records\": [{\"insurance_code\": \"\", \"drug_name\": \"药房演示药100347\", \"spec\": \"\", \"dosage_form\": \"\", \"unit\": \"\", \"batch_no\": \"PH-100347\", \"exp"
+      "elapsed_ms": 79,
+      "detail": "{\"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 197, \"total_amount\": 31340.0, \"unmatched_count\": 123, \"records\": [{\"insurance_code\": \"\", \"drug_name\": \"药房演示药100347\", \"spec\": \"\", \"dosage_form\": \"\", \"unit\": \"\", \"batch_no\": \"PH-100347\", \"exp"
     },
     {
       "phase": "7 对账",
       "role": "管理员",
       "action": "POST /insurance/inventory/upload",
       "status": 200,
-      "elapsed_ms": 91,
-      "detail": "{\"id\": 19, \"upload_no\": \"INV202611110019\", \"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 50, \"skipped_count\": 109, \"total_amount\": 4214.0, \"status\": \"success\", \"channel\": \"mock\", \"created_by\": \"admin\", \"created_at\": \"2026-11-11T19:17:18"
+      "elapsed_ms": 93,
+      "detail": "{\"id\": 20, \"upload_no\": \"INV202611110020\", \"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 74, \"skipped_count\": 123, \"total_amount\": 5199.0, \"status\": \"success\", \"channel\": \"mock\", \"created_by\": \"admin\", \"created_at\": \"2026-11-11T21:55:55"
     },
     {
       "phase": "7 对账",
       "role": "管理员",
-      "action": "GET /insurance/inventory/uploads/19",
+      "action": "GET /insurance/inventory/uploads/20",
       "status": 200,
-      "elapsed_ms": 71,
-      "detail": "{\"id\": 19, \"upload_no\": \"INV202611110019\", \"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 50, \"skipped_count\": 109, \"total_amount\": 4214.0, \"status\": \"success\", \"channel\": \"mock\", \"created_by\": \"admin\", \"created_at\": \"2026-11-11T19:17:18"
+      "elapsed_ms": 68,
+      "detail": "{\"id\": 20, \"upload_no\": \"INV202611110020\", \"start_date\": \"2026-11-11\", \"end_date\": \"2026-11-11\", \"record_count\": 74, \"skipped_count\": 123, \"total_amount\": 5199.0, \"status\": \"success\", \"channel\": \"mock\", \"created_by\": \"admin\", \"created_at\": \"2026-11-11T21:55:55"
     },
     {
       "phase": "7 对账",
       "role": "管理员",
       "action": "医保进销存上传",
       "status": "OK",
-      "detail": "预览 159 条（未对码 109），上传 50 条，跳过 109 条，INV202611110019 成功"
+      "detail": "预览 197 条（未对码 123），上传 74 条，跳过 123 条，INV202611110020 成功"
     },
     {
       "phase": "7 对账",
       "role": "管理员",
       "action": "GET /reports/departments/revenue?start_date=2026-11-11&end_date=2026-11-11",
       "status": 200,
-      "elapsed_ms": 75,
+      "elapsed_ms": 74,
       "detail": "[{\"department_id\": 1, \"department_name\": \"内科\", \"encounter_count\": 6, \"paid_amount\": 1074.0, \"refunded_amount\": 0.0, \"registration_amount\": 60.0, \"consultation_amount\": 120.0, \"drug_amount\": 704.0, \"lab_amount\": 20.0, \"imaging_amount\": 80.0, \"treatment_amount\":"
     },
     {
@@ -1306,8 +1306,8 @@
       "role": "管理员",
       "action": "GET /bi/overview",
       "status": 200,
-      "elapsed_ms": 80,
-      "detail": "{\"patients_total\": 290, \"registrations_total\": 371, \"encounters_total\": 300, \"admissions_active\": 1, \"dispenses_total\": 80, \"today_paid_count\": 39, \"today_paid_amount\": 3643.0, \"today_refunded_count\": 16, \"today_refunded_amount\": 1342.0, \"today_insurance_amoun"
+      "elapsed_ms": 77,
+      "detail": "{\"patients_total\": 315, \"registrations_total\": 396, \"encounters_total\": 321, \"admissions_active\": 1, \"dispenses_total\": 84, \"today_paid_count\": 45, \"today_paid_amount\": 4166.5, \"today_refunded_count\": 20, \"today_refunded_amount\": 1749.0, \"today_insurance_amoun"
     },
     {
       "phase": "7 对账",

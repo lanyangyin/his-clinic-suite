@@ -203,6 +203,27 @@ class DoctorDemo(QMainWindow):
             self.encounter = encounters[0]
             assert self.encounter["id"]
 
+            self.scene("接诊时修改患者史，保存留痕", work)
+
+            def fill_clinical_dialog():
+                for widget in QApplication.topLevelWidgets():
+                    if widget.__class__.__name__ == "PatientClinicalDialog" and widget.isVisible():
+                        widget.allergy_status.setCurrentIndex(
+                            widget.allergy_status.findData("present")
+                        )
+                        widget.allergy_detail.setText("青霉素、头孢")
+                        widget.special_history.setPlainText(
+                            "2型糖尿病 8 年；高血压 5 年；冠心病 2 年"
+                        )
+                        widget.reason.setText("接诊核对患者史")
+                        widget.accept()
+                        return
+
+            QTimer.singleShot(700, fill_clinical_dialog)
+            self.click(self.widget.patient_info, "修改过敏史 / 现存疾病")
+            self.wait(1.2)
+            assert "患者史已更新" in self.widget.wb_summary.text(), self.widget.wb_summary.text()
+
             lab_request = self.doctor_api.call(
                 "POST", f"/lab/encounters/{self.encounter['id']}/lab-requests",
                 json={"item_id": self.lab["id"]},
