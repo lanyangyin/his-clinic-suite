@@ -91,6 +91,7 @@ def _collect(db: Session, encounter_id: int) -> dict:
             if patient
             else "不详"
         ),
+        "special_history": patient.special_history if patient else "",
         "department_name": (
             db.get(Department, doctor.department_id).name
             if doctor and db.get(Department, doctor.department_id)

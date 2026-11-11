@@ -67,7 +67,11 @@ class MedicalRecordCreate(BaseModel):
     chief_complaint: str = Field(min_length=1, max_length=200)
     present_illness: str = Field(default="", max_length=1000)
     past_history: str = Field(default="", max_length=1000)
+    personal_history: str = Field(default="", max_length=1000)
+    marital_history: str = Field(default="", max_length=1000)
+    family_history: str = Field(default="", max_length=1000)
     physical_exam: str = Field(default="", max_length=1000)
+    auxiliary_exam: str = Field(default="", max_length=1000)
     treatment_advice: str = Field(default="", max_length=500)
 
 
@@ -75,7 +79,11 @@ class MedicalRecordUpdate(BaseModel):
     chief_complaint: str | None = Field(default=None, min_length=1, max_length=200)
     present_illness: str | None = Field(default=None, max_length=1000)
     past_history: str | None = Field(default=None, max_length=1000)
+    personal_history: str | None = Field(default=None, max_length=1000)
+    marital_history: str | None = Field(default=None, max_length=1000)
+    family_history: str | None = Field(default=None, max_length=1000)
     physical_exam: str | None = Field(default=None, max_length=1000)
+    auxiliary_exam: str | None = Field(default=None, max_length=1000)
     treatment_advice: str | None = Field(default=None, max_length=500)
 
 

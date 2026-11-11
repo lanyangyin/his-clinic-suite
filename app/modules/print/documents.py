@@ -113,13 +113,18 @@ def _record_page(data: dict) -> str:
     <tr><td class="label">住址：</td><td colspan="3">{_value(data.get('patient_address'))}</td>
         <td class="label">电话：</td><td colspan="3">{_value(data.get('patient_phone'))}</td></tr>
     <tr><td class="label">过敏史：</td><td colspan="7">{_value(data.get('allergy'))}</td></tr>
+    <tr><td class="label">特殊既往史：</td><td colspan="7">{_value(data.get('special_history'))}</td></tr>
   </table>
   <div class="rule-thin"></div>
   <div class="section"><span class="section-title">主诉：</span>{_value(record.chief_complaint if record else '')}</div>
   <div class="section"><span class="section-title">现病史：</span>{_value(record.present_illness if record else '')}</div>
   <div class="section"><span class="section-title">既往史：</span>{_value(record.past_history if record else '')}</div>
+  <div class="section"><span class="section-title">个人史：</span>{_value(record.personal_history if record else '')}</div>
+  <div class="section"><span class="section-title">婚育史：</span>{_value(record.marital_history if record else '')}</div>
+  <div class="section"><span class="section-title">家族史：</span>{_value(record.family_history if record else '')}</div>
   <div class="section"><span class="section-title">体格检查：</span>{_value(record.physical_exam if record else '')}</div>
-  <div class="section"><span class="section-title">辅助检查：</span>{aux_html}</div>
+  <div class="section"><span class="section-title">辅助检查（病历记录）：</span>{_value(record.auxiliary_exam if record else '')}</div>
+  <div class="section"><span class="section-title">辅助检查（本次）：</span>{aux_html}</div>
   <div class="section"><span class="section-title">诊断：</span>{_value(diagnosis)}</div>
   <div class="section"><span class="section-title">西药处方：</span>{western}</div>
   <div class="section"><span class="section-title">中药处方：</span>{tcm_html}</div>

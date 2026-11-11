@@ -77,7 +77,11 @@ class MedicalRecord(Base):
     chief_complaint: Mapped[str] = mapped_column(String(200), nullable=False)
     present_illness: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
     past_history: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    personal_history: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    marital_history: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    family_history: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
     physical_exam: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    auxiliary_exam: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
     treatment_advice: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     written_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(

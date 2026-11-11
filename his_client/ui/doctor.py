@@ -42,7 +42,11 @@ _RECORD_FIELDS = [
     ("chief_complaint", "主诉", 200),
     ("present_illness", "现病史", 1000),
     ("past_history", "既往史", 1000),
+    ("personal_history", "个人史", 1000),
+    ("marital_history", "婚育史", 1000),
+    ("family_history", "家族史", 1000),
     ("physical_exam", "体格检查", 1000),
+    ("auxiliary_exam", "辅助检查", 1000),
     ("treatment_advice", "处理意见", 500),
 ]
 
@@ -995,7 +999,9 @@ class DoctorWidget(QWidget):
         top.addWidget(QLabel("就诊 ID"))
         top.addWidget(self.mr_encounter_id)
         top.addWidget(load)
-        top.addStretch(1)
+        self.record_diagnosis = QLabel("诊断：—")
+        self.record_diagnosis.setStyleSheet("font-weight:bold")
+        top.addWidget(self.record_diagnosis, 1)
         layout.addLayout(top)
 
         self.record_edits: dict[str, QTextEdit] = {}
@@ -1006,15 +1012,25 @@ class DoctorWidget(QWidget):
             "chief_complaint": (0, 0),
             "present_illness": (0, 1),
             "past_history": (1, 0),
-            "physical_exam": (1, 1),
-            "treatment_advice": (2, 0),
+            "personal_history": (1, 1),
+            "marital_history": (2, 0),
+            "family_history": (2, 1),
+            "physical_exam": (3, 0),
+            "auxiliary_exam": (3, 1),
+            "treatment_advice": (4, 0),
         }
         for key, label, _limit in _RECORD_FIELDS:
             box = QGroupBox(label)
             box_layout = QVBoxLayout(box)
             edit = QTextEdit()
-            edit.setPlaceholderText(f"填写{label}")
-            edit.setMinimumHeight(100 if key != "treatment_advice" else 90)
+            placeholders = {
+                "personal_history": "吸烟、饮酒、职业、居住环境等",
+                "marital_history": "婚姻、生育史",
+                "family_history": "家族中同类疾病/遗传病",
+                "auxiliary_exam": "外院检查、既往检查结果；本次检验检查自动列在打印页",
+            }
+            edit.setPlaceholderText(placeholders.get(key, f"填写{label}"))
+            edit.setMinimumHeight(72 if key != "treatment_advice" else 80)
             self.record_edits[key] = edit
             box_layout.addWidget(edit)
             row, col = positions[key]
@@ -1047,9 +1063,15 @@ class DoctorWidget(QWidget):
     def _load_record(self) -> None:
         try:
             record = self.api.get_medical_record(self.mr_encounter_id.value())
+            encounter = self.api.get_encounter(self.mr_encounter_id.value())
         except ApiError as e:
             self.record_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
+        if hasattr(self, "record_diagnosis"):
+            self.record_diagnosis.setText(
+                f"诊断：{encounter.get('diagnosis_code') or ''} "
+                f"{encounter.get('diagnosis') or '—'}".strip()
+            )
         for key, _label, _limit in _RECORD_FIELDS:
             self.record_edits[key].setPlainText(record.get(key) or "")
         self.record_msg.setText(
