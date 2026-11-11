@@ -87,3 +87,25 @@ class MedicalRecord(Base):
     # 电子签名：签名后病历锁定（不可再修改）
     signed_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
     signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+
+class AdverseReaction(Base):
+    """药物不良反应/换药记录。"""
+
+    __tablename__ = "adverse_reactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), nullable=False, index=True
+    )
+    drug_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    reaction: Mapped[str] = mapped_column(String(500), nullable=False)
+    severity: Mapped[str] = mapped_column(
+        String(20), default="moderate", nullable=False
+    )
+    action_taken: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    reported_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )

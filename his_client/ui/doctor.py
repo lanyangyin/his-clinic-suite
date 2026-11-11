@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QMessageBox,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -28,6 +29,7 @@ from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.payment import PaymentPanel
 
@@ -180,6 +182,7 @@ class DoctorWidget(QWidget):
         right_layout.addLayout(row)
 
         actions = QGridLayout()
+        self.wb_action_buttons = {}
         for index, (text, handler) in enumerate(
             [
                 ("写病历", self._wb_record),
@@ -187,10 +190,14 @@ class DoctorWidget(QWidget):
                 ("开检验", self._wb_exam),
                 ("开治疗", self._wb_treat),
                 ("历史诊疗", self._wb_history),
+                ("挂起当前", self._pause_workbench),
+                ("继续接诊", self._resume_workbench),
+                ("药物反应 / 换药", self._adverse_reaction),
             ]
         ):
             button = QPushButton(text)
             button.clicked.connect(handler)
+            self.wb_action_buttons[text] = button
             actions.addWidget(button, index // 3, index % 3)
         right_layout.addLayout(actions)
 
@@ -271,7 +278,11 @@ class DoctorWidget(QWidget):
                 f"{level_text}{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
-                str(item.get("encounter_id") or "—"),
+                (
+                    f"{item.get('encounter_id')} "
+                    f"{ {'open':'进行中','paused':'已挂起','closed':'已收费'}.get(item.get('encounter_status'), item.get('encounter_status') or '') }".strip()
+                    if item.get("encounter_id") else "—"
+                ),
                 (
                     f"{item.get('diagnosis_code')} {item.get('diagnosis')}".strip()
                     or "—"
@@ -400,7 +411,12 @@ class DoctorWidget(QWidget):
             self.wb_diagnosis_code.blockSignals(True)
             self.wb_diagnosis_code.setCurrentIndex(code_index)
             self.wb_diagnosis_code.blockSignals(False)
-        self.wb_start.setEnabled(not item.get("encounter_id"))
+        status = item.get("encounter_status") or ""
+        self.wb_start.setEnabled(not item.get("encounter_id") or status == "paused")
+        if hasattr(self, "wb_action_buttons"):
+            self.wb_action_buttons["挂起当前"].setEnabled(status == "open")
+            self.wb_action_buttons["继续接诊"].setEnabled(status == "paused")
+            self.wb_action_buttons["药物反应 / 换药"].setEnabled(bool(item.get("encounter_id")))
         if item.get("encounter_id"):
             self._set_encounter_everywhere(item["encounter_id"])
             self._load_workbench_summary(item["encounter_id"])
@@ -446,11 +462,14 @@ class DoctorWidget(QWidget):
             self.wb_summary.setText("请先选择患者")
             return
         try:
-            encounter = self.api.create_encounter(
-                item["registration_id"],
-                self.wb_diagnosis.text().strip(),
-                self.wb_diagnosis_code.currentData() or "",
-            )
+            if item.get("encounter_status") == "paused" and item.get("encounter_id"):
+                encounter = self.api.resume_encounter(item["encounter_id"])
+            else:
+                encounter = self.api.create_encounter(
+                    item["registration_id"],
+                    self.wb_diagnosis.text().strip(),
+                    self.wb_diagnosis_code.currentData() or "",
+                )
         except ApiError as e:
             self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
             return
@@ -475,6 +494,64 @@ class DoctorWidget(QWidget):
         self.patient_info.set_patient(
             patient, encounter["id"], "已接诊", f"诊断：{self.wb_diagnosis.text().strip() or '—'}"
         )
+
+    def _pause_workbench(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择一个已接诊患者")
+            return
+        try:
+            self.api.pause_encounter(item["encounter_id"])
+        except ApiError as e:
+            self.wb_summary.setText(f"挂起失败（{e.status_code}）：{e.detail}")
+            return
+        self.wb_summary.setText("已挂起当前患者；现在可以开始下一位，之后从队列继续接诊")
+        self._load_workbench()
+
+    def _resume_workbench(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择一个已挂起患者")
+            return
+        try:
+            self.api.resume_encounter(item["encounter_id"])
+        except ApiError as e:
+            self.wb_summary.setText(f"继续接诊失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_workbench()
+        for row, candidate in enumerate(self.workbench_rows):
+            if candidate["registration_id"] == item["registration_id"]:
+                self.wb_table.selectRow(row)
+                self._select_workbench(row, 0)
+                break
+
+    def _adverse_reaction(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择当前接诊患者")
+            return
+        dialog = AdverseReactionDialog(item.get("patient_name") or "", self)
+        if dialog.exec() != dialog.Accepted:
+            return
+        payload = dialog.payload()
+        if not payload["reaction"]:
+            self.wb_summary.setText("请填写药物反应表现")
+            return
+        try:
+            self.api.record_adverse_reaction(item["encounter_id"], payload)
+        except ApiError as e:
+            self.wb_summary.setText(f"记录失败（{e.status_code}）：{e.detail}")
+            return
+        QMessageBox.information(
+            self,
+            "药物反应已记录",
+            "就诊已挂起，未执行护理单已停止。\n\n下一步：\n"
+            "1. 护士核对并停止输液/治疗\n"
+            "2. 药房按退药流程回补未用药品\n"
+            "3. 收费按退费规则处理\n"
+            "4. 医生重新开方、收费后继续治疗",
+        )
+        self._load_workbench()
 
     def _switch_tab(self, text: str) -> None:
         for index in range(self.tabs.count()):

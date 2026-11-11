@@ -13,6 +13,8 @@ from app.modules.charges.models import EncounterCharge
 from sqlalchemy import func
 
 from .schemas import (
+    AdverseReactionCreate,
+    AdverseReactionResponse,
     BarcodeLookup,
     DiagnosisUpdate,
     EncounterCreate,
@@ -40,6 +42,10 @@ from .service import (
     update_medical_record,
     worklist,
     encounter_summary,
+    pause_encounter,
+    resume_encounter,
+    record_adverse_reaction,
+    list_adverse_reactions,
 )
 
 router = APIRouter(prefix="/encounters", tags=["encounters"])
@@ -54,7 +60,7 @@ def create(
     try:
         return create_encounter(db, data)
     except ValueError as e:
-        code = 400 if "诊断编码" in str(e) else 404
+        code = 400 if ("诊断编码" in str(e) or "尚未完成" in str(e)) else 404
         raise HTTPException(status_code=code, detail=str(e))
 
 
@@ -158,6 +164,67 @@ def set_diagnosis(
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/start", response_model=EncounterResponse, status_code=201)
+def start_consultation(
+    data: EncounterCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    try:
+        return create_encounter(db, data, enforce_lock=True)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/pause", response_model=EncounterResponse)
+def pause_visit(
+    encounter_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor", "admin")),
+):
+    try:
+        return pause_encounter(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/resume", response_model=EncounterResponse)
+def resume_visit(
+    encounter_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor", "admin")),
+):
+    try:
+        return resume_encounter(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/{encounter_id}/adverse-reactions",
+    response_model=AdverseReactionResponse,
+    status_code=201,
+)
+def create_adverse_reaction(
+    encounter_id: int,
+    data: AdverseReactionCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return record_adverse_reaction(db, encounter_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/{encounter_id}/adverse-reactions",
+    response_model=list[AdverseReactionResponse],
+)
+def adverse_reactions(encounter_id: int, db: Session = Depends(get_db)):
+    return list_adverse_reactions(db, encounter_id)
 
 
 @router.get("/{encounter_id}", response_model=EncounterResponse)

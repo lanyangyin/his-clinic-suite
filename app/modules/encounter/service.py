@@ -25,7 +25,7 @@ from app.modules.registration.service import (
 )
 from app.modules.triage.service import complete_ticket_for_registration
 
-from .models import Encounter, MedicalRecord, PrescriptionItem
+from .models import AdverseReaction, Encounter, MedicalRecord, PrescriptionItem
 from .schemas import (
     EncounterCreate,
     MedicalRecordCreate,
@@ -60,7 +60,9 @@ def _resolve_diagnosis(db: Session, code: str, name: str) -> tuple[str, str]:
     return "", name
 
 
-def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
+def create_encounter(
+    db: Session, data: EncounterCreate, enforce_lock: bool = False
+) -> Encounter:
     """接诊：挂号存在且未就诊时创建就诊记录，并把挂号置为 visited。
 
     同一挂号重复调用时返回已有的就诊记录（幂等）。
@@ -77,6 +79,16 @@ def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
     if existing:
         return existing
 
+    from app.modules.staff.models import Doctor
+
+    doctor = db.get(Doctor, registration.doctor_id)
+    if enforce_lock and doctor and doctor.current_encounter_id:
+        current = db.get(Encounter, doctor.current_encounter_id)
+        if current and current.status == "open":
+            raise ValueError(
+                "当前患者尚未完成诊治，请先完成或挂起当前患者，再开始下一位"
+            )
+
     encounter = Encounter(
         registration_id=data.registration_id,
         diagnosis=data.diagnosis,
@@ -89,6 +101,8 @@ def create_encounter(db: Session, data: EncounterCreate) -> Encounter:
     mark_registration_visited(db, registration)
     complete_ticket_for_registration(db, data.registration_id)
     db.flush()
+    if doctor:
+        doctor.current_encounter_id = encounter.id
 
     # 计费：挂号费 + 诊疗费（字典存在才计费，兼容存量数据）
     add_dict_fee(
@@ -296,6 +310,13 @@ def list_encounters(db: Session, patient_id: int | None = None) -> list[Encounte
 def close_encounter(db: Session, encounter: Encounter) -> None:
     """把就诊状态改为 closed（只改内存，由调用方统一 commit）。"""
     encounter.status = "closed"
+    from app.modules.registration.service import get_registration
+    from app.modules.staff.models import Doctor
+
+    registration = get_registration(db, encounter.registration_id)
+    doctor = db.get(Doctor, registration.doctor_id) if registration else None
+    if doctor and doctor.current_encounter_id == encounter.id:
+        doctor.current_encounter_id = None
 
 
 def list_prescription_items(
@@ -534,3 +555,86 @@ def encounter_summary(db: Session, encounter_id: int) -> dict | None:
         "lab_count": len(list_requests(db, encounter.id)),
         "treatment_count": len(list_treatments(db, encounter.id)),
     }
+
+
+
+def pause_encounter(db: Session, encounter_id: int) -> Encounter:
+    """显式挂起当前就诊，允许医生先处理其他患者。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise ValueError("就诊已收费关闭，不能挂起")
+    encounter.status = "paused"
+    db.commit()
+    db.refresh(encounter)
+    return encounter
+
+
+def resume_encounter(db: Session, encounter_id: int) -> Encounter:
+    """恢复挂起就诊；同一医生有未完成的其他就诊时禁止恢复。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise ValueError("就诊已收费关闭，不能恢复")
+    from app.modules.registration.service import get_registration
+    from app.modules.staff.models import Doctor
+
+    registration = get_registration(db, encounter.registration_id)
+    doctor = db.get(Doctor, registration.doctor_id) if registration else None
+    if doctor and doctor.current_encounter_id and doctor.current_encounter_id != encounter.id:
+        current = db.get(Encounter, doctor.current_encounter_id)
+        if current and current.status == "open":
+            raise ValueError("请先完成或挂起当前患者，再恢复该患者")
+    encounter.status = "open"
+    if doctor:
+        doctor.current_encounter_id = encounter.id
+    db.commit()
+    db.refresh(encounter)
+    return encounter
+
+
+def record_adverse_reaction(
+    db: Session, encounter_id: int, data, operator: str = ""
+) -> AdverseReaction:
+    """记录药物反应，默认挂起就诊并停止未完成的护理执行单。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    row = AdverseReaction(
+        encounter_id=encounter_id,
+        drug_name=data.drug_name.strip(),
+        reaction=data.reaction.strip(),
+        severity=data.severity,
+        action_taken=data.action_taken.strip(),
+        reported_by=operator,
+    )
+    db.add(row)
+    if data.pause_encounter:
+        encounter.status = "paused"
+        from app.modules.nursing.models import NursingOrder
+
+        orders = (
+            db.query(NursingOrder)
+            .filter(
+                NursingOrder.encounter_id == encounter_id,
+                NursingOrder.status.in_(["pending", "prepared", "executing"]),
+            )
+            .all()
+        )
+        for order in orders:
+            order.status = "stopped"
+            order.note = (order.note + "；药物反应停药").strip("；")
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_adverse_reactions(db: Session, encounter_id: int) -> list[AdverseReaction]:
+    return (
+        db.query(AdverseReaction)
+        .filter(AdverseReaction.encounter_id == encounter_id)
+        .order_by(AdverseReaction.id.desc())
+        .all()
+    )

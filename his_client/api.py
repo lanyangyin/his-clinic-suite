@@ -104,6 +104,22 @@ class ApiClient:
     def get_encounter(self, encounter_id: int) -> dict:
         return self._request("GET", f"/encounters/{encounter_id}")
 
+    def pause_encounter(self, encounter_id: int) -> dict:
+        return self._request("POST", f"/encounters/{encounter_id}/pause")
+
+    def resume_encounter(self, encounter_id: int) -> dict:
+        return self._request("POST", f"/encounters/{encounter_id}/resume")
+
+    def record_adverse_reaction(self, encounter_id: int, payload: dict) -> dict:
+        return self._request(
+            "POST", f"/encounters/{encounter_id}/adverse-reactions", json=payload
+        )
+
+    def list_adverse_reactions(self, encounter_id: int) -> list:
+        return self._request(
+            "GET", f"/encounters/{encounter_id}/adverse-reactions"
+        )
+
     def get_patient_by_card(self, card_uid: str) -> dict:
         return self._request("GET", f"/patients/by-card/{card_uid}")
 
@@ -189,7 +205,7 @@ class ApiClient:
     ) -> dict:
         return self._request(
             "POST",
-            "/encounters/",
+            "/encounters/start",
             json={
                 "registration_id": registration_id,
                 "diagnosis": diagnosis,

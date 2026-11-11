@@ -94,3 +94,19 @@ class QualityResponse(BaseModel):
     score: int
     passed: bool
     missing_fields: list[str]
+
+
+class AdverseReactionCreate(BaseModel):
+    drug_name: str = ""
+    reaction: str = Field(min_length=1, max_length=500)
+    severity: str = Field(default="moderate", pattern="^(mild|moderate|severe)$")
+    action_taken: str = ""
+    pause_encounter: bool = True
+
+
+class AdverseReactionResponse(AdverseReactionCreate):
+    id: int
+    encounter_id: int
+    reported_by: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
