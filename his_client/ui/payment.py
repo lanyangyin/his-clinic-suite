@@ -77,14 +77,23 @@ class PaymentPanel(QWidget):
         self.channel.currentIndexChanged.connect(self._update_payment_inputs)
         self._update_payment_inputs()
 
+        self.charge_empty = QLabel("暂无费用明细；开方/开单后这里显示")
+        self.charge_empty.setStyleSheet("color:#94a3b8;padding:6px")
+        box_layout.addWidget(self.charge_empty)
         self.charge_table = QTableWidget(0, 5)
         self.charge_table.setHorizontalHeaderLabels(["类型", "项目", "数量", "金额", "状态"])
-        box_layout.addWidget(self.charge_table)
+        box_layout.addWidget(self.charge_table, 1)
         self.message = QLabel("")
         self.message.setWordWrap(True)
         box_layout.addWidget(self.message)
-        layout.addWidget(box)
-        layout.addStretch(1)
+        layout.addWidget(box, 1)
+
+    def set_encounter(self, encounter_id: int | None) -> None:
+        """由门诊工作站带出就诊并刷新费用。"""
+        if not encounter_id:
+            return
+        self.encounter_id.setValue(int(encounter_id))
+        self._load_charges()
 
     def _update_payment_inputs(self) -> None:
         channel = self.channel.currentData() if hasattr(self, "channel") else "cash"
@@ -121,6 +130,7 @@ class PaymentPanel(QWidget):
             self.message.setText(f"查询失败（{e.status_code}）：{e.detail}")
             return
         self.charge_table.setRowCount(len(charges))
+        self.charge_empty.setVisible(not charges)
         for row, charge in enumerate(charges):
             values = [
                 zh("charge_type", charge["charge_type"]),

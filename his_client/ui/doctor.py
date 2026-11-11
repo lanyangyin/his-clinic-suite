@@ -61,7 +61,8 @@ class DoctorWidget(QWidget):
         self.tabs.addTab(self._build_record_tab(), "病历")
         self.tabs.addTab(self._build_history_tab(), "历史诊疗")
         self.tabs.addTab(self._build_prescription_tab(), "开方")
-        self.tabs.addTab(PaymentPanel(api), "收费")
+        self.payment_panel = PaymentPanel(api)
+        self.tabs.addTab(self.payment_panel, "收费")
         self.tabs.addTab(self._build_exam_tab(), "检验 / 检查")
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
@@ -725,6 +726,10 @@ class DoctorWidget(QWidget):
             spin = getattr(self, attr, None)
             if spin is not None:
                 spin.setValue(int(encounter_id or 0))
+        if hasattr(self, "exam_table"):
+            self._refresh_exam_requests()
+        if hasattr(self, "treat_table"):
+            self._refresh_treatments()
         if not hasattr(self, "side_info"):
             return
         if not encounter_id:
@@ -1865,8 +1870,83 @@ class DoctorWidget(QWidget):
         self.exam_msg = QLabel("")
         self.exam_msg.setWordWrap(True)
         layout.addWidget(self.exam_msg)
-        layout.addStretch(1)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(QLabel("本次已开检验 / 检查"))
+        refresh_requests = QPushButton("刷新已开单")
+        refresh_requests.clicked.connect(self._refresh_exam_requests)
+        list_row.addStretch(1)
+        list_row.addWidget(refresh_requests)
+        layout.addLayout(list_row)
+        self.exam_table = QTableWidget(0, 5)
+        self.exam_table.setHorizontalHeaderLabels(["类型", "项目", "状态", "结果", "时间"])
+        self.exam_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.exam_table, 1)
         return page
+
+    def _refresh_exam_requests(self) -> None:
+        if not hasattr(self, "exam_table"):
+            return
+        encounter_id = self.exam_encounter_id.value()
+        if not encounter_id:
+            self.exam_table.setRowCount(0)
+            return
+        rows = []
+        try:
+            for request in self.api.list_lab_requests(encounter_id):
+                rows.append(
+                    (
+                        "检验",
+                        request.get("item_name") or "",
+                        request.get("status") or "",
+                        request.get("result") or "",
+                        str(request.get("created_at") or "")[:16].replace("T", " "),
+                    )
+                )
+            for request in self.api.list_imaging_requests(encounter_id):
+                rows.append(
+                    (
+                        "检查",
+                        request.get("item_name") or "",
+                        request.get("status") or "",
+                        request.get("report") or request.get("result") or "",
+                        str(request.get("created_at") or "")[:16].replace("T", " "),
+                    )
+                )
+        except ApiError as e:
+            self.exam_msg.setText(f"已开单加载失败：{e.detail}")
+            return
+        self.exam_table.setRowCount(len(rows))
+        for index, values in enumerate(rows):
+            for col, value in enumerate(values):
+                self.exam_table.setItem(index, col, QTableWidgetItem(str(value)))
+        self.exam_msg.setText(f"本次已开 {len(rows)} 项检验/检查")
+
+    def _refresh_treatments(self) -> None:
+        if not hasattr(self, "treat_table"):
+            return
+        encounter_id = self.treat_encounter_id.value()
+        if not encounter_id:
+            self.treat_table.setRowCount(0)
+            return
+        try:
+            rows = self.api.list_treatments(encounter_id)
+        except ApiError as e:
+            self.treat_msg.setText(f"已开治疗加载失败：{e.detail}")
+            return
+        self.treat_table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            values = [
+                row.get("item_name") or "",
+                str(row.get("quantity") or ""),
+                {"pending": "待执行", "done": "已执行", "cancelled": "已取消"}.get(
+                    row.get("status") or "", row.get("status") or ""
+                ),
+                row.get("executed_by") or "—",
+            ]
+            for col, value in enumerate(values):
+                self.treat_table.setItem(index, col, QTableWidgetItem(str(value)))
+        self.treat_msg.setText(f"本次已开 {len(rows)} 条治疗")
 
     def _load_lab_items(self) -> None:
         try:
@@ -1899,6 +1979,7 @@ class DoctorWidget(QWidget):
             self.exam_msg.setText(f"开单失败（{e.status_code}）：{e.detail}")
             return
         self.exam_msg.setText(f"检验已开单：{request['item_name']}（{request['id']}）")
+        self._refresh_exam_requests()
 
     def _create_imaging(self) -> None:
         item_id = self.img_combo.currentData()
@@ -1913,6 +1994,7 @@ class DoctorWidget(QWidget):
             self.exam_msg.setText(f"开单失败（{e.status_code}）：{e.detail}")
             return
         self.exam_msg.setText(f"检查已开单：{request['item_name']}（{request['id']}）")
+        self._refresh_exam_requests()
 
     # ---------- 治疗 ----------
     def _build_treatment_tab(self) -> QWidget:
@@ -1946,7 +2028,18 @@ class DoctorWidget(QWidget):
         self.treat_msg = QLabel("")
         self.treat_msg.setWordWrap(True)
         layout.addWidget(self.treat_msg)
-        layout.addStretch(1)
+
+        list_row = QHBoxLayout()
+        list_row.addWidget(QLabel("本次已开治疗"))
+        refresh_list = QPushButton("刷新已开治疗")
+        refresh_list.clicked.connect(self._refresh_treatments)
+        list_row.addStretch(1)
+        list_row.addWidget(refresh_list)
+        layout.addLayout(list_row)
+        self.treat_table = QTableWidget(0, 4)
+        self.treat_table.setHorizontalHeaderLabels(["项目", "数量", "状态", "执行人"])
+        self.treat_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.treat_table, 1)
         return page
 
     def _load_treatment_items(self) -> None:
@@ -1975,4 +2068,5 @@ class DoctorWidget(QWidget):
             self.treat_msg.setText(f"开单失败（{e.status_code}）：{e.detail}")
             return
         self.treat_msg.setText(f"治疗单已开立：{order['item_name']}（{order['id']}，待护士执行）")
+        self._refresh_treatments()
 
