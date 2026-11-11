@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QCompleter,
     QFormLayout,
     QGridLayout,
+    QHeaderView,
     QGroupBox,
     QHBoxLayout,
     QInputDialog,
@@ -64,15 +65,29 @@ class DoctorWidget(QWidget):
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
-        layout.addWidget(self.tabs)
+        body = QHBoxLayout()
+        body.addWidget(self.tabs, 1)
+        self.side_info = PatientInfoPanel()
+        self.side_info.setFixedWidth(235)
+        body.addWidget(self.side_info)
+        layout.addLayout(body)
         self._load_diagnoses()
         self._install_shortcuts()
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._auto_refresh)
         self.auto_timer.start(15000)
+        self.side_info.setFixedWidth(0)
+        self.side_info.setVisible(False)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
     def _on_tab_changed(self, _index: int) -> None:
+        if hasattr(self, "side_info"):
+            if _index == 0:
+                self.side_info.setFixedWidth(0)
+                self.side_info.setVisible(False)
+            else:
+                self.side_info.setFixedWidth(235)
+                self.side_info.setVisible(True)
         if "开方" in self.tabs.tabText(self.tabs.currentIndex()) and not hasattr(self, "drug_rows"):
             self._load_drugs()
 
@@ -444,6 +459,13 @@ class DoctorWidget(QWidget):
             f"分诊：{item.get('triage_level') or '—'} 级\n"
             f"生命体征：{item.get('vital_summary') or '未测'}",
         )
+        self.side_info.set_patient(
+            patient,
+            item.get("encounter_id"),
+            status,
+            f"分诊：{item.get('triage_level') or '—'} 级\n"
+            f"生命体征：{item.get('vital_summary') or '未测'}",
+        )
         gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
         age = item.get("age")
         allergy = item.get("allergy_label") or "不详"
@@ -547,6 +569,10 @@ class DoctorWidget(QWidget):
         }
         self.banner.set_patient(patient, encounter["id"], "已接诊")
         self.patient_info.set_patient(
+            patient, encounter["id"], "已接诊",
+            f"诊断：{self.wb_diagnosis.text().strip() or '—'}",
+        )
+        self.side_info.set_patient(
             patient, encounter["id"], "已接诊", f"诊断：{self.wb_diagnosis.text().strip() or '—'}"
         )
 
@@ -624,6 +650,29 @@ class DoctorWidget(QWidget):
             spin = getattr(self, attr, None)
             if spin is not None:
                 spin.setValue(int(encounter_id or 0))
+        if not hasattr(self, "side_info"):
+            return
+        if not encounter_id:
+            self.side_info.clear()
+            return
+        try:
+            summary = self.api.encounter_summary(encounter_id)
+        except ApiError:
+            return
+        self.side_info.set_patient(
+            {
+                "patient_no": summary.get("patient_no"),
+                "name": summary.get("patient_name"),
+                "gender": summary.get("gender"),
+                "age": summary.get("age"),
+                "allergy_label": summary.get("allergy_label"),
+                "phone": summary.get("phone"),
+            },
+            encounter_id,
+            {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
+                summary.get("status") or "", summary.get("status") or ""
+            ),
+        )
 
     def _wb_record(self) -> None:
         self._switch_tab("病历")
@@ -657,7 +706,11 @@ class DoctorWidget(QWidget):
     def _build_register_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
 
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         search_box = QGroupBox("查询患者（未建档请先到收费员工作站建档）")
         search_layout = QVBoxLayout(search_box)
         row = QHBoxLayout()
@@ -673,17 +726,20 @@ class DoctorWidget(QWidget):
         row.addWidget(self.reg_patient_id_number)
         row.addWidget(search)
         search_layout.addLayout(row)
-
         self.reg_patient_table = QTableWidget(0, 4)
         self.reg_patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号", "电话"])
-        search_layout.addWidget(self.reg_patient_table)
-        layout.addWidget(search_box)
+        search_layout.addWidget(self.reg_patient_table, 1)
+        left_layout.addWidget(search_box, 1)
+        splitter.addWidget(left)
 
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         box = QGroupBox("现场挂号")
         form = QFormLayout(box)
         self.reg_patient_id = QLineEdit()
         self.reg_patient_id.setReadOnly(True)
-        self.reg_patient_id.setPlaceholderText("在上表选择患者")
+        self.reg_patient_id.setPlaceholderText("在左侧选择患者")
         self.reg_doctor = QComboBox()
         load_doctors = QPushButton("刷新医生")
         load_doctors.clicked.connect(self._load_registration_doctors)
@@ -698,8 +754,13 @@ class DoctorWidget(QWidget):
         form.addRow("医生", doctor_row)
         form.addRow("", submit)
         form.addRow("", self.reg_msg)
-        layout.addWidget(box)
-        layout.addStretch(1)
+        right_layout.addWidget(box)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([760, 380])
+        layout.addWidget(splitter, 1)
 
         self.reg_patient_table.cellClicked.connect(self._select_registration_patient)
         return page
@@ -851,17 +912,36 @@ class DoctorWidget(QWidget):
         top.addWidget(QLabel("就诊 ID"))
         top.addWidget(self.mr_encounter_id)
         top.addWidget(load)
+        top.addStretch(1)
         layout.addLayout(top)
 
         self.record_edits: dict[str, QTextEdit] = {}
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        positions = {
+            "chief_complaint": (0, 0),
+            "present_illness": (0, 1),
+            "past_history": (1, 0),
+            "physical_exam": (1, 1),
+            "treatment_advice": (2, 0),
+        }
         for key, label, _limit in _RECORD_FIELDS:
             box = QGroupBox(label)
             box_layout = QVBoxLayout(box)
             edit = QTextEdit()
-            edit.setFixedHeight(70)
+            edit.setPlaceholderText(f"填写{label}")
+            edit.setMinimumHeight(100 if key != "treatment_advice" else 90)
             self.record_edits[key] = edit
             box_layout.addWidget(edit)
-            layout.addWidget(box)
+            row, col = positions[key]
+            if key == "treatment_advice":
+                grid.addWidget(box, row, col, 1, 2)
+            else:
+                grid.addWidget(box, row, col)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        layout.addLayout(grid, 1)
 
         buttons = QHBoxLayout()
         save = QPushButton("保存 / 更新")
@@ -873,12 +953,12 @@ class DoctorWidget(QWidget):
         buttons.addWidget(save)
         buttons.addWidget(sign)
         buttons.addWidget(quality)
+        buttons.addStretch(1)
         layout.addLayout(buttons)
 
         self.record_msg = QLabel("")
         self.record_msg.setWordWrap(True)
         layout.addWidget(self.record_msg)
-        layout.addStretch(1)
         return page
 
     def _load_record(self) -> None:
@@ -1203,6 +1283,13 @@ class DoctorWidget(QWidget):
         top.addWidget(self.rx_search, 1)
         layout.addLayout(top)
 
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_title = QLabel("药品目录")
+        left_title.setStyleSheet("font-weight:bold;color:#cbd5e1")
+        left_layout.addWidget(left_title)
         self.drug_table = QTableWidget(0, 8)
         self.drug_table.setHorizontalHeaderLabels(
             ["ID", "药品", "规格", "单价", "库存", "自费约", "医保比例", "医保类别"]
@@ -1212,8 +1299,12 @@ class DoctorWidget(QWidget):
             self.drug_table.setColumnHidden(7, True)
         self.drug_table.cellClicked.connect(self._pick_drug_row)
         self.drug_table.cellDoubleClicked.connect(self._pick_drug_row)
-        layout.addWidget(self.drug_table)
+        left_layout.addWidget(self.drug_table, 1)
+        splitter.addWidget(left)
 
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         box = QGroupBox("开立处方")
         form = QFormLayout(box)
         self.rx_drug_id = QLineEdit()
@@ -1244,15 +1335,24 @@ class DoctorWidget(QWidget):
         form.addRow("途径", self.rx_route)
         form.addRow("天数", self.rx_days)
         form.addRow("", submit)
-        layout.addWidget(box)
+        right_layout.addWidget(box)
 
         self.rx_msg = QLabel("")
         self.rx_msg.setWordWrap(True)
-        layout.addWidget(self.rx_msg)
+        right_layout.addWidget(self.rx_msg)
 
+        rx_title = QLabel("本次处方")
+        rx_title.setStyleSheet("font-weight:bold;color:#cbd5e1")
+        right_layout.addWidget(rx_title)
         self.rx_table = QTableWidget(0, 5)
         self.rx_table.setHorizontalHeaderLabels(["药品", "数量", "单价", "用法", "金额"])
-        layout.addWidget(self.rx_table)
+        self.rx_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        right_layout.addWidget(self.rx_table, 1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([680, 460])
+        layout.addWidget(splitter, 1)
         return page
 
     def _load_drugs(self) -> None:
