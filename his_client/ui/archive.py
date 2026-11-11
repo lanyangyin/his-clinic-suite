@@ -1,5 +1,5 @@
 """病案档案工作站：建档、归档上架、借阅/归还、复印、封存/启封、销毁。"""
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
+from his_client.ui.patient_banner import PatientBanner
 
 STATUS = {
     "draft": "已建档",
@@ -39,16 +41,46 @@ class ArchiveWidget(QWidget):
         self.api = api
         self.rows: list[dict] = []
         self.current: dict | None = None
+        self.banner = PatientBanner()
         tabs = SidebarTabs()
         tabs.addTab(self._build_record_tab(), "病案建档 / 归档")
         tabs.addTab(self._build_borrow_tab(), "借阅 / 复印")
         tabs.addTab(self._build_seal_tab(), "封存 / 销毁")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(tabs)
 
     def _build_record_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        top = QHBoxLayout()
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("全部", None)
+        for value, label in STATUS.items():
+            self.status_filter.addItem(label, value)
+        refresh = QPushButton("刷新病案列表")
+        refresh.clicked.connect(self._refresh)
+        top.addWidget(QLabel("状态"))
+        top.addWidget(self.status_filter)
+        top.addWidget(refresh)
+        left_layout.addLayout(top)
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(
+            ["病案号", "患者", "类型", "页数", "状态", "库位", "建档时间"]
+        )
+        self.table.cellClicked.connect(self._select)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.table, 1)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         create_box = QGroupBox("病案建档")
         form = QFormLayout(create_box)
         self.patient_id = QSpinBox()
@@ -67,31 +99,12 @@ class ArchiveWidget(QWidget):
         form.addRow("类型", self.record_type)
         form.addRow("备注", self.note)
         form.addRow("", create)
-        layout.addWidget(create_box)
-
-        top = QHBoxLayout()
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("全部", None)
-        for value, label in STATUS.items():
-            self.status_filter.addItem(label, value)
-        refresh = QPushButton("刷新病案列表")
-        refresh.clicked.connect(self._refresh)
-        top.addWidget(QLabel("状态"))
-        top.addWidget(self.status_filter)
-        top.addWidget(refresh)
-        layout.addLayout(top)
-
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(
-            ["病案号", "患者", "类型", "页数", "状态", "库位", "建档时间"]
-        )
-        self.table.cellClicked.connect(self._select)
-        layout.addWidget(self.table, 1)
+        right_layout.addWidget(create_box)
 
         archive_box = QGroupBox("归档上架")
         archive_form = QFormLayout(archive_box)
         self.location = QLineEdit()
-        self.location.setPlaceholderText("如 A区-03架-02层")
+        self.location.setPlaceholderText("如 A区-03架-02层；支持扫码")
         self.pages = QSpinBox()
         self.pages.setRange(1, 10000)
         self.completeness = QComboBox()
@@ -103,25 +116,40 @@ class ArchiveWidget(QWidget):
         archive_form.addRow("页数", self.pages)
         archive_form.addRow("完整性", self.completeness)
         archive_form.addRow("", archive_btn)
-        layout.addWidget(archive_box)
+        right_layout.addWidget(archive_box)
         self.msg = QLabel("")
         self.msg.setWordWrap(True)
-        layout.addWidget(self.msg)
+        right_layout.addWidget(self.msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 480])
+        layout.addWidget(splitter, 1)
+        self._refresh()
         return page
 
     def _build_borrow_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
         refresh = QPushButton("刷新可借阅病案")
         refresh.clicked.connect(self._refresh_borrow)
-        layout.addWidget(refresh)
+        left_layout.addWidget(refresh)
         self.borrow_table = QTableWidget(0, 6)
         self.borrow_table.setHorizontalHeaderLabels(
             ["病案号", "患者", "状态", "库位", "借阅人", "应还日期"]
         )
         self.borrow_table.cellClicked.connect(self._select_borrow)
-        layout.addWidget(self.borrow_table, 1)
-
+        self.borrow_table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.borrow_table, 1)
+        splitter.addWidget(left)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         borrow_box = QGroupBox("借阅")
         borrow_form = QFormLayout(borrow_box)
         self.borrower = QLineEdit()
@@ -137,8 +165,7 @@ class ArchiveWidget(QWidget):
         borrow_form.addRow("科室", self.department)
         borrow_form.addRow("借期(天)", self.days)
         borrow_form.addRow(borrow_btn, return_btn)
-        layout.addWidget(borrow_box)
-
+        right_layout.addWidget(borrow_box)
         copy_box = QGroupBox("复印登记")
         copy_form = QFormLayout(copy_box)
         self.applicant = QLineEdit()
@@ -154,22 +181,37 @@ class ArchiveWidget(QWidget):
         copy_form.addRow("份数", self.copies)
         copy_form.addRow("内容", self.copy_contents)
         copy_form.addRow("", copy_btn)
-        layout.addWidget(copy_box)
+        right_layout.addWidget(copy_box)
         self.borrow_msg = QLabel("")
         self.borrow_msg.setWordWrap(True)
-        layout.addWidget(self.borrow_msg)
+        right_layout.addWidget(self.borrow_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 480])
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_seal_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
         refresh = QPushButton("刷新已归档病案")
         refresh.clicked.connect(self._refresh_seal)
-        layout.addWidget(refresh)
+        left_layout.addWidget(refresh)
         self.seal_table = QTableWidget(0, 5)
         self.seal_table.setHorizontalHeaderLabels(["病案号", "患者", "状态", "库位", "备注"])
         self.seal_table.cellClicked.connect(self._select_seal)
-        layout.addWidget(self.seal_table, 1)
+        self.seal_table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.seal_table, 1)
+        splitter.addWidget(left)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         box = QGroupBox("封存 / 启封 / 销毁")
         form = QFormLayout(box)
         self.seal_reason = QLineEdit()
@@ -188,21 +230,22 @@ class ArchiveWidget(QWidget):
         request_destroy.clicked.connect(self._request_destroy)
         self.destroy_request_id = QSpinBox()
         self.destroy_request_id.setRange(0, 10_000_000)
-        self.destroy_request_id.setSpecialValueText("销毁申请 ID")
-        execute_destroy = QPushButton("执行已批准销毁")
-        execute_destroy.clicked.connect(self._execute_destroy)
-        print_destroy = QPushButton("打印销毁清册")
-        print_destroy.clicked.connect(self._print_destroy)
-        form.addRow("封存/启封原因", self.seal_reason)
+        form.addRow("封存原因", self.seal_reason)
         form.addRow("见证人", self.witness)
+        form.addRow("", seal_btn)
+        form.addRow("", unseal_btn)
         form.addRow("销毁原因", self.destroy_reason)
-        form.addRow("销毁附件", self.destroy_attachment_path)
+        form.addRow("附件", self.destroy_attachment_path)
         form.addRow("", pick_attachment)
-        form.addRow(seal_btn, unseal_btn)
+        form.addRow("销毁申请 ID", self.destroy_request_id)
         form.addRow("", request_destroy)
-        form.addRow("", self.destroy_request_id)
-        form.addRow(execute_destroy, print_destroy)
-        layout.addWidget(box)
+        right_layout.addWidget(box)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 480])
+        layout.addWidget(splitter, 1)
         self.seal_msg = QLabel("")
         self.seal_msg.setWordWrap(True)
         layout.addWidget(self.seal_msg)
@@ -234,6 +277,16 @@ class ArchiveWidget(QWidget):
     def _select(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.rows):
             self.current = self.rows[row]
+            try:
+                patient = self.api.get_patient(self.current["patient_id"])
+            except ApiError:
+                patient = None
+            if patient:
+                self.banner.set_patient(
+                    patient,
+                    self.current.get("encounter_id"),
+                    STATUS.get(self.current["status"], self.current["status"]),
+                )
             self.msg.setText(
                 f"当前病案 {self.current.get('archive_no')} · "
                 f"{STATUS.get(self.current['status'], self.current['status'])}"

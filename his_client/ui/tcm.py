@@ -1,4 +1,5 @@
 """中药处方 + 中药房 + 煎药室。"""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -66,8 +68,8 @@ class TcmWidget(QWidget):
         layout.addWidget(self.banner)
         layout.addWidget(tabs)
 
-    def _load_encounter_context(self) -> None:
-        encounter_id = self.encounter_id.value()
+    def _load_encounter_context(self, encounter_id: int | None = None) -> None:
+        encounter_id = encounter_id or self.encounter_id.value()
         if not encounter_id:
             self.banner.clear()
             return
@@ -286,15 +288,31 @@ class TcmWidget(QWidget):
     def _build_pharmacy_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
         refresh = QPushButton("刷新中药处方")
         refresh.clicked.connect(self._load_pharmacy)
-        layout.addWidget(refresh)
+        left_layout.addWidget(refresh)
         self.rx_table = QTableWidget(0, 7)
         self.rx_table.setHorizontalHeaderLabels(
             ["处方号", "患者", "方名", "剂数", "煎药", "状态", "金额"]
         )
         self.rx_table.cellClicked.connect(self._select_rx)
-        layout.addWidget(self.rx_table, 1)
+        self.rx_table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.rx_table, 1)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
+        detail_box = QGroupBox("处方详情")
+        detail_layout = QVBoxLayout(detail_box)
+        self.rx_detail = QLabel("请选择一张中药处方")
+        self.rx_detail.setWordWrap(True)
+        detail_layout.addWidget(self.rx_detail)
+        right_layout.addWidget(detail_box)
         buttons = QHBoxLayout()
         review = QPushButton("审核通过")
         review.clicked.connect(self._review_rx)
@@ -302,10 +320,16 @@ class TcmWidget(QWidget):
         dispense.clicked.connect(self._dispense_rx)
         buttons.addWidget(review)
         buttons.addWidget(dispense)
-        layout.addLayout(buttons)
+        right_layout.addLayout(buttons)
         self.rx_msg = QLabel("")
         self.rx_msg.setWordWrap(True)
-        layout.addWidget(self.rx_msg)
+        right_layout.addWidget(self.rx_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 460])
+        layout.addWidget(splitter, 1)
         return page
 
     def _load_pharmacy(self) -> None:
@@ -332,10 +356,22 @@ class TcmWidget(QWidget):
     def _select_rx(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.rx_rows):
             self.current_rx = self.rx_rows[row]
-            self.rx_msg.setText(
-                f"当前处方 {self.current_rx['prescription_no']}（"
-                f"{P_STATUS.get(self.current_rx['status'], self.current_rx['status'])}）"
+            items = "、".join(
+                f"{item['herb_name']} {item['dose_g']}g"
+                for item in self.current_rx.get("items", [])
             )
+            self.rx_detail.setText(
+                f"处方号：{self.current_rx['prescription_no']}\n"
+                f"患者：{self.current_rx.get('patient_name') or '—'}\n"
+                f"方名：{self.current_rx.get('formula_name') or '—'}\n"
+                f"剂数：{self.current_rx.get('packs')}　"
+                f"煎法：{'代煎' if self.current_rx.get('decoct_service') == 'decoct' else '自煎'}\n"
+                f"金额：{self.current_rx.get('total_amount', 0):.2f} 元\n"
+                f"状态：{P_STATUS.get(self.current_rx['status'], self.current_rx['status'])}\n"
+                f"饮片：{items or '—'}"
+            )
+            self.rx_msg.setText(f"当前处方 {self.current_rx['prescription_no']}")
+            self._load_encounter_context(self.current_rx.get("encounter_id"))
 
     def _review_rx(self) -> None:
         rx = getattr(self, "current_rx", None)
@@ -370,18 +406,30 @@ class TcmWidget(QWidget):
     def _build_decoction_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
         refresh = QPushButton("刷新煎药单")
         refresh.clicked.connect(self._load_decoction)
-        layout.addWidget(refresh)
+        left_layout.addWidget(refresh)
         self.dec_table = QTableWidget(0, 8)
         self.dec_table.setHorizontalHeaderLabels(
             ["煎药单", "患者", "处方", "状态", "浸泡", "煎煮", "袋数", "取药"]
         )
         self.dec_table.cellClicked.connect(self._select_dec)
-        layout.addWidget(self.dec_table, 1)
+        self.dec_table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.dec_table, 1)
+        splitter.addWidget(left)
 
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         box = QGroupBox("煎药过程")
         form = QFormLayout(box)
+        self.dec_detail = QLabel("请选择一张煎药单")
+        self.dec_detail.setWordWrap(True)
+        form.addRow(self.dec_detail)
         self.soak_minutes = QSpinBox()
         self.soak_minutes.setRange(0, 240)
         self.soak_minutes.setValue(30)
@@ -403,22 +451,27 @@ class TcmWidget(QWidget):
         form.addRow("袋数", self.bags)
         form.addRow("每袋ml", self.bag_volume)
         form.addRow("取药人", self.receiver)
-        layout.addWidget(box)
+        right_layout.addWidget(box)
         buttons = QHBoxLayout()
-        soak = QPushButton("开始浸泡")
-        soak.clicked.connect(self._soak)
-        decoct = QPushButton("开始煎煮")
-        decoct.clicked.connect(self._decoct)
-        package = QPushButton("包装完成")
-        package.clicked.connect(self._package)
-        issue = QPushButton("发放")
-        issue.clicked.connect(self._issue)
-        for button in (soak, decoct, package, issue):
+        for text, handler in (
+            ("开始浸泡", self._soak),
+            ("开始煎煮", self._decoct),
+            ("包装完成", self._package),
+            ("发放", self._issue),
+        ):
+            button = QPushButton(text)
+            button.clicked.connect(handler)
             buttons.addWidget(button)
-        layout.addLayout(buttons)
+        right_layout.addLayout(buttons)
         self.dec_msg = QLabel("")
         self.dec_msg.setWordWrap(True)
-        layout.addWidget(self.dec_msg)
+        right_layout.addWidget(self.dec_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 460])
+        layout.addWidget(splitter, 1)
         return page
 
     def _load_decoction(self) -> None:
@@ -446,10 +499,18 @@ class TcmWidget(QWidget):
     def _select_dec(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.dec_rows):
             self.current_dec = self.dec_rows[row]
-            self.dec_msg.setText(
-                f"当前煎药单 {self.current_dec['order_no']}（"
-                f"{D_STATUS.get(self.current_dec['status'], self.current_dec['status'])}）"
+            self.dec_detail.setText(
+                f"煎药单：{self.current_dec['order_no']}\n"
+                f"患者：{self.current_dec.get('patient_name') or '—'}\n"
+                f"处方：{self.current_dec.get('prescription_no') or '—'}\n"
+                f"状态：{D_STATUS.get(self.current_dec['status'], self.current_dec['status'])}\n"
+                f"浸泡：{self.current_dec.get('soak_minutes') or '—'} 分钟　"
+                f"煎煮：{self.current_dec.get('decoct_minutes') or '—'} 分钟\n"
+                f"袋数：{self.current_dec.get('bags') or '—'}"
             )
+            self.dec_msg.setText(f"当前煎药单 {self.current_dec['order_no']}")
+            if self.current_dec.get("encounter_id"):
+                self._load_encounter_context(self.current_dec["encounter_id"])
 
     def _dec_selected(self) -> dict | None:
         order = getattr(self, "current_dec", None)

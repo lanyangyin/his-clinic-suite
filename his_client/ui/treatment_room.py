@@ -1,5 +1,5 @@
 """治疗室工作站：清创/换药/小处置排队、知情同意、处置记录。"""
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -47,6 +48,28 @@ class TreatmentRoomWidget(QWidget):
         page = QWidget()
         self.queue_page = page
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        refresh = QPushButton("刷新排队")
+        refresh.clicked.connect(self._load_cases)
+        left_layout.addWidget(refresh)
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(
+            ["处置号", "患者", "处置", "治疗室", "优先级", "状态", "费用"]
+        )
+        self.table.cellClicked.connect(self._select_case)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.table, 1)
+        self.queue_msg = QLabel("")
+        self.queue_msg.setWordWrap(True)
+        left_layout.addWidget(self.queue_msg)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         room_box = QGroupBox("治疗室")
         room_form = QFormLayout(room_box)
         self.room_code = QLineEdit()
@@ -56,7 +79,7 @@ class TreatmentRoomWidget(QWidget):
         room_form.addRow("编码", self.room_code)
         room_form.addRow("名称", self.room_name)
         room_form.addRow("", add_room)
-        layout.addWidget(room_box)
+        right_layout.addWidget(room_box)
 
         case_box = QGroupBox("新建处置")
         form = QFormLayout(case_box)
@@ -90,23 +113,17 @@ class TreatmentRoomWidget(QWidget):
         form.addRow("收费项目 ID", self.charge_item_id)
         form.addRow("费用", self.price)
         form.addRow("", create)
-        layout.addWidget(case_box)
+        right_layout.addWidget(case_box)
 
         template_box = QGroupBox("模板记录项")
         self.template_form = QFormLayout(template_box)
-        layout.addWidget(template_box)
-
-        refresh = QPushButton("刷新排队")
-        refresh.clicked.connect(self._load_cases)
-        layout.addWidget(refresh)
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(
-            ["处置号", "患者", "处置", "治疗室", "优先级", "状态", "费用"]
-        )
-        self.table.cellClicked.connect(self._select_case)
-        layout.addWidget(self.table, 1)
-        self.queue_msg = QLabel("")
-        layout.addWidget(self.queue_msg)
+        right_layout.addWidget(template_box)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([780, 520])
+        layout.addWidget(splitter, 1)
         self._load_rooms()
         self._load_templates()
         return page

@@ -186,13 +186,13 @@ https://ggzy.guizhou.gov.cn/hallweb/hall/attach/nosession/download?attachId=c6de
 - 快捷键/扫码枪全窗口
 - 打印/导出统一
 
-## 已开始落地
+## 已落地（0.89.0）
 
-- 治疗室补患者条（姓名/性别年龄/过敏）
-- 中药开方补患者条（按就诊带出）
-- 患者360 补患者条（选中患者显示过敏）
-- 截图：`docs/screenshots/treatment_patient_banner.png`、`cm_patient_banner.png`、`patient360_banner.png`
+- 治疗室：排队主从、患者条
+- 病案室：三个页签全部主从、患者条
+- 院长审批：详情面板
+- 中药：中药房/煎药室主从、患者条
+- 手术室：排班主从、术中滚动、患者条
+- 患者360：患者条
 
-## 说明
-
-本轮完成审计 + P0 的患者上下文第一步；治疗室/病案室/中药/手术室的主从布局、院长详情面板还没改。下一步按 P0 顺序实施，每项单独测试和重录。
+详见 `docs/P0界面改造.md`。

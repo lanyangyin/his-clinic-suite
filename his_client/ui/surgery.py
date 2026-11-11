@@ -1,6 +1,8 @@
 """手术室工作站：排班、安全核查、术中记录、器械清点、复苏。"""
 from datetime import datetime, timedelta
 
+from PySide6.QtCore import Qt
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -10,7 +12,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -22,6 +26,7 @@ from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
+from his_client.ui.patient_banner import PatientBanner
 
 
 class SurgeryWidget(QWidget):
@@ -29,16 +34,45 @@ class SurgeryWidget(QWidget):
         super().__init__(parent)
         apply_theme(self)
         self.api = api
+        self.banner = PatientBanner()
         self.tabs = SidebarTabs()
         self.tabs.addTab(self._build_schedule_tab(), "手术排班")
-        self.tabs.addTab(self._build_intra_tab(), "安全核查 / 术中")
+        intra_scroll = QScrollArea()
+        intra_scroll.setWidgetResizable(True)
+        intra_scroll.setWidget(self._build_intra_tab())
+        self.tabs.addTab(intra_scroll, "安全核查 / 术中")
         self.tabs.addTab(self._build_recovery_tab(), "术后复苏")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(self.tabs)
 
     def _build_schedule_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新手术列表")
+        refresh.clicked.connect(self._load_cases)
+        top.addWidget(refresh)
+        top.addStretch(1)
+        left_layout.addLayout(top)
+        self.case_table = QTableWidget(0, 7)
+        self.case_table.setHorizontalHeaderLabels(
+            ["手术号", "患者", "手术", "术者", "手术间", "状态", "计划时间"]
+        )
+        self.case_table.cellClicked.connect(self._select_case)
+        self.case_table.horizontalHeader().setStretchLastSection(True)
+        left_layout.addWidget(self.case_table, 1)
+        self.schedule_msg = QLabel("")
+        left_layout.addWidget(self.schedule_msg)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         room_box = QGroupBox("手术间")
         room_form = QFormLayout(room_box)
         self.room_code = QLineEdit()
@@ -48,7 +82,7 @@ class SurgeryWidget(QWidget):
         room_form.addRow("编码", self.room_code)
         room_form.addRow("名称", self.room_name)
         room_form.addRow("", room_add)
-        layout.addWidget(room_box)
+        right_layout.addWidget(room_box)
 
         case_box = QGroupBox("手术排班")
         form = QFormLayout(case_box)
@@ -79,22 +113,13 @@ class SurgeryWidget(QWidget):
         form.addRow("收费项目 ID", self.sc_charge_item)
         form.addRow("手术费", self.sc_price)
         form.addRow("", create)
-        layout.addWidget(case_box)
-
-        top = QHBoxLayout()
-        refresh = QPushButton("刷新手术列表")
-        refresh.clicked.connect(self._load_cases)
-        top.addWidget(refresh)
-        top.addStretch(1)
-        layout.addLayout(top)
-        self.case_table = QTableWidget(0, 7)
-        self.case_table.setHorizontalHeaderLabels(
-            ["手术号", "患者", "手术", "术者", "手术间", "状态", "计划时间"]
-        )
-        self.case_table.cellClicked.connect(self._select_case)
-        layout.addWidget(self.case_table, 1)
-        self.schedule_msg = QLabel("")
-        layout.addWidget(self.schedule_msg)
+        right_layout.addWidget(case_box)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 500])
+        layout.addWidget(splitter, 1)
         self._load_rooms()
         return page
 
@@ -355,6 +380,18 @@ class SurgeryWidget(QWidget):
             self.intra_msg.setText(f"载入失败（{e.status_code}）：{e.detail}")
             return
         case = data["case"]
+        try:
+            patient = self.api.get_patient(case["patient_id"])
+        except ApiError:
+            patient = None
+        if patient:
+            self.banner.set_patient(
+                patient,
+                case.get("encounter_id"),
+                {"scheduled": "已排班", "in_progress": "手术中", "completed": "已完成", "cancelled": "已取消"}.get(
+                    case.get("status") or "", case.get("status") or ""
+                ),
+            )
         self.case_info.setText(
             f"{case['surgery_no']} · 患者 {case['patient_id']} · {case['procedure_name']} · "
             f"状态 {case['status']} · 核查 {len(data['checks'])} · 记录 {len(data['records'])} · "

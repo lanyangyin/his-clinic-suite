@@ -1,9 +1,13 @@
 """院长审批工作站：病案销毁、采购申请。"""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -52,11 +56,23 @@ class DirectorWidget(QWidget):
         row.addWidget(refresh)
         row.addStretch(1)
         layout.addLayout(row)
+        splitter = QSplitter(Qt.Horizontal)
         self.archive_table = QTableWidget(0, 7)
         self.archive_table.setHorizontalHeaderLabels(
             ["申请号", "病案号", "患者", "原因", "申请人", "附件", "状态"]
         )
-        layout.addWidget(self.archive_table, 1)
+        self.archive_table.cellClicked.connect(self._show_archive_detail)
+        self.archive_table.horizontalHeader().setStretchLastSection(True)
+        splitter.addWidget(self.archive_table)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
+        detail_box = QGroupBox("申请详情")
+        detail_form = QFormLayout(detail_box)
+        self.archive_detail = QLabel("请选择一条申请")
+        self.archive_detail.setWordWrap(True)
+        detail_form.addRow(self.archive_detail)
+        right_layout.addWidget(detail_box)
         self.archive_note = QLineEdit()
         self.archive_note.setPlaceholderText("审批意见（可选）")
         approve = QPushButton("批准销毁")
@@ -64,13 +80,19 @@ class DirectorWidget(QWidget):
         reject = QPushButton("驳回")
         reject.clicked.connect(self._reject_archive)
         note_row = QHBoxLayout()
-        note_row.addWidget(self.archive_note)
+        note_row.addWidget(self.archive_note, 1)
         note_row.addWidget(approve)
         note_row.addWidget(reject)
-        layout.addLayout(note_row)
+        right_layout.addLayout(note_row)
         self.archive_msg = QLabel("")
         self.archive_msg.setWordWrap(True)
-        layout.addWidget(self.archive_msg)
+        right_layout.addWidget(self.archive_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 450])
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_purchase_tab(self) -> QWidget:
@@ -82,11 +104,23 @@ class DirectorWidget(QWidget):
         row.addWidget(refresh)
         row.addStretch(1)
         layout.addLayout(row)
+        splitter = QSplitter(Qt.Horizontal)
         self.purchase_table = QTableWidget(0, 5)
         self.purchase_table.setHorizontalHeaderLabels(
             ["申请号", "科室", "申请人", "金额", "状态"]
         )
-        layout.addWidget(self.purchase_table, 1)
+        self.purchase_table.cellClicked.connect(self._show_purchase_detail)
+        self.purchase_table.horizontalHeader().setStretchLastSection(True)
+        splitter.addWidget(self.purchase_table)
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(8, 0, 0, 0)
+        detail_box = QGroupBox("申请详情")
+        detail_form = QFormLayout(detail_box)
+        self.purchase_detail = QLabel("请选择一条申请")
+        self.purchase_detail.setWordWrap(True)
+        detail_form.addRow(self.purchase_detail)
+        right_layout.addWidget(detail_box)
         self.purchase_note = QLineEdit()
         self.purchase_note.setPlaceholderText("驳回原因（批准可空）")
         approve = QPushButton("批准采购")
@@ -94,14 +128,44 @@ class DirectorWidget(QWidget):
         reject = QPushButton("驳回")
         reject.clicked.connect(self._reject_purchase)
         note_row = QHBoxLayout()
-        note_row.addWidget(self.purchase_note)
+        note_row.addWidget(self.purchase_note, 1)
         note_row.addWidget(approve)
         note_row.addWidget(reject)
-        layout.addLayout(note_row)
+        right_layout.addLayout(note_row)
         self.purchase_msg = QLabel("")
         self.purchase_msg.setWordWrap(True)
-        layout.addWidget(self.purchase_msg)
+        right_layout.addWidget(self.purchase_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 450])
+        layout.addWidget(splitter, 1)
         return page
+
+    def _show_archive_detail(self, row: int, _col: int) -> None:
+        if 0 <= row < len(self.archive_rows):
+            item = self.archive_rows[row]
+            self.archive_detail.setText(
+                f"申请号：{item['id']}\n"
+                f"病案号：{item.get('archive_no') or '—'}\n"
+                f"患者：{item.get('patient_name') or '—'}\n"
+                f"原因：{item.get('reason') or '—'}\n"
+                f"申请人：{item.get('requested_by') or '—'}\n"
+                f"附件：{item.get('attachment_name') or '无'}\n"
+                f"状态：{ARCHIVE_STATUS.get(item['status'], item['status'])}"
+            )
+
+    def _show_purchase_detail(self, row: int, _col: int) -> None:
+        if 0 <= row < len(self.purchase_rows):
+            item = self.purchase_rows[row]
+            self.purchase_detail.setText(
+                f"申请号：{item.get('request_no') or '—'}\n"
+                f"科室：{item.get('department') or '—'}\n"
+                f"申请人：{item.get('requester') or '—'}\n"
+                f"金额：{item.get('amount', 0):.2f} 元\n"
+                f"状态：{PURCHASE_STATUS.get(item['status'], item['status'])}"
+            )
 
     def _load_archives(self) -> None:
         try:
