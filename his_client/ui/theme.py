@@ -1,4 +1,5 @@
 """统一现代化浅色工作站样式（白/浅蓝）。"""
+from PySide6.QtGui import QColor, QPalette
 MODERN_QSS = """
 QWidget { color: #1e293b; font-family: "Microsoft YaHei"; font-size: 13px; }
 QWidget#workstationRoot { background: #f4f8fd; }
@@ -66,10 +67,34 @@ QTabWidget::pane { border: 1px solid #dbe7f3; background: #ffffff; }
 QStatusBar { color: #64748b; }
 QToolTip { background: #ffffff; color: #1e293b; border: 1px solid #cfdff0; }
 QCheckBox { color: #1e293b; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 14px; height: 14px;
+    border: 1px solid #b7cde3;
+    border-radius: 3px;
+    background: #ffffff;
+}
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background: #2563eb;
+    border: 1px solid #2563eb;
+}
 QTextEdit { background: #ffffff; border: 1px solid #cfdff0; border-radius: 6px; color: #1e293b; }
 """
 
 
 def apply_theme(widget) -> None:
     widget.setObjectName("workstationRoot")
+    palette = widget.palette()
+    palette.setColor(QPalette.Window, QColor("#f4f8fd"))
+    palette.setColor(QPalette.WindowText, QColor("#1e293b"))
+    palette.setColor(QPalette.Base, QColor("#ffffff"))
+    palette.setColor(QPalette.AlternateBase, QColor("#f7fbff"))
+    palette.setColor(QPalette.Text, QColor("#1e293b"))
+    palette.setColor(QPalette.Button, QColor("#ffffff"))
+    palette.setColor(QPalette.ButtonText, QColor("#1e3a5f"))
+    palette.setColor(QPalette.Highlight, QColor("#dbeafe"))
+    palette.setColor(QPalette.HighlightedText, QColor("#0f172a"))
+    palette.setColor(QPalette.ToolTipBase, QColor("#ffffff"))
+    palette.setColor(QPalette.ToolTipText, QColor("#1e293b"))
+    palette.setColor(QPalette.PlaceholderText, QColor("#94a3b8"))
+    widget.setPalette(palette)
     widget.setStyleSheet(MODERN_QSS)
