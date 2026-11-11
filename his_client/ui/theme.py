@@ -3,6 +3,7 @@ import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
+from PySide6.QtWidgets import QApplication
 
 LIGHT_QSS = """
 QWidget { color: #1e293b; font-family: "Microsoft YaHei"; font-size: 13px; }
@@ -181,4 +182,10 @@ def apply_theme(widget) -> None:
     palette.setColor(QPalette.ToolTipText, QColor(c["text"]))
     palette.setColor(QPalette.PlaceholderText, QColor(c["muted"]))
     widget.setPalette(palette)
-    widget.setStyleSheet(DARK_QSS if dark else LIGHT_QSS)
+    qss = DARK_QSS if dark else LIGHT_QSS
+    widget.setStyleSheet(qss)
+    app = QApplication.instance()
+    if app is not None:
+        # 全局样式，保证 QComboBox 弹层、QMenu、消息框等顶层弹窗也跟随主题
+        app.setPalette(palette)
+        app.setStyleSheet(qss)
