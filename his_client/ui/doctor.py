@@ -1,5 +1,6 @@
-"""医生工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
+"""门诊工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
 from PySide6.QtCore import Qt, QTimer, QUrl
+from datetime import datetime
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTabBar,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -108,23 +110,42 @@ class DoctorWidget(QWidget):
     def _build_workbench_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        top = QHBoxLayout()
-        top.addWidget(QLabel("今日门诊队列（待接诊 + 今日已接诊）"))
+        splitter = QSplitter(Qt.Horizontal)
+
+        # 左栏：日期与今日统计
+        left = QWidget()
+        left.setMaximumWidth(180)
+        left_layout = QVBoxLayout(left)
+        title = QLabel("今日门诊")
+        title.setStyleSheet("font-size:15px;font-weight:bold;color:#f8fafc;")
+        self.wb_date = QLabel(datetime.now().strftime("%Y-%m-%d"))
+        self.wb_date.setStyleSheet("color:#94a3b8;")
+        self.wb_stats = QLabel("")
+        self.wb_stats.setWordWrap(True)
+        self.wb_stats.setStyleSheet("color:#e2e8f0;line-height:1.8;")
+        refresh = QPushButton("刷新队列")
+        refresh.clicked.connect(self._load_workbench)
+        left_layout.addWidget(title)
+        left_layout.addWidget(self.wb_date)
+        left_layout.addWidget(self.wb_stats, 1)
+        left_layout.addWidget(refresh)
+        left_layout.addStretch(1)
+        splitter.addWidget(left)
+
+        # 中栏：患者队列 + 状态筛选
+        middle = QWidget()
+        middle_layout = QVBoxLayout(middle)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
         self.wb_search = QLineEdit()
         self.wb_search.setPlaceholderText("F2 搜索姓名/电话/挂号号")
         self.wb_search.setClearButtonEnabled(True)
         self.wb_search.textChanged.connect(self._filter_workbench)
-        refresh = QPushButton("刷新队列")
-        refresh.clicked.connect(self._load_workbench)
-        top.addWidget(self.wb_search, 1)
-        top.addWidget(refresh)
-        layout.addLayout(top)
-
-        splitter = QSplitter(Qt.Horizontal)
-
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        middle_layout.addWidget(self.wb_search)
+        self.wb_status_tabs = QTabBar()
+        for label in ("全部", "待接诊", "接诊中", "已挂起", "已收费"):
+            self.wb_status_tabs.addTab(label)
+        self.wb_status_tabs.currentChanged.connect(self._filter_workbench)
+        middle_layout.addWidget(self.wb_status_tabs)
         self.wb_table = QTableWidget(0, 7)
         self.wb_table.setHorizontalHeaderLabels(
             ["挂号", "患者", "医生", "挂号状态", "就诊", "诊断", "待缴"]
@@ -134,9 +155,10 @@ class DoctorWidget(QWidget):
             lambda row, _col: self._start_workbench_row(row)
         )
         self.wb_table.setAlternatingRowColors(True)
-        left_layout.addWidget(self.wb_table, 1)
-        splitter.addWidget(left)
+        middle_layout.addWidget(self.wb_table, 1)
+        splitter.addWidget(middle)
 
+        # 右栏：患者信息 + 危急值 + 操作 + 费用
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -208,9 +230,10 @@ class DoctorWidget(QWidget):
         self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
         right_layout.addWidget(self.wb_fee_table, 1)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([620, 500])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(2, 2)
+        splitter.setSizes([170, 620, 500])
         layout.addWidget(splitter, 1)
         return page
 
@@ -256,7 +279,23 @@ class DoctorWidget(QWidget):
 
     def _filter_workbench(self) -> None:
         term = self.wb_search.text().strip().lower() if hasattr(self, "wb_search") else ""
-        rows = getattr(self, "workbench_all", getattr(self, "workbench_rows", []))
+        all_rows = getattr(self, "workbench_all", getattr(self, "workbench_rows", []))
+        index = self.wb_status_tabs.currentIndex() if hasattr(self, "wb_status_tabs") else 0
+        status_filter = {
+            1: "waiting",
+            2: "open",
+            3: "paused",
+            4: "closed",
+        }.get(index, "")
+        if status_filter == "waiting":
+            rows = [item for item in all_rows if not item.get("encounter_id")]
+        elif status_filter:
+            rows = [
+                item for item in all_rows
+                if (item.get("encounter_status") or "") == status_filter
+            ]
+        else:
+            rows = list(all_rows)
         if term:
             rows = [
                 item
@@ -293,8 +332,22 @@ class DoctorWidget(QWidget):
                 self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
         total = len(getattr(self, "workbench_all", rows))
         self.wb_summary.setText(
-            f"显示 {len(rows)} / 今日 {total} 人" if term else f"今日队列 {total} 人"
+            f"显示 {len(rows)} / 今日 {total} 人" if term or status_filter else f"今日队列 {total} 人"
         )
+        waiting = sum(1 for item in all_rows if not item.get("encounter_id"))
+        open_count = sum(1 for item in all_rows if item.get("encounter_status") == "open")
+        paused_count = sum(1 for item in all_rows if item.get("encounter_status") == "paused")
+        closed_count = sum(1 for item in all_rows if item.get("encounter_status") == "closed")
+        pending = sum(float(item.get("pending_amount") or 0) for item in all_rows)
+        if hasattr(self, "wb_stats"):
+            self.wb_stats.setText(
+                f"<b style='font-size:22px'>{total}</b> 今日患者<br><br>"
+                f"待接诊 <b>{waiting}</b><br>"
+                f"接诊中 <b>{open_count}</b><br>"
+                f"已挂起 <b>{paused_count}</b><br>"
+                f"已收费 <b>{closed_count}</b><br><br>"
+                f"待缴合计<br><b>{pending:.2f}</b> 元"
+            )
         current = getattr(self, "wb_current", None)
         if current:
             for index, item in enumerate(rows):

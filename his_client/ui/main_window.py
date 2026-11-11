@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
         if role in ("cashier", "admin"):
             tabs.addTab(CashierWidget(api, role=role), "收费员工作站")
         if role in ("doctor", "admin"):
-            tabs.addTab(DoctorWidget(api), "医生工作站")
+            tabs.addTab(DoctorWidget(api), "门诊工作站")
         if role in ("doctor", "admin"):
             tabs.addTab(Patient360Widget(api), "患者 360")
         if role in ("pharmacist", "admin"):

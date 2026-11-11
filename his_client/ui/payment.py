@@ -1,4 +1,4 @@
-"""收费面板：医生工作站/药房工作站共用（现金/微信/支付宝/POS/医保卡）。"""
+"""收费面板：门诊工作站/药房工作站共用（现金/微信/支付宝/POS/医保卡）。"""
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
