@@ -119,6 +119,8 @@ class CashierWidget(QWidget):
             self.p_allergy_status.addItem(label, value)
         self.p_allergy_detail = QLineEdit()
         self.p_allergy_detail.setPlaceholderText("如 青霉素、头孢；无过敏可留空")
+        self.p_special_history = QLineEdit()
+        self.p_special_history.setPlaceholderText("如 糖尿病 10 年、高血压、冠心病；无特殊可留空")
         self.p_privacy = QCheckBox("已向患者告知并取得信息采集授权")
         self.p_privacy.setChecked(True)
 
@@ -159,6 +161,9 @@ class CashierWidget(QWidget):
         grid.addWidget(QLabel("过敏史*"), row, 0)
         grid.addWidget(self.p_allergy_status, row, 1)
         grid.addWidget(self.p_allergy_detail, row, 2, 1, 2)
+        row += 1
+        grid.addWidget(QLabel("特殊既往史"))
+        grid.addWidget(self.p_special_history, row, 1, 1, 3)
         row += 1
         grid.addWidget(self.p_privacy, row, 0, 1, 3)
         row += 1
@@ -366,6 +371,7 @@ class CashierWidget(QWidget):
             self.p_name, self.p_id_number, self.p_birth_date, self.p_phone,
             self.p_address, self.p_emergency_name, self.p_emergency_relation,
             self.p_emergency_phone, self.p_allergy_detail,
+        self.p_special_history,
         ):
             field.clear()
         self.p_gender.setCurrentIndex(0)
@@ -460,6 +466,7 @@ class CashierWidget(QWidget):
         index = self.p_allergy_status.findData(patient.get("allergy_status") or "unknown")
         self.p_allergy_status.setCurrentIndex(max(0, index))
         self.p_allergy_detail.setText(patient.get("allergy_detail") or "")
+        self.p_special_history.setText(patient.get("special_history") or "")
         self.p_privacy.setChecked(bool(patient.get("privacy_consent_at")))
         self.patient_msg.setText(
             f"当前档案：{patient.get('patient_no') or patient['id']} {patient['name']}"

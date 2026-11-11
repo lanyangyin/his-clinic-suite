@@ -361,6 +361,7 @@ class DemoController:
         self.cashier.p_emergency_relation.setText("配偶")
         self.cashier.p_emergency_phone.setText("13900001234")
         self.cashier.p_privacy.setChecked(True)
+        self.cashier.p_special_history.setText("2型糖尿病 8 年；高血压 5 年")
         self.click(patient_tab, "建档")
         patients = self.cashier_api.call(
             "GET", "/patients/", params={"id_number": f"1101011996{self.suffix[-8:]}"}

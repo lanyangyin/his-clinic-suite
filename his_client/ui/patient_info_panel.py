@@ -13,7 +13,8 @@ class PatientInfoPanel(QFrame):
             "#patientInfoPanel{background:#ffffff;border:1px solid #dbe7f3;border-radius:8px;}"
             "#patientInfoPanel QLabel{color:#334155;font-size:12px;}"
             "#patientInfoPanel QLabel#title{font-size:15px;font-weight:bold;color:#1e3a5f;}"
-            "#patientInfoPanel QLabel#allergy{color:#f87171;font-weight:bold;}"
+            "#patientInfoPanel QLabel#allergy{color:#dc2626;font-weight:bold;}"
+            "#patientInfoPanel QLabel#history{color:#b45309;font-weight:bold;}"
         )
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -26,6 +27,9 @@ class PatientInfoPanel(QFrame):
         self.allergy = QLabel("")
         self.allergy.setObjectName("allergy")
         self.allergy.setWordWrap(True)
+        self.history = QLabel("")
+        self.history.setObjectName("history")
+        self.history.setWordWrap(True)
         self.encounter = QLabel("")
         self.status = QLabel("")
         self.status.setWordWrap(True)
@@ -33,7 +37,7 @@ class PatientInfoPanel(QFrame):
         self.extra = QLabel("")
         self.extra.setWordWrap(True)
         for widget in (
-            self.title, self.name, self.demo, self.allergy,
+            self.title, self.name, self.demo, self.allergy, self.history,
             self.encounter, self.status, self.phone, self.extra,
         ):
             layout.addWidget(widget)
@@ -66,6 +70,8 @@ class PatientInfoPanel(QFrame):
             if allergy not in ("无过敏史", "不详", "过敏史不详")
             else allergy
         )
+        special = (patient.get("special_history") or "").strip()
+        self.history.setText(f"特殊既往史：{special or '无特殊'}")
         self.encounter.setText(
             f"就诊：{self.encounter_id}" if self.encounter_id else "就诊：未接诊"
         )
@@ -80,6 +86,7 @@ class PatientInfoPanel(QFrame):
         self.name.setText("未选择")
         self.demo.setText("")
         self.allergy.setText("")
+        self.history.setText("")
         self.encounter.setText("")
         self.status.setText("")
         self.phone.setText("")

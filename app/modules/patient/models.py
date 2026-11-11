@@ -45,6 +45,10 @@ class Patient(Base):
     allergy_detail: Mapped[str] = mapped_column(
         String(200), nullable=False, default="", server_default=""
     )
+    # 特殊既往病史/慢病：糖尿病、高血压、冠心病等，患者级长期信息
+    special_history: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="", server_default=""
+    )
     privacy_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="normal", server_default="normal"

@@ -151,6 +151,7 @@ class CashierDemo(QMainWindow):
             self.widget.p_birth_date.setText("1997-05-20")
             self.widget.p_phone.setText("13800001234")
             self.widget.p_address.setText("北京市东城区演示街道 1 号")
+            self.widget.p_special_history.setText("2型糖尿病 8 年；高血压 5 年")
             self.widget.p_emergency_name.setText("演示家属")
             self.widget.p_emergency_relation.setText("配偶")
             self.widget.p_emergency_phone.setText("13900001234")

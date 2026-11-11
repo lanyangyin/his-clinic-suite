@@ -25,6 +25,7 @@ class PatientCreate(BaseModel):
     insurance_type: InsuranceType = "self_pay"
     allergy_status: AllergyStatus = "unknown"
     allergy_detail: str = Field(default="", max_length=200)
+    special_history: str = Field(default="", max_length=500)
     privacy_consent: bool = False
 
     @model_validator(mode="after")
@@ -55,6 +56,7 @@ class PatientUpdate(BaseModel):
     insurance_type: InsuranceType | None = None
     allergy_status: AllergyStatus | None = None
     allergy_detail: str | None = Field(default=None, max_length=200)
+    special_history: str | None = Field(default=None, max_length=500)
     privacy_consent: bool | None = None
 
 
@@ -76,6 +78,7 @@ class PatientResponse(BaseModel):
     allergy_status: str
     allergy_detail: str
     allergy_label: str
+    special_history: str
     privacy_consent_at: datetime | None
     status: str
     created_at: datetime

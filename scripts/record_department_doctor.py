@@ -155,7 +155,11 @@ class DoctorDemo(QMainWindow):
         )
         self.patient = self.cashier.call(
             "POST", "/patients/",
-            json={"name": f"医生演示患者{self.suffix}", "id_number": f"1101011998{self.suffix[-6:]}77"},
+            json={
+                "name": f"医生演示患者{self.suffix}",
+                "id_number": f"1101011998{self.suffix[-6:]}77",
+                "special_history": "2型糖尿病 8 年；高血压 5 年",
+            },
         )
         reg = self.cashier.call(
             "POST", "/registrations/",

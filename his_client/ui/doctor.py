@@ -466,6 +466,7 @@ class DoctorWidget(QWidget):
             "gender": item.get("gender"),
             "age": item.get("age"),
             "allergy_label": item.get("allergy_label"),
+            "special_history": item.get("special_history"),
             "phone": item.get("phone"),
         }
         status = "已接诊" if item.get("encounter_id") else "待接诊"
@@ -584,6 +585,7 @@ class DoctorWidget(QWidget):
             "gender": item.get("gender"),
             "age": item.get("age"),
             "allergy_label": item.get("allergy_label"),
+            "special_history": item.get("special_history"),
             "phone": item.get("phone"),
         }
         self.banner.set_patient(patient, encounter["id"], "已接诊")
@@ -732,7 +734,6 @@ class DoctorWidget(QWidget):
         if not hasattr(self, "side_info"):
             return
         if not encounter_id:
-            self.side_info.clear()
             return
         try:
             summary = self.api.encounter_summary(encounter_id)
@@ -746,6 +747,7 @@ class DoctorWidget(QWidget):
                 "gender": summary.get("gender"),
                 "age": summary.get("age"),
                 "allergy_label": summary.get("allergy_label"),
+                "special_history": summary.get("special_history"),
                 "phone": summary.get("phone"),
             },
             encounter_id,
