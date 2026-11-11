@@ -1358,12 +1358,23 @@ class DoctorWidget(QWidget):
         self.rx_search.setClearButtonEnabled(True)
         self.rx_search.textChanged.connect(self._filter_drugs)
         top.addWidget(self.rx_search, 1)
+        self.rx_form_filter = QComboBox()
+        for label, value in (
+            ("全部剂型", ""),
+            ("口服", "口服"),
+            ("注射", "注射"),
+            ("外用", "外用"),
+            ("其他", "其他"),
+        ):
+            self.rx_form_filter.addItem(label, value)
+        self.rx_form_filter.currentIndexChanged.connect(self._filter_drugs)
+        top.addWidget(self.rx_form_filter)
         layout.addLayout(top)
 
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(0, 0, 16, 0)
         left_title = QLabel("药品目录")
         left_title.setStyleSheet("font-weight:bold;color:#cbd5e1")
         left_layout.addWidget(left_title)
@@ -1381,7 +1392,7 @@ class DoctorWidget(QWidget):
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(8, 0, 0, 0)
         box = QGroupBox("开立处方")
         form = QFormLayout(box)
         self.rx_drug_id = QLineEdit()
@@ -1430,7 +1441,103 @@ class DoctorWidget(QWidget):
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([680, 460])
         layout.addWidget(splitter, 1)
+
+        rx_tabs = QTabWidget()
+        rx_tabs.addTab(page, "西药 / 中成药 / 注射")
+        rx_tabs.addTab(self._build_tcm_prescription_page(), "中药饮片")
+        self.rx_type_tabs = rx_tabs
+        rx_tabs.currentChanged.connect(self._on_rx_type_changed)
+        outer = QWidget()
+        outer_layout = QVBoxLayout(outer)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(rx_tabs)
+        return outer
+
+    def _build_tcm_prescription_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新饮片目录")
+        refresh.clicked.connect(self._load_tcm_herbs)
+        self.tcm_search = QLineEdit()
+        self.tcm_search.setPlaceholderText("搜索饮片名称")
+        self.tcm_search.setClearButtonEnabled(True)
+        self.tcm_search.textChanged.connect(self._filter_tcm_herbs)
+        top.addWidget(refresh)
+        top.addWidget(self.tcm_search, 1)
+        layout.addLayout(top)
+
+        splitter = QSplitter(Qt.Horizontal)
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 16, 0)
+        left_title = QLabel("中药饮片目录（双击加入）")
+        left_title.setStyleSheet("font-weight:bold;color:#cbd5e1")
+        left_layout.addWidget(left_title)
+        self.herb_table = QTableWidget(0, 5)
+        self.herb_table.setHorizontalHeaderLabels(["ID", "饮片", "单价/g", "毒性", "备注"])
+        self.herb_table.cellDoubleClicked.connect(self._add_tcm_herb)
+        self.herb_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        left_layout.addWidget(self.herb_table, 1)
+        splitter.addWidget(left)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(16, 0, 0, 0)
+        form_box = QGroupBox("开中药处方")
+        form = QFormLayout(form_box)
+        self.tcm_formula = QLineEdit()
+        self.tcm_formula.setPlaceholderText("方名，如 银翘散")
+        self.tcm_packs = QSpinBox()
+        self.tcm_packs.setRange(1, 100)
+        self.tcm_packs.setValue(1)
+        self.tcm_decoct = QComboBox()
+        self.tcm_decoct.addItem("代煎", "decoct")
+        self.tcm_decoct.addItem("自煎", "self")
+        self.tcm_usage = QComboBox()
+        self.tcm_usage.addItem("内服", "internal")
+        self.tcm_usage.addItem("外用", "external")
+        self.tcm_method = QLineEdit("常规煎煮")
+        self.tcm_note = QLineEdit()
+        self.tcm_note.setPlaceholderText("备注")
+        form.addRow("方名", self.tcm_formula)
+        form.addRow("剂数", self.tcm_packs)
+        form.addRow("煎法", self.tcm_decoct)
+        form.addRow("用法", self.tcm_usage)
+        form.addRow("煎煮方法", self.tcm_method)
+        form.addRow("备注", self.tcm_note)
+        right_layout.addWidget(form_box)
+
+        selected_title = QLabel("本方饮片（剂量可改）")
+        selected_title.setStyleSheet("font-weight:bold;color:#cbd5e1")
+        right_layout.addWidget(selected_title)
+        self.tcm_table = QTableWidget(0, 4)
+        self.tcm_table.setHorizontalHeaderLabels(["ID", "饮片", "剂量g", "煎法"])
+        self.tcm_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        right_layout.addWidget(self.tcm_table, 1)
+        self.tcm_msg = QLabel("")
+        self.tcm_msg.setWordWrap(True)
+        right_layout.addWidget(self.tcm_msg)
+        row = QHBoxLayout()
+        remove = QPushButton("移除选中")
+        remove.clicked.connect(self._remove_tcm_item)
+        submit = QPushButton("开中药处方")
+        submit.clicked.connect(self._create_tcm_prescription)
+        row.addWidget(remove)
+        row.addStretch(1)
+        row.addWidget(submit)
+        right_layout.addLayout(row)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([650, 520])
+        layout.addWidget(splitter, 1)
+        self.tcm_items: list[dict] = []
         return page
+
+    def _on_rx_type_changed(self, _index: int) -> None:
+        if not hasattr(self, "tcm_herb_rows"):
+            self._load_tcm_herbs()
 
     def _load_drugs(self) -> None:
         try:
@@ -1471,6 +1578,19 @@ class DoctorWidget(QWidget):
                 if term in str(drug.get("name", "")).lower()
                 or term in str(drug.get("spec", "")).lower()
             ]
+        form = self.rx_form_filter.currentData() if hasattr(self, "rx_form_filter") else ""
+        if form:
+            def matches(drug: dict) -> bool:
+                text = f"{drug.get('name', '')}{drug.get('dosage_form', '')}"
+                if form == "注射":
+                    return "注射" in text
+                if form == "口服":
+                    return any(key in text for key in ("口服", "片", "胶囊", "颗粒", "丸", "糖浆"))
+                if form == "外用":
+                    return any(key in text for key in ("外用", "膏", "贴", "滴眼", "滴鼻", "栓"))
+                return not any(key in text for key in ("注射", "口服", "片", "胶囊", "颗粒", "丸", "外用", "膏", "贴", "滴眼"))
+
+            rows = [drug for drug in rows if matches(drug)]
         self.drug_table.setRowCount(len(rows))
         for row, drug in enumerate(rows):
             category = drug.get("insurance_category") or ""
@@ -1491,7 +1611,136 @@ class DoctorWidget(QWidget):
                 if col == 4 and drug.get("stock", 0) <= 0:
                     cell.setForeground(Qt.red)
                 self.drug_table.setItem(row, col, cell)
-        self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{term}）" if term else ""))
+        filters = " / ".join(
+            part for part in (term, form) if part
+        )
+        self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{filters}）" if filters else ""))
+
+    def _load_tcm_herbs(self) -> None:
+        try:
+            self.tcm_herb_rows = self.api.list_tcm_herbs()
+        except ApiError as e:
+            self.tcm_msg.setText(f"饮片加载失败（{e.status_code}）：{e.detail}")
+            return
+        self._filter_tcm_herbs()
+
+    def _filter_tcm_herbs(self) -> None:
+        term = self.tcm_search.text().strip().lower() if hasattr(self, "tcm_search") else ""
+        rows = getattr(self, "tcm_herb_rows", [])
+        if term:
+            rows = [row for row in rows if term in str(row.get("name", "")).lower()]
+        self.tcm_herb_filtered = rows
+        self.herb_table.setRowCount(len(rows))
+        for index, herb in enumerate(rows):
+            values = [
+                str(herb["id"]),
+                herb["name"],
+                f"{herb.get('price_per_g', 0):.2f}",
+                {"none": "普通", "toxic": "毒性", "precious": "贵重"}.get(
+                    herb.get("toxicity"), herb.get("toxicity") or ""
+                ),
+                herb.get("note") or "",
+            ]
+            for col, value in enumerate(values):
+                self.herb_table.setItem(index, col, QTableWidgetItem(str(value)))
+        self.tcm_msg.setText(f"饮片 {len(rows)} 种" + (f"（筛选：{term}）" if term else ""))
+
+    def _add_tcm_herb(self, row: int, _col: int) -> None:
+        rows = getattr(self, "tcm_herb_filtered", [])
+        if not (0 <= row < len(rows)):
+            return
+        herb = rows[row]
+        if any(item["herb_id"] == herb["id"] for item in self.tcm_items):
+            self.tcm_msg.setText(f"{herb['name']} 已在方中")
+            return
+        self.tcm_items.append(
+            {
+                "herb_id": herb["id"],
+                "herb_name": herb["name"],
+                "dose_g": 10.0,
+                "special": "none",
+            }
+        )
+        self._render_tcm_items()
+
+    def _remove_tcm_item(self) -> None:
+        row = self.tcm_table.currentRow()
+        if 0 <= row < len(self.tcm_items):
+            self.tcm_items.pop(row)
+            self._render_tcm_items()
+
+    def _render_tcm_items(self) -> None:
+        labels = [
+            ("常规", "none"),
+            ("先煎", "first"),
+            ("后下", "last"),
+            ("包煎", "wrap"),
+            ("另煎", "separate"),
+            ("烊化", "melt"),
+            ("冲服", "infuse"),
+        ]
+        self.tcm_table.setRowCount(len(self.tcm_items))
+        for row, item in enumerate(self.tcm_items):
+            self.tcm_table.setItem(row, 0, QTableWidgetItem(str(item["herb_id"])))
+            self.tcm_table.setItem(row, 1, QTableWidgetItem(item["herb_name"]))
+            self.tcm_table.setItem(row, 2, QTableWidgetItem(f"{item['dose_g']:.1f}"))
+            combo = QComboBox()
+            for text, value in labels:
+                combo.addItem(text, value)
+            index = combo.findData(item.get("special") or "none")
+            if index >= 0:
+                combo.setCurrentIndex(index)
+            self.tcm_table.setCellWidget(row, 3, combo)
+        self.tcm_msg.setText(f"本方 {len(self.tcm_items)} 味饮片")
+
+    def _create_tcm_prescription(self) -> None:
+        encounter_id = self.rx_encounter_id.value()
+        if not encounter_id:
+            self.tcm_msg.setText("请先选择已接诊患者")
+            return
+        if not self.tcm_items:
+            self.tcm_msg.setText("请先双击左侧饮片加入处方")
+            return
+        items = []
+        for row, item in enumerate(self.tcm_items):
+            dose_item = self.tcm_table.item(row, 2)
+            try:
+                dose = float((dose_item.text() if dose_item else "").strip())
+            except ValueError:
+                self.tcm_msg.setText(f"{item['herb_name']} 剂量无效")
+                return
+            if dose <= 0:
+                self.tcm_msg.setText(f"{item['herb_name']} 剂量必须大于 0")
+                return
+            combo = self.tcm_table.cellWidget(row, 3)
+            items.append(
+                {
+                    "herb_id": item["herb_id"],
+                    "dose_g": dose,
+                    "special": combo.currentData() if combo else "none",
+                    "note": "",
+                }
+            )
+        payload = {
+            "formula_name": self.tcm_formula.text().strip(),
+            "usage": self.tcm_usage.currentData(),
+            "packs": self.tcm_packs.value(),
+            "decoct_service": self.tcm_decoct.currentData(),
+            "decoction_method": self.tcm_method.text().strip() or "常规煎煮",
+            "note": self.tcm_note.text().strip(),
+            "items": items,
+        }
+        try:
+            prescription = self.api.create_tcm_prescription(encounter_id, payload)
+        except ApiError as e:
+            self.tcm_msg.setText(f"开中药方失败（{e.status_code}）：{e.detail}")
+            return
+        self.tcm_items = []
+        self._render_tcm_items()
+        self.tcm_msg.setText(
+            f"中药处方已开：{prescription['prescription_no']}，"
+            f"金额 {prescription['total_amount']:.2f} 元"
+        )
 
     def _pick_drug_row(self, row: int, _col: int) -> None:
         cell = self.drug_table.item(row, 0)
@@ -1501,7 +1750,8 @@ class DoctorWidget(QWidget):
         if not self.rx_frequency.text().strip():
             self.rx_frequency.setText("bid")
         if not self.rx_route.text().strip():
-            self.rx_route.setText("口服")
+            dosage = self.drug_table.item(row, 1).text() if self.drug_table.item(row, 1) else ""
+            self.rx_route.setText("静滴" if "注射" in dosage else "口服")
 
     def _add_prescription(self) -> None:
         drug_id = self.rx_drug_id.text().strip()

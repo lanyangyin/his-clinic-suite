@@ -137,6 +137,15 @@ class DoctorDemo(QMainWindow):
         self.drug = self.admin.call(
             "POST", "/drugs/", json={"name": f"医生演示药{self.suffix}", "base_price": 16}
         )
+        self.injection = self.admin.call(
+            "POST", "/drugs/",
+            json={
+                "name": f"医生演示注射剂{self.suffix}",
+                "base_price": 18,
+                "spec": "0.5g",
+                "dosage_form": "注射剂",
+            },
+        )
         self.lab = self.admin.call(
             "POST", "/lab/items/", json={"code": f"LD{self.suffix[-6:]}", "name": f"医生演示检验{self.suffix}", "price": 25}
         )
@@ -247,7 +256,33 @@ class DoctorDemo(QMainWindow):
             self.widget.rx_frequency.setText("tid")
             self.widget.rx_route.setText("口服")
             self.click(rx_tab, "开方")
-            self.scene("处方已开，开检验单", self.tab("检验"))
+            self.scene("西药处方已开；切换到注射剂", rx_tab)
+            self.widget.rx_type_tabs.setCurrentIndex(0)
+            self.widget._load_drugs()
+            self.widget.rx_form_filter.setCurrentIndex(
+                self.widget.rx_form_filter.findData("注射")
+            )
+            self.wait(0.8)
+            for row in range(self.widget.drug_table.rowCount()):
+                if self.widget.drug_table.item(row, 1).text() == self.injection["name"]:
+                    self.widget.drug_table.selectRow(row)
+                    self.widget.rx_drug_id.setText(self.widget.drug_table.item(row, 0).text())
+                    self.widget.rx_quantity.setValue(1)
+                    self.widget.rx_dosage.setText("0.5g")
+                    self.widget.rx_frequency.setText("qd")
+                    self.widget.rx_route.setText("静滴")
+                    break
+            self.click(rx_tab, "开方")
+            self.scene("注射剂已开；切换到中药饮片", rx_tab)
+            self.widget.rx_type_tabs.setCurrentIndex(1)
+            self.widget._load_tcm_herbs()
+            self.wait(0.8)
+            if self.widget.herb_table.rowCount():
+                self.widget._add_tcm_herb(0, 0)
+                self.widget.tcm_formula.setText("演示方")
+                self.widget._create_tcm_prescription()
+            assert "中药处方已开" in self.widget.tcm_msg.text(), self.widget.tcm_msg.text()
+            self.scene("中药饮片已开，开检验单", self.tab("检验"))
             exam_tab = self.tab("检验")
             self.widget.exam_encounter_id.setValue(self.encounter["id"])
             self.click(exam_tab, "刷新检验项目")
