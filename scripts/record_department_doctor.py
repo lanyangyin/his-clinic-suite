@@ -138,7 +138,6 @@ class DoctorDemo(QMainWindow):
             json={"patient_id": self.patient["id"], "doctor_id": self.doc["id"]},
         )
         self.registration = reg
-
     def run(self):
         try:
             FRAME_DIR.mkdir(parents=True, exist_ok=True)
@@ -149,6 +148,7 @@ class DoctorDemo(QMainWindow):
             self.caption.show()
             self.wait(1.5)
             self.setup()
+            self.widget.auto_timer.stop()
             work = self.tab("门诊工作台")
             self.widget._load_workbench()
             self.scene("医生站演示：未选患者直接点开始接诊", work)
