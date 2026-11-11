@@ -1,5 +1,4 @@
-"""患者信息侧卡：独立显示当前患者，不承担导航。"""
-from PySide6.QtCore import Qt
+"""患者信息侧卡：基本信息、就诊信息、过敏史、特殊既往史各自独立成框。"""
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 from his_client.ui.theme import colors
@@ -13,38 +12,103 @@ class PatientInfoPanel(QFrame):
         self.setMaximumWidth(280)
         c = colors()
         self.setStyleSheet(
-            f"#patientInfoPanel{{background:{c['card']};border:1px solid {c['border']};border-radius:8px;}}"
-            f"#patientInfoPanel QLabel{{color:{c['text']};font-size:12px;}}"
-            f"#patientInfoPanel QLabel#title{{font-size:15px;font-weight:bold;color:{c['title']};}}"
-            f"#patientInfoPanel QLabel#allergy{{color:{c['danger']};font-weight:bold;}}"
-            f"#patientInfoPanel QLabel#history{{color:{c['warning']};font-weight:bold;}}"
+            f"""
+            #patientInfoPanel {{ background: transparent; }}
+            #headerCard, #infoCard {{
+                background: {c['card']};
+                border: 1px solid {c['border']};
+                border-radius: 8px;
+            }}
+            #allergyCard {{
+                background: {c['card']};
+                border: 1px solid {c['danger']};
+                border-left: 4px solid {c['danger']};
+                border-radius: 8px;
+            }}
+            #historyCard {{
+                background: {c['card']};
+                border: 1px solid {c['warning']};
+                border-left: 4px solid {c['warning']};
+                border-radius: 8px;
+            }}
+            #patientInfoPanel QLabel {{ color: {c['text']}; font-size: 12px; }}
+            #patientInfoPanel QLabel#title {{
+                font-size: 15px; font-weight: bold; color: {c['title']};
+            }}
+            #patientInfoPanel QLabel#cardTitle {{
+                font-size: 12px; font-weight: bold; color: {c['muted']};
+            }}
+            #patientInfoPanel QLabel#allergyValue {{
+                color: {c['danger']}; font-weight: bold;
+            }}
+            #patientInfoPanel QLabel#historyValue {{
+                color: {c['warning']}; font-weight: bold;
+            }}
+            """
         )
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        header = QFrame()
+        header.setObjectName("headerCard")
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(10, 8, 10, 8)
+        header_layout.setSpacing(3)
         self.title = QLabel("当前患者")
         self.title.setObjectName("title")
         self.name = QLabel("未选择")
         self.name.setStyleSheet(f"font-size:16px;font-weight:bold;color:{c['title']};")
         self.demo = QLabel("")
-        self.allergy = QLabel("")
-        self.allergy.setObjectName("allergy")
-        self.allergy.setWordWrap(True)
-        self.history = QLabel("")
-        self.history.setObjectName("history")
-        self.history.setWordWrap(True)
+        header_layout.addWidget(self.title)
+        header_layout.addWidget(self.name)
+        header_layout.addWidget(self.demo)
+        outer.addWidget(header)
+
+        info = QFrame()
+        info.setObjectName("infoCard")
+        info_layout = QVBoxLayout(info)
+        info_layout.setContentsMargins(10, 7, 10, 7)
+        info_layout.setSpacing(2)
         self.encounter = QLabel("")
         self.status = QLabel("")
         self.status.setWordWrap(True)
         self.phone = QLabel("")
         self.extra = QLabel("")
         self.extra.setWordWrap(True)
-        for widget in (
-            self.title, self.name, self.demo, self.allergy, self.history,
-            self.encounter, self.status, self.phone, self.extra,
-        ):
-            layout.addWidget(widget)
-        layout.addStretch(1)
+        for widget in (self.encounter, self.status, self.phone, self.extra):
+            info_layout.addWidget(widget)
+        outer.addWidget(info)
+
+        allergy_card = QFrame()
+        allergy_card.setObjectName("allergyCard")
+        allergy_layout = QVBoxLayout(allergy_card)
+        allergy_layout.setContentsMargins(10, 7, 10, 7)
+        allergy_layout.setSpacing(2)
+        allergy_title = QLabel("过敏史")
+        allergy_title.setObjectName("cardTitle")
+        self.allergy = QLabel("过敏史不详")
+        self.allergy.setObjectName("allergyValue")
+        self.allergy.setWordWrap(True)
+        allergy_layout.addWidget(allergy_title)
+        allergy_layout.addWidget(self.allergy)
+        outer.addWidget(allergy_card)
+
+        history_card = QFrame()
+        history_card.setObjectName("historyCard")
+        history_layout = QVBoxLayout(history_card)
+        history_layout.setContentsMargins(10, 7, 10, 7)
+        history_layout.setSpacing(2)
+        history_title = QLabel("特殊既往史")
+        history_title.setObjectName("cardTitle")
+        self.history = QLabel("无特殊")
+        self.history.setObjectName("historyValue")
+        self.history.setWordWrap(True)
+        history_layout.addWidget(history_title)
+        history_layout.addWidget(self.history)
+        outer.addWidget(history_card)
+
+        outer.addStretch(1)
         self.patient_id = 0
         self.encounter_id = 0
 
@@ -68,13 +132,9 @@ class PatientInfoPanel(QFrame):
             f"{patient.get('patient_no') or ''}"
         )
         allergy = patient.get("allergy_label") or "过敏史不详"
-        self.allergy.setText(
-            f"⚠ {allergy}"
-            if allergy not in ("无过敏史", "不详", "过敏史不详")
-            else allergy
-        )
+        self.allergy.setText(allergy)
         special = (patient.get("special_history") or "").strip()
-        self.history.setText(f"特殊既往史：{special or '无特殊'}")
+        self.history.setText(special or "无特殊")
         self.encounter.setText(
             f"就诊：{self.encounter_id}" if self.encounter_id else "就诊：未接诊"
         )
@@ -88,8 +148,8 @@ class PatientInfoPanel(QFrame):
         self.encounter_id = 0
         self.name.setText("未选择")
         self.demo.setText("")
-        self.allergy.setText("")
-        self.history.setText("")
+        self.allergy.setText("过敏史不详")
+        self.history.setText("无特殊")
         self.encounter.setText("")
         self.status.setText("")
         self.phone.setText("")
