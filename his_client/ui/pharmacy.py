@@ -1,6 +1,6 @@
 """药房工作站：入库单（收货/验收/入库）、发药/退药、零售、库存查询、医保目录查询。"""
-from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QUrl, QTimer
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.payment import PaymentPanel
 
 ORDER_TYPES = [
@@ -44,8 +45,10 @@ class PharmacyWidget(QWidget):
         self.outbound_items: list[dict] = []
         self.current_order: dict | None = None
         self.handle_order: dict | None = None
+        self.banner = PatientBanner()
 
-        tabs = QTabWidget()
+        self.tabs = QTabWidget()
+        tabs = self.tabs
         # 库房：入库 / 出库审核 / 总库库存
         if role in ("warehouse", "admin"):
             tabs.addTab(self._build_inbound_tab(), "入库单")
@@ -63,12 +66,30 @@ class PharmacyWidget(QWidget):
         tabs.addTab(self._build_expiry_tab(), "效期预警")
         tabs.addTab(self._build_trace_tab(), "追溯码")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(tabs)
         if role in ("warehouse", "admin"):
             self._load_drugs()  # 入库药品下拉默认加载医保目录
             self._load_materials()  # 入库物资下拉默认加载医保耗材目录
         if role in ("pharmacist", "admin"):
             self._load_retail_catalog()
+            QShortcut(QKeySequence("F2"), self, activated=self._focus_dispense_scan)
+            QShortcut(QKeySequence("F3"), self, activated=self._load_worklist)
+            self.auto_timer = QTimer(self)
+            self.auto_timer.timeout.connect(self._auto_refresh_worklist)
+            self.auto_timer.start(15000)
+
+    def _focus_dispense_scan(self) -> None:
+        for index in range(self.tabs.count()):
+            if "发药" in self.tabs.tabText(index):
+                self.tabs.setCurrentIndex(index)
+                break
+        self.disp_scan.setFocus()
+        self.disp_scan.selectAll()
+
+    def _auto_refresh_worklist(self) -> None:
+        if self.isVisible() and self.role in ("pharmacist", "admin"):
+            self._load_worklist()
 
     # ---------- 入库单 ----------
     def _build_inbound_tab(self) -> QWidget:
@@ -615,6 +636,7 @@ class PharmacyWidget(QWidget):
             ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
         )
         self.worklist_table.cellClicked.connect(self._select_worklist)
+        self.worklist_table.cellDoubleClicked.connect(self._call_row)
         layout.addWidget(self.worklist_table, 1)
 
         sign_row = QHBoxLayout()
@@ -734,6 +756,14 @@ class PharmacyWidget(QWidget):
             self.disp_msg.setText(f"条码解析失败（{e.status_code}）：{e.detail}")
             return
         self.disp_encounter_id.setValue(lookup["encounter_id"])
+        self.banner.set_patient(
+            {
+                "id": lookup.get("patient_id"),
+                "name": lookup.get("patient_name"),
+            },
+            lookup["encounter_id"],
+            lookup.get("status_text") or "",
+        )
         if not lookup["is_paid"]:
             self.disp_scan_status.setStyleSheet("color:#b91c1c;font-weight:bold")
             self.disp_scan_status.setText(
@@ -769,11 +799,24 @@ class PharmacyWidget(QWidget):
             item = self.worklist[row]
             self.disp_encounter_id.setValue(item["encounter_id"])
             self.pickup_code.setText(item.get("pickup_code", ""))
+            self.banner.set_patient(
+                {
+                    "id": item.get("patient_id"),
+                    "name": item.get("patient_name"),
+                    "allergy_label": item.get("allergy_label"),
+                },
+                item["encounter_id"],
+                "已收费，可发药",
+            )
+
+    def _call_row(self, row: int, _col: int) -> None:
+        self.worklist_table.selectRow(row)
+        self._select_worklist(row, 0)
+        self._call()
 
     def _call(self) -> None:
         try:
-            call = self.api.call_pharmacy(
-                self.disp_encounter_id.value(),
+            call = self.api.call_pharmacy(                self.disp_encounter_id.value(),
                 self.disp_window.text().strip() or "1号窗",
                 self.disp_note.text().strip(),
             )

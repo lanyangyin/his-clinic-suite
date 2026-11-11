@@ -1,7 +1,10 @@
 """医生工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QComboBox,
+    QCompleter,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -22,6 +25,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.payment import PaymentPanel
 
 _RECORD_FIELDS = [
@@ -38,6 +42,7 @@ class DoctorWidget(QWidget):
         super().__init__(parent)
         self.api = api
         self.insurance_enabled = load_config().insurance_enabled
+        self.banner = PatientBanner()
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_workbench_tab(), "门诊工作台")
         self.tabs.addTab(self._build_register_tab(), "挂号")
@@ -49,8 +54,50 @@ class DoctorWidget(QWidget):
         self.tabs.addTab(self._build_exam_tab(), "检验 / 检查")
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
+        layout.addWidget(self.banner)
         layout.addWidget(self.tabs)
         self._load_diagnoses()
+        self._install_shortcuts()
+        self.auto_timer = QTimer(self)
+        self.auto_timer.timeout.connect(self._auto_refresh)
+        self.auto_timer.start(15000)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
+    def _on_tab_changed(self, _index: int) -> None:
+        if "开方" in self.tabs.tabText(self.tabs.currentIndex()) and not hasattr(self, "drug_rows"):
+            self._load_drugs()
+
+    def _print_current(self) -> None:
+        encounter_id = self.banner.encounter_id
+        if not encounter_id:
+            self.wb_summary.setText("请先选择患者并接诊")
+            return
+        QDesktopServices.openUrl(
+            QUrl(self.api.prescription_print_url(encounter_id))
+        )
+
+    def _install_shortcuts(self) -> None:
+        QShortcut(QKeySequence("F2"), self, activated=self._focus_workbench_search)
+        QShortcut(QKeySequence("F3"), self, activated=self._load_workbench)
+        QShortcut(QKeySequence("F4"), self, activated=self._start_workbench)
+        QShortcut(QKeySequence("F5"), self, activated=self._wb_record)
+        QShortcut(QKeySequence("F6"), self, activated=self._wb_prescribe)
+        QShortcut(QKeySequence("F8"), self, activated=lambda: self._switch_tab("收费"))
+        QShortcut(QKeySequence("F9"), self, activated=self._print_current)
+        QShortcut(QKeySequence("Esc"), self, activated=self._clear_workbench_search)
+
+    def _focus_workbench_search(self) -> None:
+        self.tabs.setCurrentIndex(0)
+        self.wb_search.setFocus()
+        self.wb_search.selectAll()
+
+    def _clear_workbench_search(self) -> None:
+        if self.wb_search.text():
+            self.wb_search.clear()
+
+    def _auto_refresh(self) -> None:
+        if self.tabs.currentIndex() == 0 and self.isVisible():
+            self._load_workbench()
 
     # ---------- 门诊工作台 ----------
     def _build_workbench_tab(self) -> QWidget:
@@ -58,8 +105,13 @@ class DoctorWidget(QWidget):
         layout = QVBoxLayout(page)
         top = QHBoxLayout()
         top.addWidget(QLabel("今日门诊队列（待接诊 + 今日已接诊）"))
+        self.wb_search = QLineEdit()
+        self.wb_search.setPlaceholderText("F2 搜索姓名/电话/挂号号")
+        self.wb_search.setClearButtonEnabled(True)
+        self.wb_search.textChanged.connect(self._filter_workbench)
         refresh = QPushButton("刷新队列")
         refresh.clicked.connect(self._load_workbench)
+        top.addWidget(self.wb_search, 1)
         top.addWidget(refresh)
         top.addStretch(1)
         layout.addLayout(top)
@@ -69,7 +121,9 @@ class DoctorWidget(QWidget):
             ["挂号", "患者", "医生", "挂号状态", "就诊", "诊断", "待缴"]
         )
         self.wb_table.cellClicked.connect(self._select_workbench)
-        layout.addWidget(self.wb_table, 1)
+        self.wb_table.cellDoubleClicked.connect(
+            lambda row, _col: self._start_workbench_row(row)
+        )
 
         self.wb_patient = QLabel("请选择患者")
         self.wb_patient.setStyleSheet("font-weight:bold;color:#0f172a")
@@ -164,12 +218,27 @@ class DoctorWidget(QWidget):
 
     def _load_workbench(self) -> None:
         try:
-            self.workbench_rows = self.api.doctor_worklist()
+            self.workbench_all = self.api.doctor_worklist()
         except ApiError as e:
             self.wb_summary.setText(f"加载队列失败（{e.status_code}）：{e.detail}")
             return
-        self.wb_table.setRowCount(len(self.workbench_rows))
-        for row, item in enumerate(self.workbench_rows):
+        self._filter_workbench()
+        self._load_critical_alerts()
+
+    def _filter_workbench(self) -> None:
+        term = self.wb_search.text().strip().lower() if hasattr(self, "wb_search") else ""
+        rows = getattr(self, "workbench_all", getattr(self, "workbench_rows", []))
+        if term:
+            rows = [
+                item
+                for item in rows
+                if term in str(item.get("patient_name", "")).lower()
+                or term in str(item.get("phone", "")).lower()
+                or term in str(item.get("registration_id", "")).lower()
+            ]
+        self.workbench_rows = rows
+        self.wb_table.setRowCount(len(rows))
+        for row, item in enumerate(rows):
             gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
             age = item.get("age")
             allergy = item.get("allergy_label") or "不详"
@@ -189,8 +258,23 @@ class DoctorWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
-        self.wb_summary.setText(f"今日队列 {len(self.workbench_rows)} 人")
-        self._load_critical_alerts()
+        total = len(getattr(self, "workbench_all", rows))
+        self.wb_summary.setText(
+            f"显示 {len(rows)} / 今日 {total} 人" if term else f"今日队列 {total} 人"
+        )
+        current = getattr(self, "wb_current", None)
+        if current:
+            for index, item in enumerate(rows):
+                if item["registration_id"] == current.get("registration_id"):
+                    self.wb_table.selectRow(index)
+                    break
+
+    def _start_workbench_row(self, row: int) -> None:
+        if 0 <= row < len(getattr(self, "workbench_rows", [])):
+            self.wb_table.selectRow(row)
+            self._select_workbench(row, 0)
+            if self.wb_start.isEnabled():
+                self._start_workbench()
 
     def _load_critical_alerts(self) -> None:
         try:
@@ -254,6 +338,18 @@ class DoctorWidget(QWidget):
             return
         item = self.workbench_rows[row]
         self.wb_current = item
+        self.banner.set_patient(
+            {
+                "id": item.get("patient_id"),
+                "patient_no": item.get("patient_no"),
+                "name": item.get("patient_name"),
+                "gender": item.get("gender"),
+                "age": item.get("age"),
+                "allergy_label": item.get("allergy_label"),
+            },
+            item.get("encounter_id"),
+            "已接诊" if item.get("encounter_id") else "待接诊",
+        )
         gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
         age = item.get("age")
         allergy = item.get("allergy_label") or "不详"
@@ -278,8 +374,10 @@ class DoctorWidget(QWidget):
             self.wb_diagnosis_code.blockSignals(False)
         self.wb_start.setEnabled(not item.get("encounter_id"))
         if item.get("encounter_id"):
+            self._set_encounter_everywhere(item["encounter_id"])
             self._load_workbench_summary(item["encounter_id"])
         else:
+            self._set_encounter_everywhere(None)
             self.wb_fee_table.setRowCount(0)
             self.wb_summary.setText("尚未接诊，填写诊断后点「开始接诊」")
 
@@ -335,6 +433,19 @@ class DoctorWidget(QWidget):
                 self._select_workbench(row, 0)
                 break
         self.wb_summary.setText(f"接诊成功：就诊 ID {encounter['id']}")
+        self._set_encounter_everywhere(encounter["id"])
+        self.banner.set_patient(
+            {
+                "id": item.get("patient_id"),
+                "patient_no": item.get("patient_no"),
+                "name": item.get("patient_name"),
+                "gender": item.get("gender"),
+                "age": item.get("age"),
+                "allergy_label": item.get("allergy_label"),
+            },
+            encounter["id"],
+            "已接诊",
+        )
 
     def _switch_tab(self, text: str) -> None:
         for index in range(self.tabs.count()):
@@ -342,22 +453,44 @@ class DoctorWidget(QWidget):
                 self.tabs.setCurrentIndex(index)
                 return
 
+    def _set_encounter_everywhere(self, encounter_id: int | None) -> None:
+        for attr in (
+            "mr_encounter_id",
+            "rx_encounter_id",
+            "exam_encounter_id",
+            "treat_encounter_id",
+        ):
+            spin = getattr(self, attr, None)
+            if spin is not None:
+                spin.setValue(int(encounter_id or 0))
+
     def _wb_record(self) -> None:
         self._switch_tab("病历")
         if hasattr(self, "mr_encounter_id") and self.wb_current:
+            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
             self._load_record()
 
     def _wb_prescribe(self) -> None:
         self._switch_tab("开方")
+        if self.wb_current:
+            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+            self._load_drugs()
 
     def _wb_exam(self) -> None:
         self._switch_tab("检验")
+        if self.wb_current:
+            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
 
     def _wb_treat(self) -> None:
         self._switch_tab("治疗")
+        if self.wb_current:
+            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+            self._load_treatment_items()
 
     def _wb_history(self) -> None:
         self._switch_tab("历史诊疗")
+        if self.wb_current and self.wb_current.get("patient_id"):
+            self._load_history(self.wb_current["patient_id"])
 
     # ---------- 挂号（医生站现场挂号） ----------
     def _build_register_tab(self) -> QWidget:
@@ -548,7 +681,10 @@ class DoctorWidget(QWidget):
 
         top = QHBoxLayout()
         self.mr_encounter_id = QSpinBox()
-        self.mr_encounter_id.setRange(1, 10_000_000)
+        self.mr_encounter_id.setRange(0, 10_000_000)
+        self.mr_encounter_id.setSpecialValueText("未接诊")
+        self.mr_encounter_id.setReadOnly(True)
+        self.mr_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
         load = QPushButton("载入病历")
         load.clicked.connect(self._load_record)
         top.addWidget(QLabel("就诊 ID"))
@@ -890,19 +1026,31 @@ class DoctorWidget(QWidget):
 
         top = QHBoxLayout()
         self.rx_encounter_id = QSpinBox()
-        self.rx_encounter_id.setRange(1, 10_000_000)
+        self.rx_encounter_id.setRange(0, 10_000_000)
+        self.rx_encounter_id.setSpecialValueText("未接诊")
+        self.rx_encounter_id.setReadOnly(True)
+        self.rx_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
         load = QPushButton("刷新药品目录")
         load.clicked.connect(self._load_drugs)
         top.addWidget(QLabel("就诊 ID"))
         top.addWidget(self.rx_encounter_id)
         top.addWidget(load)
+        self.rx_search = QLineEdit()
+        self.rx_search.setPlaceholderText("搜索药名/规格（输入即筛选）")
+        self.rx_search.setClearButtonEnabled(True)
+        self.rx_search.textChanged.connect(self._filter_drugs)
+        top.addWidget(self.rx_search, 1)
         layout.addLayout(top)
 
-        self.drug_table = QTableWidget(0, 6)
-        self.drug_table.setHorizontalHeaderLabels(["ID", "药品", "规格", "单价", "医保比例", "医保类别"])
+        self.drug_table = QTableWidget(0, 8)
+        self.drug_table.setHorizontalHeaderLabels(
+            ["ID", "药品", "规格", "单价", "库存", "自费约", "医保比例", "医保类别"]
+        )
         if not self.insurance_enabled:
-            self.drug_table.setColumnHidden(4, True)
-            self.drug_table.setColumnHidden(5, True)
+            self.drug_table.setColumnHidden(6, True)
+            self.drug_table.setColumnHidden(7, True)
+        self.drug_table.cellClicked.connect(self._pick_drug_row)
+        self.drug_table.cellDoubleClicked.connect(self._pick_drug_row)
         layout.addWidget(self.drug_table)
 
         box = QGroupBox("开立处方")
@@ -915,8 +1063,14 @@ class DoctorWidget(QWidget):
         self.rx_dosage.setPlaceholderText("如 0.5g")
         self.rx_frequency = QLineEdit()
         self.rx_frequency.setPlaceholderText("如 bid / tid")
+        self.rx_frequency.setCompleter(
+            QCompleter(["qd", "bid", "tid", "qid", "q8h", "q12h", "prn", "st"])
+        )
         self.rx_route = QLineEdit()
         self.rx_route.setPlaceholderText("如 口服 / 静滴")
+        self.rx_route.setCompleter(
+            QCompleter(["口服", "静滴", "肌注", "皮下", "外用", "舌下", "雾化", "滴眼"])
+        )
         self.rx_days = QSpinBox()
         self.rx_days.setRange(1, 365)
         self.rx_days.setValue(3)
@@ -943,23 +1097,73 @@ class DoctorWidget(QWidget):
     def _load_drugs(self) -> None:
         try:
             drugs = self.api.list_drugs()
+            stocks = self.api.list_stocks()
         except ApiError as e:
             self.rx_msg.setText(f"加载药品失败：{e.detail}")
             return
-        self.drug_table.setRowCount(len(drugs))
-        for row, drug in enumerate(drugs):
-            self.drug_table.setItem(row, 0, QTableWidgetItem(str(drug["id"])))
-            self.drug_table.setItem(row, 1, QTableWidgetItem(drug["name"]))
-            self.drug_table.setItem(row, 2, QTableWidgetItem(drug.get("spec") or ""))
-            self.drug_table.setItem(row, 3, QTableWidgetItem(f"{drug['base_price']:.2f}"))
-            self.drug_table.setItem(row, 4, QTableWidgetItem(str(drug["insurance_ratio"])))
+        stock_by_drug: dict[int, int] = {}
+        for stock in stocks:
+            stock_by_drug[stock["drug_id"]] = (
+                stock_by_drug.get(stock["drug_id"], 0) + stock["quantity"]
+            )
+        self.drug_rows = []
+        for drug in drugs:
+            self.drug_rows.append(
+                {
+                    **drug,
+                    "stock": stock_by_drug.get(drug["id"], 0),
+                    "self_pay": round(
+                        drug["base_price"]
+                        * (1 - drug["insurance_ratio"])
+                        if self.insurance_enabled
+                        else drug["base_price"],
+                        2,
+                    ),
+                }
+            )
+        self._filter_drugs()
+
+    def _filter_drugs(self) -> None:
+        term = self.rx_search.text().strip().lower() if hasattr(self, "rx_search") else ""
+        rows = getattr(self, "drug_rows", [])
+        if term:
+            rows = [
+                drug
+                for drug in rows
+                if term in str(drug.get("name", "")).lower()
+                or term in str(drug.get("spec", "")).lower()
+            ]
+        self.drug_table.setRowCount(len(rows))
+        for row, drug in enumerate(rows):
             category = drug.get("insurance_category") or ""
             status = drug.get("insurance_match_status") or "unmatched"
             tag = f"{category}类" if category else ("歧义" if status == "ambiguous" else "未对码")
-            self.drug_table.setItem(row, 5, QTableWidgetItem(tag))
-        self.drug_table.cellClicked.connect(
-            lambda row, _col: self.rx_drug_id.setText(self.drug_table.item(row, 0).text())
-        )
+            values = [
+                str(drug["id"]),
+                drug["name"],
+                drug.get("spec") or "",
+                f"{drug['base_price']:.2f}",
+                str(drug.get("stock", 0)),
+                f"{drug.get('self_pay', drug['base_price']):.2f}",
+                str(drug["insurance_ratio"]),
+                tag,
+            ]
+            for col, value in enumerate(values):
+                cell = QTableWidgetItem(value)
+                if col == 4 and drug.get("stock", 0) <= 0:
+                    cell.setForeground(Qt.red)
+                self.drug_table.setItem(row, col, cell)
+        self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{term}）" if term else ""))
+
+    def _pick_drug_row(self, row: int, _col: int) -> None:
+        cell = self.drug_table.item(row, 0)
+        if not cell:
+            return
+        self.rx_drug_id.setText(cell.text())
+        if not self.rx_frequency.text().strip():
+            self.rx_frequency.setText("bid")
+        if not self.rx_route.text().strip():
+            self.rx_route.setText("口服")
 
     def _add_prescription(self) -> None:
         drug_id = self.rx_drug_id.text().strip()
@@ -1037,7 +1241,10 @@ class DoctorWidget(QWidget):
         layout = QVBoxLayout(page)
 
         self.exam_encounter_id = QSpinBox()
-        self.exam_encounter_id.setRange(1, 10_000_000)
+        self.exam_encounter_id.setRange(0, 10_000_000)
+        self.exam_encounter_id.setSpecialValueText("未接诊")
+        self.exam_encounter_id.setReadOnly(True)
+        self.exam_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
         row = QHBoxLayout()
         row.addWidget(QLabel("就诊 ID"))
         row.addWidget(self.exam_encounter_id)
@@ -1127,7 +1334,10 @@ class DoctorWidget(QWidget):
         box = QGroupBox("开治疗单")
         form = QFormLayout(box)
         self.treat_encounter_id = QSpinBox()
-        self.treat_encounter_id.setRange(1, 10_000_000)
+        self.treat_encounter_id.setRange(0, 10_000_000)
+        self.treat_encounter_id.setSpecialValueText("未接诊")
+        self.treat_encounter_id.setReadOnly(True)
+        self.treat_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.treat_combo = QComboBox()
         self.treat_quantity = QSpinBox()
         self.treat_quantity.setRange(1, 100)

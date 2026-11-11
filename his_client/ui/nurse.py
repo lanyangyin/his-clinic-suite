@@ -1,5 +1,6 @@
 """护士工作站：门诊分诊叫号、治疗执行。"""
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,18 +21,33 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.labels import zh
+from his_client.ui.patient_banner import PatientBanner
 
 
 class NurseWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
         self.api = api
-        tabs = QTabWidget()
-        tabs.addTab(self._build_triage_tab(), "分诊叫号")
-        tabs.addTab(self._build_treatment_tab(), "治疗执行")
-        tabs.addTab(self._build_nursing_tab(), "输液执行")
+        self.banner = PatientBanner()
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_triage_tab(), "分诊叫号")
+        self.tabs.addTab(self._build_treatment_tab(), "治疗执行")
+        self.tabs.addTab(self._build_nursing_tab(), "输液执行")
         layout = QVBoxLayout(self)
-        layout.addWidget(tabs)
+        layout.addWidget(self.banner)
+        layout.addWidget(self.tabs)
+        QShortcut(QKeySequence("F3"), self, activated=self._refresh_current)
+        self.auto_timer = QTimer(self)
+        self.auto_timer.timeout.connect(self._auto_refresh)
+        self.auto_timer.start(15000)
+
+    def _refresh_current(self) -> None:
+        if self.tabs.currentIndex() == 0:
+            self._load_queue()
+
+    def _auto_refresh(self) -> None:
+        if self.isVisible() and self.tabs.currentIndex() == 0:
+            self._load_queue()
 
     # ---------- 分诊 ----------
     def _build_triage_tab(self) -> QWidget:
@@ -142,6 +158,7 @@ class NurseWidget(QWidget):
         gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
         age = patient.get("age")
         allergy = patient.get("allergy_label") or "不详"
+        self.banner.set_patient(patient, status=f"分诊 {self.queue_table.item(row, 2).text()}")
         self.triage_patient.setText(
             f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
             f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy} · "

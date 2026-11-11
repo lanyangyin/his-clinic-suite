@@ -22,7 +22,8 @@ class MainWindow(QMainWindow):
         self.api = api
         self.user = user
         self.setWindowTitle("HIS 门诊部客户端")
-        self.resize(1100, 720)
+        self.resize(1366, 768)
+        self.setMinimumSize(1200, 700)
 
         role = user.get("role", "")
         tabs = QTabWidget()

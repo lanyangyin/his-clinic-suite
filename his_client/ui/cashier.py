@@ -1,6 +1,6 @@
 """收费员工作站：患者建档/查询、挂号、收费/退费、打印。"""
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.patient_banner import PatientBanner
 
 
 class CashierWidget(QWidget):
@@ -32,14 +33,35 @@ class CashierWidget(QWidget):
         super().__init__(parent)
         self.api = api
         self.insurance_enabled = load_config().insurance_enabled
-        tabs = QTabWidget()
-        tabs.addTab(self._build_patient_tab(), "患者建档 / 查询")
-        tabs.addTab(self._build_registration_tab(), "挂号")
-        tabs.addTab(self._build_charge_tab(), "收费 / 退费")
-        tabs.addTab(self._build_shift_tab(), "交班 / 日结")
-        tabs.addTab(self._build_print_tab(), "打印")
+        self.banner = PatientBanner()
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_patient_tab(), "患者建档 / 查询")
+        self.tabs.addTab(self._build_registration_tab(), "挂号")
+        self.tabs.addTab(self._build_charge_tab(), "收费 / 退费")
+        self.tabs.addTab(self._build_shift_tab(), "交班 / 日结")
+        self.tabs.addTab(self._build_print_tab(), "打印")
         layout = QVBoxLayout(self)
-        layout.addWidget(tabs)
+        layout.addWidget(self.banner)
+        layout.addWidget(self.tabs)
+        self._install_shortcuts()
+
+    def _install_shortcuts(self) -> None:
+        QShortcut(QKeySequence("F2"), self, activated=self._focus_patient_search)
+        QShortcut(QKeySequence("F3"), self, activated=lambda: self.tabs.setCurrentIndex(2))
+        QShortcut(QKeySequence("F8"), self, activated=lambda: self.tabs.setCurrentIndex(2))
+        QShortcut(QKeySequence("Esc"), self, activated=self._clear_quick_filters)
+
+    def _focus_patient_search(self) -> None:
+        self.tabs.setCurrentIndex(0)
+        self.q_name.setFocus()
+        self.q_name.selectAll()
+
+    def _clear_quick_filters(self) -> None:
+        if self.q_name.text() or self.q_id_number.text() or self.q_phone.text():
+            self.q_name.clear()
+            self.q_id_number.clear()
+            self.q_phone.clear()
+            self._query_patients()
 
     # ---------- 患者 ----------
     def _build_patient_tab(self) -> QWidget:
@@ -182,6 +204,7 @@ class CashierWidget(QWidget):
         if not self.insurance_enabled:
             self.patient_table.setColumnHidden(5, True)
         self.patient_table.cellClicked.connect(self._select_patient_row)
+        self.patient_table.cellDoubleClicked.connect(self._patient_to_registration)
         layout.addWidget(self.patient_table)
         self.patient_rows: list[dict] = []
 
@@ -345,6 +368,14 @@ class CashierWidget(QWidget):
         if not keep_message:
             self.patient_msg.clear()
 
+    def _patient_to_registration(self, row: int, _col: int) -> None:
+        self._select_patient_row(row, 0)
+        if not (0 <= row < len(self.patient_rows)):
+            return
+        self.tabs.setCurrentIndex(1)
+        self.r_patient_id.setValue(self.patient_rows[row]["id"])
+        self.r_card_uid.clear()
+
     def _bind_patient_card(self) -> None:
         row = self.patient_table.currentRow()
         if row < 0 or row >= len(self.patient_rows):
@@ -375,6 +406,7 @@ class CashierWidget(QWidget):
             self.patient_msg.setText(f"读卡失败（{e.status_code}）：{e.detail}")
             return
         patient = found["patient"]
+        self.banner.set_patient(patient)
         self.q_name.setText(patient["name"])
         self.q_phone.setText(patient.get("phone") or "")
         self._query_patients()
@@ -387,6 +419,7 @@ class CashierWidget(QWidget):
         if not (0 <= row < len(self.patient_rows)):
             return
         patient = self.patient_rows[row]
+        self.banner.set_patient(patient)
         self.p_name.setText(patient.get("name") or "")
         index = self.p_gender.findData(patient.get("gender") or "unknown")
         self.p_gender.setCurrentIndex(max(0, index))
