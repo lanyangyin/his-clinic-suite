@@ -138,6 +138,10 @@ class SurgeryWidget(QWidget):
         self.case_info = QLabel("未载入")
         self.case_info.setWordWrap(True)
         layout.addWidget(self.case_info)
+        self.safety_summary = QLabel("三方核查：未完成")
+        self.safety_summary.setWordWrap(True)
+        self.safety_summary.setStyleSheet("color:#b45309;font-weight:bold")
+        layout.addWidget(self.safety_summary)
 
         preop_box = QGroupBox("术前访视 / 麻醉评估")
         preop = QFormLayout(preop_box)
@@ -193,6 +197,9 @@ class SurgeryWidget(QWidget):
 
         safety_box = QGroupBox("安全核查")
         safety = QVBoxLayout(safety_box)
+        self.safety_status = QLabel("三方核查：未完成")
+        self.safety_status.setWordWrap(True)
+        safety.addWidget(self.safety_status)
         self.checklist = QLineEdit()
         self.checklist.setPlaceholderText("核查内容，如 身份/部位/过敏史")
         safety.addWidget(self.checklist)
@@ -397,6 +404,14 @@ class SurgeryWidget(QWidget):
             f"状态 {case['status']} · 核查 {len(data['checks'])} · 记录 {len(data['records'])} · "
             f"清点 {len(data['counts'])} · 复苏 {len(data['recovery'])}"
         )
+        checks = {row["phase"]: row for row in data["checks"]}
+        parts = []
+        for phase, label in (("sign_in", "术前"), ("time_out", "Time Out"), ("sign_out", "离室")):
+            row = checks.get(phase)
+            parts.append(f"{label} ✓ {row.get('completed_by') or '—'}" if row else f"{label} —")
+        text = "三方核查：" + "　".join(parts)
+        self.safety_status.setText(text)
+        self.safety_summary.setText(text)
         preop = data.get("preop") or {}
         self.preop_anesthesiologist.setText(preop.get("anesthesiologist") or "")
         self.preop_asa.setText(preop.get("asa_grade") or "")

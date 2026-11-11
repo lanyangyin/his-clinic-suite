@@ -1036,6 +1036,15 @@ class DoctorWidget(QWidget):
         top.addWidget(QLabel("就诊 ID"))
         top.addWidget(self.mr_encounter_id)
         top.addWidget(load)
+        self.record_template = QComboBox()
+        self.record_template.addItem("选择病历模板", "")
+        self.record_template.addItem("上呼吸道感染", "uri")
+        self.record_template.addItem("高血压复诊", "hypertension")
+        self.record_template.addItem("伤口换药", "wound")
+        apply_template = QPushButton("套用")
+        apply_template.clicked.connect(self._apply_record_template)
+        top.addWidget(self.record_template)
+        top.addWidget(apply_template)
         self.record_diagnosis = QLabel("诊断：—")
         self.record_diagnosis.setStyleSheet("font-weight:bold")
         top.addWidget(self.record_diagnosis, 1)
@@ -1096,6 +1105,54 @@ class DoctorWidget(QWidget):
         self.record_msg.setWordWrap(True)
         layout.addWidget(self.record_msg)
         return page
+
+    def _apply_record_template(self) -> None:
+        code = self.record_template.currentData()
+        if not code:
+            return
+        templates = {
+            "uri": {
+                "chief_complaint": "发热、咳嗽 2 天。",
+                "present_illness": "受凉后出现发热，最高 38.3℃，伴咳嗽、咽痛，无胸闷气促。",
+                "past_history": "既往体健，否认高血压、糖尿病、肝炎、结核等病史。",
+                "personal_history": "否认吸烟、饮酒，否认近期疫区旅居史。",
+                "marital_history": "已婚，育有 1 子，配偶及子女体健。",
+                "family_history": "否认家族遗传病及传染病史。",
+                "physical_exam": "T 38.1℃，P 88 次/分，R 20 次/分，BP 118/76 mmHg。咽充血，双侧扁桃体 I 度肿大，双肺呼吸音清，未闻及干湿啰音。",
+                "auxiliary_exam": "血常规：白细胞及中性粒细胞比例升高。",
+                "treatment_advice": "1. 对症退热、止咳；2. 多饮水、休息；3. 如持续高热、气促及时复诊。",
+            },
+            "hypertension": {
+                "chief_complaint": "发现血压升高 5 年，头晕 1 周。",
+                "present_illness": "高血压病史 5 年，长期口服降压药，近期家庭自测血压 150-160/90-100 mmHg，伴轻度头晕。",
+                "past_history": "高血压 5 年，否认糖尿病、冠心病、脑卒中史。",
+                "personal_history": "低盐饮食，否认吸烟，偶饮酒。",
+                "marital_history": "已婚，育有 1 女。",
+                "family_history": "父亲有高血压病史。",
+                "physical_exam": "BP 156/96 mmHg，神清，心肺腹查体未见明显异常，双下肢无水肿。",
+                "auxiliary_exam": "心电图：窦性心律，左室高电压。",
+                "treatment_advice": "1. 调整降压方案；2. 低盐低脂饮食、规律运动；3. 每日家庭自测血压并记录；4. 2 周复诊。",
+            },
+            "wound": {
+                "chief_complaint": "右手指外伤后伤口换药。",
+                "present_illness": "右手指外伤清创缝合后第 3 天，伤口无明显红肿渗液，疼痛可耐受。",
+                "past_history": "既往体健。",
+                "personal_history": "否认吸烟、饮酒。",
+                "marital_history": "未婚。",
+                "family_history": "无特殊。",
+                "physical_exam": "右手食指伤口敷料干燥，周围皮肤无红肿，末梢血运感觉正常。",
+                "auxiliary_exam": "无。",
+                "treatment_advice": "1. 换药；2. 保持伤口干燥；3. 如红肿渗液及时复诊。",
+            },
+        }
+        values = templates.get(code)
+        if not values:
+            return
+        for key, text in values.items():
+            edit = self.record_edits.get(key)
+            if edit is not None:
+                edit.setPlainText(text)
+        self.wb_summary.setText(f"已套用病历模板：{self.record_template.currentText()}")
 
     def _load_record(self) -> None:
         try:

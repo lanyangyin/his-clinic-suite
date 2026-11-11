@@ -196,3 +196,12 @@ https://ggzy.guizhou.gov.cn/hallweb/hall/attach/nosession/download?attachId=c6de
 - 患者360：患者条
 
 详见 `docs/P0界面改造.md`。
+
+## P1 已落地（0.90.0）
+
+- 病历模板
+- 药房处方明细/库存/效期
+- 手术三方核查状态
+- 院长审批意见模板
+
+详见 `docs/P1界面优化.md`。

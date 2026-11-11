@@ -669,6 +669,20 @@ class PharmacyWidget(QWidget):
         self.disp_patient_label.setStyleSheet("font-weight:bold")
         right_layout.addWidget(self.disp_patient_label)
 
+        rx_box = QGroupBox("处方明细 / 库存效期")
+        rx_layout = QVBoxLayout(rx_box)
+        self.disp_detail_table = QTableWidget(0, 5)
+        self.disp_detail_table.setHorizontalHeaderLabels(
+            ["药品", "数量", "用法", "库存", "最近效期"]
+        )
+        self.disp_detail_table.setMaximumHeight(130)
+        self.disp_detail_table.horizontalHeader().setStretchLastSection(True)
+        rx_layout.addWidget(self.disp_detail_table)
+        self.disp_detail_msg = QLabel("")
+        self.disp_detail_msg.setWordWrap(True)
+        rx_layout.addWidget(self.disp_detail_msg)
+        right_layout.addWidget(rx_box)
+
         form_box = QGroupBox("核对发药")
         form = QFormLayout(form_box)
         self.disp_encounter_id = QSpinBox()
@@ -799,6 +813,45 @@ class PharmacyWidget(QWidget):
             self.disp_msg.setText(f"队列加载失败（{e.status_code}）：{e.detail}")
             return
         self._filter_worklist()
+
+    def _load_dispense_detail(self, encounter_id: int) -> None:
+        try:
+            rows = self.api.list_prescriptions(encounter_id)
+        except ApiError as e:
+            self.disp_detail_table.setRowCount(0)
+            self.disp_detail_msg.setText(f"处方明细加载失败（{e.status_code}）：{e.detail}")
+            return
+        self.disp_detail_table.setRowCount(len(rows))
+        for index, item in enumerate(rows):
+            stock_text = "—"
+            expiry_text = "—"
+            drug_id = item.get("drug_id")
+            if drug_id:
+                try:
+                    stocks = self.api.list_stocks(drug_id)
+                except ApiError:
+                    stocks = []
+                total = sum(int(s.get("quantity") or 0) for s in stocks)
+                stock_text = str(total)
+                expiries = [s.get("expiry") for s in stocks if s.get("expiry")]
+                if expiries:
+                    expiry_text = min(expiries)
+            values = [
+                item.get("drug_name") or "—",
+                str(item.get("quantity") or ""),
+                " ".join(
+                    part for part in (
+                        item.get("dosage"),
+                        item.get("frequency"),
+                        item.get("route"),
+                    ) if part
+                ) or "—",
+                stock_text,
+                expiry_text,
+            ]
+            for col, value in enumerate(values):
+                self.disp_detail_table.setItem(index, col, QTableWidgetItem(str(value)))
+        self.disp_detail_msg.setText(f"处方 {len(rows)} 条；库存为药房当前可用总量")
 
     def _filter_worklist(self) -> None:
         term = self.disp_search.text().strip().lower() if hasattr(self, "disp_search") else ""
@@ -947,6 +1000,7 @@ class PharmacyWidget(QWidget):
                 "已收费，可发药",
                 f"取药码：{item.get('pickup_code') or '—'}",
             )
+            self._load_dispense_detail(item["encounter_id"])
 
     def _call_row(self, row: int, _col: int) -> None:
         self.worklist_table.selectRow(row)

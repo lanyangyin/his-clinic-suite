@@ -1,6 +1,7 @@
 """院长审批工作站：病案销毁、采购申请。"""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -73,6 +74,15 @@ class DirectorWidget(QWidget):
         self.archive_detail.setWordWrap(True)
         detail_form.addRow(self.archive_detail)
         right_layout.addWidget(detail_box)
+        self.archive_preset = QComboBox()
+        self.archive_preset.addItem("选择意见模板", "")
+        self.archive_preset.addItem("同意，按清册执行", "同意，按清册执行")
+        self.archive_preset.addItem("材料不齐，需补充附件", "材料不齐，需补充附件")
+        self.archive_preset.addItem("暂缓，待进一步核实", "暂缓，待进一步核实")
+        self.archive_preset.currentIndexChanged.connect(
+            lambda: self.archive_note.setText(self.archive_preset.currentData() or "")
+        )
+        right_layout.addWidget(self.archive_preset)
         self.archive_note = QLineEdit()
         self.archive_note.setPlaceholderText("审批意见（可选）")
         approve = QPushButton("批准销毁")
@@ -121,6 +131,15 @@ class DirectorWidget(QWidget):
         self.purchase_detail.setWordWrap(True)
         detail_form.addRow(self.purchase_detail)
         right_layout.addWidget(detail_box)
+        self.purchase_preset = QComboBox()
+        self.purchase_preset.addItem("选择意见模板", "")
+        self.purchase_preset.addItem("同意采购", "同意采购")
+        self.purchase_preset.addItem("预算不足，暂缓", "预算不足，暂缓")
+        self.purchase_preset.addItem("请补充三家比价", "请补充三家比价")
+        self.purchase_preset.currentIndexChanged.connect(
+            lambda: self.purchase_note.setText(self.purchase_preset.currentData() or "")
+        )
+        right_layout.addWidget(self.purchase_preset)
         self.purchase_note = QLineEdit()
         self.purchase_note.setPlaceholderText("驳回原因（批准可空）")
         approve = QPushButton("批准采购")
