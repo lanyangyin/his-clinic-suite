@@ -11,7 +11,9 @@ class SidebarTabs(QTabWidget):
         self.setUsesScrollButtons(True)
         self.setStyleSheet(
             """
+            QTabWidget { background: #f4f8fd; }
             QTabWidget::pane { border: 1px solid #d7dce5; background: #ffffff; }
+            QTabBar { background: #f4f8fd; }
             QTabBar::tab {
                 padding: 8px 16px;
                 margin-right: 2px;

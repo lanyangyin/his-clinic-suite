@@ -11,11 +11,13 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.config import ClientConfig
+from his_client.ui.theme import apply_theme
 
 
 class LoginDialog(QDialog):
     def __init__(self, config: ClientConfig, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.setWindowTitle("HIS 客户端登录")
         self.setMinimumWidth(380)
         self.api: ApiClient | None = None

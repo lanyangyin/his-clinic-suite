@@ -10,9 +10,9 @@ class PatientInfoPanel(QFrame):
         self.setMinimumWidth(210)
         self.setMaximumWidth(280)
         self.setStyleSheet(
-            "#patientInfoPanel{background:#1e293b;border:1px solid #334155;border-radius:8px;}"
-            "#patientInfoPanel QLabel{color:#e2e8f0;font-size:12px;}"
-            "#patientInfoPanel QLabel#title{font-size:15px;font-weight:bold;color:#f8fafc;}"
+            "#patientInfoPanel{background:#ffffff;border:1px solid #dbe7f3;border-radius:8px;}"
+            "#patientInfoPanel QLabel{color:#334155;font-size:12px;}"
+            "#patientInfoPanel QLabel#title{font-size:15px;font-weight:bold;color:#1e3a5f;}"
             "#patientInfoPanel QLabel#allergy{color:#f87171;font-weight:bold;}"
         )
         layout = QVBoxLayout(self)
@@ -21,7 +21,7 @@ class PatientInfoPanel(QFrame):
         self.title = QLabel("当前患者")
         self.title.setObjectName("title")
         self.name = QLabel("未选择")
-        self.name.setStyleSheet("font-size:16px;font-weight:bold;color:#f8fafc;")
+        self.name.setStyleSheet("font-size:16px;font-weight:bold;color:#0f172a;")
         self.demo = QLabel("")
         self.allergy = QLabel("")
         self.allergy.setObjectName("allergy")

@@ -15,11 +15,13 @@ from his_client.ui.patient360 import Patient360Widget
 from his_client.ui.tcm import TcmWidget
 from his_client.ui.treatment_room import TreatmentRoomWidget
 from his_client.ui.pharmacy import PharmacyWidget
+from his_client.ui.theme import apply_theme
 
 
 class MainWindow(QMainWindow):
     def __init__(self, api: ApiClient, user: dict, parent=None):
         super().__init__(parent)
+        apply_theme(self)
         self.api = api
         self.user = user
         self.setWindowTitle("HIS 门诊部客户端")

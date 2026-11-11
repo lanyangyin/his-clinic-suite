@@ -78,7 +78,7 @@ class PaymentPanel(QWidget):
         self._update_payment_inputs()
 
         self.charge_empty = QLabel("暂无费用明细；开方/开单后这里显示")
-        self.charge_empty.setStyleSheet("color:#94a3b8;padding:6px")
+        self.charge_empty.setStyleSheet("color:#64748b;padding:6px")
         box_layout.addWidget(self.charge_empty)
         self.charge_table = QTableWidget(0, 5)
         self.charge_table.setHorizontalHeaderLabels(["类型", "项目", "数量", "金额", "状态"])

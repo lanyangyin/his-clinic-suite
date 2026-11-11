@@ -1,62 +1,74 @@
-"""统一现代化工作站样式。"""
+"""统一现代化浅色工作站样式（白/浅蓝）。"""
 MODERN_QSS = """
-QWidget { color: #e2e8f0; font-family: "Microsoft YaHei"; font-size: 13px; }
+QWidget { color: #1e293b; font-family: "Microsoft YaHei"; font-size: 13px; }
+QWidget#workstationRoot { background: #f4f8fd; }
 QGroupBox {
-    border: 1px solid #334155;
+    border: 1px solid #dbe7f3;
     border-radius: 8px;
     margin-top: 12px;
     padding: 10px 8px 8px 8px;
-    background: #111827;
+    background: #ffffff;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     left: 10px;
     padding: 0 4px;
-    color: #cbd5e1;
+    color: #1e3a5f;
+    font-weight: 600;
 }
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateEdit {
-    background: #0b1220;
-    border: 1px solid #334155;
+    background: #ffffff;
+    border: 1px solid #cfdff0;
     border-radius: 6px;
     padding: 5px 8px;
-    color: #e2e8f0;
-    selection-background-color: #4f46e5;
+    color: #1e293b;
+    selection-background-color: #bfdbfe;
+    selection-color: #0f172a;
 }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-    border: 1px solid #6366f1;
+    border: 1px solid #60a5fa;
 }
 QPushButton {
-    background: #1e293b;
-    border: 1px solid #475569;
+    background: #ffffff;
+    border: 1px solid #c7d8ea;
     border-radius: 6px;
     padding: 6px 12px;
-    color: #e2e8f0;
+    color: #1e3a5f;
 }
-QPushButton:hover { background: #334155; border-color: #6366f1; }
-QPushButton:pressed { background: #4f46e5; }
-QPushButton:disabled { color: #64748b; background: #111827; border-color: #1f2937; }
+QPushButton:hover { background: #eaf3ff; border-color: #60a5fa; }
+QPushButton:pressed { background: #dbeafe; }
+QPushButton:disabled { color: #94a3b8; background: #f8fafc; border-color: #e2e8f0; }
 QTableWidget {
-    background: #0b1220;
-    alternate-background-color: #111827;
-    gridline-color: #1f2937;
-    selection-background-color: #4f46e5;
-    selection-color: #ffffff;
-    border: 1px solid #334155;
+    background: #ffffff;
+    alternate-background-color: #f7fbff;
+    gridline-color: #e6eef7;
+    selection-background-color: #dbeafe;
+    selection-color: #0f172a;
+    border: 1px solid #dbe7f3;
     border-radius: 6px;
 }
+QTableWidget::item:selected { background: #dbeafe; color: #0f172a; }
+QTableCornerButton::section { background: #eaf3ff; border: none; }
+QHeaderView { background: #eaf3ff; }
 QHeaderView::section {
-    background: #1e293b;
-    color: #cbd5e1;
+    background: #eaf3ff;
+    color: #1e3a5f;
     padding: 6px;
     border: none;
-    border-right: 1px solid #334155;
+    border-right: 1px solid #dbe7f3;
+    font-weight: 600;
 }
-QScrollBar:vertical { background: #0b1220; width: 10px; }
-QScrollBar::handle:vertical { background: #475569; border-radius: 5px; min-height: 24px; }
-QSplitter::handle { background: #1f2937; width: 3px; }
-QStatusBar { color: #94a3b8; }
+QScrollBar:vertical { background: #f4f8fd; width: 10px; }
+QScrollBar::handle:vertical { background: #b7cde3; border-radius: 5px; min-height: 24px; }
+QSplitter::handle { background: #dbe7f3; width: 3px; }
+QTabWidget::pane { border: 1px solid #dbe7f3; background: #ffffff; }
+QStatusBar { color: #64748b; }
+QToolTip { background: #ffffff; color: #1e293b; border: 1px solid #cfdff0; }
+QCheckBox { color: #1e293b; }
+QTextEdit { background: #ffffff; border: 1px solid #cfdff0; border-radius: 6px; color: #1e293b; }
 """
 
 
 def apply_theme(widget) -> None:
+    widget.setObjectName("workstationRoot")
     widget.setStyleSheet(MODERN_QSS)

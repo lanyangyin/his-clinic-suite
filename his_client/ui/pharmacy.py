@@ -638,7 +638,7 @@ class PharmacyWidget(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_title = QLabel("待发药队列")
-        left_title.setStyleSheet("font-size:15px;font-weight:bold;color:#f8fafc;")
+        left_title.setStyleSheet("font-size:15px;font-weight:bold;color:#0f172a;")
         left_layout.addWidget(left_title)
         left_row = QHBoxLayout()
         refresh = QPushButton("刷新队列")
@@ -666,7 +666,7 @@ class PharmacyWidget(QWidget):
         self.disp_info = PatientInfoPanel()
         right_layout.addWidget(self.disp_info)
         self.disp_patient_label = QLabel("当前患者：—")
-        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#e2e8f0")
+        self.disp_patient_label.setStyleSheet("font-weight:bold;color:#334155")
         right_layout.addWidget(self.disp_patient_label)
 
         form_box = QGroupBox("核对发药")
