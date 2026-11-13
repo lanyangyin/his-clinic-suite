@@ -131,14 +131,15 @@ def create_encounter(
     if doctor:
         doctor.current_encounter_id = encounter.id
 
-    # 计费：挂号费 + 诊疗费（字典存在才计费，兼容存量数据）
-    add_dict_fee(
-        db,
-        encounter_id=encounter.id,
-        code=REGISTRATION_FEE_CODE,
-        source_type="registration",
-        source_id=registration.id,
-    )
+    # 计费：初诊收挂号费；复诊免挂号费，仍收诊疗费（字典存在才计费）
+    if registration.visit_type != "follow_up":
+        add_dict_fee(
+            db,
+            encounter_id=encounter.id,
+            code=REGISTRATION_FEE_CODE,
+            source_type="registration",
+            source_id=registration.id,
+        )
     add_dict_fee(
         db,
         encounter_id=encounter.id,

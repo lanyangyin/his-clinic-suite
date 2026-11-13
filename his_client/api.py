@@ -201,6 +201,16 @@ class ApiClient:
             payload["original_registration_id"] = original_registration_id
         return self._request("POST", "/registrations/", json=payload)
 
+    def update_registration_visit_type(
+        self, registration_id: int, visit_type: str, original_registration_id: int | None = None
+    ) -> dict:
+        payload = {"visit_type": visit_type}
+        if original_registration_id:
+            payload["original_registration_id"] = original_registration_id
+        return self._request(
+            "PUT", f"/registrations/{registration_id}/visit-type", json=payload
+        )
+
     def list_registrations(
         self, patient_id: int | None = None, status: str | None = None
     ) -> list:

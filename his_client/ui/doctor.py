@@ -244,10 +244,14 @@ class DoctorWidget(QWidget):
         self.wb_start.clicked.connect(self._start_workbench)
         self.wb_multi = QPushButton("多诊断")
         self.wb_multi.clicked.connect(self._wb_multi_diagnosis)
+        self.wb_convert = QPushButton("复诊转初诊")
+        self.wb_convert.setVisible(False)
+        self.wb_convert.clicked.connect(self._convert_followup_to_initial)
         row.addWidget(QLabel("主诊断"))
         row.addWidget(self.wb_diagnosis_code)
         row.addWidget(self.wb_diagnosis, 1)
         row.addWidget(self.wb_multi)
+        row.addWidget(self.wb_convert)
         row.addWidget(self.wb_start)
         right_layout.addLayout(row)
 
@@ -275,6 +279,11 @@ class DoctorWidget(QWidget):
         self.wb_summary = QLabel("")
         self.wb_summary.setWordWrap(True)
         right_layout.addWidget(self.wb_summary)
+        self.wb_followup_hint = QLabel("")
+        self.wb_followup_hint.setWordWrap(True)
+        self.wb_followup_hint.setStyleSheet("color:#b45309;font-weight:bold")
+        self.wb_followup_hint.setVisible(False)
+        right_layout.addWidget(self.wb_followup_hint)
         self.wb_fee_table = QTableWidget(0, 4)
         self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
         self.wb_fee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -567,6 +576,14 @@ class DoctorWidget(QWidget):
             self.wb_diagnosis_code.blockSignals(True)
             self.wb_diagnosis_code.setCurrentIndex(code_index)
             self.wb_diagnosis_code.blockSignals(False)
+        follow_up = item.get("visit_type") == "follow_up"
+        self.wb_followup_hint.setVisible(follow_up)
+        if follow_up:
+            self.wb_followup_hint.setText(
+                "复诊流程：先看历史诊疗 → 核对上次诊断/医嘱 → 本次记录复诊；"
+                "不需要重新开药时可直接写复诊记录；病情变化点「复诊转初诊」"
+            )
+        self.wb_convert.setVisible(follow_up and not item.get("encounter_id"))
         status = item.get("encounter_status") or ""
         self.wb_start.setEnabled(not item.get("encounter_id") or status == "paused")
         if hasattr(self, "wb_action_buttons"):
@@ -657,6 +674,28 @@ class DoctorWidget(QWidget):
             self.wb_summary.setText(
                 f"已录入 {len(rows)} 条诊断；开始接诊后自动保存，第一条为主诊断"
             )
+
+    def _convert_followup_to_initial(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item:
+            self.wb_summary.setText("请先选择患者")
+            return
+        if item.get("encounter_id"):
+            self.wb_summary.setText("已接诊，不能修改挂号类型")
+            return
+        try:
+            self.api.update_registration_visit_type(item["registration_id"], "initial")
+        except ApiError as e:
+            self.wb_summary.setText(f"转初诊失败（{e.status_code}）：{e.detail}")
+            return
+        registration_id = item["registration_id"]
+        self._load_workbench()
+        for row, candidate in enumerate(getattr(self, "workbench_rows", [])):
+            if candidate.get("registration_id") == registration_id:
+                self.wb_table.selectRow(row)
+                self._select_workbench(row, 0)
+                break
+        self.wb_summary.setText("已转为初诊；接诊时按初诊收挂号费")
 
     def _start_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
@@ -1313,8 +1352,9 @@ class DoctorWidget(QWidget):
             self.record_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
         if hasattr(self, "record_diagnosis"):
+            prefix = "复诊 · " if encounter.get("visit_type") == "follow_up" else ""
             self.record_diagnosis.setText(
-                f"诊断：{encounter.get('diagnosis_code') or ''} "
+                f"{prefix}诊断：{encounter.get('diagnosis_code') or ''} "
                 f"{encounter.get('diagnosis') or '—'}".strip()
             )
         if hasattr(self, "record_diagnosis_editor"):

@@ -406,6 +406,13 @@ class CashierWidget(QWidget):
         )
         self._load_visit_type(patient["id"])
 
+    def _sync_visit_type_ui(self) -> None:
+        if not hasattr(self, "r_submit"):
+            return
+        follow = self.r_visit_type.currentData() == "follow_up"
+        self.r_submit.setText("复诊登记（免挂号费）" if follow else "挂号")
+        self.r_convert.setVisible(follow)
+
     def _load_visit_type(self, patient_id: int) -> None:
         if not hasattr(self, "r_visit_type"):
             return
@@ -422,14 +429,18 @@ class CashierWidget(QWidget):
             )
             self.r_visit_hint.setText(
                 f"历史就诊 {len(prior)} 次，上次挂号 {last['id']}；"
-                "已自动选复诊，可改回初诊"
+                "复诊免挂号费，先看历史、沿用上次医嘱；病情变化点「改为初诊」"
             )
+            self.r_submit.setText("复诊登记（免挂号费）")
+            self.r_convert.setVisible(True)
         else:
             self._original_registration_id = None
             self.r_visit_type.setCurrentIndex(
                 self.r_visit_type.findData("initial")
             )
-            self.r_visit_hint.setText("无历史就诊，按初诊挂号")
+            self.r_visit_hint.setText("无历史就诊，按初诊正常挂号")
+            self.r_submit.setText("挂号")
+            self.r_convert.setVisible(False)
 
     def _bind_patient_card(self) -> None:
         row = self.patient_table.currentRow()
@@ -594,6 +605,7 @@ class CashierWidget(QWidget):
         self.r_visit_type = QComboBox()
         self.r_visit_type.addItem("初诊", "initial")
         self.r_visit_type.addItem("复诊（关联上次就诊）", "follow_up")
+        self.r_visit_type.currentIndexChanged.connect(self._sync_visit_type_ui)
         self.r_visit_hint = QLabel("选择患者后自动识别初诊/复诊")
         self.r_visit_hint.setWordWrap(True)
         form.addRow("就诊类型", self.r_visit_type)
@@ -610,9 +622,15 @@ class CashierWidget(QWidget):
         form.addRow("", self.r_doctor_label)
         form.addRow("", refresh_btn)
         form.addRow("排班 ID（可选）", self.r_schedule_id)
-        submit = QPushButton("挂号")
-        submit.clicked.connect(self._create_registration)
-        form.addRow("", submit)
+        self.r_submit = QPushButton("挂号")
+        self.r_submit.clicked.connect(self._create_registration)
+        self.r_convert = QPushButton("改为初诊")
+        self.r_convert.setVisible(False)
+        self.r_convert.clicked.connect(self._convert_to_initial)
+        action_row = QHBoxLayout()
+        action_row.addWidget(self.r_submit, 1)
+        action_row.addWidget(self.r_convert)
+        form.addRow("", action_row)
         layout.addWidget(box)
 
         self.reg_msg = QLabel("")
@@ -743,11 +761,31 @@ class CashierWidget(QWidget):
             self.reg_msg.setText(f"挂号失败（{e.status_code}）：{e.detail}")
             return
         type_label = "复诊" if registration.get("visit_type") == "follow_up" else "初诊"
+        self._last_registration_id = registration["id"]
         self.reg_msg.setText(
             f"挂号成功：挂号 ID {registration['id']}，{type_label}，"
             f"状态 {zh('registration_status', registration['status'])}"
             f"（关联上次 {registration.get('original_registration_id') or '—'}）"
         )
+
+    def _convert_to_initial(self) -> None:
+        registration_id = getattr(self, "_last_registration_id", None)
+        if not registration_id:
+            self.reg_msg.setText("请先完成挂号，再转换类型")
+            return
+        try:
+            registration = self.api.update_registration_visit_type(
+                registration_id, "initial"
+            )
+        except ApiError as e:
+            self.reg_msg.setText(f"转初诊失败（{e.status_code}）：{e.detail}")
+            return
+        self.r_visit_type.setCurrentIndex(self.r_visit_type.findData("initial"))
+        self._original_registration_id = None
+        self.r_submit.setText("挂号")
+        self.r_convert.setVisible(False)
+        self.r_visit_hint.setText("已转为初诊；接诊时按初诊收挂号费")
+        self.reg_msg.setText(f"挂号 {registration['id']} 已转为初诊")
 
     # ---------- 收费 / 退费 ----------
     def _build_charge_tab(self) -> QWidget:

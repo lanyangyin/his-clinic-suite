@@ -7,8 +7,15 @@ from app.database import get_db
 from app.modules.auth.security import require_role
 from app.modules.staff.service import get_doctor
 
-from .schemas import RegistrationCreate, RegistrationResponse, ScheduleCreate, ScheduleResponse
+from .schemas import (
+    RegistrationCreate,
+    RegistrationResponse,
+    ScheduleCreate,
+    ScheduleResponse,
+    VisitTypeUpdate,
+)
 from .service import (
+    convert_registration_visit_type,
     create_registration,
     create_schedule,
     get_registration,
@@ -34,6 +41,24 @@ def register(
     except ValueError as e:
         code = 404 if str(e) in _NOT_FOUND_MESSAGES else 400
         raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.put("/{registration_id}/visit-type", response_model=RegistrationResponse)
+def change_visit_type(
+    registration_id: int,
+    data: VisitTypeUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("cashier", "doctor")),
+):
+    try:
+        return convert_registration_visit_type(
+            db,
+            registration_id,
+            data.visit_type,
+            data.original_registration_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/", response_model=list[RegistrationResponse])

@@ -161,6 +161,51 @@ def create_registration(db: Session, data: RegistrationCreate) -> Registration:
     return registration
 
 
+def convert_registration_visit_type(
+    db: Session,
+    registration_id: int,
+    visit_type: str,
+    original_registration_id: int | None = None,
+) -> Registration:
+    """接诊前把复诊改为初诊（或反向），已接诊不允许改类型。"""
+    from app.modules.encounter.models import Encounter
+
+    registration = get_registration(db, registration_id)
+    if not registration:
+        raise ValueError("挂号记录不存在")
+    if db.query(Encounter).filter(Encounter.registration_id == registration_id).first():
+        raise ValueError("已接诊，不能修改挂号类型")
+    if visit_type == "initial":
+        registration.visit_type = "initial"
+        registration.original_registration_id = None
+    elif visit_type == "follow_up":
+        original = None
+        if original_registration_id:
+            original = get_registration(db, original_registration_id)
+            if not original or original.patient_id != registration.patient_id:
+                raise ValueError("上次挂号不属于该患者")
+        else:
+            original = (
+                db.query(Registration)
+                .filter(
+                    Registration.patient_id == registration.patient_id,
+                    Registration.status == "visited",
+                    Registration.id != registration.id,
+                )
+                .order_by(Registration.id.desc())
+                .first()
+            )
+        if not original:
+            raise ValueError("该患者没有历史就诊，不能转为复诊")
+        registration.visit_type = "follow_up"
+        registration.original_registration_id = original.id
+    else:
+        raise ValueError("未知挂号类型")
+    db.commit()
+    db.refresh(registration)
+    return registration
+
+
 def get_registration(db: Session, registration_id: int) -> Registration | None:
     """按 ID 查询挂号记录；不存在时返回 None。"""
     return db.get(Registration, registration_id)

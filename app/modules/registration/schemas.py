@@ -27,6 +27,11 @@ class RegistrationCreate(BaseModel):
     original_registration_id: int | None = None
 
 
+class VisitTypeUpdate(BaseModel):
+    visit_type: Literal["initial", "follow_up"]
+    original_registration_id: int | None = None
+
+
 class RegistrationResponse(RegistrationCreate):
     id: int
     status: str
