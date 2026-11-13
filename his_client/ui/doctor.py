@@ -413,7 +413,10 @@ class DoctorWidget(QWidget):
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 (
-                    f"{item.get('encounter_id')} "
+                    (
+                        f"{item['encounter_date']} " if item.get("cross_day") else ""
+                    )
+                    + f"{item.get('encounter_id')} "
                     f"{ {'open':'进行中','paused':'已挂起','closed':'已收费'}.get(item.get('encounter_status'), item.get('encounter_status') or '') }".strip()
                     if item.get("encounter_id") else "—"
                 ),
@@ -426,8 +429,12 @@ class DoctorWidget(QWidget):
             for col, value in enumerate(values):
                 self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
         total = len(getattr(self, "workbench_all", rows))
+        cross_count = sum(1 for item in all_rows if item.get("cross_day"))
+        suffix = f"（含跨日未完成 {cross_count}）" if cross_count else ""
         self.wb_summary.setText(
-            f"显示 {len(rows)} / 今日 {total} 人" if term or status_filter else f"今日队列 {total} 人"
+            f"显示 {len(rows)} / 队列 {total} 人{suffix}"
+            if term or status_filter
+            else f"队列 {total} 人{suffix}"
         )
         waiting = sum(1 for item in all_rows if not item.get("encounter_id"))
         open_count = sum(1 for item in all_rows if item.get("encounter_status") == "open")
@@ -553,6 +560,7 @@ class DoctorWidget(QWidget):
             f"过敏：{allergy} · 分诊 {item.get('triage_level') or '—'} 级 · "
             f"{item.get('vital_summary') or '未测生命体征'} · "
             f"挂号 {item['registration_id']} · 就诊 {item.get('encounter_id') or '未接诊'}"
+            + (" · 跨日未完成" if item.get("cross_day") else "")
         )
         if item.get("isolation"):
             self.wb_patient.setText(self.wb_patient.text() + " · 隔离提示")

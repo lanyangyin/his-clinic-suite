@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -583,8 +583,13 @@ def worklist(db: Session) -> list[dict]:
         )
         if encounter is None and registration.status != "registered":
             continue
-        if encounter is not None and encounter.created_at.date() != date.today():
-            continue
+        cross_day = bool(encounter and encounter.created_at.date() != date.today())
+        if encounter is not None:
+            # 已收费的只保留今天；未完成的跨日保留 14 天，便于看结果/继续接诊
+            if encounter.status == "closed" and cross_day:
+                continue
+            if encounter.status in ("open", "paused") and encounter.created_at < datetime.now() - timedelta(days=14):
+                continue
         charges = list_charges(db, encounter.id) if encounter else []
         total = round(sum(row.amount for row in charges), 2)
         pending = round(sum(row.amount for row in charges if row.status == "pending"), 2)
@@ -621,6 +626,8 @@ def worklist(db: Session) -> list[dict]:
                 "original_registration_id": registration.original_registration_id,
                 "encounter_id": encounter.id if encounter else None,
                 "encounter_status": encounter.status if encounter else "",
+                "encounter_date": encounter.created_at.strftime("%Y-%m-%d") if encounter else "",
+                "cross_day": cross_day,
                 "diagnosis": encounter.diagnosis if encounter else "",
                 "diagnosis_code": encounter.diagnosis_code if encounter else "",
                 "total_amount": total,
