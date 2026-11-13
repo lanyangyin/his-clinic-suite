@@ -104,19 +104,54 @@ date
 
 ---
 
-## 第 4 步：源码放 /sdcard/HIS
+## 第 4 步：获取服务端（推荐最小包，不必克隆整个仓库）
+
+完整仓库包含客户端、测试、视频和截图，Termux 不需要。  
+下载 **Termux 专用服务端源码包**，约 336 KB：
+
+```bash
+mkdir -p /sdcard/HIS
+cd /sdcard/HIS
+
+curl -L -o his-server-termux-1.1.1.tar.gz \
+  https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-server-termux-1.1.1.tar.gz
+
+tar -xzf his-server-termux-1.1.1.tar.gz -C /sdcard/HIS --strip-components=1
+ls
+```
+
+包内只有：
+
+```text
+app/
+alembic/
+scripts/
+deploy/
+config.ini
+config.release.ini
+requirements-server.txt
+DEPLOY-TERMUX.md
+```
+
+不含：
+
+- `his_client/`
+- `tests/`
+- 视频、截图
+- `his.db`
+- `.venv`
+
+### 备选：克隆完整仓库
+
+只有需要改客户端/服务端源码时才这样做：
 
 ```bash
 mkdir -p /sdcard/HIS
 cd /sdcard/HIS
 git clone https://github.com/lanyangyin/his-clinic-suite.git .
-ls
 ```
 
-如果仓库私有，先在 Termux/Ubuntu 配好 GitHub SSH key，改用 SSH clone。
-
-> 源码在 `/sdcard`，`.git` 也在 `/sdcard`。  
-> Git 操作会比内部存储慢，这是 normal。
+私有仓库使用 SSH clone。源码在 `/sdcard`、`.git` 也在 `/sdcard`，Git 操作会慢一些，这是正常的。
 
 ---
 

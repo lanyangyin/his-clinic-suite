@@ -129,6 +129,7 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 
 - `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`（首次启动自动建库并创建 `admin/admin123`）
 - `his-client.zip`：客户端，解压 → 改 `config.ini` 服务器地址 → 双击 `his-client.exe`
+- `his-server-termux-1.1.1.tar.gz`：Termux 专用服务端最小源码包，约 336 KB，不含客户端/测试/视频
 
 源码与构建脚本都在本仓库；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 

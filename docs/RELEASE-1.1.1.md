@@ -16,6 +16,7 @@
 |---|---:|---|
 | `dist/his-client.zip` | 49,783,521 | `64FB924A066BF71EC16892CF7B5181D358215F023B37369BEB489240F00F3256` |
 | `dist/his-server.zip` | 24,898,878 | `2D9F60AF3B07578E1A4A7144CE89849AA13A9957ECD4614F768F80B551C29195` |
+| `his-server-termux-1.1.1.tar.gz` | 343,835 | `0EDA262FDA44ECBDB7E16AC0576F23566B9D2309706EB9A7DDA4847A0113852E` |
 
 ## 启动
 
@@ -49,3 +50,4 @@ https://github.com/lanyangyin/his-clinic-suite/releases/tag/v1.1.1
 
 - 客户端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-client.zip
 - 服务端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-server.zip
+- Termux 最小包：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-server-termux-1.1.1.tar.gz
