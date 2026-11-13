@@ -257,7 +257,7 @@ HIS_PYTHON=/root/his-venv/bin/python \
 HIS_DATABASE_URL=sqlite:////sdcard/HIS/data/his.db \
 HIS_SQLITE_JOURNAL=DELETE \
 HIS_SQLITE_SYNCHRONOUS=FULL \
-./scripts/run_server_linux.sh
+bash ./scripts/run_server_linux.sh
 ```
 
 ### 稳定模式
@@ -268,7 +268,7 @@ HIS_HOST=0.0.0.0 \
 HIS_PORT=8001 \
 HIS_PYTHON=/root/his-venv/bin/python \
 HIS_DATABASE_URL=sqlite:////root/his-data/his.db \
-./scripts/run_server_linux.sh
+bash ./scripts/run_server_linux.sh
 ```
 
 首次启动会自动：
@@ -368,7 +368,7 @@ nohup env \
   HIS_DATABASE_URL=sqlite:////sdcard/HIS/data/his.db \
   HIS_SQLITE_JOURNAL=DELETE \
   HIS_SQLITE_SYNCHRONOUS=FULL \
-  ./scripts/run_server_linux.sh \
+  bash ./scripts/run_server_linux.sh \
   > /sdcard/HIS/server.log 2>&1 &
 ```
 
@@ -535,7 +535,7 @@ HIS_HOST=0.0.0.0 HIS_PORT=8001 \
 HIS_PYTHON=/root/his-venv/bin/python \
 HIS_DATABASE_URL=sqlite:////sdcard/HIS/data/his.db \
 HIS_SQLITE_JOURNAL=DELETE HIS_SQLITE_SYNCHRONOUS=FULL \
-./scripts/run_server_linux.sh
+bash ./scripts/run_server_linux.sh
 ```
 
 验证：
