@@ -46,9 +46,9 @@ url = http://服务器IP:8000
 
 ## GitHub Release
 
+> 历史版本资产未迁移到 `his-clinic-suite`。请使用当前 v1.1.1 Release。
+
+
 已发布：
 
-https://github.com/lanyangyin/his-clinic-suite/releases/tag/v1.1.0
 
-- 客户端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.0/his-client.zip
-- 服务端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.0/his-server.zip
