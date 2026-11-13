@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -18,8 +20,14 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     def _sqlite_pragmas(dbapi_connection, connection_record):
         """并发友好设置：WAL 允许读写并行；busy_timeout 让写入排队等待。"""
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
+        journal = os.environ.get("HIS_SQLITE_JOURNAL", "WAL").upper()
+        if journal not in {"WAL", "DELETE", "TRUNCATE", "PERSIST", "MEMORY", "OFF"}:
+            journal = "WAL"
+        cursor.execute(f"PRAGMA journal_mode={journal}")
         cursor.execute("PRAGMA busy_timeout=30000")
+        sync = os.environ.get("HIS_SQLITE_SYNCHRONOUS", "").upper()
+        if sync in {"OFF", "NORMAL", "FULL", "EXTRA"}:
+            cursor.execute(f"PRAGMA synchronous={sync}")
         cursor.close()
 
 

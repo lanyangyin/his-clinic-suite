@@ -2,8 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-if [ ! -x ".venv/bin/python" ]; then
-  echo "缺少 .venv，请先创建：python3.12 -m venv .venv && .venv/bin/pip install -r requirements-server.txt" >&2
+PYTHON="${HIS_PYTHON:-.venv/bin/python}"
+if [ ! -x "$PYTHON" ]; then
+  echo "缺少 Python 虚拟环境：$PYTHON" >&2
+  echo "可设置 HIS_PYTHON=/path/to/venv/bin/python" >&2
   exit 1
 fi
 
@@ -11,4 +13,4 @@ export HIS_HOST="${HIS_HOST:-0.0.0.0}"
 export HIS_PORT="${HIS_PORT:-8001}"
 export TZ="${TZ:-Asia/Shanghai}"
 
-exec .venv/bin/python scripts/run_server.py
+exec "$PYTHON" scripts/run_server.py
