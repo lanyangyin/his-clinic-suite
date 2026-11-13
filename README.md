@@ -137,9 +137,9 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 ```
 app/                后端（modules/ 下按业务模块组织四件套 models/schemas/service/router）
   modules/admin/    Web 管理台（Jinja2 模板）
-alembic/            Alembic 迁移（0001~0035）
+alembic/            Alembic 迁移（0001~0089）
 his_client/         PySide6 客户端（api/config/ui）
-tests/              pytest（456 个用例）
+tests/              pytest（666 个用例）
 scripts/            初始化、演示、并发检查、打包、服务安装脚本
 docs/               部署手册、试用手册、界面截图
 config.ini          服务端配置（端口/密钥/数据库）
@@ -148,7 +148,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 456 passed
+uv run pytest                                  # 666 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
@@ -156,8 +156,12 @@ uv run python scripts/check_concurrency.py     # 并发抢号验证
 
 ## 部署文档
 
-- [部署手册](docs/部署手册.md)：Windows/Linux 部署、开机自启、备份恢复、迁移、常见问题
-- [试用手册](docs/小诊所试用手册.md)：日常操作流程与打印说明
+- [部署手册总览](docs/部署手册.md)
+- [Linux 服务端部署](docs/Linux部署指南.md)
+- [Android Termux 服务端部署](docs/Termux部署指南.md)
+- [Windows 桌面客户端部署](docs/客户端部署指南.md)
+- [部署文档索引](docs/Linux与Termux部署.md)
+- [试用手册](docs/小诊所试用手册.md)
 
 ## 说明
 
