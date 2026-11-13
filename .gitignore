@@ -44,3 +44,6 @@ data/archive_destructions/
 
 # 客户端登录记忆（只含 IP/端口/账号，不含密码）
 login_history.json
+
+# 客户端界面状态（分隔条高度等）
+ui_state.ini

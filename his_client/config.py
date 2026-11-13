@@ -21,6 +21,7 @@ class ClientConfig:
     remember_login: bool = True
     remember_limit: int = 10
     history_path: str = ""
+    ui_state_path: str = ""
 
 
 def _candidate_paths(explicit: str | Path | None) -> list[Path]:
@@ -92,4 +93,5 @@ def load_config(path: str | Path | None = None) -> ClientConfig:
         else (Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd())
     )
     config.history_path = str(base_dir / "login_history.json")
+    config.ui_state_path = str(base_dir / "ui_state.ini")
     return config
