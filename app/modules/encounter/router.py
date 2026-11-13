@@ -18,6 +18,8 @@ from .schemas import (
     BarcodeLookup,
     DiagnosisUpdate,
     EncounterCreate,
+    EncounterDiagnosisItem,
+    EncounterDiagnosisResponse,
     EncounterResponse,
     MedicalRecordCreate,
     MedicalRecordResponse,
@@ -35,8 +37,10 @@ from .service import (
     get_encounter,
     get_medical_record,
     get_medical_record_quality,
+    list_encounter_diagnoses,
     list_encounters,
     list_prescription_items,
+    replace_encounter_diagnoses,
     sign_medical_record,
     update_diagnosis,
     update_medical_record,
@@ -147,6 +151,32 @@ def lookup_by_barcode(
         pending_amount=round(pending_amount, 2),
         status_text=status_text,
     )
+
+
+@router.get(
+    "/{encounter_id}/diagnoses",
+    response_model=list[EncounterDiagnosisResponse],
+)
+def get_diagnoses(encounter_id: int, db: Session = Depends(get_db)):
+    return list_encounter_diagnoses(db, encounter_id)
+
+
+@router.put(
+    "/{encounter_id}/diagnoses",
+    response_model=list[EncounterDiagnosisResponse],
+)
+def set_diagnoses(
+    encounter_id: int,
+    data: list[EncounterDiagnosisItem],
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor")),
+):
+    try:
+        return replace_encounter_diagnoses(db, encounter_id, data, user.username)
+    except EncounterClosedError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/{encounter_id}/diagnosis", response_model=EncounterResponse)

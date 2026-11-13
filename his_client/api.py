@@ -234,6 +234,14 @@ class ApiClient:
             },
         )
 
+    def list_encounter_diagnoses(self, encounter_id: int) -> list:
+        return self._request("GET", f"/encounters/{encounter_id}/diagnoses")
+
+    def save_encounter_diagnoses(self, encounter_id: int, items: list[dict]) -> list:
+        return self._request(
+            "PUT", f"/encounters/{encounter_id}/diagnoses", json=items
+        )
+
     def update_encounter_diagnosis(
         self, encounter_id: int, diagnosis_code: str, diagnosis: str = ""
     ) -> dict:

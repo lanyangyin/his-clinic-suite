@@ -75,6 +75,19 @@ def _record_page(data: dict) -> str:
     }
     record = data.get("record")
     diagnosis = data["encounter"].diagnosis or ""
+    diagnoses = data.get("diagnoses")
+    if not diagnoses:
+        diagnoses = (
+            [{"diagnosis_code": "", "diagnosis": diagnosis, "diagnosis_type": "primary"}]
+            if diagnosis
+            else []
+        )
+    diagnosis_html = "".join(
+        f'<div>{index + 1}. {"【主诊断】" if item.get("diagnosis_type") == "primary" else "【其他诊断】"}'
+        f'{escape(item.get("diagnosis_code") or "")} {escape(item.get("diagnosis") or "")}'
+        f'{"（" + escape(item.get("note") or "") + "）" if item.get("note") else ""}</div>'
+        for index, item in enumerate(diagnoses)
+    ) or "—"
     western = "".join(
         f'<div class="rx-line">{index + 1}. {escape(line["name"])}　'
         f'{escape(line.get("spec") or "")}　×{line["qty"]}{escape(line.get("unit") or "")}</div>'
@@ -125,7 +138,7 @@ def _record_page(data: dict) -> str:
   <div class="section"><span class="section-title">体格检查：</span>{_value(record.physical_exam if record else '')}</div>
   <div class="section"><span class="section-title">辅助检查（病历记录）：</span>{_value(record.auxiliary_exam if record else '')}</div>
   <div class="section"><span class="section-title">辅助检查（本次）：</span>{aux_html}</div>
-  <div class="section"><span class="section-title">诊断：</span>{_value(diagnosis)}</div>
+  <div class="section"><span class="section-title">诊断：</span>{diagnosis_html}</div>
   <div class="section"><span class="section-title">西药处方：</span>{western}</div>
   <div class="section"><span class="section-title">中药处方：</span>{tcm_html}</div>
   <div class="section"><span class="section-title">建议：</span>{_value(record.treatment_advice if record else '')}</div>

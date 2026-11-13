@@ -38,6 +38,7 @@ from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.patient_clinical_dialog import PatientClinicalDialog
+from his_client.ui.diagnosis_editor import DiagnosisDialog, DiagnosisEditor
 from his_client.ui.payment import PaymentPanel
 
 _RECORD_FIELDS = [
@@ -241,9 +242,12 @@ class DoctorWidget(QWidget):
         self.wb_diagnosis.setPlaceholderText("诊断，如 急性上呼吸道感染")
         self.wb_start = QPushButton("开始接诊")
         self.wb_start.clicked.connect(self._start_workbench)
-        row.addWidget(QLabel("诊断"))
+        self.wb_multi = QPushButton("多诊断")
+        self.wb_multi.clicked.connect(self._wb_multi_diagnosis)
+        row.addWidget(QLabel("主诊断"))
         row.addWidget(self.wb_diagnosis_code)
         row.addWidget(self.wb_diagnosis, 1)
+        row.addWidget(self.wb_multi)
         row.addWidget(self.wb_start)
         right_layout.addLayout(row)
 
@@ -287,10 +291,10 @@ class DoctorWidget(QWidget):
             rows = self.api.list_diagnoses()
         except ApiError:
             return
+        self.diagnoses = rows
         for combo in (
             getattr(self, "wb_diagnosis_code", None),
             getattr(self, "rec_diagnosis_code", None),
-            getattr(self, "record_diag_code", None),
         ):
             if combo is None:
                 continue
@@ -300,18 +304,19 @@ class DoctorWidget(QWidget):
             for row in rows:
                 combo.addItem(f"{row['code']} {row['name']}", row["code"])
             combo.blockSignals(False)
+        if hasattr(self, "record_diagnosis_editor"):
+            self.record_diagnosis_editor.set_options(rows)
 
     def _diagnosis_selected(self, _index: int) -> None:
         combo = self.sender()
         code = combo.currentData() if combo else ""
         text = combo.currentText() if combo else ""
         name = text.split(" ", 1)[1] if " " in text else ""
-        if combo is getattr(self, "wb_diagnosis_code", None):
-            target = self.wb_diagnosis
-        elif combo is getattr(self, "record_diag_code", None):
-            target = getattr(self, "record_diag_text", None)
-        else:
-            target = getattr(self, "rec_diagnosis", None)
+        target = (
+            self.wb_diagnosis
+            if combo is getattr(self, "wb_diagnosis_code", None)
+            else getattr(self, "rec_diagnosis", None)
+        )
         if code and target is not None:
             target.setText(name)
 
@@ -547,6 +552,15 @@ class DoctorWidget(QWidget):
             self.wb_patient.setStyleSheet("color:#ef4444;font-weight:bold")
         else:
             self.wb_patient.setStyleSheet("")
+        self.wb_pending_diagnoses = []
+        if not item.get("encounter_id") and item.get("diagnosis"):
+            self.wb_pending_diagnoses = [
+                {
+                    "diagnosis_code": item.get("diagnosis_code") or "",
+                    "diagnosis": item.get("diagnosis") or "",
+                    "note": "",
+                }
+            ]
         self.wb_diagnosis.setText(item.get("diagnosis") or "")
         code_index = self.wb_diagnosis_code.findData(item.get("diagnosis_code") or "")
         if code_index >= 0:
@@ -599,6 +613,51 @@ class DoctorWidget(QWidget):
         self.exam_encounter_id.setValue(encounter_id)
         self.treat_encounter_id.setValue(encounter_id)
 
+    def _wb_multi_diagnosis(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item:
+            self.wb_summary.setText("请先选择患者")
+            return
+        encounter_id = item.get("encounter_id")
+        if encounter_id:
+            try:
+                rows = self.api.list_encounter_diagnoses(encounter_id)
+            except ApiError as e:
+                self.wb_summary.setText(f"诊断加载失败（{e.status_code}）：{e.detail}")
+                return
+        else:
+            rows = getattr(self, "wb_pending_diagnoses", [])
+            if not rows and self.wb_diagnosis.text().strip():
+                rows = [
+                    {
+                        "diagnosis_code": self.wb_diagnosis_code.currentData() or "",
+                        "diagnosis": self.wb_diagnosis.text().strip(),
+                        "note": "",
+                    }
+                ]
+        dialog = DiagnosisDialog(rows, getattr(self, "diagnoses", []), self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        rows = dialog.rows()
+        primary = rows[0]
+        self.wb_diagnosis.setText(primary.get("diagnosis") or "")
+        idx = self.wb_diagnosis_code.findData(primary.get("diagnosis_code") or "")
+        self.wb_diagnosis_code.blockSignals(True)
+        self.wb_diagnosis_code.setCurrentIndex(max(0, idx))
+        self.wb_diagnosis_code.blockSignals(False)
+        if encounter_id:
+            try:
+                self.api.save_encounter_diagnoses(encounter_id, rows)
+            except ApiError as e:
+                self.wb_summary.setText(f"诊断保存失败（{e.status_code}）：{e.detail}")
+                return
+            self.wb_summary.setText(f"诊断已保存：{len(rows)} 条，第一条为主诊断")
+        else:
+            self.wb_pending_diagnoses = rows
+            self.wb_summary.setText(
+                f"已录入 {len(rows)} 条诊断；开始接诊后自动保存，第一条为主诊断"
+            )
+
     def _start_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
         if not item:
@@ -616,6 +675,16 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
             return
+        if not item.get("encounter_id") and getattr(self, "wb_pending_diagnoses", None):
+            try:
+                self.api.save_encounter_diagnoses(
+                    encounter["id"], self.wb_pending_diagnoses
+                )
+            except ApiError as e:
+                self.wb_summary.setText(
+                    f"接诊成功，但多诊断保存失败（{e.status_code}）：{e.detail}"
+                )
+            self.wb_pending_diagnoses = []
         self._load_workbench()
         for row, candidate in enumerate(self.workbench_rows):
             if candidate["registration_id"] == item["registration_id"]:
@@ -1123,20 +1192,14 @@ class DoctorWidget(QWidget):
         top.addWidget(self.record_diagnosis, 1)
         layout.addLayout(top)
 
-        diag_row = QHBoxLayout()
-        self.record_diag_code = QComboBox()
-        self.record_diag_code.addItem("诊断编码（可选）", "")
-        self.record_diag_code.currentIndexChanged.connect(self._diagnosis_selected)
-        self.record_diag_text = QLineEdit()
-        self.record_diag_text.setPlaceholderText("修改诊断名称，如 急性上呼吸道感染")
-        save_diag = QPushButton("保存诊断")
-        save_diag.clicked.connect(self._save_record_diagnosis)
-        diag_row.addWidget(QLabel("诊断编码"))
-        diag_row.addWidget(self.record_diag_code)
-        diag_row.addWidget(QLabel("诊断"))
-        diag_row.addWidget(self.record_diag_text, 1)
-        diag_row.addWidget(save_diag)
-        layout.addLayout(diag_row)
+        diagnosis_box = QGroupBox("诊断（第一行为主诊断，按重要性排序）")
+        diagnosis_layout = QVBoxLayout(diagnosis_box)
+        self.record_diagnosis_editor = DiagnosisEditor()
+        diagnosis_layout.addWidget(self.record_diagnosis_editor)
+        save_diag = QPushButton("保存全部诊断")
+        save_diag.clicked.connect(self._save_record_diagnoses)
+        diagnosis_layout.addWidget(save_diag)
+        layout.addWidget(diagnosis_box)
 
         self.record_edits: dict[str, QTextEdit] = {}
         grid = QGridLayout()
@@ -1254,12 +1317,21 @@ class DoctorWidget(QWidget):
                 f"诊断：{encounter.get('diagnosis_code') or ''} "
                 f"{encounter.get('diagnosis') or '—'}".strip()
             )
-        if hasattr(self, "record_diag_text"):
-            self.record_diag_code.blockSignals(True)
-            idx = self.record_diag_code.findData(encounter.get("diagnosis_code") or "")
-            self.record_diag_code.setCurrentIndex(max(0, idx))
-            self.record_diag_code.blockSignals(False)
-            self.record_diag_text.setText(encounter.get("diagnosis") or "")
+        if hasattr(self, "record_diagnosis_editor"):
+            try:
+                rows = self.api.list_encounter_diagnoses(self.mr_encounter_id.value())
+            except ApiError:
+                rows = []
+            if not rows and encounter.get("diagnosis"):
+                rows = [
+                    {
+                        "diagnosis_code": encounter.get("diagnosis_code") or "",
+                        "diagnosis": encounter.get("diagnosis") or "",
+                        "diagnosis_type": "primary",
+                        "note": "",
+                    }
+                ]
+            self.record_diagnosis_editor.set_items(rows)
         for key, _label, _limit in _RECORD_FIELDS:
             self.record_edits[key].setPlainText(record.get(key) or "")
         self.record_msg.setText(
@@ -1267,31 +1339,31 @@ class DoctorWidget(QWidget):
             f"签名：{record.get('signed_by') or '未签名'}）"
         )
 
-    def _save_record_diagnosis(self) -> None:
+    def _save_record_diagnoses(self) -> None:
         encounter_id = self.mr_encounter_id.value()
         if not encounter_id:
             self.record_msg.setText("请先载入病历")
             return
-        code = self.record_diag_code.currentData() or ""
-        text = self.record_diag_text.text().strip()
-        if not text:
-            self.record_msg.setText("诊断不能为空")
+        items = self.record_diagnosis_editor.get_items()
+        if not items:
+            self.record_msg.setText("至少填写一条诊断")
             return
         try:
-            encounter = self.api.update_encounter_diagnosis(encounter_id, code, text)
+            rows = self.api.save_encounter_diagnoses(encounter_id, items)
         except ApiError as e:
             self.record_msg.setText(f"诊断保存失败（{e.status_code}）：{e.detail}")
             return
+        primary = rows[0] if rows else {}
         self.record_diagnosis.setText(
-            f"诊断：{encounter.get('diagnosis_code') or ''} "
-            f"{encounter.get('diagnosis') or '—'}".strip()
+            f"主诊断：{primary.get('diagnosis_code') or ''} "
+            f"{primary.get('diagnosis') or '—'}（共 {len(rows)} 条）"
         )
-        self.wb_diagnosis.setText(encounter.get("diagnosis") or "")
-        idx = self.wb_diagnosis_code.findData(encounter.get("diagnosis_code") or "")
+        self.wb_diagnosis.setText(primary.get("diagnosis") or "")
+        idx = self.wb_diagnosis_code.findData(primary.get("diagnosis_code") or "")
         self.wb_diagnosis_code.blockSignals(True)
         self.wb_diagnosis_code.setCurrentIndex(max(0, idx))
         self.wb_diagnosis_code.blockSignals(False)
-        self.record_msg.setText("诊断已更新")
+        self.record_msg.setText(f"诊断已保存：{len(rows)} 条，第一条为主诊断")
 
     def _record_payload(self) -> dict:
         return {

@@ -20,7 +20,12 @@ from app.modules.pharmacy.retail_service import get_retail_sale
 from app.modules.pharmacy.service import get_dispense
 from app.modules.nursing.models import NursingOrder
 from app.modules.charges.service import list_charges
-from app.modules.encounter.service import get_encounter, get_medical_record, list_prescription_items
+from app.modules.encounter.service import (
+    get_encounter,
+    get_medical_record,
+    list_encounter_diagnoses,
+    list_prescription_items,
+)
 from app.modules.lis.service import get_request
 from app.modules.lis.models import LabRequest
 from app.modules.pacs.models import ImagingRequest
@@ -99,6 +104,16 @@ def _collect(db: Session, encounter_id: int) -> dict:
         ),
         "doctor_name": doctor.name if doctor else "（未知医师）",
         "record": record,
+        "diagnoses": [
+            {
+                "diagnosis_code": row.diagnosis_code,
+                "diagnosis": row.diagnosis,
+                "diagnosis_type": row.diagnosis_type,
+                "sort_no": row.sort_no,
+                "note": row.note,
+            }
+            for row in list_encounter_diagnoses(db, encounter_id)
+        ],
         "record_no": f"BL{encounter.created_at:%Y%m%d}{encounter.id:04d}",
         "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
         "lines": lines,

@@ -34,6 +34,20 @@ class DiagnosisUpdate(BaseModel):
     diagnosis: str = ""
 
 
+class EncounterDiagnosisItem(BaseModel):
+    diagnosis_code: str = Field(default="", max_length=20)
+    diagnosis: str = Field(min_length=1, max_length=200)
+    note: str = Field(default="", max_length=200)
+
+
+class EncounterDiagnosisResponse(EncounterDiagnosisItem):
+    id: int
+    encounter_id: int
+    diagnosis_type: str
+    sort_no: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PrescriptionItemCreate(BaseModel):
     drug_id: int
     quantity: int = Field(gt=0)

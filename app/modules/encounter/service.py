@@ -25,9 +25,16 @@ from app.modules.registration.service import (
 )
 from app.modules.triage.service import complete_ticket_for_registration
 
-from .models import AdverseReaction, Encounter, MedicalRecord, PrescriptionItem
+from .models import (
+    AdverseReaction,
+    Encounter,
+    EncounterDiagnosis,
+    MedicalRecord,
+    PrescriptionItem,
+)
 from .schemas import (
     EncounterCreate,
+    EncounterDiagnosisItem,
     MedicalRecordCreate,
     MedicalRecordUpdate,
     PrescriptionItemCreate,
@@ -107,6 +114,17 @@ def create_encounter(
         db, data.diagnosis_code, data.diagnosis
     )
     db.add(encounter)
+    db.flush()
+    if encounter.diagnosis:
+        db.add(
+            EncounterDiagnosis(
+                encounter_id=encounter.id,
+                diagnosis_code=encounter.diagnosis_code,
+                diagnosis=encounter.diagnosis,
+                diagnosis_type="primary",
+                sort_no=0,
+            )
+        )
     mark_registration_visited(db, registration)
     complete_ticket_for_registration(db, data.registration_id)
     db.flush()
@@ -134,15 +152,104 @@ def create_encounter(
     return encounter
 
 
+def list_encounter_diagnoses(
+    db: Session, encounter_id: int
+) -> list[EncounterDiagnosis]:
+    return (
+        db.query(EncounterDiagnosis)
+        .filter(EncounterDiagnosis.encounter_id == encounter_id)
+        .order_by(EncounterDiagnosis.sort_no, EncounterDiagnosis.id)
+        .all()
+    )
+
+
+def replace_encounter_diagnoses(
+    db: Session,
+    encounter_id: int,
+    items: list[EncounterDiagnosisItem],
+    operator: str = "",
+) -> list[EncounterDiagnosis]:
+    """按顺序保存诊断：第一条主诊断，其余其他诊断。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise EncounterClosedError("就诊已收费，不能再修改诊断")
+    if len(items) > 20:
+        raise ValueError("诊断最多 20 条")
+    normalized = []
+    seen = set()
+    for index, item in enumerate(items):
+        name = (item.diagnosis or "").strip()
+        if not name:
+            raise ValueError("诊断名称不能为空")
+        code, name = _resolve_diagnosis(db, item.diagnosis_code, name)
+        key = (code, name)
+        if key in seen:
+            raise ValueError(f"诊断重复：{name}")
+        seen.add(key)
+        normalized.append(
+            {
+                "diagnosis_code": code,
+                "diagnosis": name,
+                "diagnosis_type": "primary" if index == 0 else "secondary",
+                "sort_no": index,
+                "note": (item.note or "").strip(),
+            }
+        )
+
+    (
+        db.query(EncounterDiagnosis)
+        .filter(EncounterDiagnosis.encounter_id == encounter_id)
+        .delete(synchronize_session=False)
+    )
+    rows = []
+    for data in normalized:
+        row = EncounterDiagnosis(encounter_id=encounter_id, **data)
+        db.add(row)
+        rows.append(row)
+    if normalized:
+        encounter.diagnosis_code = normalized[0]["diagnosis_code"]
+        encounter.diagnosis = normalized[0]["diagnosis"]
+    else:
+        encounter.diagnosis_code = ""
+        encounter.diagnosis = ""
+    db.commit()
+    for row in rows:
+        db.refresh(row)
+    return rows
+
+
 def update_diagnosis(
     db: Session, encounter_id: int, diagnosis_code: str, diagnosis: str
 ) -> Encounter:
+    """兼容旧接口：更新主诊断，保留其他诊断。"""
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
     if encounter.status == "closed":
         raise EncounterClosedError("就诊已收费，不能再修改诊断")
     code, name = _resolve_diagnosis(db, diagnosis_code, diagnosis)
+    primary = (
+        db.query(EncounterDiagnosis)
+        .filter(EncounterDiagnosis.encounter_id == encounter_id)
+        .order_by(EncounterDiagnosis.sort_no, EncounterDiagnosis.id)
+        .first()
+    )
+    if primary:
+        primary.diagnosis_code = code
+        primary.diagnosis = name
+        primary.diagnosis_type = "primary"
+    else:
+        db.add(
+            EncounterDiagnosis(
+                encounter_id=encounter.id,
+                diagnosis_code=code,
+                diagnosis=name,
+                diagnosis_type="primary",
+                sort_no=0,
+            )
+        )
     encounter.diagnosis_code = code
     encounter.diagnosis = name
     db.commit()
@@ -553,6 +660,17 @@ def encounter_summary(db: Session, encounter_id: int) -> dict | None:
         "doctor_name": doctor.name if doctor else "",
         "diagnosis": encounter.diagnosis,
         "diagnosis_code": encounter.diagnosis_code,
+        "diagnoses": [
+            {
+                "id": row.id,
+                "diagnosis_code": row.diagnosis_code,
+                "diagnosis": row.diagnosis,
+                "diagnosis_type": row.diagnosis_type,
+                "sort_no": row.sort_no,
+                "note": row.note,
+            }
+            for row in list_encounter_diagnoses(db, encounter.id)
+        ],
         "visit_type": encounter.visit_type or "initial",
         "original_encounter_id": encounter.original_encounter_id,
         "status": encounter.status,

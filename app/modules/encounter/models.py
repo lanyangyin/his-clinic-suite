@@ -31,6 +31,32 @@ class Encounter(Base):
     items: Mapped[list["PrescriptionItem"]] = relationship()
 
 
+class EncounterDiagnosis(Base):
+    """就诊诊断：按 sort_no 排序，第一条为主诊断。"""
+
+    __tablename__ = "encounter_diagnoses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), nullable=False, index=True
+    )
+    diagnosis_code: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
+    diagnosis: Mapped[str] = mapped_column(String(200), nullable=False)
+    # primary 主诊断 / secondary 其他诊断，由排序自动生成
+    diagnosis_type: Mapped[str] = mapped_column(
+        String(20), default="primary", server_default="primary", nullable=False
+    )
+    sort_no: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    note: Mapped[str] = mapped_column(
+        String(200), default="", server_default="", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, nullable=False
+    )
+
+
 class PrescriptionItem(Base):
     __tablename__ = "prescription_items"
 
