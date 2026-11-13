@@ -168,4 +168,14 @@ uv run python scripts/check_concurrency.py     # 并发抢号验证
 
 - 演示用医保/短信/CA 均为本地 Mock，生产接入需替换真实接口与密钥
 - 金额、检查检验、医保结算等按演示规则实现，实际使用请按当地政策调整
-- 未开源授权，仅供内部评估/演示使用
+- 采用 GPL-3.0-only 开源授权，详见下方 License 章节
+
+
+## License
+
+GNU General Public License v3.0 only (GPL-3.0-only).
+
+- Full text: [LICENSE](LICENSE)
+- Copyright (C) 2026 lanyangyin and contributors
+- Third-party dependencies keep their own licenses.
+- Demo keys/accounts/mock insurance/CA data are for local development only; never use them in production.
