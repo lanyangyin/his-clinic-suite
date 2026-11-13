@@ -19,7 +19,7 @@ echo "[2/4] PyInstaller 打包（约 2~4 分钟）..."
     scripts/server_entry.py
 
 echo "[3/4] 写入配置与运维脚本..."
-cp config.ini dist/his-server/config.ini
+cp config.release.ini dist/his-server/config.ini
 cp backup.sh dist/his-server/backup.sh
 cp scripts/install_service.sh scripts/uninstall_service.sh dist/his-server/
 chmod +x dist/his-server/his-server dist/his-server/backup.sh dist/his-server/install_service.sh dist/his-server/uninstall_service.sh

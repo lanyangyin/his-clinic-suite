@@ -18,7 +18,7 @@ echo [2/4] Running PyInstaller...
 if errorlevel 1 goto build_failed
 
 echo [3/4] Copying config and maintenance scripts...
-copy /Y "config.ini" "dist\his-server\config.ini" >nul
+copy /Y "config.release.ini" "dist\his-server\config.ini" >nul
 copy /Y "backup.bat" "dist\his-server\backup.bat" >nul
 copy /Y "scripts\install_service.bat" "dist\his-server\install_service.bat" >nul
 copy /Y "scripts\uninstall_service.bat" "dist\his-server\uninstall_service.bat" >nul
