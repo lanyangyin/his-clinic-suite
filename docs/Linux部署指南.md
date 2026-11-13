@@ -86,13 +86,13 @@ cd /opt/his
 
 ```bash
 cd /opt/his
-git clone https://github.com/lanyangyin/his-clinic.git .
+git clone https://github.com/lanyangyin/his-clinic-system.git .
 ```
 
 如果仓库是私有的，使用 SSH：
 
 ```bash
-git clone git@github.com:lanyangyin/his-clinic.git .
+git clone git@github.com:lanyangyin/his-clinic-system.git .
 ```
 
 ### 方式 B：从开发机复制
@@ -439,7 +439,7 @@ sudo useradd --system --create-home --shell /bin/bash his
 sudo mkdir -p /opt/his && sudo chown his:his /opt/his
 sudo -iu his
 cd /opt/his
-git clone https://github.com/lanyangyin/his-clinic.git .
+git clone https://github.com/lanyangyin/his-clinic-system.git .
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-server.txt
 cp config.release.ini config.local.ini
