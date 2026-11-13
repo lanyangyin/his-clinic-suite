@@ -10,21 +10,41 @@ from .schemas import (
     DoctorCreate,
     DoctorResponse,
 )
-from .service import create_department, create_doctor, get_department, get_doctor, list_doctors
+from .service import (
+    create_department,
+    create_doctor,
+    deactivate_department,
+    deactivate_doctor,
+    get_department,
+    get_doctor,
+    list_departments,
+    list_doctors,
+)
 
 router = APIRouter(tags=["staff"])
 
 
 @router.get("/doctors/", response_model=list[DoctorResponse])
-def get_all_doctors(department_id: int | None = None, db: Session = Depends(get_db)):
-    return list_doctors(db, department_id)
+def get_all_doctors(
+    department_id: int | None = None,
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+):
+    return list_doctors(db, department_id, include_inactive)
+
+
+@router.get("/departments/", response_model=list[DepartmentResponse])
+def get_all_departments(
+    include_inactive: bool = False, db: Session = Depends(get_db)
+):
+    return list_departments(db, include_inactive)
 
 
 @router.post("/departments/", response_model=DepartmentResponse, status_code=201)
 def new_department(
     data: DepartmentCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     return create_department(db, data)
 
@@ -37,14 +57,38 @@ def get_department_one(department_id: int, db: Session = Depends(get_db)):
     return department
 
 
+@router.delete("/departments/{department_id}", response_model=DepartmentResponse)
+def delete_department(
+    department_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "hr")),
+):
+    try:
+        return deactivate_department(db, department_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/doctors/", response_model=DoctorResponse, status_code=201)
 def new_doctor(
     data: DoctorCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         return create_doctor(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/doctors/{doctor_id}", response_model=DoctorResponse)
+def delete_doctor(
+    doctor_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "hr")),
+):
+    try:
+        return deactivate_doctor(db, doctor_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

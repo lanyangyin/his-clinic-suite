@@ -15,6 +15,7 @@ from his_client.ui.patient360 import Patient360Widget
 from his_client.ui.tcm import TcmWidget
 from his_client.ui.treatment_room import TreatmentRoomWidget
 from his_client.ui.pharmacy import PharmacyWidget
+from his_client.ui.hr import HrWidget
 from his_client.ui.theme import apply_theme
 from his_client.ui.window_theme import apply_light_titlebar
 
@@ -32,6 +33,8 @@ class MainWindow(QMainWindow):
         self._light_title_done = False
         role = user.get("role", "")
         tabs = SidebarTabs()
+        if role in ("hr", "admin"):
+            tabs.addTab(HrWidget(api), "人事工作站")
         if role in ("cashier", "admin"):
             tabs.addTab(CashierWidget(api, role=role), "收费员工作站")
         if role in ("doctor", "admin"):

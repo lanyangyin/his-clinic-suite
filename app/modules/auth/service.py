@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from .models import AuditLog, User
 from .schemas import UserCreate
 
-ROLES = {"admin", "doctor", "nurse", "cashier", "pharmacist", "warehouse", "lab", "radiology", "archive", "decoction", "surgery", "treatment", "director"}
+ROLES = {"admin", "doctor", "nurse", "cashier", "pharmacist", "warehouse", "lab", "radiology", "archive", "decoction", "surgery", "treatment", "director", "hr"}
 _ITERATIONS = 100_000
 
 
@@ -46,6 +46,7 @@ def create_user(db: Session, data: UserCreate) -> User:
         salt=salt,
         role=data.role,
         display_name=data.display_name or data.username,
+        employee_id=data.employee_id,
     )
     db.add(user)
     db.commit()

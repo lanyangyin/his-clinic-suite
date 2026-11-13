@@ -1,7 +1,7 @@
 # Android Termux 部署指南（优先 /sdcard）
 
 适用：Android 10+、arm64 手机/平板。  
-服务端版本：HIS 1.1.1。  
+服务端版本：HIS 1.2.0。  
 目标：源码、配置、数据库、备份**优先放 `/sdcard/HIS`**；Python 虚拟环境放内部，保证可执行。
 
 > 说明：Android 的 `/sdcard` 是 FUSE/模拟存储，不是 ext4。  
@@ -113,10 +113,10 @@ date
 mkdir -p /sdcard/HIS
 cd /sdcard/HIS
 
-curl -L -o his-server-termux-1.1.1.tar.gz \
-  https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-server-termux-1.1.1.tar.gz
+curl -L -o his-server-termux-1.2.0.tar.gz \
+  https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.2.0/his-server-termux-1.2.0.tar.gz
 
-tar -xzf his-server-termux-1.1.1.tar.gz -C /sdcard/HIS --strip-components=1
+tar -xzf his-server-termux-1.2.0.tar.gz -C /sdcard/HIS --strip-components=1
 ls
 ```
 
@@ -298,7 +298,7 @@ curl http://127.0.0.1:8001/health
 应返回：
 
 ```json
-{"status":"ok","version":"1.1.1"}
+{"status":"ok","version":"1.2.0"}
 ```
 
 查看手机 IP（Termux 外层，不是 Ubuntu）：
@@ -454,7 +454,7 @@ git pull
 - [ ] `.venv` 在 `/root/his-venv`
 - [ ] `config.local.ini` 改了 secret_key
 - [ ] 数据库模式已选 A 或 B
-- [ ] `/health` 返回 1.1.1
+- [ ] `/health` 返回 1.2.0
 - [ ] 电脑能打开管理台
 - [ ] admin 密码已改
 - [ ] 客户端能连接

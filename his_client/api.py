@@ -65,9 +65,46 @@ class ApiClient:
     def me(self) -> dict:
         return self._request("GET", "/auth/me")
 
-    # ---- 基础数据 ----
-    def list_doctors(self) -> list:
-        return self._request("GET", "/doctors/")
+    # ---- 基础数据 / 人事 ----
+    def list_doctors(self, include_inactive: bool = False) -> list:
+        params = {"include_inactive": "true"} if include_inactive else None
+        return self._request("GET", "/doctors/", params=params)
+
+    def create_doctor(self, name: str, department_id: int) -> dict:
+        return self._request(
+            "POST",
+            "/doctors/",
+            json={"name": name, "department_id": department_id},
+        )
+
+    def delete_doctor(self, doctor_id: int) -> dict:
+        return self._request("DELETE", f"/doctors/{doctor_id}")
+
+    def list_departments(self, include_inactive: bool = False) -> list:
+        params = {"include_inactive": "true"} if include_inactive else None
+        return self._request("GET", "/departments/", params=params)
+
+    def create_department(self, name: str) -> dict:
+        return self._request("POST", "/departments/", json={"name": name})
+
+    def delete_department(self, department_id: int) -> dict:
+        return self._request("DELETE", f"/departments/{department_id}")
+
+    def list_users(self) -> list:
+        return self._request("GET", "/users/")
+
+    def create_user(self, payload: dict) -> dict:
+        return self._request("POST", "/users/", json=payload)
+
+    def list_employees(self, status: str | None = None) -> list:
+        params = {"status": status} if status else None
+        return self._request("GET", "/hr/employees/", params=params)
+
+    def create_employee(self, payload: dict) -> dict:
+        return self._request("POST", "/hr/employees/", json=payload)
+
+    def resign_employee(self, employee_id: int) -> dict:
+        return self._request("POST", f"/hr/employees/{employee_id}/resign")
 
     def list_drugs(self) -> list:
         return self._request("GET", "/drugs/")

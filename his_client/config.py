@@ -18,6 +18,9 @@ class ClientConfig:
     timeout: int = 10
     printer: str = ""
     insurance_enabled: bool = False
+    remember_login: bool = True
+    remember_limit: int = 10
+    history_path: str = ""
 
 
 def _candidate_paths(explicit: str | Path | None) -> list[Path]:
@@ -57,6 +60,10 @@ def _read_values(path: Path) -> dict:
         values["printer"] = parser.get("client", "printer").strip()
     if parser.has_option("features", "insurance"):
         values["insurance_enabled"] = parser.getboolean("features", "insurance")
+    if parser.has_option("client", "remember_login"):
+        values["remember_login"] = parser.getboolean("client", "remember_login")
+    if parser.has_option("client", "remember_limit"):
+        values["remember_limit"] = max(1, min(50, parser.getint("client", "remember_limit")))
     return values
 
 
@@ -69,12 +76,20 @@ def parse_config(path: Path) -> ClientConfig:
 
 def load_config(path: str | Path | None = None) -> ClientConfig:
     config = ClientConfig()
+    found_path: Path | None = None
     for candidate in _candidate_paths(path):
         if candidate.is_file():
             config = parse_config(candidate)
+            found_path = candidate
             break
     for candidate in _override_paths():
         if candidate.is_file():
             for key, value in _read_values(candidate).items():
                 setattr(config, key, value)
+    base_dir = (
+        found_path.parent
+        if found_path is not None
+        else (Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd())
+    )
+    config.history_path = str(base_dir / "login_history.json")
     return config

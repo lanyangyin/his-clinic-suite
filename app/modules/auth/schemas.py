@@ -8,6 +8,7 @@ class UserCreate(BaseModel):
     password: str
     role: str
     display_name: str = ""
+    employee_id: int | None = None
 
 
 class UserResponse(BaseModel):
@@ -15,6 +16,7 @@ class UserResponse(BaseModel):
     username: str
     role: str
     display_name: str
+    employee_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

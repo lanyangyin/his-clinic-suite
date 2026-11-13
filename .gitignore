@@ -41,3 +41,6 @@ docs/dept_preview/
 data/treatment_consents/
 
 data/archive_destructions/
+
+# 客户端登录记忆（只含 IP/端口/账号，不含密码）
+login_history.json

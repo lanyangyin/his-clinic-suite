@@ -7,6 +7,7 @@ class DepartmentCreate(BaseModel):
 
 class DepartmentResponse(DepartmentCreate):
     id: int
+    active: bool = True
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -17,4 +18,5 @@ class DoctorCreate(BaseModel):
 
 class DoctorResponse(DoctorCreate):
     id: int
+    active: bool = True
     model_config = ConfigDict(from_attributes=True)

@@ -43,7 +43,7 @@ router = APIRouter(prefix="/hr", tags=["hr"])
 def new_employee(
     data: EmployeeCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         return create_employee(db, data)
@@ -72,7 +72,7 @@ def get_one(employee_id: int, db: Session = Depends(get_db)):
 def resign_employee(
     employee_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         return resign(db, employee_id)
@@ -85,7 +85,7 @@ def resign_employee(
 def attendance_check(
     data: AttendanceCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         return check_attendance(db, data)
@@ -117,7 +117,7 @@ def get_attendance_summary(
 def new_salary_request(
     data: SalaryRequestCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("admin")),
+    user=Depends(require_role("admin", "hr")),
 ):
     try:
         return create_salary_request(db, data, user.username)
@@ -179,7 +179,7 @@ def reject_salary(
 def new_shift(
     data: ShiftCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         return create_shift(db, data)
@@ -202,7 +202,7 @@ def get_shifts(
 def remove_shift(
     shift_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    _: None = Depends(require_role("admin", "hr")),
 ):
     try:
         delete_shift(db, shift_id)

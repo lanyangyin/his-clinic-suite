@@ -20,12 +20,24 @@ def me(user=Depends(require_login)):
 def new_user(
     data: UserCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("admin")),
+    user=Depends(require_role("admin", "hr")),
 ):
+    if user.role == "hr" and data.role in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="人事不能创建管理员/院长账号")
     try:
         return create_user(db, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/users/", response_model=list[UserResponse])
+def list_all_users(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "hr")),
+):
+    from .service import list_users
+
+    return list_users(db)
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
