@@ -404,6 +404,32 @@ class CashierWidget(QWidget):
             if allergy not in ("无过敏史", "不详", "过敏史不详")
             else "font-weight:bold"
         )
+        self._load_visit_type(patient["id"])
+
+    def _load_visit_type(self, patient_id: int) -> None:
+        if not hasattr(self, "r_visit_type"):
+            return
+        try:
+            rows = self.api.list_registrations(patient_id=patient_id)
+        except ApiError:
+            rows = []
+        prior = [row for row in rows if row.get("status") == "visited"]
+        if prior:
+            last = prior[0]
+            self._original_registration_id = last["id"]
+            self.r_visit_type.setCurrentIndex(
+                self.r_visit_type.findData("follow_up")
+            )
+            self.r_visit_hint.setText(
+                f"历史就诊 {len(prior)} 次，上次挂号 {last['id']}；"
+                "已自动选复诊，可改回初诊"
+            )
+        else:
+            self._original_registration_id = None
+            self.r_visit_type.setCurrentIndex(
+                self.r_visit_type.findData("initial")
+            )
+            self.r_visit_hint.setText("无历史就诊，按初诊挂号")
 
     def _bind_patient_card(self) -> None:
         row = self.patient_table.currentRow()
@@ -565,6 +591,13 @@ class CashierWidget(QWidget):
         self.r_patient_label = QLabel("患者：—")
         self.r_patient_label.setStyleSheet("font-weight:bold")
         form.addRow("", self.r_patient_label)
+        self.r_visit_type = QComboBox()
+        self.r_visit_type.addItem("初诊", "initial")
+        self.r_visit_type.addItem("复诊（关联上次就诊）", "follow_up")
+        self.r_visit_hint = QLabel("选择患者后自动识别初诊/复诊")
+        self.r_visit_hint.setWordWrap(True)
+        form.addRow("就诊类型", self.r_visit_type)
+        form.addRow("", self.r_visit_hint)
         self.r_card_uid = QLineEdit()
         self.r_card_uid.setPlaceholderText("NFC 就诊卡号")
         lookup_card = QPushButton("按卡带出患者")
@@ -692,15 +725,28 @@ class CashierWidget(QWidget):
             self.reg_msg.setText("请先刷新医生列表并选择医生")
             return
         schedule_id = self.r_schedule_id.value() or None
+        visit_type = self.r_visit_type.currentData() or "initial"
+        original_id = (
+            getattr(self, "_original_registration_id", None)
+            if visit_type == "follow_up"
+            else None
+        )
         try:
             registration = self.api.create_registration(
-                self.r_patient_id.value(), doctor_id, schedule_id
+                self.r_patient_id.value(),
+                doctor_id,
+                schedule_id,
+                visit_type=visit_type,
+                original_registration_id=original_id,
             )
         except ApiError as e:
             self.reg_msg.setText(f"挂号失败（{e.status_code}）：{e.detail}")
             return
+        type_label = "复诊" if registration.get("visit_type") == "follow_up" else "初诊"
         self.reg_msg.setText(
-            f"挂号成功：挂号 ID {registration['id']}，状态 {zh('registration_status', registration['status'])}"
+            f"挂号成功：挂号 ID {registration['id']}，{type_label}，"
+            f"状态 {zh('registration_status', registration['status'])}"
+            f"（关联上次 {registration.get('original_registration_id') or '—'}）"
         )
 
     # ---------- 收费 / 退费 ----------

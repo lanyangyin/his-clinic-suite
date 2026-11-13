@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, ForeignKey
+from sqlalchemy import DateTime, Integer, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -18,6 +18,12 @@ class Encounter(Base):
         String(20), default="", server_default="", nullable=False
     )
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
+    # initial 初诊 / follow_up 复诊，从挂号继承
+    visit_type: Mapped[str] = mapped_column(
+        String(20), default="initial", server_default="initial", nullable=False
+    )
+    # 复诊关联的上次就诊
+    original_encounter_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )

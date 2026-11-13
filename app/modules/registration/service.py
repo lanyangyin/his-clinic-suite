@@ -104,6 +104,7 @@ def create_registration_for_appointment(
         patient_id=patient_id,
         doctor_id=doctor_id,
         schedule_id=schedule_id,
+        visit_type="initial",
     )
     db.add(registration)
     db.flush()
@@ -123,10 +124,36 @@ def create_registration(db: Session, data: RegistrationCreate) -> Registration:
     if data.schedule_id is not None:
         take_schedule_slot(db, data.schedule_id, data.doctor_id)
 
+    original_id = None
+    if data.visit_type == "follow_up":
+        if data.original_registration_id:
+            original = get_registration(db, data.original_registration_id)
+            if not original:
+                raise ValueError("上次挂号不存在")
+            if original.patient_id != data.patient_id:
+                raise ValueError("上次挂号不属于该患者")
+            if original.status != "visited":
+                raise ValueError("上次挂号尚未完成就诊，不能作为复诊依据")
+        else:
+            original = (
+                db.query(Registration)
+                .filter(
+                    Registration.patient_id == data.patient_id,
+                    Registration.status == "visited",
+                )
+                .order_by(Registration.id.desc())
+                .first()
+            )
+            if not original:
+                raise ValueError("该患者没有历史就诊，不能挂复诊号")
+        original_id = original.id
+
     registration = Registration(
         patient_id=data.patient_id,
         doctor_id=data.doctor_id,
         schedule_id=data.schedule_id,
+        visit_type=data.visit_type,
+        original_registration_id=original_id,
     )
     db.add(registration)
     db.commit()

@@ -183,11 +183,22 @@ class ApiClient:
 
     # ---- 挂号 / 就诊 ----
     def create_registration(
-        self, patient_id: int, doctor_id: int, schedule_id: int | None = None
+        self,
+        patient_id: int,
+        doctor_id: int,
+        schedule_id: int | None = None,
+        visit_type: str = "initial",
+        original_registration_id: int | None = None,
     ) -> dict:
-        payload = {"patient_id": patient_id, "doctor_id": doctor_id}
+        payload = {
+            "patient_id": patient_id,
+            "doctor_id": doctor_id,
+            "visit_type": visit_type,
+        }
         if schedule_id:
             payload["schedule_id"] = schedule_id
+        if original_registration_id:
+            payload["original_registration_id"] = original_registration_id
         return self._request("POST", "/registrations/", json=payload)
 
     def list_registrations(

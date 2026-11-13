@@ -12,6 +12,8 @@ class EncounterCreate(BaseModel):
 class EncounterResponse(EncounterCreate):
     id: int
     status: str
+    visit_type: str = "initial"
+    original_encounter_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

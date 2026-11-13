@@ -89,10 +89,19 @@ def create_encounter(
                 "当前患者尚未完成诊治，请先完成或挂起当前患者，再开始下一位"
             )
 
+    original_encounter = None
+    if registration.original_registration_id:
+        original_encounter = (
+            db.query(Encounter)
+            .filter(Encounter.registration_id == registration.original_registration_id)
+            .first()
+        )
     encounter = Encounter(
         registration_id=data.registration_id,
         diagnosis=data.diagnosis,
         diagnosis_code=data.diagnosis_code,
+        visit_type=registration.visit_type or "initial",
+        original_encounter_id=original_encounter.id if original_encounter else None,
     )
     encounter.diagnosis_code, encounter.diagnosis = _resolve_diagnosis(
         db, data.diagnosis_code, data.diagnosis
@@ -500,6 +509,8 @@ def worklist(db: Session) -> list[dict]:
                 "doctor_id": doctor.id,
                 "doctor_name": doctor.name,
                 "registration_status": registration.status,
+                "visit_type": registration.visit_type or "initial",
+                "original_registration_id": registration.original_registration_id,
                 "encounter_id": encounter.id if encounter else None,
                 "encounter_status": encounter.status if encounter else "",
                 "diagnosis": encounter.diagnosis if encounter else "",
@@ -542,6 +553,8 @@ def encounter_summary(db: Session, encounter_id: int) -> dict | None:
         "doctor_name": doctor.name if doctor else "",
         "diagnosis": encounter.diagnosis,
         "diagnosis_code": encounter.diagnosis_code,
+        "visit_type": encounter.visit_type or "initial",
+        "original_encounter_id": encounter.original_encounter_id,
         "status": encounter.status,
         "record_signed": bool(record and record.signed_by),
         "total_amount": round(sum(row.amount for row in charges), 2),

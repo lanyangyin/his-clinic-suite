@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -37,3 +37,9 @@ class Registration(Base):
     schedule_id: Mapped[int | None] = mapped_column(
         ForeignKey("doctor_schedules.id"), nullable=True, index=True
     )
+    # initial 初诊 / follow_up 复诊
+    visit_type: Mapped[str] = mapped_column(
+        String(20), default="initial", server_default="initial", nullable=False
+    )
+    # 复诊关联的上次挂号（可空）
+    original_registration_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

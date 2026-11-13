@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,6 +23,8 @@ class RegistrationCreate(BaseModel):
     patient_id: int
     doctor_id: int
     schedule_id: int | None = None
+    visit_type: Literal["initial", "follow_up"] = "initial"
+    original_registration_id: int | None = None
 
 
 class RegistrationResponse(RegistrationCreate):

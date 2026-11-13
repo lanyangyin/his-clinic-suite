@@ -187,9 +187,9 @@ class DoctorWidget(QWidget):
         self.wb_status_tabs.currentChanged.connect(self._filter_workbench)
         queue_layout.addWidget(self.wb_status_tabs)
 
-        self.wb_table = QTableWidget(0, 7)
+        self.wb_table = QTableWidget(0, 8)
         self.wb_table.setHorizontalHeaderLabels(
-            ["挂号", "患者", "医生", "挂号状态", "就诊", "诊断", "待缴"]
+            ["挂号", "患者", "类型", "医生", "挂号状态", "就诊", "诊断", "待缴"]
         )
         self.wb_table.cellClicked.connect(self._select_workbench)
         self.wb_table.cellDoubleClicked.connect(
@@ -395,6 +395,7 @@ class DoctorWidget(QWidget):
             values = [
                 str(item["registration_id"]),
                 f"{level_text}{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
+                "复诊" if item.get("visit_type") == "follow_up" else "初诊",
                 item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 (
@@ -534,6 +535,7 @@ class DoctorWidget(QWidget):
         allergy = item.get("allergy_label") or "不详"
         self.wb_patient.setText(
             f"{item['patient_name']} · {gender}/{age if age is not None else '—'}岁 · "
+            f"{'复诊' if item.get('visit_type') == 'follow_up' else '初诊'} · "
             f"过敏：{allergy} · 分诊 {item.get('triage_level') or '—'} 级 · "
             f"{item.get('vital_summary') or '未测生命体征'} · "
             f"挂号 {item['registration_id']} · 就诊 {item.get('encounter_id') or '未接诊'}"
@@ -573,6 +575,7 @@ class DoctorWidget(QWidget):
             return
         self.wb_summary_data = summary
         self.wb_summary.setText(
+            f"{'复诊' if summary.get('visit_type') == 'follow_up' else '初诊'}　"
             f"诊断：{summary.get('diagnosis_code') or ''} {summary['diagnosis'] or '—'}　状态："
             f"{zh('encounter_status', summary['status'])}　"
             f"病历：{'已签名' if summary['record_signed'] else '未签名'}　"
