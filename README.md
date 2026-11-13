@@ -3,8 +3,26 @@
 一套可运行、可打包分发的中小型门诊部信息系统：**FastAPI 后端 + Web 管理台 + PySide6 桌面客户端**。
 
 - 后端 30+ 业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
-- 456 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
+- 666 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
+- **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
+
+```text
+his-clinic/
+├─ app/                 FastAPI 服务端
+├─ his_client/          PySide6 桌面客户端
+├─ scripts/build_server.bat
+├─ scripts/build_client.bat
+├─ docs/               部署、流程、测试文档
+└─ alembic/             数据库迁移
+```
+
+## 部署文档
+
+- [Linux 服务端独立部署](docs/Linux部署指南.md)
+- [Android Termux 服务端独立部署](docs/Termux部署指南.md)
+- [Windows 桌面客户端部署](docs/客户端部署指南.md)
+- [部署文档索引](docs/Linux与Termux部署.md)
 
 ## 功能概览
 

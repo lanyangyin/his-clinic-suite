@@ -29,14 +29,14 @@ Termux 请从 **F-Droid** 或 Termux GitHub Releases 安装，不要用应用商
 手机 IP：192.168.1.80
 端口：8001
 管理台：http://192.168.1.80:8001/admin
-客户端：http://192.168.1.80:8001
+客户端连接地址：http://192.168.1.80:8001
 ```
 
 ### 重要限制
 
 - 手机不是 7×24 服务器
 - 多台收费/医生终端同时高频写入不建议
-- 数据库必须放 proot 的 ext4 文件系统，**不要放 `/sdcard`**
+- 源码/备份可以放 `/sdcard`；**SQLite 数据库不建议放 `/sdcard`**（原因见下文）
 - Termux 被系统杀死后服务会停
 - 公网访问必须加 VPN/HTTPS，不要直接暴露 8001
 
@@ -117,7 +117,7 @@ date
 
 ## 第 4 步：获取项目
 
-建议放 `/root/his`，不要放 `/sdcard`。
+推荐放 `/root/his`。源码可以放 `/sdcard`，但 `.venv` 和 SQLite 数据库不要放 `/sdcard`。
 
 ```bash
 cd /root
@@ -128,7 +128,7 @@ ls
 
 私有仓库用 SSH 时，先在 Termux/Ubuntu 配好 GitHub SSH key。
 
-如果不用 Git，也可以在 Termux 里通过共享存储把项目复制到 rootfs，但**不要把运行目录直接放在 `/sdcard`**。
+如果不用 Git，也可以在 Termux 里通过共享存储把源码复制到 rootfs；源码目录可以放 `/sdcard`，但 `.venv`、`his.db`、`his.db-wal` 不要放。
 
 ---
 
@@ -187,7 +187,7 @@ phone =
 - `0.0.0.0` 允许同一 Wi-Fi 的电脑访问
 - 端口用 8001，不要用 80/443
 - 数据库默认 `/root/his/his.db`
-- 不要放到 `/sdcard`
+- **数据库不要放到 `/sdcard`**
 
 ```bash
 chmod 600 config.local.ini
@@ -378,6 +378,40 @@ cp /data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/ubuntu/
 
 ---
 
+## 关于 /sdcard 的准确说法
+
+### 可以放
+
+- 项目源码
+- 文档
+- 导出的备份文件
+- 安装包/压缩包
+
+### 不建议放
+
+- `his.db`
+- `his.db-wal`
+- `his.db-shm`
+- `.venv`
+- 大量频繁读写的文件
+
+原因：
+
+- Android `/sdcard` 是 FUSE/模拟存储，不是普通 ext4
+- SQLite WAL 需要可靠的共享内存和文件锁，FUSE 上可能失败
+- 可能出现 `database is locked`、`disk I/O error`、异常断电后损坏
+- Android 11+ 的分区存储/权限会让 Termux 访问 `/sdcard` 更复杂
+- `.venv` 里有符号链接和可执行权限，放 `/sdcard` 容易出问题
+
+如果只是想把源码放 `/sdcard` 节省内部空间，可以；但数据库和虚拟环境放 rootfs：
+
+```text
+/root/his         源码 + .venv + his.db + his.db-wal
+/sdcard/Download  只放备份/安装包
+```
+
+“能启动”不等于“可靠”。门诊数据不要拿 SQLite 在 `/sdcard` 上冒险。
+
 ## 第 11 步：升级
 
 ```bash
@@ -436,7 +470,7 @@ chroot 里同样需要 Python、虚拟环境、项目、配置；Android 没有 
 - [ ] termux-wake-lock 已开
 - [ ] 电池优化已关闭
 - [ ] 备份已测试
-- [ ] 数据库不在 `/sdcard`
+- [ ] SQLite 数据库不在 `/sdcard`
 
 ---
 
@@ -465,7 +499,7 @@ sed -i 's/\r$//' scripts/run_server_linux.sh
 
 ### 数据库 locked
 
-- 数据库不要放 `/sdcard`
+- SQLite 数据库不要放 `/sdcard`
 - 只运行一个服务进程
 - 用 `.backup`，不要直接复制 WAL 数据库
 - 关闭其他打开数据库的工具
