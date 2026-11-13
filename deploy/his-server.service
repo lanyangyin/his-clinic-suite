@@ -1,0 +1,23 @@
+[Unit]
+Description=HIS clinic server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=his
+Group=his
+WorkingDirectory=/opt/his
+Environment=HIS_HOST=0.0.0.0
+Environment=HIS_PORT=8001
+Environment=TZ=Asia/Shanghai
+ExecStart=/opt/his/.venv/bin/python /opt/his/scripts/run_server.py
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+# 只允许写应用目录；按实际路径调整
+ReadWritePaths=/opt/his
+
+[Install]
+WantedBy=multi-user.target

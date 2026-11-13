@@ -11,13 +11,15 @@ import uvicorn  # noqa: E402
 
 from app.settings import BASE_DIR, DATABASE_URL, HOST, PORT  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
-from app.migrate import ensure_initial_admin, ensure_initial_director  # noqa: E402
+from app.migrate import ensure_initial_admin, ensure_initial_director, ensure_schema  # noqa: E402
 
 
 def main() -> int:
     print(f"数据目录: {BASE_DIR}")
     print(f"数据库:   {DATABASE_URL}")
     print(f"监听:     http://{HOST}:{PORT}")
+    result = ensure_schema()
+    print(f"数据库结构: {result}")
     db = SessionLocal()
     try:
         ensure_initial_admin(db)

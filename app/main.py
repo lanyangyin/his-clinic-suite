@@ -6,6 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import JSONResponse, Response
 
 from app import settings
+from app.version import APP_VERSION
 
 from app.database import get_db
 from app.modules.idempotency import service as idempotency
@@ -70,6 +71,11 @@ from app.modules.auth.service import log_action
 
 # 表结构由 Alembic 管理：uv run alembic upgrade head
 app = FastAPI(title="HIS")
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "version": APP_VERSION}
 
 _IDEMPOTENT_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 _IDEMPOTENCY_HEADER = "Idempotency-Key"
