@@ -4,6 +4,7 @@
 
 - [Linux 独立部署指南（从第 0 步到可用）](Linux部署指南.md)
 - [Android Termux 独立部署指南（从第 0 步到可用）](Termux部署指南.md)
+- [桌面客户端部署指南（Windows 为主）](客户端部署指南.md)
 
 ## 结论
 
