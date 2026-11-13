@@ -290,6 +290,7 @@ class DoctorWidget(QWidget):
         for combo in (
             getattr(self, "wb_diagnosis_code", None),
             getattr(self, "rec_diagnosis_code", None),
+            getattr(self, "record_diag_code", None),
         ):
             if combo is None:
                 continue
@@ -305,11 +306,12 @@ class DoctorWidget(QWidget):
         code = combo.currentData() if combo else ""
         text = combo.currentText() if combo else ""
         name = text.split(" ", 1)[1] if " " in text else ""
-        target = (
-            self.wb_diagnosis
-            if combo is getattr(self, "wb_diagnosis_code", None)
-            else getattr(self, "rec_diagnosis", None)
-        )
+        if combo is getattr(self, "wb_diagnosis_code", None):
+            target = self.wb_diagnosis
+        elif combo is getattr(self, "record_diag_code", None):
+            target = getattr(self, "record_diag_text", None)
+        else:
+            target = getattr(self, "rec_diagnosis", None)
         if code and target is not None:
             target.setText(name)
 
@@ -1118,6 +1120,21 @@ class DoctorWidget(QWidget):
         top.addWidget(self.record_diagnosis, 1)
         layout.addLayout(top)
 
+        diag_row = QHBoxLayout()
+        self.record_diag_code = QComboBox()
+        self.record_diag_code.addItem("诊断编码（可选）", "")
+        self.record_diag_code.currentIndexChanged.connect(self._diagnosis_selected)
+        self.record_diag_text = QLineEdit()
+        self.record_diag_text.setPlaceholderText("修改诊断名称，如 急性上呼吸道感染")
+        save_diag = QPushButton("保存诊断")
+        save_diag.clicked.connect(self._save_record_diagnosis)
+        diag_row.addWidget(QLabel("诊断编码"))
+        diag_row.addWidget(self.record_diag_code)
+        diag_row.addWidget(QLabel("诊断"))
+        diag_row.addWidget(self.record_diag_text, 1)
+        diag_row.addWidget(save_diag)
+        layout.addLayout(diag_row)
+
         self.record_edits: dict[str, QTextEdit] = {}
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
@@ -1234,12 +1251,44 @@ class DoctorWidget(QWidget):
                 f"诊断：{encounter.get('diagnosis_code') or ''} "
                 f"{encounter.get('diagnosis') or '—'}".strip()
             )
+        if hasattr(self, "record_diag_text"):
+            self.record_diag_code.blockSignals(True)
+            idx = self.record_diag_code.findData(encounter.get("diagnosis_code") or "")
+            self.record_diag_code.setCurrentIndex(max(0, idx))
+            self.record_diag_code.blockSignals(False)
+            self.record_diag_text.setText(encounter.get("diagnosis") or "")
         for key, _label, _limit in _RECORD_FIELDS:
             self.record_edits[key].setPlainText(record.get(key) or "")
         self.record_msg.setText(
             f"病历已载入（书写：{record.get('written_by') or '—'}，"
             f"签名：{record.get('signed_by') or '未签名'}）"
         )
+
+    def _save_record_diagnosis(self) -> None:
+        encounter_id = self.mr_encounter_id.value()
+        if not encounter_id:
+            self.record_msg.setText("请先载入病历")
+            return
+        code = self.record_diag_code.currentData() or ""
+        text = self.record_diag_text.text().strip()
+        if not text:
+            self.record_msg.setText("诊断不能为空")
+            return
+        try:
+            encounter = self.api.update_encounter_diagnosis(encounter_id, code, text)
+        except ApiError as e:
+            self.record_msg.setText(f"诊断保存失败（{e.status_code}）：{e.detail}")
+            return
+        self.record_diagnosis.setText(
+            f"诊断：{encounter.get('diagnosis_code') or ''} "
+            f"{encounter.get('diagnosis') or '—'}".strip()
+        )
+        self.wb_diagnosis.setText(encounter.get("diagnosis") or "")
+        idx = self.wb_diagnosis_code.findData(encounter.get("diagnosis_code") or "")
+        self.wb_diagnosis_code.blockSignals(True)
+        self.wb_diagnosis_code.setCurrentIndex(max(0, idx))
+        self.wb_diagnosis_code.blockSignals(False)
+        self.record_msg.setText("诊断已更新")
 
     def _record_payload(self) -> dict:
         return {
