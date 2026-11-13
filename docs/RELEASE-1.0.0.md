@@ -42,12 +42,9 @@ url = http://服务器IP:8000
 
 ## GitHub Release
 
-```bash
-gh release create v1.0.0 \
-  dist/his-client.zip \
-  dist/his-server.zip \
-  --title "HIS 1.0.0" \
-  --notes-file docs/RELEASE-1.0.0.md
-```
+已发布：
 
-当前环境无 GitHub CLI/Token，二进制资产未上传；源码和标签可正常推送。
+https://github.com/lanyangyin/his-clinic/releases/tag/v1.0.0
+
+- 客户端：https://github.com/lanyangyin/his-clinic/releases/download/v1.0.0/his-client.zip
+- 服务端：https://github.com/lanyangyin/his-clinic/releases/download/v1.0.0/his-server.zip
