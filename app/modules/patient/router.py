@@ -38,7 +38,7 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 def register_patient(
     data: PatientCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("cashier")),
+    user=Depends(require_role("cashier", "doctor")),
 ):
     return create_patient(db, data, user.username)
 
@@ -49,7 +49,7 @@ def check_duplicates(
     id_number: str = "",
     phone: str = "",
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier")),
+    _: None = Depends(require_role("cashier", "doctor")),
 ):
     exact, candidates = find_duplicates(db, name, id_number, phone)
     return {"exact": exact, "candidates": candidates}

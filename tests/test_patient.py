@@ -22,7 +22,7 @@ def test_create_patient_wrong_role_rejected(client, auth):
     r = client.post(
         "/patients/",
         json={"name": "张三", "id_number": "110101199001011234"},
-        headers=auth["doctor"],
+        headers=auth["nurse"],
     )
     assert r.status_code == 403
 

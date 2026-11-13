@@ -112,3 +112,37 @@ def test_audit_logs_record_anonymous_failures(client, auth):
     logs = client.get("/audit/logs").json()
     anonymous = [l for l in logs if l["username"] == "anonymous"]
     assert any(l["path"] == "/patients/" and l["status_code"] == 401 for l in anonymous)
+
+
+def test_doctor_can_quick_create_and_register(client, auth):
+    patient = client.post(
+        "/patients/",
+        json={
+            "name": "医生快速建档",
+            "phone": "13800000001",
+            "id_type": "none",
+            "gender": "female",
+            "address": "待补录",
+            "privacy_consent": True,
+        },
+        headers=auth["doctor"],
+    )
+    assert patient.status_code == 201, patient.text
+    body = patient.json()
+    assert body["patient_no"]
+    assert body["phone"] == "13800000001"
+
+    department = client.post(
+        "/departments/", json={"name": "医生快速挂号科"}, headers=auth["admin"]
+    ).json()
+    doctor = client.post(
+        "/doctors/",
+        json={"name": "快速挂号医生", "department_id": department["id"]},
+        headers=auth["admin"],
+    ).json()
+    registration = client.post(
+        "/registrations/",
+        json={"patient_id": body["id"], "doctor_id": doctor["id"]},
+        headers=auth["doctor"],
+    )
+    assert registration.status_code == 201, registration.text

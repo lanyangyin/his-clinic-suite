@@ -835,7 +835,7 @@ class DoctorWidget(QWidget):
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        search_box = QGroupBox("查询患者（未建档请先到收费员工作站建档）")
+        search_box = QGroupBox("查询患者（未建档可在右侧快速建档挂号）")
         search_layout = QVBoxLayout(search_box)
         row = QHBoxLayout()
         self.reg_patient_name = QLineEdit()
@@ -859,6 +859,27 @@ class DoctorWidget(QWidget):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
+        quick_box = QGroupBox("快速建档并挂号")
+        quick_form = QFormLayout(quick_box)
+        self.qr_name = QLineEdit()
+        self.qr_name.setPlaceholderText("姓名，必填")
+        self.qr_phone = QLineEdit()
+        self.qr_phone.setPlaceholderText("手机号，必填")
+        self.qr_gender = QComboBox()
+        self.qr_gender.addItem("性别不详", "unknown")
+        self.qr_gender.addItem("男", "male")
+        self.qr_gender.addItem("女", "female")
+        self.qr_id_number = QLineEdit()
+        self.qr_id_number.setPlaceholderText("身份证号（可后补）")
+        quick_btn = QPushButton("快速建档并挂号")
+        quick_btn.clicked.connect(self._quick_create_and_register)
+        quick_form.addRow("姓名", self.qr_name)
+        quick_form.addRow("手机号", self.qr_phone)
+        quick_form.addRow("性别", self.qr_gender)
+        quick_form.addRow("身份证", self.qr_id_number)
+        quick_form.addRow("", quick_btn)
+        right_layout.addWidget(quick_box)
+
         box = QGroupBox("现场挂号")
         form = QFormLayout(box)
         self.reg_patient_id = QLineEdit()
@@ -927,6 +948,53 @@ class DoctorWidget(QWidget):
                 f"{doctor['name']}（科室 {doctor.get('department_id')}）", doctor["id"]
             )
         self.reg_msg.setText(f"医生 {len(doctors)} 位")
+
+    def _quick_create_and_register(self) -> None:
+        name = self.qr_name.text().strip()
+        phone = self.qr_phone.text().strip()
+        if not name or not phone:
+            self.reg_msg.setText("快速建档至少填写姓名和手机号")
+            return
+        doctor_id = self.reg_doctor.currentData()
+        if not doctor_id:
+            self._load_registration_doctors()
+            doctor_id = self.reg_doctor.currentData()
+        if not doctor_id:
+            self.reg_msg.setText("请先在右侧刷新医生并选择挂号医生")
+            return
+        id_number = self.qr_id_number.text().strip()
+        payload = {
+            "name": name,
+            "gender": self.qr_gender.currentData(),
+            "phone": phone,
+            "id_type": "id_card" if id_number else "none",
+            "id_number": id_number or None,
+            "address": "待补录",
+            "emergency_contact_name": "",
+            "emergency_contact_relation": "",
+            "emergency_contact_phone": "",
+            "insurance_type": "self_pay",
+            "allergy_status": "unknown",
+            "allergy_detail": "",
+            "privacy_consent": True,
+        }
+        try:
+            patient = self.api.create_patient(payload=payload)
+            registration = self.api.create_registration(patient["id"], doctor_id)
+        except ApiError as e:
+            self.reg_msg.setText(f"快速建档挂号失败（{e.status_code}）：{e.detail}")
+            return
+        self.reg_patient_id.setText(str(patient["id"]))
+        self.banner.set_patient(patient)
+        self.side_info.set_patient(patient)
+        self.reg_msg.setText(
+            f"快速建档挂号成功：{patient['name']}，患者号 {patient.get('patient_no') or patient['id']}，"
+            f"挂号 ID {registration['id']}；证件/地址可后补"
+        )
+        self.qr_name.clear()
+        self.qr_phone.clear()
+        self.qr_id_number.clear()
+        self._load_pending_registrations()
 
     def _create_registration(self) -> None:
         patient_id = self.reg_patient_id.text().strip()
