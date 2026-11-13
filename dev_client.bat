@@ -1,11 +1,18 @@
 @echo off
-chcp 65001 >nul
+setlocal
 cd /d "%~dp0"
-if not exist ".venv\Scripts\python.exe" (
-    echo [错误] 未找到 .venv，请先执行：py -3.12 -m venv .venv
-    pause
-    exit /b 1
-)
-echo 启动 HIS 桌面客户端（源码模式）...
+
+if not exist ".venv\Scripts\python.exe" goto no_venv
+
+echo Starting HIS desktop client (source mode)...
 ".venv\Scripts\python.exe" -m his_client %*
+set "RC=%ERRORLEVEL%"
 pause
+exit /b %RC%
+
+:no_venv
+echo [ERROR] .venv not found.
+echo Run: py -3.12 -m venv .venv
+echo Then install dependencies before starting the client.
+pause
+exit /b 1

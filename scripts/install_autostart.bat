@@ -1,22 +1,24 @@
 @echo off
-chcp 65001 >nul
+setlocal
 cd /d "%~dp0"
 
 net session >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 请右键“以管理员身份运行”本脚本
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto no_admin
 
 schtasks /create /tn "HIS-Server" /tr "\"%~dp0his-server.exe\"" /sc onstart /ru SYSTEM /rl HIGHEST /f
-if errorlevel 1 (
-    echo [错误] 创建开机启动任务失败
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto create_failed
 schtasks /run /tn "HIS-Server"
-echo.
-echo 已创建开机启动任务 HIS-Server 并立即启动
-echo 管理：taskschd.msc
+echo Created startup task HIS-Server and started it.
+echo Manage: taskschd.msc
 pause
+exit /b 0
+
+:no_admin
+echo [ERROR] Run this script as Administrator.
+pause
+exit /b 1
+
+:create_failed
+echo [ERROR] Failed to create the startup task.
+pause
+exit /b 1

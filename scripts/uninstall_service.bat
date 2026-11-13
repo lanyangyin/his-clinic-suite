@@ -1,19 +1,25 @@
 @echo off
-chcp 65001 >nul
+setlocal
 cd /d "%~dp0"
 
 net session >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 请右键“以管理员身份运行”本脚本
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto no_admin
 
-if exist "tools\nssm.exe" (
-    "tools\nssm.exe" stop HISServer
-    "tools\nssm.exe" remove HISServer confirm
-    echo 服务已停止并移除：HISServer
-) else (
-    echo [提示] 未找到 tools\nssm.exe，若用任务计划启动请运行 uninstall_autostart.bat
-)
+if not exist "tools\nssm.exe" goto no_nssm
+
+"tools\nssm.exe" stop HISServer
+"tools\nssm.exe" remove HISServer confirm
+echo Stopped and removed service: HISServer
 pause
+exit /b 0
+
+:no_admin
+echo [ERROR] Run this script as Administrator.
+pause
+exit /b 1
+
+:no_nssm
+echo [ERROR] tools\nssm.exe not found.
+echo If the server was started by Task Scheduler, run uninstall_autostart.bat.
+pause
+exit /b 1

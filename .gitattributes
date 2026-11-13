@@ -1,7 +1,8 @@
-# 统一换行符：源码 LF；Windows 脚本 CRLF
-* text=auto eol=lf
+# Windows batch files must be CRLF; Linux shell scripts must be LF.
+* text=auto
+
 *.bat text eol=crlf
 *.cmd text eol=crlf
-*.png binary
-*.jpg binary
-*.zip binary
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.service text eol=lf

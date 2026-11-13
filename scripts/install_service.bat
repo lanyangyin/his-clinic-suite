@@ -1,22 +1,11 @@
 @echo off
-chcp 65001 >nul
+setlocal
 cd /d "%~dp0"
 
 net session >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 请右键“以管理员身份运行”本脚本
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto no_admin
 
-if not exist "tools\nssm.exe" (
-    echo [提示] 未找到 tools\nssm.exe
-    echo 方式一：从 https://nssm.cc 下载 nssm.exe 放到本目录 tools\ 下，再运行本脚本
-    echo 方式二：改用 install_autostart.bat（任务计划开机启动，无需 NSSM）
-    pause
-    exit /b 1
-)
-
+if not exist "tools\nssm.exe" goto no_nssm
 if not exist "logs" mkdir "logs"
 
 "tools\nssm.exe" install HISServer "%~dp0his-server.exe"
@@ -25,8 +14,26 @@ if not exist "logs" mkdir "logs"
 "tools\nssm.exe" set HISServer AppStdout "%~dp0logs\server.log"
 "tools\nssm.exe" set HISServer AppStderr "%~dp0logs\server.log"
 "tools\nssm.exe" start HISServer
+if errorlevel 1 goto install_failed
 
-echo.
-echo 服务已安装并启动：HISServer（开机自动启动）
-echo 管理：services.msc / logs\server.log
+echo Installed and started service: HISServer
+echo Manage: services.msc / logs\server.log
 pause
+exit /b 0
+
+:no_admin
+echo [ERROR] Run this script as Administrator.
+pause
+exit /b 1
+
+:no_nssm
+echo [ERROR] tools\nssm.exe not found.
+echo Download NSSM from https://nssm.cc and place nssm.exe in tools\.
+echo Alternatively use install_autostart.bat (Task Scheduler).
+pause
+exit /b 1
+
+:install_failed
+echo [ERROR] Failed to install or start the service.
+pause
+exit /b 1
