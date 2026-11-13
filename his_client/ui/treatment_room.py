@@ -62,6 +62,7 @@ class TreatmentRoomWidget(QWidget):
         self.table.setHorizontalHeaderLabels(
             ["处置号", "患者", "类型", "处置", "治疗室", "优先级", "状态", "费用"]
         )
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self._select_case)
         self.table.horizontalHeader().setStretchLastSection(True)
         left_layout.addWidget(self.table, 1)
@@ -640,12 +641,14 @@ class TreatmentRoomWidget(QWidget):
         self.wb_cases.setHorizontalHeaderLabels(
             ["处置号", "患者", "处置", "状态", "优先级", "费用"]
         )
+        self.wb_cases.horizontalHeader().setStretchLastSection(True)
         self.wb_cases.cellClicked.connect(self._select_wb_case)
         layout.addWidget(self.wb_cases, 1)
 
         layout.addWidget(QLabel("到期 / 逾期随访"))
         self.wb_followups = QTableWidget(0, 4)
         self.wb_followups.setHorizontalHeaderLabels(["患者", "日期", "目的", "类型"])
+        self.wb_followups.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.wb_followups, 1)
         self.wb_msg = QLabel("")
         layout.addWidget(self.wb_msg)

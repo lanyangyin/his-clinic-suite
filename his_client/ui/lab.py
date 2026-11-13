@@ -38,6 +38,7 @@ class LabWidget(QWidget):
         tabs.addTab(self._build_query_tab(), "报告查询")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
+        self._refresh()
 
     def _build_work_tab(self) -> QWidget:
         page = QWidget()
@@ -71,6 +72,7 @@ class LabWidget(QWidget):
         self.table.setHorizontalHeaderLabels(
             ["申请", "标本号", "患者", "项目", "状态", "加急", "申请时间", "结果"]
         )
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self._select_row)
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
@@ -170,6 +172,7 @@ class LabWidget(QWidget):
         self.reviewed_table.setHorizontalHeaderLabels(
             ["报告号", "患者", "项目", "结果", "异常", "审核人", "报告时间"]
         )
+        self.reviewed_table.horizontalHeader().setStretchLastSection(True)
         self.reviewed_table.cellClicked.connect(self._select_reviewed)
         layout.addWidget(self.reviewed_table, 1)
         self.query_msg = QLabel("")

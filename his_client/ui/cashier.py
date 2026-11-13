@@ -213,6 +213,7 @@ class CashierWidget(QWidget):
         self.patient_table.setHorizontalHeaderLabels(
             ["ID", "患者编号", "姓名", "性别/年龄", "电话", "医保", "过敏"]
         )
+        self.patient_table.horizontalHeader().setStretchLastSection(True)
         if not self.insurance_enabled:
             self.patient_table.setColumnHidden(5, True)
         self.patient_table.cellClicked.connect(self._select_patient_row)
@@ -855,6 +856,7 @@ class CashierWidget(QWidget):
 
         self.charge_table = QTableWidget(0, 5)
         self.charge_table.setHorizontalHeaderLabels(["类型", "项目", "数量", "金额", "状态"])
+        self.charge_table.horizontalHeader().setStretchLastSection(True)
         box_layout.addWidget(self.charge_table)
         self.charge_msg = QLabel("")
         self.charge_msg.setWordWrap(True)
@@ -902,6 +904,7 @@ class CashierWidget(QWidget):
         self.refund_table.setHorizontalHeaderLabels(
             ["明细 ID", "类型", "项目", "数量", "已退", "可退", "单价"]
         )
+        self.refund_table.horizontalHeader().setStretchLastSection(True)
         self.refund_table.setColumnHidden(0, True)
         self.refund_table.cellClicked.connect(self._select_refund_charge)
         refund_layout.addWidget(self.refund_table)
@@ -1249,11 +1252,13 @@ class CashierWidget(QWidget):
         layout.addWidget(self.shift_summary)
         self.channel_table = QTableWidget(0, 4)
         self.channel_table.setHorizontalHeaderLabels(["渠道", "笔数", "金额", "已退"])
+        self.channel_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.channel_table)
         self.shift_table = QTableWidget(0, 6)
         self.shift_table.setHorizontalHeaderLabels(
             ["交班单", "收费员", "备用金", "应有现金", "实收", "差异"]
         )
+        self.shift_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.shift_table)
         self.shift_msg = QLabel("")
         layout.addWidget(self.shift_msg)

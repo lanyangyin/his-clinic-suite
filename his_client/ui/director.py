@@ -47,6 +47,8 @@ class DirectorWidget(QWidget):
         tabs.addTab(self._build_purchase_tab(), "采购申请审批")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)
+        self._load_archives()
+        self._load_purchases()
 
     def _build_archive_tab(self) -> QWidget:
         page = QWidget()

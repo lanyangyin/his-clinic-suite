@@ -198,10 +198,11 @@ class DoctorWidget(QWidget):
         self.wb_status_tabs.currentChanged.connect(self._filter_workbench)
         queue_layout.addWidget(self.wb_status_tabs)
 
-        self.wb_table = QTableWidget(0, 8)
+        self.wb_table = QTableWidget(0, 6)
         self.wb_table.setHorizontalHeaderLabels(
-            ["挂号", "患者", "类型", "医生", "挂号状态", "就诊", "诊断", "待缴"]
+            ["挂号", "患者", "医生", "就诊", "诊断", "待缴"]
         )
+        self.wb_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.wb_table.cellClicked.connect(self._select_workbench)
         self.wb_table.cellDoubleClicked.connect(
             lambda row, _col: self._start_workbench_row(row)
@@ -289,21 +290,21 @@ class DoctorWidget(QWidget):
         context_layout.addWidget(self.wb_followup_hint)
         context_layout.addStretch(1)
 
-        # 危急值跨患者，独立放在可拖动分栏的下方；高度由用户调节并记忆。
-        self.critical_splitter = QSplitter(Qt.Vertical)
-        self.critical_splitter.addWidget(self.wb_context)
-        self.critical_splitter.addWidget(self.critical_box)
-        self.critical_splitter.setChildrenCollapsible(False)
-        self.critical_splitter.setStretchFactor(0, 1)
-        self.critical_splitter.setStretchFactor(1, 1)
-        self.critical_splitter.splitterMoved.connect(self._save_critical_split)
-        right_layout.addWidget(self.critical_splitter, 1)
-        self._restore_critical_split()
+        right_layout.addWidget(self.wb_context, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([800, 520])
-        layout.addWidget(splitter, 1)
+        # 危急值跨患者，横跨整个工作台底部；与上方队列/操作区分割，高度可调并记忆。
+        self.critical_splitter = QSplitter(Qt.Vertical)
+        self.critical_splitter.addWidget(splitter)
+        self.critical_splitter.addWidget(self.critical_box)
+        self.critical_splitter.setChildrenCollapsible(False)
+        self.critical_splitter.setStretchFactor(0, 4)
+        self.critical_splitter.setStretchFactor(1, 1)
+        self.critical_splitter.splitterMoved.connect(self._save_critical_split)
+        layout.addWidget(self.critical_splitter, 1)
+        self._restore_critical_split()
         return page
 
     def _load_diagnoses(self) -> None:
@@ -465,7 +466,7 @@ class DoctorWidget(QWidget):
         if settings is None:
             self.critical_splitter.setSizes([320, 260])
             return
-        value = settings.value("workbench/critical_split", [320, 260])
+        value = settings.value("workbench/critical_split_v2", [320, 260])
         try:
             sizes = [int(x) for x in list(value)]
         except (TypeError, ValueError):
@@ -477,7 +478,7 @@ class DoctorWidget(QWidget):
     def _save_critical_split(self, *_args) -> None:
         settings = self._critical_settings()
         if settings is not None:
-            settings.setValue("workbench/critical_split", self.critical_splitter.sizes())
+            settings.setValue("workbench/critical_split_v2", self.critical_splitter.sizes())
             settings.sync()
 
     def _load_critical_alerts(self) -> None:
@@ -510,7 +511,7 @@ class DoctorWidget(QWidget):
             self.critical_msg.setStyleSheet("color:#ef4444;font-weight:bold")
             if hasattr(self, "critical_badge"):
                 self.critical_badge.setText(
-                    f"⚠ 危急值待确认 {len(alerts)} 条"
+                    f"! 危急值待确认 {len(alerts)} 条"
                     + (f"（超时 {overdue}）" if overdue else "")
                 )
                 self.critical_badge.setVisible(True)

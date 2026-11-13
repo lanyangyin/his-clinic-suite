@@ -45,6 +45,7 @@ class NurseWidget(QWidget):
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._auto_refresh)
         self.auto_timer.start(15000)
+        self._load_queue()
 
     def _refresh_current(self) -> None:
         if self.tabs.currentIndex() == 0:
@@ -130,6 +131,7 @@ class NurseWidget(QWidget):
         self.queue_table.setHorizontalHeaderLabels(
             ["叫号单", "挂号", "级别", "体温", "血压", "SpO2", "状态"]
         )
+        self.queue_table.horizontalHeader().setStretchLastSection(True)
         self.queue_table.cellClicked.connect(self._select_ticket_patient)
         layout.addWidget(self.queue_table)
 
@@ -290,6 +292,7 @@ class NurseWidget(QWidget):
         self.treat_table.setHorizontalHeaderLabels(
             ["治疗单 ID", "就诊 ID", "项目", "数量", "状态"]
         )
+        self.treat_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.treat_table)
 
         self.treat_msg = QLabel("")
@@ -363,6 +366,7 @@ class NurseWidget(QWidget):
         self.nursing_table.setHorizontalHeaderLabels(
             ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单", "高危"]
         )
+        self.nursing_table.horizontalHeader().setStretchLastSection(True)
         self.nursing_table.cellClicked.connect(self._select_nursing)
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
