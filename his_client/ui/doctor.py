@@ -1,6 +1,6 @@
 """门诊工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
 from PySide6.QtCore import Qt, QTimer, QUrl
-from datetime import datetime
+from datetime import date, datetime
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -62,7 +62,7 @@ class DoctorWidget(QWidget):
         self.insurance_enabled = load_config().insurance_enabled
         self.banner = PatientBanner()
         self.tabs = SidebarTabs()
-        self.tabs.addTab(self._build_workbench_tab(), "门诊工作台")
+        self.tabs.addTab(self._build_workbench_tab(), "候诊队列")
         self.tabs.addTab(self._build_register_tab(), "挂号")
         self.tabs.addTab(self._build_reception_tab(), "接诊")
         self.tabs.addTab(self._build_record_tab(), "病历")
@@ -74,6 +74,16 @@ class DoctorWidget(QWidget):
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
+        self.critical_badge = QPushButton("")
+        self.critical_badge.setVisible(False)
+        self.critical_badge.setCursor(Qt.PointingHandCursor)
+        self.critical_badge.setStyleSheet(
+            "QPushButton{background:#fef2f2;color:#b91c1c;border:1px solid #ef4444;"
+            "border-radius:4px;padding:5px 10px;font-weight:bold;text-align:left;}"
+            "QPushButton:hover{background:#fee2e2;}"
+        )
+        self.critical_badge.clicked.connect(self._focus_critical)
+        layout.addWidget(self.critical_badge, 0, Qt.AlignLeft)
         body = QHBoxLayout()
         self.side_panel = QWidget()
         self.side_panel.setFixedWidth(300)
@@ -81,6 +91,8 @@ class DoctorWidget(QWidget):
         side_layout.setContentsMargins(0, 0, 8, 0)
         self.side_info = PatientInfoPanel(editable=True)
         self.side_info.edit_requested.connect(self._edit_patient_clinical)
+        # 工作台不再重复放一张患者卡；统一使用左侧患者摘要
+        self.patient_info = self.side_info
         self.patient_info.edit_requested.connect(self._edit_patient_clinical)
         side_layout.addWidget(self.side_info)
         history_row = QHBoxLayout()
@@ -106,22 +118,19 @@ class DoctorWidget(QWidget):
         body.addWidget(self.tabs, 1)
         layout.addLayout(body)
         self._load_diagnoses()
+        self._load_registration_doctors()
+        self._load_workbench()
+        self._load_pending_registrations()
         self._install_shortcuts()
         self.auto_timer = QTimer(self)
         self.auto_timer.timeout.connect(self._auto_refresh)
         self.auto_timer.start(15000)
-        self.side_panel.setFixedWidth(0)
-        self.side_panel.setVisible(False)
+        self.side_panel.setFixedWidth(300)
+        self.side_panel.setVisible(True)
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
     def _on_tab_changed(self, _index: int) -> None:
-        if hasattr(self, "side_panel"):
-            if _index == 0:
-                self.side_panel.setFixedWidth(0)
-                self.side_panel.setVisible(False)
-            else:
-                self.side_panel.setFixedWidth(300)
-                self.side_panel.setVisible(True)
+        # 侧栏始终保留固定宽度，避免切页时内容整体左右跳动
         if "开方" in self.tabs.tabText(self.tabs.currentIndex()) and not hasattr(self, "drug_rows"):
             self._load_drugs()
 
@@ -183,7 +192,7 @@ class DoctorWidget(QWidget):
         queue_layout.addLayout(top)
 
         self.wb_status_tabs = QTabBar()
-        for label in ("全部", "待接诊", "接诊中", "已挂起", "已收费"):
+        for label in ("全部", "待接诊", "接诊中", "治疗中", "已挂起", "已收费"):
             self.wb_status_tabs.addTab(label)
         self.wb_status_tabs.currentChanged.connect(self._filter_workbench)
         queue_layout.addWidget(self.wb_status_tabs)
@@ -204,16 +213,12 @@ class DoctorWidget(QWidget):
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        self.patient_info = PatientInfoPanel(editable=True)
-        self.patient_info.setMaximumWidth(16777215)
-        self.patient_info.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        right_layout.addWidget(self.patient_info)
         self.wb_patient = QLabel("请选择患者")
         self.wb_patient.setWordWrap(True)
         self.wb_patient.setVisible(False)
 
-        critical_box = QGroupBox("危急值待确认")
-        critical_layout = QVBoxLayout(critical_box)
+        self.critical_box = QGroupBox("危急值待确认")
+        critical_layout = QVBoxLayout(self.critical_box)
         self.critical_table = QTableWidget(0, 5)
         self.critical_table.setHorizontalHeaderLabels(
             ["患者", "项目", "结果", "报告时间", "超时"]
@@ -232,14 +237,12 @@ class DoctorWidget(QWidget):
         critical_layout.addLayout(critical_row)
         self.critical_msg = QLabel("")
         critical_layout.addWidget(self.critical_msg)
-        right_layout.addWidget(critical_box)
-
         row = QHBoxLayout()
         self.wb_diagnosis_code = QComboBox()
         self.wb_diagnosis_code.addItem("诊断编码（可选）", "")
         self.wb_diagnosis_code.currentIndexChanged.connect(self._diagnosis_selected)
         self.wb_diagnosis = QLineEdit()
-        self.wb_diagnosis.setPlaceholderText("诊断，如 急性上呼吸道感染")
+        self.wb_diagnosis.setPlaceholderText("可先接诊，诊断在病历页补录")
         self.wb_start = QPushButton("开始接诊")
         self.wb_start.clicked.connect(self._start_workbench)
         self.wb_multi = QPushButton("多诊断")
@@ -247,7 +250,7 @@ class DoctorWidget(QWidget):
         self.wb_convert = QPushButton("复诊转初诊")
         self.wb_convert.setVisible(False)
         self.wb_convert.clicked.connect(self._convert_followup_to_initial)
-        row.addWidget(QLabel("主诊断"))
+        row.addWidget(QLabel("主诊断（可后补）"))
         row.addWidget(self.wb_diagnosis_code)
         row.addWidget(self.wb_diagnosis, 1)
         row.addWidget(self.wb_multi)
@@ -288,6 +291,9 @@ class DoctorWidget(QWidget):
         self.wb_fee_table.setHorizontalHeaderLabels(["项目", "数量", "金额", "状态"])
         self.wb_fee_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         right_layout.addWidget(self.wb_fee_table, 1)
+        # 危急值跨患者，不与单个患者信息混在顶部，放右下角
+        self.critical_box.setMaximumHeight(180)
+        right_layout.addWidget(self.critical_box)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -378,11 +384,14 @@ class DoctorWidget(QWidget):
         status_filter = {
             1: "waiting",
             2: "open",
-            3: "paused",
-            4: "closed",
+            3: "treatment",
+            4: "paused",
+            5: "closed",
         }.get(index, "")
         if status_filter == "waiting":
             rows = [item for item in all_rows if not item.get("encounter_id")]
+        elif status_filter == "treatment":
+            rows = [item for item in all_rows if item.get("treatment_status") == "in_progress"]
         elif status_filter:
             rows = [
                 item for item in all_rows
@@ -439,12 +448,15 @@ class DoctorWidget(QWidget):
         waiting = sum(1 for item in all_rows if not item.get("encounter_id"))
         open_count = sum(1 for item in all_rows if item.get("encounter_status") == "open")
         paused_count = sum(1 for item in all_rows if item.get("encounter_status") == "paused")
+        treatment_count = sum(
+            1 for item in all_rows if item.get("treatment_status") == "in_progress"
+        )
         closed_count = sum(1 for item in all_rows if item.get("encounter_status") == "closed")
         if hasattr(self, "wb_status_tabs"):
             for index, (label, count) in enumerate(
                 zip(
-                    ("全部", "待接诊", "接诊中", "已挂起", "已收费"),
-                    (total, waiting, open_count, paused_count, closed_count),
+                    ("全部", "待接诊", "接诊中", "治疗中", "已挂起", "已收费"),
+                    (total, waiting, open_count, treatment_count, paused_count, closed_count),
                 )
             ):
                 self.wb_status_tabs.setTabText(index, f"{label} {count}")
@@ -487,13 +499,24 @@ class DoctorWidget(QWidget):
                     cell.setForeground(Qt.red)
                 self.critical_table.setItem(row, col, cell)
         if alerts:
-            self.critical_msg.setText(
-                f"待确认 {len(alerts)} 条；超时 {sum(1 for x in alerts if x.get('critical_overdue'))} 条"
-            )
+            overdue = sum(1 for x in alerts if x.get("critical_overdue"))
+            self.critical_msg.setText(f"待确认 {len(alerts)} 条；超时 {overdue} 条")
             self.critical_msg.setStyleSheet("color:#ef4444;font-weight:bold")
+            if hasattr(self, "critical_badge"):
+                self.critical_badge.setText(
+                    f"⚠ 危急值待确认 {len(alerts)} 条"
+                    + (f"（超时 {overdue}）" if overdue else "")
+                )
+                self.critical_badge.setVisible(True)
         else:
             self.critical_msg.setText("暂无未确认危急值")
             self.critical_msg.setStyleSheet("")
+            if hasattr(self, "critical_badge"):
+                self.critical_badge.setVisible(False)
+
+    def _focus_critical(self) -> None:
+        self.tabs.setCurrentIndex(0)
+        self.critical_table.setFocus()
 
     def _select_critical(self, row: int, _col: int) -> None:
         if 0 <= row < len(getattr(self, "critical_rows", [])):
@@ -519,6 +542,19 @@ class DoctorWidget(QWidget):
         self.critical_msg.setText("危急值已确认")
         self._load_critical_alerts()
 
+    @staticmethod
+    def _workbench_status_text(item: dict) -> str:
+        treatment = item.get("treatment_status")
+        if treatment == "in_progress":
+            return "治疗中"
+        if treatment == "waiting":
+            return "待治疗"
+        return {
+            "open": "进行中",
+            "paused": "已挂起",
+            "closed": "已收费",
+        }.get(item.get("encounter_status"), item.get("encounter_status") or "")
+
     def _select_workbench(self, row: int, _col: int) -> None:
         if not (0 <= row < len(self.workbench_rows)):
             return
@@ -534,7 +570,12 @@ class DoctorWidget(QWidget):
             "special_history": item.get("special_history"),
             "phone": item.get("phone"),
         }
-        status = "已接诊" if item.get("encounter_id") else "待接诊"
+        if item.get("treatment_status") == "in_progress":
+            status = "治疗中"
+        elif item.get("treatment_status") == "waiting":
+            status = "待治疗"
+        else:
+            status = "已接诊" if item.get("encounter_id") else "待接诊"
         self.banner.set_patient(patient, item.get("encounter_id"), status)
         self.patient_info.set_patient(
             patient,
@@ -990,6 +1031,11 @@ class DoctorWidget(QWidget):
         self.qr_gender.addItem("性别不详", "unknown")
         self.qr_gender.addItem("男", "male")
         self.qr_gender.addItem("女", "female")
+        self.qr_age = QSpinBox()
+        self.qr_age.setRange(0, 150)
+        self.qr_age.setSpecialValueText("年龄未知")
+        self.qr_age.setSuffix(" 岁")
+        self.qr_age.setValue(0)
         self.qr_id_number = QLineEdit()
         self.qr_id_number.setPlaceholderText("身份证号（可后补）")
         quick_btn = QPushButton("快速建档并挂号")
@@ -997,6 +1043,7 @@ class DoctorWidget(QWidget):
         quick_form.addRow("姓名", self.qr_name)
         quick_form.addRow("手机号", self.qr_phone)
         quick_form.addRow("性别", self.qr_gender)
+        quick_form.addRow("年龄", self.qr_age)
         quick_form.addRow("身份证", self.qr_id_number)
         quick_form.addRow("", quick_btn)
         right_layout.addWidget(quick_box)
@@ -1007,6 +1054,7 @@ class DoctorWidget(QWidget):
         self.reg_patient_id.setReadOnly(True)
         self.reg_patient_id.setPlaceholderText("在左侧选择患者")
         self.reg_doctor = QComboBox()
+        self.reg_doctor.currentIndexChanged.connect(self._confirm_doctor_change)
         load_doctors = QPushButton("刷新医生")
         load_doctors.clicked.connect(self._load_registration_doctors)
         doctor_row = QHBoxLayout()
@@ -1063,12 +1111,59 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.reg_msg.setText(f"加载医生失败（{e.status_code}）：{e.detail}")
             return
+        self._loading_doctors = True
+        self.reg_doctor.blockSignals(True)
         self.reg_doctor.clear()
         for doctor in doctors:
             self.reg_doctor.addItem(
                 f"{doctor['name']}（科室 {doctor.get('department_id')}）", doctor["id"]
             )
-        self.reg_msg.setText(f"医生 {len(doctors)} 位")
+        self._default_doctor_id = None
+        self._default_doctor_name = ""
+        try:
+            me = self.api.me()
+        except ApiError:
+            me = {}
+        if me.get("role") == "doctor":
+            display = str(me.get("display_name") or me.get("username") or "").strip()
+            for index, doctor in enumerate(doctors):
+                name = str(doctor.get("name") or "")
+                if name and (name == display or name in display or display in name):
+                    self.reg_doctor.setCurrentIndex(index)
+                    self._default_doctor_id = doctor["id"]
+                    self._default_doctor_name = name
+                    break
+        self.reg_doctor.blockSignals(False)
+        self._loading_doctors = False
+        self.reg_msg.setText(f"医生 {len(doctors)} 位" + (
+            "；已优先选中当前登录医生" if self._default_doctor_id else ""
+        ))
+
+    def _confirm_doctor_change(self, _index: int) -> None:
+        if getattr(self, "_loading_doctors", False):
+            return
+        default_id = getattr(self, "_default_doctor_id", None)
+        current_id = self.reg_doctor.currentData()
+        if default_id is None or current_id is None or current_id == default_id:
+            return
+        current_name = self.reg_doctor.currentText()
+        default_name = getattr(self, "_default_doctor_name", "") or "当前登录医生"
+        answer = QMessageBox.question(
+            self,
+            "更换挂号医生",
+            f"当前登录医生是 {default_name}。\n\n确认把现场挂号改到 {current_name}？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            self.reg_doctor.blockSignals(True)
+            index = self.reg_doctor.findData(default_id)
+            if index >= 0:
+                self.reg_doctor.setCurrentIndex(index)
+            self.reg_doctor.blockSignals(False)
+            return
+        # 用户确认后，以新医生为准，避免每次选择都重复弹窗
+        self._default_doctor_id = current_id
 
     def _quick_create_and_register(self) -> None:
         name = self.qr_name.text().strip()
@@ -1084,9 +1179,20 @@ class DoctorWidget(QWidget):
             self.reg_msg.setText("请先在右侧刷新医生并选择挂号医生")
             return
         id_number = self.qr_id_number.text().strip()
+        age = self.qr_age.value()
+        birth_date = None
+        if age > 0:
+            today = date.today()
+            try:
+                birth = date(today.year - age, today.month, today.day)
+            except ValueError:
+                # 2 月 29 日出生且目标年份不是闰年时，用 2 月 28 日近似
+                birth = date(today.year - age, today.month, 28)
+            birth_date = birth.isoformat()
         payload = {
             "name": name,
             "gender": self.qr_gender.currentData(),
+            "birth_date": birth_date,
             "phone": phone,
             "id_type": "id_card" if id_number else "none",
             "id_number": id_number or None,
@@ -1115,6 +1221,7 @@ class DoctorWidget(QWidget):
         self.qr_name.clear()
         self.qr_phone.clear()
         self.qr_id_number.clear()
+        self.qr_age.setValue(0)
         self._load_pending_registrations()
 
     def _create_registration(self) -> None:
@@ -1150,22 +1257,29 @@ class DoctorWidget(QWidget):
         row.addWidget(refresh)
         layout.addLayout(row)
 
-        self.reg_table = QTableWidget(0, 4)
-        self.reg_table.setHorizontalHeaderLabels(["挂号 ID", "患者 ID", "医生 ID", "状态"])
-        layout.addWidget(self.reg_table)
+        self.reg_table = QTableWidget(0, 6)
+        self.reg_table.setHorizontalHeaderLabels(
+            ["挂号", "患者", "性别/年龄", "医生", "分诊", "状态"]
+        )
+        self.reg_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.reg_table.cellClicked.connect(self._select_reception_patient)
+        layout.addWidget(self.reg_table, 1)
 
         box = QGroupBox("接诊")
         form = QFormLayout(box)
         self.reg_id = QSpinBox()
         self.reg_id.setRange(1, 10_000_000)
         self.rec_diagnosis_code = QComboBox()
-        self.rec_diagnosis_code.addItem("诊断编码（可选）", "")
+        self.rec_diagnosis_code.addItem("诊断编码（可后补）", "")
         self.rec_diagnosis_code.currentIndexChanged.connect(self._diagnosis_selected)
         self.diagnosis = QLineEdit()
-        self.diagnosis.setPlaceholderText("诊断，如：上呼吸道感染")
+        self.diagnosis.setPlaceholderText("诊断可后补，如：上呼吸道感染")
+        self.reception_patient = QLabel("未选择患者")
+        self.reception_patient.setWordWrap(True)
         start = QPushButton("开始接诊")
         start.clicked.connect(self._start_encounter)
         form.addRow("挂号 ID", self.reg_id)
+        form.addRow("患者", self.reception_patient)
         form.addRow("诊断编码", self.rec_diagnosis_code)
         form.addRow("诊断", self.diagnosis)
         form.addRow("", start)
@@ -1179,20 +1293,41 @@ class DoctorWidget(QWidget):
 
     def _load_pending_registrations(self) -> None:
         try:
-            rows = self.api.list_registrations(status="registered")
+            rows = [
+                item for item in self.api.doctor_worklist()
+                if not item.get("encounter_id")
+                and item.get("registration_status") == "registered"
+            ]
         except ApiError as e:
             self.reception_msg.setText(f"加载失败：{e.detail}")
             return
+        self.pending_registrations = rows
         self.reg_table.setRowCount(len(rows))
         for index, reg in enumerate(rows):
-            self.reg_table.setItem(index, 0, QTableWidgetItem(str(reg["id"])))
-            self.reg_table.setItem(index, 1, QTableWidgetItem(str(reg["patient_id"])))
-            self.reg_table.setItem(index, 2, QTableWidgetItem(str(reg["doctor_id"])))
-            self.reg_table.setItem(index, 3, QTableWidgetItem(zh('registration_status', reg["status"])))
-        self.reg_table.cellClicked.connect(
-            lambda row, _col: self.reg_id.setValue(
-                int(self.reg_table.item(row, 0).text())
-            )
+            gender = {"male": "男", "female": "女"}.get(reg.get("gender"), "不详")
+            age = reg.get("age")
+            values = [
+                str(reg["registration_id"]),
+                reg.get("patient_name") or "",
+                f"{gender}/{age if age is not None else '—'}",
+                reg.get("doctor_name") or "",
+                f"{reg.get('triage_level') or '—'} 级",
+                zh("registration_status", reg.get("registration_status", "")),
+            ]
+            for col, value in enumerate(values):
+                self.reg_table.setItem(index, col, QTableWidgetItem(str(value)))
+
+    def _select_reception_patient(self, row: int, _col: int) -> None:
+        rows = getattr(self, "pending_registrations", [])
+        if not 0 <= row < len(rows):
+            return
+        item = rows[row]
+        self.reg_id.setValue(item["registration_id"])
+        gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+        age = item.get("age")
+        self.reception_patient.setText(
+            f"{item.get('patient_name') or ''} · {gender}/{age if age is not None else '—'}岁 · "
+            f"医生 {item.get('doctor_name') or '—'} · 挂号 {item['registration_id']}"
         )
 
     def _start_encounter(self) -> None:
@@ -1205,9 +1340,9 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.reception_msg.setText(f"接诊失败（{e.status_code}）：{e.detail}")
             return
-        self.reception_msg.setText(
-            f"接诊成功：就诊 ID {encounter['id']}，诊断「{encounter['diagnosis']}」"
-        )
+        diagnosis = encounter.get("diagnosis") or "未填写（可在病历补录）"
+        self.reception_msg.setText(f"接诊成功：就诊 ID {encounter['id']}，诊断 {diagnosis}")
+        self._load_pending_registrations()
 
     # ---------- 病历 ----------
     def _build_record_tab(self) -> QWidget:

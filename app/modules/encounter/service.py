@@ -574,6 +574,25 @@ def worklist(db: Session) -> list[dict]:
         .order_by(Registration.id.desc())
         .all()
     )
+    # 治疗中/待治疗状态是就诊状态的补充：医生挂起后患者可能正在输液
+    from app.modules.treatment.models import TreatmentOrder
+    from app.modules.treatment_room.models import TreatmentRoomCase
+
+    case_by_encounter = {
+        row.encounter_id: row
+        for row in db.query(TreatmentRoomCase)
+        .filter(
+            TreatmentRoomCase.encounter_id.isnot(None),
+            TreatmentRoomCase.status.in_(("waiting", "in_progress")),
+        )
+        .all()
+    }
+    pending_order_encounters = {
+        row.encounter_id
+        for row in db.query(TreatmentOrder)
+        .filter(TreatmentOrder.status == "pending")
+        .all()
+    }
     result = []
     for registration, patient, doctor in rows:
         encounter = (
@@ -598,6 +617,13 @@ def worklist(db: Session) -> list[dict]:
             .filter(TriageTicket.registration_id == registration.id)
             .first()
         )
+        case = case_by_encounter.get(encounter.id) if encounter else None
+        if case and case.status == "in_progress":
+            treatment_status = "in_progress"
+        elif case or (encounter and encounter.id in pending_order_encounters):
+            treatment_status = "waiting"
+        else:
+            treatment_status = ""
         result.append(
             {
                 "registration_id": registration.id,
@@ -626,6 +652,8 @@ def worklist(db: Session) -> list[dict]:
                 "original_registration_id": registration.original_registration_id,
                 "encounter_id": encounter.id if encounter else None,
                 "encounter_status": encounter.status if encounter else "",
+                "treatment_status": treatment_status,
+                "treatment_case_id": case.id if case else None,
                 "encounter_date": encounter.created_at.strftime("%Y-%m-%d") if encounter else "",
                 "cross_day": cross_day,
                 "diagnosis": encounter.diagnosis if encounter else "",
