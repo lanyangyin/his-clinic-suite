@@ -121,7 +121,7 @@ date
 
 ```bash
 cd /root
-git clone https://github.com/lanyangyin/his-clinic-system.git his
+git clone https://github.com/lanyangyin/his-clinic-suite.git his
 cd /root/his
 ls
 ```
@@ -533,7 +533,7 @@ Ubuntu：
 apt update
 apt install -y python3 python3-venv python3-pip sqlite3 git curl tzdata tmux
 cd /root
-git clone https://github.com/lanyangyin/his-clinic-system.git his
+git clone https://github.com/lanyangyin/his-clinic-suite.git his
 cd /root/his
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-server.txt

@@ -8,7 +8,7 @@
 - **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
 
 ```text
-his-clinic-system/
+his-clinic-suite/
 ├─ app/                 FastAPI 服务端
 ├─ his_client/          PySide6 桌面客户端
 ├─ scripts/build_server.bat

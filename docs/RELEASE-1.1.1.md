@@ -45,7 +45,7 @@ url = http://服务器IP:8000
 
 ## GitHub Release
 
-https://github.com/lanyangyin/his-clinic-system/releases/tag/v1.1.1
+https://github.com/lanyangyin/his-clinic-suite/releases/tag/v1.1.1
 
-- 客户端：https://github.com/lanyangyin/his-clinic-system/releases/download/v1.1.1/his-client.zip
-- 服务端：https://github.com/lanyangyin/his-clinic-system/releases/download/v1.1.1/his-server.zip
+- 客户端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-client.zip
+- 服务端：https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.1.1/his-server.zip
