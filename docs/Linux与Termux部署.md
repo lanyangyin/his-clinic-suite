@@ -21,11 +21,18 @@
 ```text
 数据库结构: created
 Uvicorn running on http://127.0.0.1:8002
-GET /health -> 200 {"status":"ok","version":"0.92.1"}
+GET /health -> 200 {"status":"ok","version":"1.1.0"}
 GET /admin -> 302
 ```
 
 注意：项目放在 WSL 的 `/mnt/d` 下时，`/mnt/d` 的 9p 文件系统可能让 Alembic 建库卡住；把项目放到 Linux 本机目录（如 `/opt/his`、`/tmp/his-test`）正常。生产不要放 Windows 挂载盘。
+
+## 文件位置
+
+- 本文：`docs/Linux与Termux部署.md`
+- Linux 启动脚本：`scripts/run_server_linux.sh`
+- 服务端依赖：`requirements-server.txt`
+- systemd 服务：`deploy/his-server.service`
 
 ## Linux 部署
 
@@ -161,7 +168,7 @@ TZ=Asia/Shanghai
 
 ```bash
 curl http://127.0.0.1:8001/health
-# {"status":"ok","version":"0.92.1"}
+# {"status":"ok","version":"1.1.0"}
 ```
 
 ## 什么时候不该用 Android
