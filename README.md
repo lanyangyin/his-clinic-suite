@@ -3,7 +3,7 @@
 一套可运行、可打包分发的中小型门诊部信息系统：**FastAPI 后端 + Web 管理台 + PySide6 桌面客户端**。
 
 - 后端 30+ 业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
-- 668 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
+- 674 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
 - **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
 
@@ -25,6 +25,7 @@ his-clinic-suite/
 - [部署文档索引](docs/Linux与Termux部署.md)
 - [登录记忆与人事工作站](docs/登录记忆与人事工作站.md)
 - [客户端布局审计](docs/客户端布局审计.md)
+- [出生日期/年龄/身份证联动](docs/出生日期年龄联动.md)
 
 ## 功能概览
 
@@ -132,7 +133,7 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 
 - `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`（首次启动自动建库并创建 `admin/admin123`）
 - `his-client.zip`：客户端，解压 → 改 `config.ini` 服务器地址 → 双击 `his-client.exe`
-- `his-server-termux-1.2.2.tar.gz`：Termux 专用服务端最小源码包，约 336 KB，不含客户端/测试/视频
+- `his-server-termux-1.2.3.tar.gz`：Termux 专用服务端最小源码包，约 336 KB，不含客户端/测试/视频
 
 源码与构建脚本都在本仓库；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 
@@ -152,7 +153,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 668 passed
+uv run pytest                                  # 674 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
@@ -167,6 +168,7 @@ uv run python scripts/check_concurrency.py     # 并发抢号验证
 - [部署文档索引](docs/Linux与Termux部署.md)
 - [登录记忆与人事工作站](docs/登录记忆与人事工作站.md)
 - [客户端布局审计](docs/客户端布局审计.md)
+- [出生日期/年龄/身份证联动](docs/出生日期年龄联动.md)
 - [试用手册](docs/小诊所试用手册.md)
 
 ## 说明

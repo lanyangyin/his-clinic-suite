@@ -35,6 +35,7 @@ from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.birth_age import BirthAgeEditor, parse_id_birth
 from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.patient_clinical_dialog import PatientClinicalDialog
@@ -956,20 +957,17 @@ class DoctorWidget(QWidget):
         self.qr_gender.addItem("性别不详", "unknown")
         self.qr_gender.addItem("男", "male")
         self.qr_gender.addItem("女", "female")
-        self.qr_age = QSpinBox()
-        self.qr_age.setRange(0, 150)
-        self.qr_age.setSpecialValueText("年龄未知")
-        self.qr_age.setSuffix(" 岁")
-        self.qr_age.setValue(0)
+        self.qr_birth_age = BirthAgeEditor()
         self.qr_id_number = QLineEdit()
-        self.qr_id_number.setPlaceholderText("身份证号（可后补）")
+        self.qr_id_number.setPlaceholderText("身份证号（可后补，填完自动带出出生日期）")
+        self.qr_id_number.editingFinished.connect(self._quick_id_changed)
         quick_btn = QPushButton("快速建档并挂号")
         quick_btn.clicked.connect(self._quick_create_and_register)
         quick_form.addRow("姓名", self.qr_name)
         quick_form.addRow("手机号", self.qr_phone)
         quick_form.addRow("性别", self.qr_gender)
-        quick_form.addRow("年龄", self.qr_age)
         quick_form.addRow("身份证", self.qr_id_number)
+        quick_form.addRow("", self.qr_birth_age)
         quick_form.addRow("", quick_btn)
         right_layout.addWidget(quick_box)
 
@@ -1090,6 +1088,15 @@ class DoctorWidget(QWidget):
         # 用户确认后，以新医生为准，避免每次选择都重复弹窗
         self._default_doctor_id = current_id
 
+    def _quick_id_changed(self) -> None:
+        digits = self.qr_id_number.text().strip()
+        self.qr_birth_age.set_id_number(digits)
+        born, _error = parse_id_birth(digits)
+        if len(digits) == 18 and born is not None and self.qr_gender.currentData() == "unknown":
+            self.qr_gender.setCurrentIndex(
+                self.qr_gender.findData("male" if int(digits[16]) % 2 else "female")
+            )
+
     def _quick_create_and_register(self) -> None:
         name = self.qr_name.text().strip()
         phone = self.qr_phone.text().strip()
@@ -1104,16 +1111,7 @@ class DoctorWidget(QWidget):
             self.reg_msg.setText("请先在右侧刷新医生并选择挂号医生")
             return
         id_number = self.qr_id_number.text().strip()
-        age = self.qr_age.value()
-        birth_date = None
-        if age > 0:
-            today = date.today()
-            try:
-                birth = date(today.year - age, today.month, today.day)
-            except ValueError:
-                # 2 月 29 日出生且目标年份不是闰年时，用 2 月 28 日近似
-                birth = date(today.year - age, today.month, 28)
-            birth_date = birth.isoformat()
+        birth_date = self.qr_birth_age.birth_date_text() or None
         payload = {
             "name": name,
             "gender": self.qr_gender.currentData(),
@@ -1146,7 +1144,7 @@ class DoctorWidget(QWidget):
         self.qr_name.clear()
         self.qr_phone.clear()
         self.qr_id_number.clear()
-        self.qr_age.setValue(0)
+        self.qr_birth_age.reset()
         self._load_pending_registrations()
 
     def _create_registration(self) -> None:

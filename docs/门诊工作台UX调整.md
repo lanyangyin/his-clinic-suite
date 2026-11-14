@@ -210,7 +210,7 @@
 
 ## 验证
 
-- pytest：668 passed（1.2.0 基线）
+- pytest：674 passed（1.2.0 基线）
 - 客户端全流程：18/18
 - 截图：
   - `docs/screenshots/doctor_workbench_1_2_1.png`

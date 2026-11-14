@@ -1,4 +1,6 @@
 """收费员工作站：患者建档/查询、挂号、收费/退费、打印。"""
+from datetime import date
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtCore import QUrl
@@ -31,6 +33,7 @@ from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.mixed_payment_dialog import MixedPaymentDialog
+from his_client.ui.birth_age import BirthAgeEditor, age_text, parse_id_birth
 
 
 class CashierWidget(QWidget):
@@ -92,8 +95,7 @@ class CashierWidget(QWidget):
             self.p_id_type.addItem(label, value)
         self.p_id_number = QLineEdit()
         self.p_id_number.setPlaceholderText("身份证号 / 证件号；无证件可留空")
-        self.p_birth_date = QLineEdit()
-        self.p_birth_date.setPlaceholderText("YYYY-MM-DD，可留空由身份证带出")
+        self.birth_age = BirthAgeEditor()
         self.p_phone = QLineEdit()
         self.p_address = QLineEdit()
         self.p_address.setPlaceholderText("现住址，至少到区/街道")
@@ -135,10 +137,10 @@ class CashierWidget(QWidget):
         grid.addWidget(QLabel("证件号码"), row, 2)
         grid.addWidget(self.p_id_number, row, 3)
         row += 1
-        grid.addWidget(QLabel("出生日期*"), row, 0)
-        grid.addWidget(self.p_birth_date, row, 1)
-        grid.addWidget(QLabel("手机号*"), row, 2)
-        grid.addWidget(self.p_phone, row, 3)
+        grid.addWidget(self.birth_age, row, 0, 1, 4)
+        row += 1
+        grid.addWidget(QLabel("手机号*"), row, 0)
+        grid.addWidget(self.p_phone, row, 1)
         row += 1
         grid.addWidget(QLabel("现住址*"), row, 0)
         grid.addWidget(self.p_address, row, 1, 1, 3)
@@ -239,19 +241,11 @@ class CashierWidget(QWidget):
         if self.p_id_type.currentData() != "id_card":
             return
         digits = self.p_id_number.text().strip()
-        if len(digits) != 18 or not digits[:17].isdigit():
+        self.birth_age.set_id_number(digits)
+        born, _error = parse_id_birth(digits)
+        if born is None:
             return
-        try:
-            from datetime import date
-
-            date(
-                int(digits[6:10]), int(digits[10:12]), int(digits[12:14])
-            )
-        except ValueError:
-            return
-        if not self.p_birth_date.text().strip():
-            self.p_birth_date.setText(f"{digits[6:10]}-{digits[10:12]}-{digits[12:14]}")
-        if self.p_gender.currentData() == "unknown":
+        if len(digits) == 18 and self.p_gender.currentData() == "unknown":
             self.p_gender.setCurrentIndex(
                 self.p_gender.findData("male" if int(digits[16]) % 2 else "female")
             )
@@ -262,7 +256,7 @@ class CashierWidget(QWidget):
             "id_type": self.p_id_type.currentData(),
             "id_number": self.p_id_number.text().strip() or None,
             "gender": self.p_gender.currentData(),
-            "birth_date": self.p_birth_date.text().strip() or None,
+            "birth_date": self.birth_age.birth_date_text() or None,
             "phone": self.p_phone.text().strip() or None,
             "address": self.p_address.text().strip(),
             "emergency_contact_name": self.p_emergency_name.text().strip(),
@@ -279,8 +273,8 @@ class CashierWidget(QWidget):
             return "请填写姓名"
         if payload["id_type"] != "none" and not payload["id_number"]:
             return "请填写证件号码，或选择无证件"
-        if not payload["birth_date"]:
-            return "请填写出生日期"
+        if not payload["birth_date"] and not self.birth_age.unknown.isChecked():
+            return "请选择出生日期，或勾选年龄不详"
         if not payload["phone"]:
             return "请填写手机号"
         if not payload["address"]:
@@ -369,12 +363,13 @@ class CashierWidget(QWidget):
 
     def _clear_patient_form(self, keep_message: bool = False) -> None:
         for field in (
-            self.p_name, self.p_id_number, self.p_birth_date, self.p_phone,
+            self.p_name, self.p_id_number, self.p_phone,
             self.p_address, self.p_emergency_name, self.p_emergency_relation,
             self.p_emergency_phone, self.p_allergy_detail,
-        self.p_special_history,
+            self.p_special_history,
         ):
             field.clear()
+        self.birth_age.reset()
         self.p_gender.setCurrentIndex(0)
         self.p_id_type.setCurrentIndex(0)
         self.p_insurance.setCurrentIndex(3)
@@ -395,10 +390,14 @@ class CashierWidget(QWidget):
     def _set_registration_patient_label(self, patient: dict) -> None:
         gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
         age = patient.get("age")
+        birth = patient.get("birth_date")
+        age_display = age_text(date.fromisoformat(birth)) if birth else (
+            f"{age}岁" if age is not None else "年龄不详"
+        )
         allergy = patient.get("allergy_label") or "不详"
         self.r_patient_label.setText(
             f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
-            f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
+            f"{gender}/{age_display} · 过敏：{allergy}"
         )
         self.r_patient_label.setStyleSheet(
             "font-weight:bold;color:#ef4444"
@@ -493,7 +492,8 @@ class CashierWidget(QWidget):
         index = self.p_id_type.findData(patient.get("id_type") or "id_card")
         self.p_id_type.setCurrentIndex(max(0, index))
         self.p_id_number.setText(patient.get("id_number") or "")
-        self.p_birth_date.setText(patient.get("birth_date") or "")
+        birth = patient.get("birth_date")
+        self.birth_age.set_birth_date(date.fromisoformat(birth) if birth else None)
         self.p_phone.setText(patient.get("phone") or "")
         self.p_address.setText(patient.get("address") or "")
         self.p_emergency_name.setText(patient.get("emergency_contact_name") or "")
@@ -524,6 +524,10 @@ class CashierWidget(QWidget):
         self.patient_table.setRowCount(len(rows))
         for row, patient in enumerate(rows):
             age = patient.get("age")
+            birth = patient.get("birth_date")
+            age_display = age_text(date.fromisoformat(birth)) if birth else (
+                f"{age}岁" if age is not None else "年龄不详"
+            )
             gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
             insurance = {
                 "employee": "职工", "resident": "居民", "remote": "异地",
@@ -533,7 +537,7 @@ class CashierWidget(QWidget):
                 str(patient["id"]),
                 patient.get("patient_no") or "—",
                 patient["name"],
-                f"{gender}/{age if age is not None else '—'}",
+                f"{gender}/{age_display}",
                 patient.get("phone") or "—",
                 insurance,
                 patient.get("allergy_label") or "不详",
