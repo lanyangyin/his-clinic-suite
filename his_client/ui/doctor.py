@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from his_client.api import ApiClient, ApiError
-from his_client.ui.theme import apply_theme
+from his_client.ui.theme import apply_theme, colors, register_theme_listener
 from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
@@ -79,11 +79,7 @@ class DoctorWidget(QWidget):
         self.critical_badge = QPushButton("")
         self.critical_badge.setVisible(False)
         self.critical_badge.setCursor(Qt.PointingHandCursor)
-        self.critical_badge.setStyleSheet(
-            "QPushButton{background:#fef2f2;color:#b91c1c;border:1px solid #ef4444;"
-            "border-radius:4px;padding:5px 10px;font-weight:bold;text-align:left;}"
-            "QPushButton:hover{background:#fee2e2;}"
-        )
+        self._style_critical_badge()
         self.critical_badge.clicked.connect(self._focus_critical)
         layout.addWidget(self.critical_badge, 0, Qt.AlignLeft)
         body = QHBoxLayout()
@@ -130,6 +126,22 @@ class DoctorWidget(QWidget):
         self.side_panel.setFixedWidth(300)
         self.side_panel.setVisible(True)
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        register_theme_listener(self)
+
+    def _style_critical_badge(self) -> None:
+        c = colors()
+        self.critical_badge.setStyleSheet(
+            f"QPushButton{{background:{c['card']};color:{c['danger']};"
+            f"border:1px solid {c['danger']};border-radius:4px;padding:5px 10px;"
+            "font-weight:bold;text-align:left;}"
+            f"QPushButton:hover{{background:{c['selected']};}}"
+        )
+
+    def apply_theme(self) -> None:
+        self._style_critical_badge()
+        if hasattr(self, "wb_fee_summary"):
+            self.wb_fee_summary.setStyleSheet(f"color:{colors()['muted']};")
+        self.update()
 
     def _on_tab_changed(self, _index: int) -> None:
         # 侧栏始终保留固定宽度，避免切页时内容整体左右跳动

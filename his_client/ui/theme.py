@@ -1,7 +1,8 @@
 """跟随系统的浅色/深色主题。HIS_THEME=light|dark 可强制覆盖。"""
 import os
+import weakref
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -164,8 +165,14 @@ def colors() -> dict:
     }
 
 
-def apply_theme(widget) -> None:
-    widget.setObjectName("workstationRoot")
+_theme_listeners: list[weakref.ReferenceType] = []
+_notifying_theme = False
+_theme_filter = None
+_theme_timer = None
+_last_dark = None
+
+
+def _theme_palette(widget) -> QPalette:
     dark = is_dark()
     c = colors()
     palette = widget.palette()
@@ -181,11 +188,98 @@ def apply_theme(widget) -> None:
     palette.setColor(QPalette.ToolTipBase, QColor(c["surface"]))
     palette.setColor(QPalette.ToolTipText, QColor(c["text"]))
     palette.setColor(QPalette.PlaceholderText, QColor(c["muted"]))
-    widget.setPalette(palette)
-    qss = DARK_QSS if dark else LIGHT_QSS
-    widget.setStyleSheet(qss)
+    return palette
+
+
+def _apply_widget_theme(widget) -> None:
+    widget.setObjectName("workstationRoot")
+    widget.setPalette(_theme_palette(widget))
+    widget.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
+    widget.update()
+
+
+def apply_theme(widget) -> None:
+    _apply_widget_theme(widget)
     app = QApplication.instance()
     if app is not None:
-        # 全局样式，保证 QComboBox 弹层、QMenu、消息框等顶层弹窗也跟随主题
-        app.setPalette(palette)
-        app.setStyleSheet(qss)
+        app.setPalette(_theme_palette(widget))
+        app.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
+
+
+def register_theme_listener(widget) -> None:
+    """注册需要重算自身内联颜色的控件（不用强引用防止泄漏）。"""
+    _theme_listeners[:] = [
+        ref for ref in _theme_listeners
+        if ref() is not None and ref() is not widget
+    ]
+    _theme_listeners.append(weakref.ref(widget))
+
+
+def notify_theme_changed() -> None:
+    """系统浅色/深色切换时重新应用全局 QSS、调色板和自定义控件。"""
+    global _notifying_theme, _last_dark
+    if _notifying_theme:
+        return
+    app = QApplication.instance()
+    if app is None:
+        return
+    _notifying_theme = True
+    try:
+        app.setPalette(_theme_palette(app))
+        app.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
+        for ref in list(_theme_listeners):
+            widget = ref()
+            if widget is None:
+                continue
+            try:
+                widget.apply_theme()
+            except (AttributeError, RuntimeError):
+                pass
+        for widget in app.topLevelWidgets():
+            try:
+                if widget.isWindow():
+                    widget.setPalette(_theme_palette(widget))
+                    widget.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
+                    widget.update()
+            except RuntimeError:
+                continue
+    finally:
+        _last_dark = is_dark()
+        _notifying_theme = False
+
+
+class _ThemeEventFilter(QObject):
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.ThemeChange, QEvent.ApplicationPaletteChange):
+            notify_theme_changed()
+        return False
+
+
+def _check_theme_change() -> None:
+    global _last_dark
+    current = is_dark()
+    if _last_dark is None:
+        _last_dark = current
+        return
+    if current != _last_dark:
+        notify_theme_changed()
+
+
+def install_theme_watcher(app) -> None:
+    """监听系统主题变化；信号 + 事件 + 低频轮询三重兜底。"""
+    global _theme_filter, _theme_timer, _last_dark
+    _last_dark = is_dark()
+    hints = app.styleHints()
+    if hasattr(hints, "colorSchemeChanged"):
+        try:
+            hints.colorSchemeChanged.connect(lambda *_args: notify_theme_changed())
+        except (TypeError, RuntimeError):
+            pass
+    if _theme_filter is None:
+        _theme_filter = _ThemeEventFilter(app)
+        app.installEventFilter(_theme_filter)
+    if _theme_timer is None:
+        _theme_timer = QTimer(app)
+        _theme_timer.setInterval(1500)
+        _theme_timer.timeout.connect(_check_theme_change)
+        _theme_timer.start()

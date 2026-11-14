@@ -1,7 +1,7 @@
 """工作站主导航：横向页签，不旋转文字。"""
 from PySide6.QtWidgets import QTabWidget
 
-from his_client.ui.theme import colors
+from his_client.ui.theme import colors, register_theme_listener
 
 
 class SidebarTabs(QTabWidget):
@@ -11,6 +11,10 @@ class SidebarTabs(QTabWidget):
         self.setDocumentMode(True)
         self.setMovable(False)
         self.setUsesScrollButtons(True)
+        self._apply_theme_style()
+        register_theme_listener(self)
+
+    def _apply_theme_style(self) -> None:
         c = colors()
         self.setStyleSheet(
             f"""
@@ -35,3 +39,7 @@ class SidebarTabs(QTabWidget):
             QTabBar::tab:hover:!selected {{ background: {c['selected']}; }}
             """
         )
+
+    def apply_theme(self) -> None:
+        self._apply_theme_style()
+        self.update()

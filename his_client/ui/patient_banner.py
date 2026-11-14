@@ -2,19 +2,15 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel
 
-from his_client.ui.theme import colors
+from his_client.ui.theme import colors, register_theme_listener
 
 
 class PatientBanner(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("patientBanner")
-        c = colors()
-        self.setStyleSheet(
-            f"#patientBanner{{background:{c['card']};border-bottom:2px solid #6366f1;}}"
-            f"#patientBanner QLabel{{font-size:13px;color:{c['text']};}}"
-            f"#patientBanner QLabel#patientName{{font-weight:bold;font-size:15px;color:{c['title']};}}"
-        )
+        self._apply_theme_style()
+        register_theme_listener(self)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(16)
@@ -22,7 +18,7 @@ class PatientBanner(QFrame):
         self.name.setObjectName("patientName")
         self.demo = QLabel("")
         self.allergy = QLabel("")
-        self.allergy.setStyleSheet(f"color:{c['danger']};font-weight:bold;")
+        self.allergy.setStyleSheet(f"color:{colors()['danger']};font-weight:bold;")
         self.encounter = QLabel("")
         self.status = QLabel("")
         self.status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -32,6 +28,21 @@ class PatientBanner(QFrame):
         layout.addWidget(self.status)
         self.patient_id = 0
         self.encounter_id = 0
+
+    def _apply_theme_style(self) -> None:
+        c = colors()
+        self.setStyleSheet(
+            f"#patientBanner{{background:{c['card']};border-bottom:2px solid #6366f1;}}"
+            f"#patientBanner QLabel{{font-size:13px;color:{c['text']};}}"
+            f"#patientBanner QLabel#patientName{{font-weight:bold;font-size:15px;color:{c['title']};}}"
+        )
+        if hasattr(self, "allergy"):
+            self.allergy.setStyleSheet(f"color:{c['danger']};font-weight:bold;")
+
+    def apply_theme(self) -> None:
+        self._apply_theme_style()
+        self.set_status(self.status.text())
+        self.update()
 
     def set_patient(self, patient: dict | None, encounter_id: int | None = None, status: str = "") -> None:
         c = colors()

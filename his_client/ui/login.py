@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.config import ClientConfig
-from his_client.ui.theme import apply_theme
+from his_client.ui.theme import apply_theme, colors, register_theme_listener
 from his_client.ui.window_theme import apply_light_titlebar
 
 
@@ -76,9 +76,9 @@ class LoginDialog(QDialog):
         form.addRow("密码", self.password_edit)
         layout.addLayout(form)
 
-        hint = QLabel("IP、端口、账号会记住；密码不保存。")
-        hint.setStyleSheet("color: #64748b;")
-        layout.addWidget(hint)
+        self.hint = QLabel("IP、端口、账号会记住；密码不保存。")
+        self.hint.setStyleSheet(f"color: {colors()['muted']};")
+        layout.addWidget(self.hint)
 
         self.error_label = QLabel("")
         self.error_label.setStyleSheet("color: #b91c1c;")
@@ -92,6 +92,12 @@ class LoginDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
         self.password_edit.returnPressed.connect(self._try_login)
+        register_theme_listener(self)
+
+    def apply_theme(self) -> None:
+        self.hint.setStyleSheet(f"color: {colors()['muted']};")
+        self.error_label.setStyleSheet(f"color: {colors()['danger']};")
+        self.update()
 
     def _fill_combo(self, combo: QComboBox, values: list, current: str) -> None:
         combo.clear()

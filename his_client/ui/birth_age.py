@@ -11,6 +11,7 @@ import calendar
 from datetime import date, timedelta
 
 from PySide6.QtCore import QDate, Signal
+from his_client.ui.theme import colors, register_theme_listener
 from PySide6.QtWidgets import (
     QCheckBox,
     QDateEdit,
@@ -135,9 +136,9 @@ class BirthAgeEditor(QWidget):
         self.days.setSuffix(" 天")
         self.days.setFixedWidth(82)
         self.calculated = QLabel("年龄不详")
-        self.calculated.setStyleSheet("color:#64748b;")
+        self.calculated.setStyleSheet(f"color:{colors()['muted']};")
         self.status = QLabel("")
-        self.status.setStyleSheet("color:#b45309;")
+        self.status.setStyleSheet(f"color:{colors()['warning']};")
         self.status.setWordWrap(True)
 
         layout.addWidget(QLabel("出生日期"), 0, 0)
@@ -162,6 +163,7 @@ class BirthAgeEditor(QWidget):
             spin.valueChanged.connect(self._age_changed)
         self._set_enabled(False)
         self._update_label()
+        register_theme_listener(self)
 
     def _set_enabled(self, enabled: bool) -> None:
         self.date_edit.setEnabled(enabled)
@@ -171,13 +173,14 @@ class BirthAgeEditor(QWidget):
     def _update_label(self) -> None:
         if self.unknown.isChecked():
             self.calculated.setText("")
+            self.calculated.setStyleSheet(f"color:{colors()['muted']};")
             return
         if self._birth is None:
             self.calculated.setText("请选择出生日期")
-            self.calculated.setStyleSheet("color:#b45309;")
+            self.calculated.setStyleSheet(f"color:{colors()['warning']};")
             return
         self.calculated.setText(age_text(self._birth))
-        self.calculated.setStyleSheet("color:#0f766e;font-weight:bold;")
+        self.calculated.setStyleSheet(f"color:{colors()['success']};font-weight:bold;")
 
     def _date_changed(self, qdate: QDate) -> None:
         if self._syncing or self.unknown.isChecked():
@@ -227,6 +230,11 @@ class BirthAgeEditor(QWidget):
             self._syncing = False
         self._update_label()
         self.changed.emit()
+
+    def apply_theme(self) -> None:
+        self.status.setStyleSheet(f"color:{colors()['warning']};")
+        self._update_label()
+        self.update()
 
     def set_id_number(self, value: str) -> bool:
         born, error = parse_id_birth(value)

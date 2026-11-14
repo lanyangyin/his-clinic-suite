@@ -4,7 +4,7 @@ import re
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout
 
-from his_client.ui.theme import colors
+from his_client.ui.theme import colors, register_theme_listener
 
 _TIME_PATTERN = re.compile(
     r"(约|大约|近|余|多)?\s*\d+(?:\.\d+)?\s*(?:余)?\s*"
@@ -41,42 +41,8 @@ class PatientInfoPanel(QFrame):
         self.setObjectName("patientInfoPanel")
         self.setMinimumWidth(210)
         self.setMaximumWidth(280)
-        c = colors()
-        self.setStyleSheet(
-            f"""
-            #patientInfoPanel {{ background: transparent; }}
-            #headerCard, #infoCard {{
-                background: {c['card']};
-                border: 1px solid {c['border']};
-                border-radius: 8px;
-            }}
-            #allergyCard {{
-                background: {c['card']};
-                border: 1px solid {c['danger']};
-                border-left: 4px solid {c['danger']};
-                border-radius: 8px;
-            }}
-            #historyCard {{
-                background: {c['card']};
-                border: 1px solid {c['warning']};
-                border-left: 4px solid {c['warning']};
-                border-radius: 8px;
-            }}
-            #patientInfoPanel QLabel {{ color: {c['text']}; font-size: 12px; }}
-            #patientInfoPanel QLabel#title {{
-                font-size: 15px; font-weight: bold; color: {c['title']};
-            }}
-            #patientInfoPanel QLabel#cardTitle {{
-                font-size: 12px; font-weight: bold; color: {c['muted']};
-            }}
-            #patientInfoPanel QLabel#allergyValue {{
-                color: {c['danger']}; font-weight: bold;
-            }}
-            #patientInfoPanel QLabel#historyValue {{
-                color: {c['warning']}; font-weight: bold;
-            }}
-            """
-        )
+        self._apply_theme_style()
+        register_theme_listener(self)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(6)
@@ -89,7 +55,9 @@ class PatientInfoPanel(QFrame):
         self.title = QLabel("当前患者")
         self.title.setObjectName("title")
         self.name = QLabel("未选择")
-        self.name.setStyleSheet(f"font-size:16px;font-weight:bold;color:{c['title']};")
+        self.name.setStyleSheet(
+            f"font-size:16px;font-weight:bold;color:{colors()['title']};"
+        )
         self.demo = QLabel("")
         header_layout.addWidget(self.title)
         header_layout.addWidget(self.name)
@@ -147,6 +115,52 @@ class PatientInfoPanel(QFrame):
         outer.addStretch(1)
         self.patient_id = 0
         self.encounter_id = 0
+
+    def _apply_theme_style(self) -> None:
+        c = colors()
+        self.setStyleSheet(
+            f"""
+            #patientInfoPanel {{ background: transparent; }}
+            #headerCard, #infoCard {{
+                background: {c['card']};
+                border: 1px solid {c['border']};
+                border-radius: 8px;
+            }}
+            #allergyCard {{
+                background: {c['card']};
+                border: 1px solid {c['danger']};
+                border-left: 4px solid {c['danger']};
+                border-radius: 8px;
+            }}
+            #historyCard {{
+                background: {c['card']};
+                border: 1px solid {c['warning']};
+                border-left: 4px solid {c['warning']};
+                border-radius: 8px;
+            }}
+            #patientInfoPanel QLabel {{ color: {c['text']}; font-size: 12px; }}
+            #patientInfoPanel QLabel#title {{
+                font-size: 15px; font-weight: bold; color: {c['title']};
+            }}
+            #patientInfoPanel QLabel#cardTitle {{
+                font-size: 12px; font-weight: bold; color: {c['muted']};
+            }}
+            #patientInfoPanel QLabel#allergyValue {{
+                color: {c['danger']}; font-weight: bold;
+            }}
+            #patientInfoPanel QLabel#historyValue {{
+                color: {c['warning']}; font-weight: bold;
+            }}
+            """
+        )
+        if hasattr(self, "name"):
+            self.name.setStyleSheet(
+                f"font-size:16px;font-weight:bold;color:{c['title']};"
+            )
+
+    def apply_theme(self) -> None:
+        self._apply_theme_style()
+        self.update()
 
     def set_patient(
         self,

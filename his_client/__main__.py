@@ -37,6 +37,8 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setFont(QFont("Microsoft YaHei", 10))
+    from his_client.ui.theme import install_theme_watcher
+    install_theme_watcher(app)
     from his_client.ui.window_theme import install_light_titlebars
     install_light_titlebars(app)
 
