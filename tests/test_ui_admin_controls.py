@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QTabWidget
 
 from his_client.ui.cashier import CashierWidget
 from his_client.ui.tcm import TcmWidget
+from his_client.ui.inpatient import InpatientWidget
 
 
 @pytest.fixture(scope="module")
@@ -22,6 +23,12 @@ class _NoopApi:
             "date": "2026-01-01", "payment_count": 0, "amount": 0.0,
             "net": 0.0, "pending_amount": 0.0, "channels": [], "shifts": [],
         }
+
+    def list_inpatient_admissions(self):
+        return []
+
+    def list_inpatient_orders(self, admission_id):
+        return []
 
     def list_tcm_stock_batches(self):
         return []
@@ -44,3 +51,10 @@ def test_admin_tcm_has_adjust_approval_tab(qapp):
     texts = [tabs.tabText(i) for i in range(tabs.count())]
     assert "盘点审批" in texts
     assert "批次库存" in texts
+
+
+def test_inpatient_widget_has_lists(qapp):
+    widget = InpatientWidget(_NoopApi(), role="doctor")
+    assert widget.admission_table.columnCount() == 5
+    assert widget.order_table.columnCount() == 5
+    assert widget.admission_table.rowCount() == 0

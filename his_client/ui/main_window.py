@@ -26,6 +26,7 @@ from his_client.ui.audit_center import AuditCenterWidget
 from his_client.ui.narcotic import NarcoticWidget
 from his_client.ui.radiology import RadiologyWidget
 from his_client.ui.surgery import SurgeryWidget
+from his_client.ui.inpatient import InpatientWidget
 from his_client.ui.purchase_receive import PurchaseReceiveWidget
 from his_client.ui.theme import apply_theme, refresh_theme
 from his_client.ui.window_theme import apply_light_titlebar
