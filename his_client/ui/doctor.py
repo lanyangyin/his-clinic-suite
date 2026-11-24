@@ -2425,6 +2425,7 @@ class DoctorWidget(QWidget):
         self.tcm_table.setHorizontalHeaderLabels(["ID", "饮片", "剂量g", "煎法"])
         # 剂量需要医生直接修改；其余业务表格仍由全局策略设为只读
         self.tcm_table.setProperty("allow_cell_edit", True)
+        self.tcm_table.setProperty("editable_columns", (2,))
         self.tcm_table.setEditTriggers(
             QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed
         )
