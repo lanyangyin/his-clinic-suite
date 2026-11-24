@@ -356,3 +356,29 @@ def test_discharge_medications(client, auth):
     assert paid.status_code == 201, paid.text
     bill = client.get(f"/admissions/{admission['id']}/bill", headers=auth["doctor"]).json()
     assert bill["balance"] == 0
+
+
+def test_discharge_medication_insufficient_stock(client, auth):
+    patient = make_patient(client, auth)
+    doctor = make_doctor(client, auth)
+    _, beds = make_ward_and_beds(client, auth)
+    admission = client.post(
+        "/admissions/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "bed_id": beds[0]["id"]},
+        headers=auth["cashier"],
+    ).json()
+    drug = client.post(
+        "/drugs/", json={"name": "无库存带药", "base_price": 3},
+        headers=auth["admin"],
+    ).json()
+    created = client.post(
+        f"/admissions/{admission['id']}/discharge-medications",
+        json={"drug_id": drug["id"], "quantity": 2},
+        headers=auth["doctor"],
+    ).json()
+    denied = client.post(
+        f"/discharge-medications/{created['id']}/dispense",
+        headers=auth["pharmacist"],
+    )
+    assert denied.status_code == 400
+    assert "库存" in denied.json()["detail"] or "不足" in denied.json()["detail"]
