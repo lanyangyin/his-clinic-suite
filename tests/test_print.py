@@ -299,3 +299,24 @@ def test_reprint_banner_helper():
 
     assert "首次打印" in _reprint_banner(1)
     assert "补打 第2次" in _reprint_banner(2)
+
+
+def test_signed_record_print_has_verification_code(client, auth):
+    import re
+
+    encounter, _payment = setup_paid_encounter(client, auth)
+    signed = client.post(
+        f"/encounters/{encounter['id']}/medical-record/sign", headers=auth["doctor"]
+    )
+    assert signed.status_code == 200, signed.text
+    html = client.get(f"/print/medical-record/{encounter['id']}").text
+    assert "已签名" in html
+    match = re.search(r"验签码：([0-9A-F]{12})", html)
+    assert match, html
+    verify = client.get(
+        f"/print/verify-medical-record/{encounter['id']}",
+        params={"code": match.group(1)},
+        headers=auth["admin"],
+    )
+    assert verify.status_code == 200, verify.text
+    assert verify.json()["valid"] is True

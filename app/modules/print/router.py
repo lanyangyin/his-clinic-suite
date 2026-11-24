@@ -1,5 +1,6 @@
 from datetime import datetime
 from html import escape
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -157,6 +158,18 @@ def _collect(db: Session, encounter_id: int) -> dict:
         ],
         "record_no": f"BL{encounter.created_at:%Y%m%d}{encounter.id:04d}",
         "prescription_no": header.prescription_no if header else "",
+        "signature": (
+            {
+                "signed": True,
+                "signed_by": record.signed_by or "",
+                "signed_at": record.signed_at.strftime("%Y-%m-%d %H:%M") if record and record.signed_at else "",
+                "verify_code": hashlib.sha256(
+                    f"{encounter.id}:{record.signed_at.isoformat()}:{settings.SECRET_KEY}".encode()
+                ).hexdigest()[:12].upper() if record and record.signed_at else "",
+            }
+            if record and record.signed_at
+            else {"signed": False}
+        ),
         "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
         "lines": lines,
         "total": round(total, 2),
@@ -373,6 +386,27 @@ def create_print_token(
     )
     db.commit()
     return {"token": raw, "expires_in": min(max(ttl_seconds, 10), 600)}
+
+
+@router.get("/verify-medical-record/{encounter_id}")
+def verify_medical_record(
+    encounter_id: int,
+    code: str,
+    db: Session = Depends(get_db),
+    _=Depends(require_print_access),
+):
+    record = get_medical_record(db, encounter_id)
+    if not record or not record.signed_at:
+        return {"valid": False, "reason": "病历未签名"}
+    expected = hashlib.sha256(
+        f"{encounter_id}:{record.signed_at.isoformat()}:{settings.SECRET_KEY}".encode()
+    ).hexdigest()[:12].upper()
+    return {
+        "valid": code.strip().upper() == expected,
+        "signed_by": record.signed_by,
+        "signed_at": record.signed_at,
+        "verify_code": expected,
+    }
 
 
 @router.get("/logs")

@@ -145,9 +145,19 @@ def _record_page(data: dict) -> str:
   <div class="section"><span class="section-title">合计：</span>{data['total']:.2f} 元</div>
   <div class="sign">
     <span>医师：{_value(data.get('doctor_name'))}</span>
-    <span>医师签名：__________</span>
+    {_signature_html(data.get('signature') or {})}
   </div>
 </div>"""
+
+
+def _signature_html(signature: dict) -> str:
+    if not signature.get("signed"):
+        return "<span>医师签名：__________</span>"
+    return (
+        f"<span>医师签名：{_value(signature.get('signed_by'))}（已签名）</span>"
+        f"<span>签名时间：{_value(signature.get('signed_at'))}</span>"
+        f"<span>验签码：{_value(signature.get('verify_code'))}</span>"
+    )
 
 
 def _western_page(data: dict) -> str:
