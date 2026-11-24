@@ -6,7 +6,10 @@
   <label>开始日期 <input type="date" name="start_date" value="{{ request.query_params.get('start_date', '') }}"></label>
   <label>结束日期 <input type="date" name="end_date" value="{{ request.query_params.get('end_date', '') }}"></label>
   <button type="submit">筛选</button>
-  <a href="/admin/refund-approvals.csv?start_date={{ request.query_params.get('start_date', '') }}&end_date={{ request.query_params.get('end_date', '') }}">导出 CSV</a>
+  <label>导出字段
+    <input name="fields" value="{{ request.query_params.get('fields', '') }}" placeholder="默认全部；逗号分隔 id,payment_id,...">
+  </label>
+  <a href="/admin/refund-approvals.csv?start_date={{ request.query_params.get('start_date', '') }}&end_date={{ request.query_params.get('end_date', '') }}&fields={{ request.query_params.get('fields', '') }}">导出 CSV</a>
 </form>
 <div class="panel">
   <table>

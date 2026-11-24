@@ -631,6 +631,9 @@ def test_refund_approvals_csv_export(client, auth):
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
     assert "退费单号" in response.text
+    custom = client.get("/admin/refund-approvals.csv", params={"fields": "payment_id,amount"})
+    assert "支付单" in custom.text
+    assert "退费单号" not in custom.text
 
 
 def test_admin_notification_templates_page(client, auth):

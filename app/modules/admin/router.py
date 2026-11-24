@@ -490,6 +490,7 @@ def refund_approvals_csv(
     request: Request,
     start_date: date | None = None,
     end_date: date | None = None,
+    fields: str | None = None,
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -503,13 +504,22 @@ def refund_approvals_csv(
     rows = query.order_by(RefundApproval.id.desc()).all()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["ID", "支付单", "退费单号", "金额", "原因", "操作人", "角色", "时间"])
+    available = {
+        "id": ("ID", lambda row: row.id),
+        "payment_id": ("支付单", lambda row: row.payment_id),
+        "refund_no": ("退费单号", lambda row: row.refund_no),
+        "amount": ("金额", lambda row: f"{row.amount:.2f}"),
+        "reason": ("原因", lambda row: row.reason),
+        "operator": ("操作人", lambda row: row.operator),
+        "role": ("角色", lambda row: row.operator_role),
+        "created_at": ("时间", lambda row: row.created_at.strftime("%Y-%m-%d %H:%M")),
+    }
+    selected = [item.strip() for item in (fields or "").split(",") if item.strip() in available]
+    if not selected:
+        selected = list(available)
+    writer.writerow([available[item][0] for item in selected])
     for row in rows:
-        writer.writerow([
-            row.id, row.payment_id, row.refund_no, f"{row.amount:.2f}",
-            row.reason, row.operator, row.operator_role,
-            row.created_at.strftime("%Y-%m-%d %H:%M"),
-        ])
+        writer.writerow([available[item][1](row) for item in selected])
     return Response(
         content="\ufeff" + buffer.getvalue(),
         media_type="text/csv; charset=utf-8",
