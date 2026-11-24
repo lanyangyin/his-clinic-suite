@@ -1,7 +1,8 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.request import Request, urlopen
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app import settings
@@ -82,9 +83,20 @@ def _post(url: str, payload: dict) -> None:
 
 
 def dispatch_pending(db: Session, limit: int = 100) -> dict:
+    now = datetime.now()
     rows = (
         db.query(NotificationOutbox)
-        .filter(NotificationOutbox.status == "pending")
+        .filter(
+            or_(
+                NotificationOutbox.status == "pending",
+                and_(
+                    NotificationOutbox.status == "failed",
+                    NotificationOutbox.attempts < 3,
+                    NotificationOutbox.next_retry_at.is_not(None),
+                    NotificationOutbox.next_retry_at <= now,
+                ),
+            )
+        )
         .order_by(NotificationOutbox.id)
         .limit(limit)
         .all()
@@ -114,10 +126,13 @@ def dispatch_pending(db: Session, limit: int = 100) -> dict:
             row.status = "sent"
             row.sent_at = datetime.now()
             row.last_error = ""
+            row.next_retry_at = None
             sent += 1
         except Exception as exc:
             row.status = "failed"
             row.last_error = str(exc)[:300]
+            delay = min(30, 2 ** max(1, row.attempts))
+            row.next_retry_at = datetime.now() + timedelta(minutes=delay)
             failed += 1
     db.commit()
     return {"processed": len(rows), "sent": sent, "failed": failed}
@@ -171,7 +186,14 @@ def read_at_for(db: Session, notification_id: int, username: str):
 def retry_failed(db: Session) -> int:
     rows = (
         db.query(NotificationOutbox)
-        .filter(NotificationOutbox.status == "failed", NotificationOutbox.attempts < 3)
+        .filter(
+            NotificationOutbox.status == "failed",
+            NotificationOutbox.attempts < 3,
+            or_(
+                NotificationOutbox.next_retry_at.is_(None),
+                NotificationOutbox.next_retry_at <= datetime.now(),
+            ),
+        )
         .all()
     )
     for row in rows:
