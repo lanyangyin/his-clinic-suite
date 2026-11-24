@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
 from app.modules.admin.models import RefundExportTemplate
+from app.modules.billing.models import ChargeRefund, Payment
 from app.modules.auth.schemas import UserCreate
 from app.modules.labels import zh
 from app.modules.materials.service import get_item as get_material_item
@@ -142,7 +143,7 @@ from app.modules.encounter.service import list_record_revisions, review_record_r
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox, NotificationTemplate
-from app.modules.inpatient.models import Admission, Bed, InpatientOrder, Ward
+from app.modules.inpatient.models import Admission, Bed, InpatientOrder, InpatientPayment, Ward
 from app.modules.tcm.models import TcmStockAdjustment
 from app.modules.tcm.service import approve_stock_adjustment
 from app.modules.billing.models import RefundApproval
@@ -404,6 +405,50 @@ def refund_export_template_save(
     row.fields = fields.strip()
     db.commit()
     return RedirectResponse("/admin/refund-export-templates", status_code=302)
+
+
+@router.get("/finance", response_class=HTMLResponse)
+def finance_page(
+    request: Request,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    start = datetime.combine(start_date, time.min) if start_date else datetime.combine(date.today(), time.min)
+    end = datetime.combine(end_date, time.max) if end_date else datetime.combine(date.today(), time.max)
+    payments = (
+        db.query(Payment)
+        .filter(Payment.created_at >= start, Payment.created_at <= end,
+                Payment.status.in_(("paid", "partially_refunded")))
+        .order_by(Payment.id.desc())
+        .all()
+    )
+    inpatient = (
+        db.query(InpatientPayment)
+        .filter(InpatientPayment.created_at >= start, InpatientPayment.created_at <= end)
+        .order_by(InpatientPayment.id.desc())
+        .all()
+    )
+    refunds = (
+        db.query(ChargeRefund)
+        .filter(ChargeRefund.created_at >= start, ChargeRefund.created_at <= end)
+        .order_by(ChargeRefund.id.desc())
+        .all()
+    )
+    totals = {
+        "payment": round(sum(row.amount for row in payments), 2),
+        "inpatient": round(sum(row.amount for row in inpatient), 2),
+        "refund": round(sum(row.amount for row in refunds), 2),
+    }
+    totals["net"] = round(totals["payment"] + totals["inpatient"] - totals["refund"], 2)
+    return templates.TemplateResponse(
+        request, "finance.html",
+        _ctx(request, payments=payments, inpatient=inpatient, refunds=refunds, totals=totals,
+             start_date=start_date, end_date=end_date),
+    )
 
 
 @router.get("/inpatient", response_class=HTMLResponse)

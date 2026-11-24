@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}财务对账 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>财务对账</h2>
+<form class="inline" method="get" action="/admin/finance">
+  <label>开始 <input type="date" name="start_date" value="{{ start_date or '' }}"></label>
+  <label>结束 <input type="date" name="end_date" value="{{ end_date or '' }}"></label>
+  <button type="submit">查询</button>
+</form>
+<div class="panel">
+  <p>门诊收费：￥{{ '%.2f'|format(totals.payment) }}　
+     住院缴费：￥{{ '%.2f'|format(totals.inpatient) }}　
+     退费：￥{{ '%.2f'|format(totals.refund) }}　
+     净收入：￥{{ '%.2f'|format(totals.net) }}</p>
+  <h3>门诊收费</h3>
+  <table><tr><th>ID</th><th>就诊</th><th>金额</th><th>状态</th><th>时间</th></tr>
+  {% for row in payments %}<tr><td>{{ row.id }}</td><td>{{ row.encounter_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.status }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}
+  </table>
+  <h3>住院缴费</h3>
+  <table><tr><th>ID</th><th>住院</th><th>金额</th><th>方式</th><th>时间</th></tr>
+  {% for row in inpatient %}<tr><td>{{ row.id }}</td><td>{{ row.admission_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.method }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}
+  </table>
+  <h3>退费</h3>
+  <table><tr><th>ID</th><th>支付单</th><th>金额</th><th>时间</th></tr>
+  {% for row in refunds %}<tr><td>{{ row.id }}</td><td>{{ row.payment_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -697,3 +697,14 @@ def test_refund_export_templates(client, auth):
     custom = client.get("/admin/refund-approvals.csv", params={"template_id": 1})
     assert "支付单" in custom.text
     assert "退费单号" not in custom.text
+
+
+def test_admin_finance_page(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/finance")
+    assert page.status_code == 200, page.text
+    assert "财务对账" in page.text
