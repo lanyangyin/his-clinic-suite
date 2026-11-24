@@ -265,3 +265,16 @@ app.include_router(review_router)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.include_router(admin_router)
 app.include_router(download_router)
+
+
+from app.modules.notify import dispatcher as notify_dispatcher  # noqa: E402
+
+
+@app.on_event("startup")
+def _start_notify_dispatcher() -> None:
+    notify_dispatcher.start()
+
+
+@app.on_event("shutdown")
+def _stop_notify_dispatcher() -> None:
+    notify_dispatcher.stop()

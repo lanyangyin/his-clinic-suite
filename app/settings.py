@@ -137,6 +137,15 @@ REFUND_APPROVAL_THRESHOLD = float(
     or _ini.get("features", "refund_approval_threshold", fallback="500")
 )
 
+NOTIFY_AUTO_DISPATCH = (
+    os.environ.get("HIS_NOTIFY_AUTO_DISPATCH", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "notify_auto_dispatch", fallback=False)
+)
+NOTIFY_DISPATCH_INTERVAL = int(
+    os.environ.get("HIS_NOTIFY_DISPATCH_INTERVAL", "")
+    or _ini.get("features", "notify_dispatch_interval", fallback="60")
+)
+
 ALLOW_ANONYMOUS_READ = (
     os.environ.get("HIS_ALLOW_ANONYMOUS_READ", "").lower() in {"1", "true", "yes", "on"}
     or _ini.getboolean("features", "anonymous_read", fallback=False)
