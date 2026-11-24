@@ -15,6 +15,10 @@ class RoomResponse(RoomCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CancelRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=200)
+
+
 class CaseCreate(BaseModel):
     patient_id: int
     encounter_id: int | None = None

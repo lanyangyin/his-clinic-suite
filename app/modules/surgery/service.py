@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.modules.encounter.service import get_encounter
-from app.modules.charges.models import ChargeItem
+from app.modules.charges.models import ChargeItem, EncounterCharge
 from app.modules.charges.service import add_charge
 from app.modules.patient.models import Patient
 from app.modules.patient.service import get_patient
@@ -98,6 +98,36 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
     db.commit()
     db.refresh(row)
     return row
+
+
+def cancel_case(db: Session, case_id: int, reason: str, operator: str = "") -> SurgeryCase:
+    """取消未开始手术：释放排班，未收费则撤销待收手术费；已收费必须先退费。"""
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    if case.status != "scheduled":
+        raise ValueError("仅已排班且未开始的手术可以取消")
+    if not reason.strip():
+        raise ValueError("请填写取消原因")
+    charge = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.source_type == "surgery_case",
+            EncounterCharge.source_id == case.id,
+        )
+        .first()
+    )
+    if charge:
+        if charge.status != "pending":
+            raise ValueError("该手术费用已收费，请先退费后再取消")
+        db.delete(charge)
+    case.status = "cancelled"
+    case.cancelled_at = datetime.now()
+    case.cancelled_by = operator
+    case.cancel_reason = reason.strip()
+    db.commit()
+    db.refresh(case)
+    return case
 
 
 def list_cases(db: Session, status: str | None = None) -> list[dict]:

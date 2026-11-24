@@ -224,3 +224,23 @@ def test_surgery_attach_cssd_package(client, auth):
 def test_surgery_permissions(client, auth):
     assert client.get("/surgery/cases", headers=auth["doctor"]).status_code == 403
     assert client.get("/surgery/rooms", headers=auth["cashier"]).status_code == 403
+
+
+def test_surgery_cancel_scheduled_case(client, auth):
+    patient, room, case = _setup(client, auth)
+    response = client.post(
+        f"/surgery/cases/{case['id']}/cancel",
+        json={"reason": "患者要求改期"},
+        headers=auth["surgery"],
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "cancelled"
+    detail = client.get(f"/surgery/cases/{case['id']}", headers=auth["surgery"]).json()
+    assert detail["case"]["status"] == "cancelled"
+    # 已取消不能再次取消
+    again = client.post(
+        f"/surgery/cases/{case['id']}/cancel",
+        json={"reason": "重复"},
+        headers=auth["surgery"],
+    )
+    assert again.status_code == 400

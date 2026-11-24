@@ -38,6 +38,9 @@ class SurgeryCase(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    cancel_reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
 
     patient = relationship("Patient")
     room = relationship("OperatingRoom")

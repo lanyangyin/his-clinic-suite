@@ -12,6 +12,7 @@ from .schemas import (
     AnesthesiaCreate,
     AnesthesiaResponse,
     CaseCreate,
+    CancelRequest,
     CaseResponse,
     CountCreate,
     CountResponse,
@@ -33,6 +34,7 @@ from .service import (
     add_recovery,
     add_safety,
     attach_package,
+    cancel_case,
     complete_case,
     create_case,
     create_room,
@@ -76,6 +78,19 @@ def new_case(
 ):
     try:
         return create_case(db, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/cases/{case_id}/cancel", response_model=CaseResponse)
+def cancel(
+    case_id: int,
+    data: CancelRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("surgery")),
+):
+    try:
+        return cancel_case(db, case_id, data.reason, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
