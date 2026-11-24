@@ -42,7 +42,13 @@ from app.modules.staff.service import get_doctor
 router = APIRouter(prefix="/print", tags=["print"], dependencies=[Depends(require_print_access)])
 
 
-def _log_print(db: Session, user, document_type: str, ref_id: int | None) -> None:
+def _log_print(db: Session, user, document_type: str, ref_id: int | None) -> int:
+    count = (
+        db.query(PrintLog)
+        .filter(PrintLog.document_type == document_type, PrintLog.ref_id == ref_id)
+        .count()
+        + 1
+    )
     db.add(
         PrintLog(
             document_type=document_type,
@@ -51,6 +57,17 @@ def _log_print(db: Session, user, document_type: str, ref_id: int | None) -> Non
         )
     )
     db.commit()
+    return count
+
+
+def _with_reprint_banner(html: str, count: int) -> str:
+    label = "首次打印" if count <= 1 else f"补打 第{count}次"
+    color = "#0f172a" if count <= 1 else "#b91c1c"
+    banner = (
+        f'<div style="margin:4px 0;padding:2px 6px;border:1px solid {color};'
+        f'color:{color};font-size:11px;display:inline-block">{label}</div>'
+    )
+    return html.replace("<body>", f"<body>{banner}", 1)
 
 
 def _clinic_meta() -> dict:
@@ -385,7 +402,7 @@ def barcode_svg(code: str):
 
 @router.get("/prescription-header/{prescription_id}", response_class=HTMLResponse)
 def print_prescription_header(prescription_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "prescription-header", prescription_id)
+    print_count = _log_print(db, user, "prescription-header", prescription_id)
     from app.modules.encounter.models import PrescriptionItem
 
     header = db.get(Prescription, prescription_id)
@@ -416,7 +433,7 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
         "dispensed": "已发药",
         "cancelled": "已作废",
     }.get(header.status, header.status)
-    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    return HTMLResponse(_with_reprint_banner(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>处方 {escape(header.prescription_no)}</title><style>{PRESCRIPTION_CSS}</style></head><body>
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
@@ -432,7 +449,7 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
 <div class="divider"></div>
 <p>审核药师：{escape(header.reviewed_by or '—')}　审核意见：{escape(header.review_note or '—')}</p>
 <p>医师签名：__________　日期：{header.created_at:%Y-%m-%d}</p>
-</body></html>""")
+</body></html>""", print_count))
 
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)
@@ -447,12 +464,12 @@ def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=De
 
 @router.get("/medical-record/{encounter_id}", response_class=HTMLResponse)
 def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "medical-record", encounter_id)
+    print_count = _log_print(db, user, "medical-record", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(render_record(data))
+    return HTMLResponse(_with_reprint_banner(render_record(data), print_count))
 
 
 @router.get("/western-prescription/{encounter_id}", response_class=HTMLResponse)

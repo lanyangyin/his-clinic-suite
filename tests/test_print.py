@@ -272,3 +272,13 @@ def test_print_one_time_token(client, auth, monkeypatch):
         f"/print/prescription/{encounter['id']}", params={"token": token}
     )
     assert second.status_code == 401
+
+
+def test_medical_record_reprint_banner(client, auth):
+    encounter, _payment = setup_paid_encounter(client, auth)
+    first = client.get(f"/print/medical-record/{encounter['id']}")
+    assert first.status_code == 200
+    assert "补打" not in first.text
+    second = client.get(f"/print/medical-record/{encounter['id']}")
+    assert second.status_code == 200
+    assert "补打 第2次" in second.text
