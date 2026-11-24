@@ -24,6 +24,7 @@
   <form method="post" action="/admin/finance/vouchers/generate" style="display:inline">
     <button type="submit">生成凭证</button>
   </form>
+  <a href="/admin/finance/vouchers.csv">导出凭证 CSV</a>
   <table><tr><th>凭证号</th><th>业务</th><th>ID</th><th>金额</th><th>方向</th></tr>
   {% for row in vouchers %}<tr><td>{{ row.voucher_no }}</td><td>{{ row.biz_type }}</td><td>{{ row.biz_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ '收入' if row.direction == 'income' else '支出' }}</td></tr>{% endfor %}
   </table>

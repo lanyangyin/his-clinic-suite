@@ -463,6 +463,28 @@ def generate_financial_vouchers(
     return RedirectResponse("/admin/finance", status_code=302)
 
 
+@router.get("/finance/vouchers.csv")
+def financial_vouchers_csv(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = db.query(FinancialVoucher).order_by(FinancialVoucher.id.desc()).all()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["凭证号", "业务类型", "业务ID", "金额", "方向", "时间"])
+    for row in rows:
+        writer.writerow([
+            row.voucher_no, row.biz_type, row.biz_id, f"{row.amount:.2f}",
+            "收入" if row.direction == "income" else "支出",
+            row.created_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=financial-vouchers.csv"},
+    )
+
+
 @router.get("/finance", response_class=HTMLResponse)
 def finance_page(
     request: Request,

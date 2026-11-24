@@ -720,3 +720,15 @@ def test_financial_voucher_generation(client, auth):
     assert generated.status_code == 302
     page = client.get("/admin/finance")
     assert "财务凭证" in page.text
+
+
+def test_financial_vouchers_csv(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    response = client.get("/admin/finance/vouchers.csv")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers["content-type"]
+    assert "凭证号" in response.text
