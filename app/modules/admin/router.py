@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import date
+from datetime import date, datetime, time
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -448,11 +448,21 @@ def notification_template_save(
 
 
 @router.get("/refund-approvals.csv")
-def refund_approvals_csv(request: Request, db: Session = Depends(get_db)):
+def refund_approvals_csv(
+    request: Request,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
     redirect = _guard(request, db)
     if redirect:
         return redirect
-    rows = db.query(RefundApproval).order_by(RefundApproval.id.desc()).all()
+    query = db.query(RefundApproval)
+    if start_date:
+        query = query.filter(RefundApproval.created_at >= datetime.combine(start_date, time.min))
+    if end_date:
+        query = query.filter(RefundApproval.created_at <= datetime.combine(end_date, time.max))
+    rows = query.order_by(RefundApproval.id.desc()).all()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["ID", "支付单", "退费单号", "金额", "原因", "操作人", "角色", "时间"])
@@ -470,16 +480,21 @@ def refund_approvals_csv(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/refund-approvals", response_class=HTMLResponse)
-def refund_approvals_page(request: Request, db: Session = Depends(get_db)):
+def refund_approvals_page(
+    request: Request,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
     redirect = _guard(request, db)
     if redirect:
         return redirect
-    rows = (
-        db.query(RefundApproval)
-        .order_by(RefundApproval.id.desc())
-        .limit(200)
-        .all()
-    )
+    query = db.query(RefundApproval)
+    if start_date:
+        query = query.filter(RefundApproval.created_at >= datetime.combine(start_date, datetime.min.time()))
+    if end_date:
+        query = query.filter(RefundApproval.created_at <= datetime.combine(end_date, datetime.max.time()))
+    rows = query.order_by(RefundApproval.id.desc()).limit(200).all()
     return templates.TemplateResponse(
         request, "refund_approvals.html", _ctx(request, rows=rows)
     )
@@ -841,7 +856,7 @@ def suppliers_create(
     redirect = _guard(request, db)
     if redirect:
         return redirect
-    from datetime import date
+    from datetime import date, datetime, time
 
     try:
         expiry = date.fromisoformat(license_expiry) if license_expiry.strip() else None
@@ -895,7 +910,7 @@ def suppliers_update(
     redirect = _guard(request, db)
     if redirect:
         return redirect
-    from datetime import date
+    from datetime import date, datetime, time
 
     try:
         expiry = date.fromisoformat(license_expiry) if license_expiry.strip() else None

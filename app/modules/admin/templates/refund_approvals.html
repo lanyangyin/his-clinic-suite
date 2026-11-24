@@ -2,7 +2,12 @@
 {% block title %}退费审批留痕 · HIS 管理台{% endblock %}
 {% block content %}
 <h2>大额退费审批留痕</h2>
-<p><a href="/admin/refund-approvals.csv">导出 CSV</a></p>
+<form class="inline" method="get" action="/admin/refund-approvals">
+  <label>开始日期 <input type="date" name="start_date" value="{{ request.query_params.get('start_date', '') }}"></label>
+  <label>结束日期 <input type="date" name="end_date" value="{{ request.query_params.get('end_date', '') }}"></label>
+  <button type="submit">筛选</button>
+  <a href="/admin/refund-approvals.csv?start_date={{ request.query_params.get('start_date', '') }}&end_date={{ request.query_params.get('end_date', '') }}">导出 CSV</a>
+</form>
 <div class="panel">
   <table>
     <tr><th>ID</th><th>支付单</th><th>退费单号</th><th>金额</th><th>原因</th><th>操作人</th><th>角色</th><th>时间</th></tr>
