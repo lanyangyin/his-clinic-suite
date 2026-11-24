@@ -160,6 +160,13 @@ def discharge(db: Session, admission_id: int) -> Admission:
     bed = get_bed(db, admission.bed_id)
     if bed:
         bed.status = "empty"
+    # 出院即停止所有未停长期/临时医嘱，避免出院后仍可被执行
+    for order in (
+        db.query(InpatientOrder)
+        .filter(InpatientOrder.admission_id == admission.id, InpatientOrder.status == "open")
+        .all()
+    ):
+        order.status = "stopped"
     admission.status = "discharged"
     admission.discharged_at = datetime.now()
     db.commit()
@@ -226,12 +233,11 @@ def execute_order(db: Session, order_id: int, note: str = "") -> OrderExecution:
     order = get_order(db, order_id)
     if not order:
         raise ValueError("医嘱不存在")
-    if order.status != "open":
-        raise ValueError("该医嘱已停止或已完成，不能执行")
-
     admission = get_admission(db, order.admission_id)
     if not admission or admission.status != "in":
         raise ValueError("该患者已出院，不能执行医嘱")
+    if order.status != "open":
+        raise ValueError("该医嘱已停止或已完成，不能执行")
 
     execution = OrderExecution(order_id=order_id, note=note)
     db.add(execution)
@@ -292,12 +298,11 @@ def create_dispense_request(db: Session, order_id: int) -> InpatientDispenseRequ
     order = get_order(db, order_id)
     if not order:
         raise ValueError("医嘱不存在")
-    if order.status != "open":
-        raise ValueError("该医嘱已停止或已完成，不能摆药")
-
     admission = get_admission(db, order.admission_id)
     if not admission or admission.status != "in":
         raise ValueError("该患者已出院，不能摆药")
+    if order.status != "open":
+        raise ValueError("该医嘱已停止或已完成，不能摆药")
 
     request = InpatientDispenseRequest(
         admission_id=order.admission_id,

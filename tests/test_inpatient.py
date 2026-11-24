@@ -284,3 +284,27 @@ def test_get_missing_resources(client, auth):
     assert client.get("/wards/999").status_code == 404
     assert client.get("/beds/999").status_code == 404
     assert client.get("/admissions/999").status_code == 404
+
+
+def test_discharge_stops_open_orders(client, auth):
+    patient = make_patient(client, auth)
+    doctor = make_doctor(client, auth)
+    _, beds = make_ward_and_beds(client, auth)
+    admission = client.post(
+        "/admissions/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "bed_id": beds[0]["id"]},
+        headers=auth["cashier"],
+    ).json()
+    drug = client.post(
+        "/drugs/", json={"name": "出院停药", "base_price": 10},
+        headers=auth["admin"],
+    ).json()
+    order = client.post(
+        f"/admissions/{admission['id']}/orders",
+        json={"doctor_id": doctor["id"], "drug_id": drug["id"], "order_type": "standing", "quantity": 1},
+        headers=auth["doctor"],
+    ).json()
+    assert order["status"] == "open"
+    client.post(f"/admissions/{admission['id']}/discharge", headers=auth["doctor"])
+    got = client.get(f"/orders/{order['id']}", headers=auth["doctor"]).json()
+    assert got["status"] == "stopped"
