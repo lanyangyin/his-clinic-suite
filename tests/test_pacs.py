@@ -303,3 +303,19 @@ def test_imaging_worklist_urgent_first(client, auth):
     rows = client.get("/pacs/worklist", headers=auth["radiology"]).json()
     ids = [row["id"] for row in rows]
     assert ids.index(urgent["id"]) < ids.index(routine["id"])
+
+
+def test_invalid_dicom_uid_rejected(client, auth):
+    encounter = make_encounter(client, auth)
+    item = make_item(client, auth, code="CT-UID", name="UID 测试").json()
+    request = client.post(
+        f"/pacs/encounters/{encounter['id']}/imaging-requests",
+        json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    bad = client.post(
+        f"/pacs/requests/{request['id']}/report",
+        json={"findings": "正常", "study_uid": "not-a-uid"},
+        headers=auth["radiology"],
+    )
+    assert bad.status_code == 422

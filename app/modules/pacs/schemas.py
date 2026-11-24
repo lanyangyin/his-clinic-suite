@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+import re
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ImagingItemCreate(BaseModel):
@@ -35,6 +37,16 @@ class ImagingRequestCreate(BaseModel):
 
 
 class ImagingReportRequest(BaseModel):
+    @field_validator("study_uid", "series_uid", mode="before")
+    @classmethod
+    def _validate_dicom_uid(cls, value):
+        text = (value or "").strip()
+        if not text:
+            return ""
+        if len(text) > 64 or not re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", text):
+            raise ValueError("DICOM UID 必须是 64 位以内的数字和点号")
+        return text
+
     report: str = Field(default="", max_length=1000)
     findings: str = Field(default="", max_length=1000)
     impression: str = Field(default="", max_length=500)
