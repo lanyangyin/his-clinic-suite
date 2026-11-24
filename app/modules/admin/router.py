@@ -139,6 +139,8 @@ from app.modules.encounter.service import list_record_revisions, review_record_r
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox
+from app.modules.patient.models import PatientMergeRequest
+from app.modules.patient.service import review_merge_request
 from app.modules.notify.service import dispatch_pending, retry_failed
 from app.modules.pacs.service import list_templates as list_imaging_templates
 from app.modules.publichealth.service import PublicHealthUnavailable
@@ -364,6 +366,40 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/patient-merges", response_class=HTMLResponse)
+def patient_merges_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = (
+        db.query(PatientMergeRequest)
+        .order_by(PatientMergeRequest.id.desc())
+        .limit(200)
+        .all()
+    )
+    return templates.TemplateResponse(
+        request, "patient_merges.html", _ctx(request, rows=rows)
+    )
+
+
+@router.post("/patient-merges/{request_id}/review")
+def patient_merge_review(
+    request_id: int,
+    approve: int = Form(...),
+    note: str = Form(""),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        review_merge_request(db, request_id, bool(approve), "admin", note)
+    except ValueError:
+        pass
+    return RedirectResponse("/admin/patient-merges", status_code=302)
 
 
 @router.get("/master/departments", response_class=HTMLResponse)

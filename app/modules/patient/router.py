@@ -98,7 +98,7 @@ def review_merge(
     request_id: int,
     data: PatientMergeReview,
     db: Session = Depends(get_db),
-    user=Depends(require_role("director")),
+    user=Depends(require_role("director", "admin")),
 ):
     try:
         return review_merge_request(db, request_id, data.approve, user.username, data.note)
