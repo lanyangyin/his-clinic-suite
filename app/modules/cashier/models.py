@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, String
+from sqlalchemy import DateTime, Float, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -8,6 +8,14 @@ from app.database import Base
 
 class CashierShift(Base):
     __tablename__ = "cashier_shifts"
+    __table_args__ = (
+        Index(
+            "uq_cashier_open_shift",
+            "cashier",
+            unique=True,
+            sqlite_where=text("status = 'open'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     shift_no: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)

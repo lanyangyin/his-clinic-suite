@@ -2,6 +2,7 @@
 from datetime import date, datetime, time
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.billing.models import ChargeRefund, Payment
@@ -34,9 +35,13 @@ def open_shift(db: Session, cashier: str, data: ShiftOpen) -> CashierShift:
         note=data.note,
     )
     db.add(shift)
-    db.flush()
-    shift.shift_no = f"CS{datetime.now():%Y%m%d}{shift.id:04d}"
-    db.commit()
+    try:
+        db.flush()
+        shift.shift_no = f"CS{datetime.now():%Y%m%d}{shift.id:04d}"
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("当前已有未交班记录")
     db.refresh(shift)
     return shift
 
@@ -169,4 +174,5 @@ def daily(db: Session, day: date | None = None, cashier: str | None = None) -> d
         "channels": sorted(channels.values(), key=lambda row: row["amount"], reverse=True),
         "shifts": _daily_shifts(db, day, cashier),
         "scope": cashier or "all",
+        "pending_scope": "all",
     }

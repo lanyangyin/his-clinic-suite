@@ -1311,7 +1311,7 @@ class CashierWidget(QWidget):
         self.shift_data = data
         self.shift_summary.setText(
             f"{data['date']}　收费 {data['payment_count']} 笔　"
-            f"总额 {data['amount']:.2f}　净收入 {data['net']:.2f}　待收费 {data['pending_amount']:.2f}"
+            f"总额 {data['amount']:.2f}　净收入 {data['net']:.2f}　全院待收费 {data['pending_amount']:.2f}"
         )
         self.channel_table.setRowCount(len(data["channels"]))
         for row, item in enumerate(data["channels"]):
