@@ -90,6 +90,7 @@ def usage(db: Session, start_date: date | None = None, end_date: date | None = N
         {
             "payment_id": payment.id,
             "invoice_no": payment.invoice_no,
+            "invoice_batch_id": payment.invoice_batch_id,
             "invoice_status": payment.invoice_status,
             "print_count": payment.invoice_print_count,
             "amount": payment.amount,
@@ -104,7 +105,7 @@ def usage(db: Session, start_date: date | None = None, end_date: date | None = N
     batches = []
     for batch in db.query(InvoiceBatch).order_by(InvoiceBatch.id.desc()).all():
         used = max(0, batch.next_no - batch.start_no)
-        related = [row for row in invoices if batch.prefix in (row["invoice_no"] or "")]
+        related = [row for row in invoices if row["invoice_batch_id"] == batch.id]
         batches.append(
             {
                 "id": batch.id,

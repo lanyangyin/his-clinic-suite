@@ -265,6 +265,7 @@ class CashierWidget(QWidget):
             "insurance_type": self.p_insurance.currentData(),
             "allergy_status": self.p_allergy_status.currentData(),
             "allergy_detail": self.p_allergy_detail.text().strip(),
+            "special_history": self.p_special_history.text().strip(),
             "privacy_consent": self.p_privacy.isChecked(),
         }
 
