@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
+
+from app.modules.auth.security import require_read_login
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 
-from .schemas import AuditLogResponse, UserCreate, UserResponse
+from .schemas import AuditLogResponse, NarcoticRightUpdate, UserCreate, UserResponse
 from .security import require_login, require_role
 from .service import create_user, get_user, list_recent_audit_logs
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(tags=["auth"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/auth/me", response_model=UserResponse)
@@ -45,6 +47,22 @@ def get_user_one(user_id: int, db: Session = Depends(get_db)):
     user = get_user(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    return user
+
+
+@router.put("/users/{user_id}/narcotic-right", response_model=UserResponse)
+def set_narcotic_right(
+    user_id: int,
+    data: NarcoticRightUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    user = get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    user.narcotic_right = data.enabled
+    db.commit()
+    db.refresh(user)
     return user
 
 

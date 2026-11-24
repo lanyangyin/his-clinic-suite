@@ -1,0 +1,183 @@
+[
+  {
+    "role": "admin",
+    "user": "admin",
+    "tabs": [
+      "人事工作站",
+      "审批待办",
+      "审批流程配置",
+      "集成配置",
+      "通知中心",
+      "收费员工作站",
+      "门诊工作站",
+      "患者 360",
+      "药房工作站",
+      "药事审核工作站",
+      "处方审方",
+      "库房工作站",
+      "库房审核工作站",
+      "护士工作站",
+      "检验工作站",
+      "影像工作站",
+      "手术室工作站",
+      "病案档案工作站",
+      "麻精账册",
+      "审计中心",
+      "院长审批工作站",
+      "治疗项目审批",
+      "中药 / 煎药",
+      "治疗室工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\admin.png",
+    "tab_count": 24
+  },
+  {
+    "role": "cashier",
+    "user": "cashier",
+    "tabs": [
+      "收费员工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\cashier.png",
+    "tab_count": 1
+  },
+  {
+    "role": "doctor",
+    "user": "doctor",
+    "tabs": [
+      "门诊工作站",
+      "患者 360",
+      "中药处方"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\doctor.png",
+    "tab_count": 3
+  },
+  {
+    "role": "pharmacist",
+    "user": "pharmacist",
+    "tabs": [
+      "通知中心",
+      "药房工作站",
+      "药事审核工作站",
+      "处方审方",
+      "麻精账册",
+      "中药房 / 煎药室",
+      "审批待办"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\pharmacist.png",
+    "tab_count": 7
+  },
+  {
+    "role": "warehouse",
+    "user": "warehouse",
+    "tabs": [
+      "通知中心",
+      "库房工作站",
+      "库房审核工作站",
+      "审批待办"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\warehouse.png",
+    "tab_count": 4
+  },
+  {
+    "role": "nurse",
+    "user": "nurse",
+    "tabs": [
+      "护士工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\nurse.png",
+    "tab_count": 1
+  },
+  {
+    "role": "lab",
+    "user": "lab",
+    "tabs": [
+      "检验工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\lab.png",
+    "tab_count": 1
+  },
+  {
+    "role": "radiology",
+    "user": "radiology",
+    "tabs": [
+      "影像工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\radiology.png",
+    "tab_count": 1
+  },
+  {
+    "role": "archive",
+    "user": "archive",
+    "tabs": [
+      "病案档案工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\archive.png",
+    "tab_count": 1
+  },
+  {
+    "role": "director",
+    "user": "director",
+    "tabs": [
+      "通知中心",
+      "麻精账册",
+      "审计中心",
+      "院长审批工作站",
+      "治疗项目审批",
+      "审批待办"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\director.png",
+    "tab_count": 6
+  },
+  {
+    "role": "hr",
+    "user": "hr_gui",
+    "tabs": [
+      "人事工作站",
+      "审批待办",
+      "通知中心"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\hr.png",
+    "tab_count": 3
+  },
+  {
+    "role": "treatment",
+    "user": "treatment",
+    "tabs": [
+      "治疗室工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\treatment.png",
+    "tab_count": 1
+  },
+  {
+    "role": "surgery",
+    "user": "surgery",
+    "tabs": [
+      "手术室工作站"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\surgery.png",
+    "tab_count": 1
+  },
+  {
+    "role": "decoction",
+    "user": "decoction",
+    "tabs": [
+      "煎药室"
+    ],
+    "errors": [],
+    "screenshot": "docs\\gui_tour\\decoction.png",
+    "tab_count": 1
+  }
+]

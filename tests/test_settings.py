@@ -32,3 +32,12 @@ def test_server_config_defaults_from_ini():
     assert settings.HOST in ("0.0.0.0", "127.0.0.1")
     assert isinstance(settings.PORT, int)
     assert settings.SECRET_KEY
+
+
+def test_strict_config_rejects_placeholder_secret(monkeypatch):
+    import pytest
+
+    monkeypatch.setattr(settings, "STRICT_CONFIG", True)
+    monkeypatch.setattr(settings, "SECRET_KEY", "his-dev-secret-change-me-0123456789")
+    with pytest.raises(RuntimeError):
+        settings.validate_runtime_settings()

@@ -1,0 +1,1398 @@
+[
+  {
+    "module": "admin",
+    "loc": 2789,
+    "routes": 103,
+    "unauth_routes": 103,
+    "classes": [],
+    "tests": [
+      "test_admin.py",
+      "test_admin_pages.py",
+      "test_linen_cssd_admin.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "appointment",
+    "loc": 310,
+    "routes": 6,
+    "unauth_routes": 2,
+    "classes": [
+      "Appointment",
+      "AppointmentCreate",
+      "AppointmentResponse"
+    ],
+    "tests": [
+      "test_appointment.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "approval",
+    "loc": 934,
+    "routes": 9,
+    "unauth_routes": 0,
+    "classes": [
+      "ApprovalEvent",
+      "ApprovalRequest",
+      "ApprovalStep",
+      "ApprovalFlowStep",
+      "FlowStepIn",
+      "FlowIn",
+      "ApprovalAction"
+    ],
+    "tests": [
+      "test_director_approvals.py"
+    ],
+    "ui": [
+      "approval_flow.py",
+      "approval_inbox.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "archive",
+    "loc": 1062,
+    "routes": 20,
+    "unauth_routes": 0,
+    "classes": [
+      "ArchiveRecord",
+      "ArchiveBorrowing",
+      "ArchiveCopyRequest",
+      "ArchiveSeal",
+      "ArchiveDestruction",
+      "ArchiveDestructionRequest",
+      "ArchiveRecordCreate",
+      "ArchiveCompleteRequest",
+      "BorrowCreate",
+      "BorrowResponse",
+      "CopyCreate",
+      "CopyCompleteRequest",
+      "CopyResponse",
+      "SealCreate",
+      "SealResponse",
+      "DestroyCreate",
+      "ArchiveRecordResponse",
+      "DestructionRequestCreate",
+      "DestructionDecision",
+      "DestructionExecute",
+      "DestructionRequestResponse"
+    ],
+    "tests": [
+      "test_archive.py"
+    ],
+    "ui": [
+      "archive.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "auth",
+    "loc": 306,
+    "routes": 6,
+    "unauth_routes": 2,
+    "classes": [
+      "User",
+      "AuditLog",
+      "UserCreate",
+      "UserResponse",
+      "NarcoticRightUpdate",
+      "AuditLogResponse"
+    ],
+    "tests": [
+      "test_auth.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "bi",
+    "loc": 731,
+    "routes": 4,
+    "unauth_routes": 0,
+    "classes": [
+      "OverviewResponse",
+      "RevenueTrendItem",
+      "TopDiagnosisItem",
+      "TopDrugItem"
+    ],
+    "tests": [
+      "test_antibiotics.py",
+      "test_bi.py",
+      "test_billing.py",
+      "test_birth_age_utils.py",
+      "test_combined_prescribing.py",
+      "test_concurrency.py",
+      "test_inpatient_billing.py",
+      "test_insurance.py",
+      "test_traceability.py"
+    ],
+    "ui": [
+      "birth_age.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "billing",
+    "loc": 659,
+    "routes": 5,
+    "unauth_routes": 3,
+    "classes": [
+      "Payment",
+      "ChargeRefund",
+      "PaymentAllocation",
+      "PaymentAllocationCreate",
+      "PaymentAllocationResponse",
+      "PaymentCreate",
+      "PaymentResponse",
+      "RefundItem",
+      "RefundRequest",
+      "BillingSummary"
+    ],
+    "tests": [
+      "test_billing.py",
+      "test_concurrency.py",
+      "test_inpatient_billing.py",
+      "test_insurance.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "ca",
+    "loc": 301,
+    "routes": 7,
+    "unauth_routes": 5,
+    "classes": [
+      "CACertificate",
+      "CASeal",
+      "CertificateCreate",
+      "CertificateResponse",
+      "SealCreate",
+      "SealResponse",
+      "VerifyResponse"
+    ],
+    "tests": [
+      "test_ca.py",
+      "test_cashier_daily.py",
+      "test_catalog_dropdown.py",
+      "test_catalog_proposal.py",
+      "test_clinical_refactor.py",
+      "test_clinical_safety.py",
+      "test_critical_value.py",
+      "test_gsp_recall.py",
+      "test_insurance_catalog.py",
+      "test_material_catalog.py",
+      "test_medical_record.py",
+      "test_medical_record_sections.py",
+      "test_patient_cards.py",
+      "test_patient_clinical_edit.py",
+      "test_pharmacy_calls.py"
+    ],
+    "ui": [
+      "cashier.py",
+      "catalog_proposal.py",
+      "notifications.py",
+      "patient_clinical_dialog.py",
+      "treatment_room.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "cashier",
+    "loc": 280,
+    "routes": 4,
+    "unauth_routes": 0,
+    "classes": [
+      "CashierShift",
+      "ShiftOpen",
+      "ShiftClose",
+      "ShiftResponse"
+    ],
+    "tests": [
+      "test_cashier_daily.py"
+    ],
+    "ui": [
+      "cashier.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "catalog_proposal",
+    "loc": 301,
+    "routes": 4,
+    "unauth_routes": 0,
+    "classes": [
+      "CatalogProposal",
+      "CatalogProposalCreate",
+      "CatalogProposalReview",
+      "CatalogProposalResponse"
+    ],
+    "tests": [
+      "test_catalog_proposal.py"
+    ],
+    "ui": [
+      "catalog_proposal.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "charges",
+    "loc": 343,
+    "routes": 6,
+    "unauth_routes": 5,
+    "classes": [
+      "ChargeItem",
+      "EncounterCharge",
+      "ChargeItemCreate",
+      "ChargeItemResponse",
+      "EncounterChargeResponse",
+      "ChargeSummary"
+    ],
+    "tests": [
+      "test_charges.py",
+      "test_procedure_charges.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "cssd",
+    "loc": 580,
+    "routes": 12,
+    "unauth_routes": 0,
+    "classes": [
+      "InstrumentSet",
+      "SterilizationBatch",
+      "InstrumentPackage",
+      "PackageUsage",
+      "SetCreate",
+      "SetResponse",
+      "BatchCreate",
+      "BatchResponse",
+      "ReleaseRequest",
+      "RejectRequest",
+      "PackageCreate",
+      "PackageResponse",
+      "IssueRequest",
+      "UseRequest",
+      "UsageResponse",
+      "PackageRecallRequest"
+    ],
+    "tests": [
+      "test_cssd.py",
+      "test_linen_cssd_admin.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "dict",
+    "loc": 189,
+    "routes": 5,
+    "unauth_routes": 3,
+    "classes": [
+      "DictEntry",
+      "DictEntryCreate",
+      "DictEntryUpdate",
+      "DictEntryResponse",
+      "DictTypeItem"
+    ],
+    "tests": [
+      "test_dict.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "download",
+    "loc": 36,
+    "routes": 2,
+    "unauth_routes": 2,
+    "classes": [],
+    "tests": [
+      "test_distribution.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "drug",
+    "loc": 234,
+    "routes": 6,
+    "unauth_routes": 4,
+    "classes": [
+      "Drug",
+      "DrugInteraction",
+      "DrugCreate",
+      "DrugResponse",
+      "DrugInteractionCreate",
+      "DrugInteractionResponse"
+    ],
+    "tests": [
+      "test_drug.py",
+      "test_drug_safety.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "encounter",
+    "loc": 2439,
+    "routes": 30,
+    "unauth_routes": 8,
+    "classes": [
+      "Encounter",
+      "EncounterDiagnosis",
+      "Prescription",
+      "PrescriptionItem",
+      "PrescriptionLine",
+      "MedicalRecord",
+      "MedicalRecordVersion",
+      "AdverseReaction",
+      "EncounterCreate",
+      "EncounterResponse",
+      "BarcodeLookup",
+      "DiagnosisUpdate",
+      "EncounterDiagnosisItem",
+      "EncounterDiagnosisResponse",
+      "PrescriptionItemCreate",
+      "PrescriptionItemUpdate",
+      "PrescriptionBatchCreate",
+      "PrescriptionReviewRequest",
+      "PrescriptionHeaderResponse",
+      "PrescriptionItemResponse",
+      "MedicalRecordCreate",
+      "MedicalRecordUpdate",
+      "MedicalRecordResponse",
+      "QualityResponse",
+      "AdverseReactionCreate",
+      "AdverseReactionResponse",
+      "EncounterClosedError",
+      "PrescriptionRuleError"
+    ],
+    "tests": [
+      "test_encounter.py",
+      "test_insurance.py",
+      "test_partial_refund.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "facility",
+    "loc": 192,
+    "routes": 6,
+    "unauth_routes": 4,
+    "classes": [
+      "Campus",
+      "Room",
+      "CampusCreate",
+      "CampusResponse",
+      "RoomCreate",
+      "RoomResponse"
+    ],
+    "tests": [
+      "test_facility.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "finance",
+    "loc": 224,
+    "routes": 4,
+    "unauth_routes": 3,
+    "classes": [
+      "FinanceClosure",
+      "DailyCloseRequest",
+      "ClosureResponse",
+      "MonthlySummaryResponse"
+    ],
+    "tests": [
+      "test_finance.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "gsp",
+    "loc": 578,
+    "routes": 12,
+    "unauth_routes": 0,
+    "classes": [
+      "GspAcceptance",
+      "GspAcceptanceItem",
+      "GspStorageLog",
+      "GspAdverseReaction",
+      "GspRecall",
+      "GspPersonnel",
+      "AcceptanceItemCreate",
+      "AcceptanceCreate",
+      "AcceptanceItemResponse",
+      "AcceptanceResponse",
+      "StorageLogCreate",
+      "StorageLogResponse",
+      "AdverseCreate",
+      "AdverseResponse",
+      "RecallCreate",
+      "RecallResponse",
+      "PersonnelCreate",
+      "PersonnelResponse"
+    ],
+    "tests": [
+      "test_gsp.py",
+      "test_gsp_recall.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "hr",
+    "loc": 672,
+    "routes": 15,
+    "unauth_routes": 7,
+    "classes": [
+      "Employee",
+      "AttendanceRecord",
+      "SalaryRequest",
+      "StaffShift",
+      "EmployeeCreate",
+      "EmployeeResponse",
+      "AttendanceCreate",
+      "AttendanceResponse",
+      "AttendanceSummary",
+      "SalaryRequestCreate",
+      "SalaryReviewRequest",
+      "SalaryRequestResponse",
+      "ShiftCreate",
+      "ShiftResponse"
+    ],
+    "tests": [
+      "test_hr.py",
+      "test_hr_management.py"
+    ],
+    "ui": [
+      "hr.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "idempotency",
+    "loc": 119,
+    "routes": 0,
+    "unauth_routes": 0,
+    "classes": [
+      "IdempotencyKey"
+    ],
+    "tests": [
+      "test_idempotency.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "inpatient",
+    "loc": 1139,
+    "routes": 27,
+    "unauth_routes": 14,
+    "classes": [
+      "Ward",
+      "Bed",
+      "Admission",
+      "InpatientOrder",
+      "OrderExecution",
+      "InpatientCharge",
+      "InpatientDispenseRequest",
+      "VitalSign",
+      "NursingNote",
+      "WardCreate",
+      "WardResponse",
+      "BedCreate",
+      "BedResponse",
+      "AdmissionCreate",
+      "AdmissionResponse",
+      "TransferBedRequest",
+      "OrderCreate",
+      "OrderResponse",
+      "ExecuteRequest",
+      "ExecutionResponse",
+      "ChargeResponse",
+      "BillResponse",
+      "DispenseRequestResponse",
+      "VitalSignCreate",
+      "VitalSignResponse",
+      "NursingNoteCreate",
+      "NursingNoteResponse"
+    ],
+    "tests": [
+      "test_concurrency.py",
+      "test_inpatient.py",
+      "test_inpatient_billing.py",
+      "test_inpatient_dispense.py",
+      "test_inpatient_orders.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "insurance",
+    "loc": 492,
+    "routes": 2,
+    "unauth_routes": 0,
+    "classes": [
+      "InsuranceUnavailable",
+      "InsuranceForbiddenError"
+    ],
+    "tests": [
+      "test_insurance.py",
+      "test_insurance_attributes.py",
+      "test_insurance_catalog.py",
+      "test_insurance_interface.py",
+      "test_insurance_inventory.py",
+      "test_insurance_match.py",
+      "test_insurance_switch.py",
+      "test_insurance_workbench.py",
+      "test_partial_refund.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "insurance_catalog",
+    "loc": 732,
+    "routes": 9,
+    "unauth_routes": 4,
+    "classes": [
+      "InsuranceDrug",
+      "InsuranceCatalogVersion",
+      "InsuranceDrugResponse",
+      "CatalogImportResult",
+      "CatalogVersionResponse",
+      "CatalogSyncRequest"
+    ],
+    "tests": [
+      "test_insurance_catalog.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "insurance_inventory",
+    "loc": 577,
+    "routes": 4,
+    "unauth_routes": 0,
+    "classes": [
+      "InterfaceError",
+      "InsuranceInterfaceConfig",
+      "InsuranceInventoryUpload",
+      "PeriodRequest",
+      "InventoryRecord",
+      "InventoryPreviewResponse",
+      "UploadResponse",
+      "UploadDetail"
+    ],
+    "tests": [
+      "test_insurance_interface.py",
+      "test_insurance_inventory.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "insurance_materials",
+    "loc": 407,
+    "routes": 5,
+    "unauth_routes": 1,
+    "classes": [
+      "InsuranceMaterial",
+      "InsuranceMaterialResponse",
+      "MaterialImportResult",
+      "MaterialSyncRequest"
+    ],
+    "tests": [],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "integration",
+    "loc": 178,
+    "routes": 3,
+    "unauth_routes": 2,
+    "classes": [
+      "IntegrationLog",
+      "Hl7Message",
+      "Hl7Result",
+      "IntegrationLogResponse"
+    ],
+    "tests": [
+      "test_integration.py"
+    ],
+    "ui": [
+      "integration_config.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "integrations",
+    "loc": 101,
+    "routes": 0,
+    "unauth_routes": 0,
+    "classes": [
+      "IntegrationConfig",
+      "IntegrationUpdate"
+    ],
+    "tests": [],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "invoice",
+    "loc": 414,
+    "routes": 7,
+    "unauth_routes": 0,
+    "classes": [
+      "InvoiceBatch",
+      "InvoiceOperation",
+      "InvoiceBatchCreate",
+      "InvoiceBatchResponse",
+      "InvoicePrintResponse",
+      "InvoiceVoid"
+    ],
+    "tests": [
+      "test_invoice_and_scope.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "kiosk",
+    "loc": 109,
+    "routes": 3,
+    "unauth_routes": 3,
+    "classes": [
+      "KioskRegistrationCreate",
+      "KioskRegistrationResponse",
+      "KioskPaymentCreate",
+      "KioskPaymentResponse"
+    ],
+    "tests": [
+      "test_kiosk.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "linen",
+    "loc": 458,
+    "routes": 9,
+    "unauth_routes": 0,
+    "classes": [
+      "LinenBatch",
+      "LinenDistribution",
+      "CurtainRecord",
+      "LinenBatchCreate",
+      "LinenBatchResponse",
+      "DistributionCreate",
+      "DistributionResponse",
+      "RecallCreate",
+      "CurtainCreate",
+      "CurtainResponse",
+      "LinenSummary"
+    ],
+    "tests": [
+      "test_linen.py",
+      "test_linen_cssd_admin.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "lis",
+    "loc": 816,
+    "routes": 16,
+    "unauth_routes": 4,
+    "classes": [
+      "LabItem",
+      "LabRequest",
+      "LabItemCreate",
+      "LabItemResponse",
+      "LabRequestCreate",
+      "LabReportRequest",
+      "SpecimenActionRequest",
+      "RejectRequest",
+      "CriticalRequest",
+      "CriticalAckRequest",
+      "LabRequestResponse"
+    ],
+    "tests": [
+      "test_lis.py",
+      "test_lists.py",
+      "test_lis_workflow.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "materials",
+    "loc": 377,
+    "routes": 7,
+    "unauth_routes": 4,
+    "classes": [
+      "MaterialItem",
+      "MaterialStock",
+      "MaterialUsage",
+      "MaterialItemCreate",
+      "MaterialItemResponse",
+      "StockInCreate",
+      "MaterialStockResponse",
+      "UsageCreate",
+      "UsageResponse"
+    ],
+    "tests": [
+      "test_materials.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "narcotic",
+    "loc": 353,
+    "routes": 5,
+    "unauth_routes": 0,
+    "classes": [
+      "NarcoticLedger",
+      "NarcoticInventoryCheck",
+      "AmpouleReturnRequest",
+      "InventoryCheckCreate",
+      "InventoryCheckReview"
+    ],
+    "tests": [],
+    "ui": [
+      "narcotic.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "notify",
+    "loc": 245,
+    "routes": 3,
+    "unauth_routes": 0,
+    "classes": [
+      "NotificationOutbox"
+    ],
+    "tests": [],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "nursing",
+    "loc": 573,
+    "routes": 8,
+    "unauth_routes": 0,
+    "classes": [
+      "NursingOrder",
+      "NursingPreparation",
+      "NursingObservation",
+      "PrepareRequest",
+      "StartRequest",
+      "ObserveRequest",
+      "CompleteRequest",
+      "SkipRequest",
+      "NursingOrderResponse",
+      "ObservationResponse",
+      "PreparationResponse"
+    ],
+    "tests": [
+      "test_high_alert_nursing.py",
+      "test_nursing.py"
+    ],
+    "ui": [
+      "nurse.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "pacs",
+    "loc": 354,
+    "routes": 8,
+    "unauth_routes": 4,
+    "classes": [
+      "ImagingItem",
+      "ImagingRequest",
+      "ImagingItemCreate",
+      "ImagingItemResponse",
+      "ImagingRequestCreate",
+      "ImagingReportRequest",
+      "ImagingRequestResponse"
+    ],
+    "tests": [
+      "test_pacs.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "pathway",
+    "loc": 353,
+    "routes": 10,
+    "unauth_routes": 5,
+    "classes": [
+      "ClinicalPathway",
+      "PathwayEnrollment",
+      "PathwayVariance",
+      "PathwayCreate",
+      "PathwayResponse",
+      "EnrollRequest",
+      "EnrollmentResponse",
+      "VarianceCreate",
+      "VarianceResponse"
+    ],
+    "tests": [
+      "test_pathway.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "patient",
+    "loc": 1259,
+    "routes": 15,
+    "unauth_routes": 3,
+    "classes": [
+      "Patient",
+      "PatientAccessLog",
+      "PatientCard",
+      "PatientClinicalChange",
+      "PatientCreate",
+      "PatientUpdate",
+      "PatientResponse",
+      "DuplicateCandidate",
+      "DuplicateCheckResponse",
+      "PatientCardCreate",
+      "PatientCardResponse",
+      "ClinicalProfileUpdate",
+      "ClinicalChangeResponse"
+    ],
+    "tests": [
+      "test_concurrency.py",
+      "test_inpatient.py",
+      "test_inpatient_billing.py",
+      "test_inpatient_dispense.py",
+      "test_inpatient_orders.py",
+      "test_patient.py",
+      "test_patient_cards.py",
+      "test_patient_clinical_edit.py",
+      "test_patient_history.py",
+      "test_patient_profile.py",
+      "test_patient_special_history.py"
+    ],
+    "ui": [
+      "patient360.py",
+      "patient_banner.py",
+      "patient_clinical_dialog.py",
+      "patient_info_panel.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "payment_gateway",
+    "loc": 318,
+    "routes": 0,
+    "unauth_routes": 0,
+    "classes": [
+      "PaymentChannelConfig"
+    ],
+    "tests": [
+      "test_payment_gateway.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "performance",
+    "loc": 89,
+    "routes": 1,
+    "unauth_routes": 0,
+    "classes": [
+      "DoctorPerformanceItem"
+    ],
+    "tests": [
+      "test_performance.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "pharmacy",
+    "loc": 1587,
+    "routes": 17,
+    "unauth_routes": 3,
+    "classes": [
+      "Dispense",
+      "DispenseItem",
+      "DrugStock",
+      "PharmacyCall",
+      "PharmacyPickupCode",
+      "RetailSale",
+      "RetailSaleItem",
+      "DispenseRequest",
+      "DispenseResponse",
+      "PickupVerifyResponse",
+      "PharmacyCallRequest",
+      "PharmacyCallResponse",
+      "StockInRequest",
+      "StockInResponse",
+      "StockResponse",
+      "RetailItemCreate",
+      "RetailSaleCreate",
+      "RetailItemResponse",
+      "RetailSaleResponse"
+    ],
+    "tests": [
+      "test_concurrency.py",
+      "test_pharmacy.py",
+      "test_pharmacy_calls.py"
+    ],
+    "ui": [
+      "pharmacy.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "portal",
+    "loc": 179,
+    "routes": 2,
+    "unauth_routes": 2,
+    "classes": [
+      "PortalRegistrationItem",
+      "PortalEncounterItem",
+      "PortalPatientResponse",
+      "PortalLabItem",
+      "PortalImagingItem",
+      "PortalReportsResponse"
+    ],
+    "tests": [
+      "test_portal.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "print",
+    "loc": 1053,
+    "routes": 12,
+    "unauth_routes": 12,
+    "classes": [],
+    "tests": [
+      "test_print.py"
+    ],
+    "ui": [
+      "lab.py",
+      "nurse.py",
+      "pharmacy.py",
+      "print_preview.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "procedure_materials",
+    "loc": 136,
+    "routes": 0,
+    "unauth_routes": 0,
+    "classes": [
+      "ProcedureMaterial",
+      "ProcedureMaterialCreate",
+      "ProcedureMaterialResponse"
+    ],
+    "tests": [],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "publichealth",
+    "loc": 162,
+    "routes": 4,
+    "unauth_routes": 2,
+    "classes": [
+      "DiseaseReport",
+      "ReportCreate",
+      "ReportResponse"
+    ],
+    "tests": [
+      "test_publichealth.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "receiving",
+    "loc": 583,
+    "routes": 6,
+    "unauth_routes": 2,
+    "classes": [
+      "InboundOrder",
+      "InboundItem",
+      "InboundItemCreate",
+      "InboundOrderCreate",
+      "CheckItem",
+      "InboundCheckRequest",
+      "InboundItemResponse",
+      "InboundOrderResponse"
+    ],
+    "tests": [
+      "test_receiving.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "registration",
+    "loc": 438,
+    "routes": 4,
+    "unauth_routes": 1,
+    "classes": [
+      "DoctorSchedule",
+      "Registration",
+      "ScheduleCreate",
+      "ScheduleResponse",
+      "RegistrationCreate",
+      "VisitTypeUpdate",
+      "RegistrationResponse"
+    ],
+    "tests": [
+      "test_concurrency.py",
+      "test_registration.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "reports",
+    "loc": 134,
+    "routes": 2,
+    "unauth_routes": 0,
+    "classes": [
+      "DepartmentRevenueItem"
+    ],
+    "tests": [
+      "test_reports.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "review",
+    "loc": 238,
+    "routes": 3,
+    "unauth_routes": 0,
+    "classes": [
+      "ReviewSummary",
+      "ReviewIssue",
+      "ReviewItem",
+      "ReviewDetail"
+    ],
+    "tests": [
+      "test_review.py"
+    ],
+    "ui": [
+      "prescription_review.py",
+      "print_preview.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "sms",
+    "loc": 94,
+    "routes": 2,
+    "unauth_routes": 0,
+    "classes": [
+      "SmsMessage",
+      "SmsSend",
+      "SmsResponse"
+    ],
+    "tests": [
+      "test_sms.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "staff",
+    "loc": 250,
+    "routes": 8,
+    "unauth_routes": 4,
+    "classes": [
+      "Department",
+      "Doctor",
+      "DepartmentCreate",
+      "DepartmentResponse",
+      "DoctorCreate",
+      "DoctorResponse"
+    ],
+    "tests": [
+      "test_concurrency.py",
+      "test_staff.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "stock_ledger",
+    "loc": 287,
+    "routes": 1,
+    "unauth_routes": 0,
+    "classes": [
+      "StockMovement",
+      "StockMovementResponse"
+    ],
+    "tests": [
+      "test_stock_ledger.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "stocktake",
+    "loc": 391,
+    "routes": 4,
+    "unauth_routes": 0,
+    "classes": [
+      "Stocktake",
+      "StocktakeItem",
+      "StocktakeCreate",
+      "StocktakeItemUpdate",
+      "StocktakeCounts",
+      "StocktakeItemResponse",
+      "StocktakeResponse"
+    ],
+    "tests": [
+      "test_stocktake.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "supplier",
+    "loc": 88,
+    "routes": 3,
+    "unauth_routes": 2,
+    "classes": [
+      "Supplier",
+      "SupplierCreate",
+      "SupplierResponse"
+    ],
+    "tests": [
+      "test_supplier.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "surgery",
+    "loc": 922,
+    "routes": 15,
+    "unauth_routes": 0,
+    "classes": [
+      "OperatingRoom",
+      "SurgeryCase",
+      "SurgerySafetyCheck",
+      "SurgeryRecord",
+      "SurgeryInstrumentCount",
+      "SurgeryRecovery",
+      "SurgeryPreopAssessment",
+      "AnesthesiaRecord",
+      "RoomCreate",
+      "RoomResponse",
+      "CaseCreate",
+      "CaseResponse",
+      "SafetyCreate",
+      "SafetyResponse",
+      "RecordCreate",
+      "RecordResponse",
+      "CountCreate",
+      "CountResponse",
+      "RecoveryCreate",
+      "RecoveryResponse",
+      "PreopCreate",
+      "PreopResponse",
+      "AnesthesiaCreate",
+      "AnesthesiaResponse"
+    ],
+    "tests": [
+      "test_surgery.py"
+    ],
+    "ui": [
+      "surgery.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "tcm",
+    "loc": 965,
+    "routes": 15,
+    "unauth_routes": 1,
+    "classes": [
+      "TcmHerb",
+      "TcmPrescription",
+      "TcmPrescriptionItem",
+      "DecoctionOrder",
+      "DecoctionBag",
+      "HerbCreate",
+      "HerbResponse",
+      "PrescriptionItemCreate",
+      "PrescriptionCreate",
+      "PrescriptionItemUpdate",
+      "PrescriptionItemResponse",
+      "PrescriptionResponse",
+      "SoakRequest",
+      "DecoctRequest",
+      "PackageRequest",
+      "IssueRequest",
+      "BagResponse",
+      "DecoctionResponse"
+    ],
+    "tests": [
+      "test_tcm.py"
+    ],
+    "ui": [
+      "tcm.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "traceability",
+    "loc": 431,
+    "routes": 7,
+    "unauth_routes": 0,
+    "classes": [
+      "DrugTraceCode",
+      "TraceScanRequest",
+      "TraceCodeResponse",
+      "TraceScanResult"
+    ],
+    "tests": [
+      "test_traceability.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "treatment",
+    "loc": 258,
+    "routes": 6,
+    "unauth_routes": 3,
+    "classes": [
+      "TreatmentOrder",
+      "TreatmentOrderCreate",
+      "TreatmentOrderResponse"
+    ],
+    "tests": [
+      "test_treatment.py",
+      "test_treatment_consent.py",
+      "test_treatment_room.py"
+    ],
+    "ui": [
+      "treatment_room.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "treatment_room",
+    "loc": 1661,
+    "routes": 23,
+    "unauth_routes": 0,
+    "classes": [
+      "TreatmentRoom",
+      "TreatmentRoomCase",
+      "TreatmentFollowUp",
+      "TreatmentTemplateConfig",
+      "TreatmentTemplateMaterial",
+      "RoomCreate",
+      "RoomResponse",
+      "CaseCreate",
+      "StartRequest",
+      "CompleteRequest",
+      "CaseResponse",
+      "TreatmentTemplate",
+      "FollowUpCreate",
+      "FollowUpResponse",
+      "TemplateConfigUpdate",
+      "TemplateConfigResponse",
+      "TemplateMaterialUpdate",
+      "FollowUpComplete"
+    ],
+    "tests": [
+      "test_treatment_room.py"
+    ],
+    "ui": [
+      "treatment_room.py"
+    ],
+    "todo": 0
+  },
+  {
+    "module": "triage",
+    "loc": 275,
+    "routes": 5,
+    "unauth_routes": 2,
+    "classes": [
+      "TriageTicket",
+      "TicketCreate",
+      "TicketResponse"
+    ],
+    "tests": [
+      "test_triage.py"
+    ],
+    "ui": [],
+    "todo": 0
+  },
+  {
+    "module": "warehouse",
+    "loc": 1907,
+    "routes": 22,
+    "unauth_routes": 5,
+    "classes": [
+      "WarehouseStock",
+      "WarehouseCheck",
+      "PurchaseRecord",
+      "OutboundOrder",
+      "OutboundItem",
+      "StockAdjustment",
+      "PurchaseRequest",
+      "PurchaseRequestItem",
+      "PurchaseCreate",
+      "WarehouseStockResponse",
+      "TransferCreate",
+      "TransferResponse",
+      "CheckCreate",
+      "CheckResponse",
+      "PurchaseRecordResponse",
+      "OutboundItemCreate",
+      "OutboundOrderCreate",
+      "OutboundItemResponse",
+      "OutboundOrderResponse",
+      "OutboundIssueItem",
+      "OutboundIssueRequest",
+      "StockAdjustmentResponse",
+      "ExpiryAlertItem",
+      "ExpiryAlertResponse",
+      "PurchaseRequestItemCreate",
+      "PurchaseRequestCreate",
+      "PurchaseRejectRequest",
+      "PurchaseOrderRequest",
+      "PurchaseReceiveItem",
+      "PurchaseReceiveRequest",
+      "PurchaseRequestItemResponse",
+      "PurchaseRequestResponse"
+    ],
+    "tests": [
+      "test_warehouse.py",
+      "test_warehouse_expiry.py",
+      "test_warehouse_outbound.py"
+    ],
+    "ui": [],
+    "todo": 0
+  }
+]

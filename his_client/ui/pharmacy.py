@@ -6,11 +6,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -22,11 +24,13 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.print_preview import open_print_preview
 from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.patient_info_panel import PatientInfoPanel
+from his_client.ui.table_policy import set_column_layout
 from his_client.ui.payment import PaymentPanel
 
 ORDER_TYPES = [
@@ -77,6 +81,11 @@ class PharmacyWidget(QWidget):
         if role in ("warehouse", "admin"):
             self._load_drugs()  # 入库药品下拉默认加载医保目录
             self._load_materials()  # 入库物资下拉默认加载医保耗材目录
+        if role == "pharmacist":
+            for index in range(tabs.count()):
+                if "发药" in tabs.tabText(index):
+                    tabs.setCurrentIndex(index)
+                    break
         if role in ("pharmacist", "admin"):
             self._load_retail_catalog()
             QShortcut(QKeySequence("F2"), self, activated=self._focus_dispense_scan)
@@ -654,6 +663,7 @@ class PharmacyWidget(QWidget):
         self.worklist_table.setHorizontalHeaderLabels(
             ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
         )
+        set_column_layout(self.worklist_table, stretch=(2, 4), contents=(0, 1, 3, 5, 6))
         self.worklist_table.cellClicked.connect(self._select_worklist)
         self.worklist_table.cellDoubleClicked.connect(self._call_row)
         left_layout.addWidget(self.worklist_table, 1)
@@ -676,15 +686,15 @@ class PharmacyWidget(QWidget):
             ["药品", "数量", "用法", "库存", "最近效期"]
         )
         self.disp_detail_table.setMaximumHeight(130)
-        self.disp_detail_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.disp_detail_table, stretch=(0,), contents=(1, 2, 3, 4))
         rx_layout.addWidget(self.disp_detail_table)
         self.disp_detail_msg = QLabel("")
         self.disp_detail_msg.setWordWrap(True)
         rx_layout.addWidget(self.disp_detail_msg)
-        right_layout.addWidget(rx_box)
-
         form_box = QGroupBox("核对发药")
         form = QFormLayout(form_box)
+        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.disp_encounter_id = QSpinBox()
         self.disp_encounter_id.setRange(0, 10_000_000)
         self.disp_encounter_id.setSpecialValueText("扫码/队列选择")
@@ -694,6 +704,8 @@ class PharmacyWidget(QWidget):
         self.disp_window.setMaximumWidth(90)
         self.disp_note = QLineEdit()
         self.disp_note.setPlaceholderText("核对备注")
+        self.disp_witness = QLineEdit()
+        self.disp_witness.setPlaceholderText("高危/麻精发药第二见证人")
         self.disp_scan = QLineEdit()
         self.disp_scan.setPlaceholderText("扫处方条码定位")
         self.disp_scan.returnPressed.connect(self._scan_dispense_barcode)
@@ -705,6 +717,8 @@ class PharmacyWidget(QWidget):
         submit.clicked.connect(self._dispense)
         self.print_dispense_label_btn = QPushButton("打印上次发药袋标签")
         self.print_dispense_label_btn.clicked.connect(self._print_dispense_label)
+        self.print_dispense_slip_btn = QPushButton("打印取药凭证")
+        self.print_dispense_slip_btn.clicked.connect(self._print_dispense_slip)
         call_btn = QPushButton("叫号")
         call_btn.clicked.connect(self._call)
         scan_row = QHBoxLayout()
@@ -716,13 +730,16 @@ class PharmacyWidget(QWidget):
         window_row.addWidget(self.disp_window)
         window_row.addWidget(self.disp_note, 1)
         form.addRow("窗口 / 备注", window_row)
+        form.addRow("第二见证人", self.disp_witness)
         form.addRow("就诊", self.disp_encounter_id)
-        action_row = QHBoxLayout()
-        action_row.addWidget(call_btn)
-        action_row.addWidget(submit)
-        action_row.addWidget(self.print_dispense_label_btn)
-        form.addRow("", action_row)
+        action_row = QGridLayout()
+        action_row.addWidget(call_btn, 0, 0)
+        action_row.addWidget(submit, 0, 1)
+        action_row.addWidget(self.print_dispense_label_btn, 1, 0)
+        action_row.addWidget(self.print_dispense_slip_btn, 1, 1)
+        form.addRow("操作", action_row)
         right_layout.addWidget(form_box)
+        right_layout.addWidget(rx_box)
 
         sign_box = QGroupBox("取药人 / 签名")
         sign_layout = QFormLayout(sign_box)
@@ -756,23 +773,48 @@ class PharmacyWidget(QWidget):
         right_layout.addWidget(self.disp_msg)
 
         return_box = QGroupBox("退药")
-        return_row = QHBoxLayout(return_box)
+        return_layout = QVBoxLayout(return_box)
+        return_row = QHBoxLayout()
+        return_layout.addLayout(return_row)
         self.return_dispense_id = QSpinBox()
-        self.return_dispense_id.setRange(1, 10_000_000)
+        self.return_dispense_id.setRange(0, 10_000_000)
+        self.return_dispense_id.setSpecialValueText("选择发药记录")
+        self.return_dispense_id.setValue(0)
         return_btn = QPushButton("退药（库存回补）")
         return_btn.clicked.connect(self._return_dispense)
         return_row.addWidget(QLabel("发药记录"))
         return_row.addWidget(self.return_dispense_id)
         return_row.addWidget(return_btn)
+        partial_row = QHBoxLayout()
+        self.return_line_id = QSpinBox()
+        self.return_line_id.setRange(0, 10_000_000)
+        self.return_line_id.setSpecialValueText("明细 ID")
+        self.return_qty = QSpinBox()
+        self.return_qty.setRange(1, 10000)
+        partial_btn = QPushButton("按明细部分退药")
+        partial_btn.clicked.connect(self._return_dispense_items)
+        partial_row.addWidget(QLabel("明细"))
+        partial_row.addWidget(self.return_line_id)
+        partial_row.addWidget(QLabel("数量"))
+        partial_row.addWidget(self.return_qty)
+        partial_row.addWidget(partial_btn)
+        partial_row.addStretch(1)
+        return_layout.addLayout(partial_row)
         right_layout.addWidget(return_box)
         self.return_msg = QLabel("")
         self.return_msg.setWordWrap(True)
         right_layout.addWidget(self.return_msg)
         right_layout.addStretch(1)
-        splitter.addWidget(right)
+        right.setMinimumWidth(540)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(right)
+        splitter.addWidget(scroll)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([700, 500])
+        splitter.setSizes([860, 620])
         layout.addWidget(splitter, 1)
         self._load_worklist()
         return page
@@ -785,6 +827,7 @@ class PharmacyWidget(QWidget):
                 self.pickup_code.text().strip(),
                 self.receiver_name.text().strip(),
                 self.receiver_relation.text().strip() or "本人",
+                self.disp_witness.text().strip(),
             )
         except ApiError as e:
             self.disp_msg.setText(f"发药失败（{e.status_code}）：{e.detail}")
@@ -803,7 +846,12 @@ class PharmacyWidget(QWidget):
             f"核对发药成功：记录 {record['id']}，取药人 {record['receiver_name'] or '—'}"
         )
         self.disp_last_id = record["id"]
+        self.disp_last_encounter_id = record.get("encounter_id")
+        self.print_dispense_slip_btn.setEnabled(bool(self.disp_last_encounter_id))
         self.return_dispense_id.setValue(record["id"])
+        items = record.get("items") or []
+        if items:
+            self.return_line_id.setValue(int(items[0]["id"]))
         self._load_worklist()
 
     def _load_worklist(self) -> None:
@@ -882,12 +930,25 @@ class PharmacyWidget(QWidget):
             f"待发药 {len(rows)} 人" + (f"（筛选：{term}）" if term else "")
         )
 
+    def _print_dispense_slip(self) -> None:
+        encounter_id = getattr(self, "disp_last_encounter_id", None)
+        if not encounter_id:
+            self.disp_msg.setText("还没有可打印的取药凭证")
+            return
+        open_print_preview(
+            self,
+            f"{self.api.base_url}/print/dispense-slip/{encounter_id}",
+            "取药凭证打印预览",
+        )
+
     def _print_dispense_label(self) -> None:
         if not getattr(self, "disp_last_id", None):
             self.disp_msg.setText("还没有可打印的发药记录")
             return
-        QDesktopServices.openUrl(
-            QUrl(f"{self.api.base_url}/print/dispense-label/{self.disp_last_id}")
+        open_print_preview(
+            self,
+            f"{self.api.base_url}/print/dispense-label/{self.disp_last_id}",
+            "发药袋标签打印预览",
         )
 
     def _verify_code(self) -> None:
@@ -1022,6 +1083,9 @@ class PharmacyWidget(QWidget):
         self._load_worklist()
 
     def _return_dispense(self) -> None:
+        if self.return_dispense_id.value() <= 0:
+            self.return_msg.setText("请先选择发药记录")
+            return
         try:
             record = self.api.return_dispense(self.return_dispense_id.value())
         except ApiError as e:
@@ -1029,6 +1093,25 @@ class PharmacyWidget(QWidget):
             return
         self.return_msg.setText(
             f"退药成功：记录 {record['id']}（{zh('dispense_status', record['status'])}），库存已回补"
+        )
+
+    def _return_dispense_items(self) -> None:
+        dispense_id = self.return_dispense_id.value()
+        line_id = self.return_line_id.value()
+        if dispense_id <= 0 or line_id <= 0:
+            self.return_msg.setText("请选择发药记录并填写明细 ID")
+            return
+        try:
+            record = self.api.return_dispense_items(
+                dispense_id,
+                [{"line_id": line_id, "quantity": self.return_qty.value()}],
+                "部分退药",
+            )
+        except ApiError as e:
+            self.return_msg.setText(f"部分退药失败（{e.status_code}）：{e.detail}")
+            return
+        self.return_msg.setText(
+            f"部分退药成功：记录 {record['id']}（{zh('dispense_status', record['status'])}）"
         )
 
     # ---------- 领用出库（向库房申请） ----------
@@ -1903,7 +1986,9 @@ class PharmacyWidget(QWidget):
         if not self.retail_last_sale_id:
             self.retail_msg.setText("还没有可打印的零售单")
             return
-        QDesktopServices.openUrl(QUrl(self.api.retail_print_url(self.retail_last_sale_id)))
+        open_print_preview(
+            self, self.api.retail_print_url(self.retail_last_sale_id), "零售小票打印预览"
+        )
 
     def _load_retail_sales(self) -> None:
         try:

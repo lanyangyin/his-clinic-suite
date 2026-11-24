@@ -190,3 +190,24 @@ def test_treatment_bad_item(client, auth):
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "治疗项目不存在或已停用"
+
+
+def test_paid_treatment_cannot_be_cancelled_without_refund(client, auth):
+    patient, doctor, reg, encounter, item = make_setup(client, auth)
+    order = client.post(
+        f"/treatments/encounters/{encounter['id']}",
+        json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
+    blocked = client.post(
+        f"/treatments/{order['id']}/cancel", headers=auth["doctor"]
+    )
+    assert blocked.status_code == 400
+    assert "已收费" in blocked.json()["detail"]
+    charges = client.get(f"/charges/encounters/{encounter['id']}").json()
+    charge = next(c for c in charges if c["charge_type"] == "treatment")
+    assert charge["status"] == "paid"

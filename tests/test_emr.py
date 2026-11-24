@@ -136,3 +136,30 @@ def test_role_protection(client, auth):
     # 未登录不能签名
     r = client.post(f"/encounters/{encounter['id']}/medical-record/sign")
     assert r.status_code == 401
+
+
+def test_signed_record_locks_diagnosis_and_prescription(client, auth):
+    encounter = make_encounter(client, auth)
+    make_record(client, auth, encounter["id"])
+    client.post(
+        f"/encounters/{encounter['id']}/medical-record/sign",
+        headers=auth["doctor"],
+    )
+    diagnosis = client.put(
+        f"/encounters/{encounter['id']}/diagnoses",
+        json=[{"diagnosis": "新诊断"}],
+        headers=auth["doctor"],
+    )
+    assert diagnosis.status_code == 400
+    assert "病历已签名" in diagnosis.json()["detail"]
+    drug = client.post(
+        "/drugs/", json={"name": "签名锁药", "base_price": 1.0},
+        headers=auth["admin"],
+    ).json()
+    prescription = client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    assert prescription.status_code == 400, prescription.text
+    assert "病历已签名" in prescription.json()["detail"]

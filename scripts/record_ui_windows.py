@@ -69,6 +69,9 @@ class RoleWindow(QMainWindow):
         self.resize(1000, 620)
 
 
+_SHOT_INDEX = 0
+
+
 class CaptionBar(QWidget):
     def __init__(self):
         super().__init__()
@@ -89,9 +92,89 @@ class CaptionBar(QWidget):
 
     def set_text(self, text: str) -> None:
         self.label.setText(text)
+        self._schedule_shot(text)
+
+    def _schedule_shot(self, text: str) -> None:
+        import os
+        from pathlib import Path as _Path
+
+        out_dir = os.environ.get("HIS_SCENE_SHOT_DIR", "").strip()
+        if not out_dir:
+            return
+        target = _Path(out_dir)
+        target.mkdir(parents=True, exist_ok=True)
+
+        def grab():
+            global _SHOT_INDEX
+            _SHOT_INDEX += 1
+            pixmap = QApplication.primaryScreen().grabWindow(0)
+            path = target / f"scene_{_SHOT_INDEX:03d}.png"
+            pixmap.save(str(path), "PNG")
+            with (target / "scenes.txt").open("a", encoding="utf-8") as handle:
+                handle.write(f"{path.name}\t{text}\n")
+
+        QTimer.singleShot(700, grab)
 
 
-class DemoController:
+class LoginMixin:
+    """在科室录像开头真实打开登录框、输入账号密码并点击“登录”。"""
+
+    def _save_login_shot(self, name: str) -> None:
+        import os
+        from pathlib import Path as _Path
+
+        out_dir = os.environ.get("HIS_SCENE_SHOT_DIR", "").strip()
+        if not out_dir:
+            return
+        target = _Path(out_dir)
+        target.mkdir(parents=True, exist_ok=True)
+        pixmap = QApplication.primaryScreen().grabWindow(0)
+        pixmap.save(str(target / f"{name}.png"), "PNG")
+
+    def perform_login(self, username: str, password: str, base: str = "http://127.0.0.1:8001"):
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox
+
+        from his_client.config import ClientConfig
+        from his_client.ui.login import LoginDialog
+
+        config = ClientConfig(server_url=base, timeout=20, remember_login=False)
+        dialog = LoginDialog(config)
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        self.caption.set_text(f"登录：{username}")
+        self.caption.show()
+        self.caption.raise_()
+        self.wait(2.2)
+        dialog.host_combo.setCurrentText("127.0.0.1")
+        dialog.port_combo.setCurrentText("8001")
+        dialog.username_combo.setCurrentText(username)
+        dialog.password_edit.clear()
+        dialog.password_edit.setFocus()
+        QTest.keyClicks(dialog.password_edit, password)
+        self.wait(0.8)
+        self._save_login_shot("login_filled")
+        self.caption.set_text(f"点击登录：{username}")
+        self.caption.raise_()
+        self.wait(0.8)
+        buttons = dialog.findChild(QDialogButtonBox)
+        ok_button = buttons.button(QDialogButtonBox.Ok)
+        QTest.mouseClick(ok_button, Qt.LeftButton)
+        self.wait(0.8)
+        if dialog.result() != QDialog.Accepted:
+            error = dialog.error_label.text()
+            dialog.close()
+            raise RuntimeError(f"登录失败：{error}")
+        self._save_login_shot("login_success")
+        self.caption.set_text(f"登录成功，进入 {username} 工作站")
+        self.caption.raise_()
+        self.wait(1.6)
+        api, user = dialog.api, dialog.user
+        dialog.close()
+        return api, user
+
+
+class DemoController(LoginMixin):
     def __init__(self):
         self.admin = Api("admin", "admin123")
         self.cashier_api = Api("cashier", "cashier123")
@@ -354,7 +437,6 @@ class DemoController:
         self.cashier.p_name.setText(f"演示患者{self.suffix}")
         self.cashier.p_gender.setCurrentIndex(self.cashier.p_gender.findData("male"))
         self.cashier.p_id_number.setText(f"1101011996{self.suffix[-8:]}")
-        self.cashier.p_birth_date.setText("1996-05-20")
         self.cashier.p_phone.setText("13800000000")
         self.cashier.p_address.setText("北京市东城区演示街道 1 号")
         self.cashier.p_emergency_name.setText("演示家属")
@@ -695,6 +777,8 @@ class DemoController:
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.capture_timer.start(200)
+            self.caption.show()
+            self.perform_login("admin", "admin123")
             self.wait(0.5)
             self.setup()
             self.run_flow()

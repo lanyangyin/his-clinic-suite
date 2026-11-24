@@ -191,3 +191,49 @@ def test_purchase_request_admin_page_lists_supplier(client, auth):
     detail = client.get(f"/admin/purchase-requests/{request['id']}")
     assert supplier["name"] in detail.text
 
+
+
+def test_purchase_multistep_approval(client, auth):
+    supplier, drug, outbound = _setup(client, auth)
+    flow = client.put(
+        "/approvals/flows/purchase_request",
+        json={
+            "steps": [
+                {"role_required": "director", "due_hours": 2, "active": True},
+                {"role_required": "admin", "due_hours": 24, "active": True},
+            ]
+        },
+        headers=auth["admin"],
+    )
+    assert flow.status_code == 200, flow.text
+    request = client.post(
+        f"/warehouse/outbound-orders/{outbound['id']}/purchase-request",
+        headers=auth["warehouse"],
+    ).json()
+    first = client.post(
+        f"/warehouse/purchase-requests/{request['id']}/approve",
+        headers=auth["director"],
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "submitted"
+    state = client.get(
+        f"/approvals/requests/purchase_request/{request['id']}",
+        headers=auth["director"],
+    ).json()
+    assert state["current_step"] == 2
+    final = client.post(
+        "/approvals/requests/action",
+        json={
+            "biz_type": "purchase_request",
+            "biz_id": request["id"],
+            "action": "approve",
+            "note": "二级通过",
+        },
+        headers=auth["admin"],
+    )
+    assert final.status_code == 200, final.text
+    assert final.json()["result"] == "approved"
+    detail = client.get(
+        f"/warehouse/purchase-requests/{request['id']}", headers=auth["warehouse"]
+    ).json()
+    assert detail["status"] == "approved"

@@ -50,3 +50,12 @@ def test_get_patient_missing(client):
     r = client.get("/patients/999")
     assert r.status_code == 404
     assert r.json()["detail"] == "患者不存在"
+
+
+def test_patient_reads_require_login_when_anonymous_read_disabled(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_READ", False)
+    assert client.get("/patients/").status_code == 401
+    ok = client.get("/patients/", headers=auth["cashier"])
+    assert ok.status_code == 200

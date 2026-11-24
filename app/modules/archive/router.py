@@ -6,7 +6,7 @@ from pathlib import Path
 import uuid
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     ArchiveCompleteRequest,
@@ -44,7 +44,7 @@ from .service import (
     unseal_record,
 )
 
-router = APIRouter(prefix="/archive", tags=["archive"])
+router = APIRouter(prefix="/archive", tags=["archive"], dependencies=[Depends(require_read_login)])
 DESTRUCTION_DIR = Path("data/archive_destructions")
 
 

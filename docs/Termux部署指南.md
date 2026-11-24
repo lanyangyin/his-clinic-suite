@@ -127,6 +127,7 @@ app/
 alembic/
 scripts/
 deploy/
+start-termux.sh
 config.ini
 config.release.ini
 requirements-server.txt
@@ -247,7 +248,42 @@ export HIS_DATABASE_URL=sqlite:////root/his-data/his.db
 
 ## 第 8 步：首次启动
 
-### sdcard 全量模式
+### 推荐：一键启动脚本
+
+项目根目录已带：
+
+```text
+start-termux.sh
+```
+
+在 Termux 外层执行：
+
+```bash
+cd /sdcard/HIS
+chmod +x start-termux.sh
+./start-termux.sh
+```
+
+脚本会：
+
+- 在外层 Termux 自动 `proot-distro login ubuntu`
+- 绑定 `/sdcard`
+- 申请 `termux-wake-lock`
+- 使用 `/root/his-venv/bin/python`
+- 设置 `HIS_HOST=0.0.0.0`、`HIS_PORT=8001`
+- 自动执行数据库迁移和初始化
+- 前台启动 Uvicorn
+
+已经在 Ubuntu 内部时，直接：
+
+```bash
+cd /sdcard/HIS
+./start-termux.sh
+```
+
+### 手动启动（等价命令）
+
+#### sdcard 全量模式
 
 ```bash
 cd /sdcard/HIS
@@ -270,6 +306,30 @@ HIS_PYTHON=/root/his-venv/bin/python \
 HIS_DATABASE_URL=sqlite:////root/his-data/his.db \
 bash ./scripts/run_server_linux.sh
 ```
+
+### 后台运行
+
+```bash
+cd /sdcard/HIS
+./start-termux.sh --background
+```
+
+查看状态、停止和日志：
+
+```bash
+./start-termux.sh status
+./start-termux.sh stop
+./start-termux.sh logs
+```
+
+后台模式使用：
+
+```text
+run/termux.pid
+server.log
+```
+
+不要把同一数据库同时交给两个服务进程。
 
 首次启动会自动：
 
@@ -332,24 +392,17 @@ url = http://手机IP:8001
 
 ## 第 10 步：后台运行
 
-Ubuntu 内：
+推荐直接使用启动脚本：
 
 ```bash
-apt install -y tmux
-tmux new -s his
+cd /sdcard/HIS
+./start-termux.sh --background
+./start-termux.sh status
+./start-termux.sh logs
+./start-termux.sh stop
 ```
 
-在 tmux 里执行第 8 步的启动命令。
-
-按 `Ctrl+B`，再按 `D` 脱离。
-
-回到：
-
-```bash
-tmux attach -t his
-```
-
-Termux 外层：
+Termux 外层仍然需要：
 
 ```bash
 termux-wake-lock
@@ -357,22 +410,21 @@ termux-wake-lock
 
 并关闭 Termux 电池优化。
 
-如果使用 nohup：
+如果坚持用 tmux：
+
+```bash
+apt install -y tmux
+tmux new -s his
+```
+
+在 tmux 里执行：
 
 ```bash
 cd /sdcard/HIS
-nohup env \
-  HIS_HOST=0.0.0.0 \
-  HIS_PORT=8001 \
-  HIS_PYTHON=/root/his-venv/bin/python \
-  HIS_DATABASE_URL=sqlite:////sdcard/HIS/data/his.db \
-  HIS_SQLITE_JOURNAL=DELETE \
-  HIS_SQLITE_SYNCHRONOUS=FULL \
-  bash ./scripts/run_server_linux.sh \
-  > /sdcard/HIS/server.log 2>&1 &
+./start-termux.sh
 ```
 
----
+按 `Ctrl+B`，再按 `D` 脱离。
 
 ## 第 11 步：备份
 

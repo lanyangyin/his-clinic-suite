@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     DecoctRequest,
@@ -12,6 +12,7 @@ from .schemas import (
     IssueRequest,
     PackageRequest,
     PrescriptionCreate,
+    PrescriptionItemUpdate,
     PrescriptionResponse,
     SoakRequest,
 )
@@ -28,10 +29,12 @@ from .service import (
     list_prescriptions,
     package,
     review_prescription,
+    update_prescription_item,
+    delete_prescription_item,
     soak,
 )
 
-router = APIRouter(prefix="/tcm", tags=["tcm"])
+router = APIRouter(prefix="/tcm", tags=["tcm"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/herbs", response_model=HerbResponse, status_code=201)
@@ -89,6 +92,36 @@ def prescription_detail(
     if not prescription:
         raise HTTPException(status_code=404, detail="中药处方不存在")
     return prescription
+
+
+@router.put(
+    "/prescriptions/{prescription_id}/items/{item_id}",
+    response_model=PrescriptionResponse,
+)
+def edit_item(
+    prescription_id: int,
+    item_id: int,
+    data: PrescriptionItemUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor")),
+):
+    try:
+        return update_prescription_item(db, prescription_id, item_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/prescriptions/{prescription_id}/items/{item_id}", status_code=204)
+def remove_item(
+    prescription_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor")),
+):
+    try:
+        delete_prescription_item(db, prescription_id, item_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/prescriptions/{prescription_id}/review", response_model=PrescriptionResponse)

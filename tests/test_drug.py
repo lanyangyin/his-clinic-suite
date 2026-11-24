@@ -37,3 +37,28 @@ def test_get_drug(client, auth):
 
 def test_get_drug_missing(client):
     assert client.get("/drugs/999").status_code == 404
+
+
+def test_update_drug_master_data(client, auth):
+    drug = client.post(
+        "/drugs/",
+        json={"name": "可维护药品", "spec": "旧规格", "base_price": 10.0},
+        headers=auth["admin"],
+    ).json()
+    updated = client.put(
+        f"/drugs/{drug['id']}",
+        json={"spec": "新规格", "base_price": 12.5, "high_alert": True},
+        headers=auth["admin"],
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["spec"] == "新规格"
+    assert updated.json()["base_price"] == 12.5
+    assert updated.json()["high_alert"] is True
+    denied = client.put(
+        f"/drugs/{drug['id']}", json={"base_price": 1}, headers=auth["doctor"]
+    )
+    assert denied.status_code == 403
+    missing = client.put(
+        "/drugs/999999", json={"base_price": 1}, headers=auth["admin"]
+    )
+    assert missing.status_code == 400

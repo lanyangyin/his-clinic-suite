@@ -88,12 +88,15 @@ def test_drug_create(client, auth):
             "base_price": "12.5",
             "insurance_ratio": "0.8",
             "antibiotic_level": "1",
+            "dosage_form": "胶囊剂",
         },
         follow_redirects=False,
     )
     assert r.status_code == 302
     page = client.get("/admin/master/drugs")
     assert "阿莫西林" in page.text
+    drugs = client.get("/drugs/", params={"name": "阿莫西林"}).json()
+    assert drugs[0]["dosage_form"] == "胶囊剂"
     assert "12.50" in page.text
 
 
@@ -371,3 +374,161 @@ def test_insurance_catalog_admin_page(client, auth):
     assert "管理台测试药" in page.text
     assert "V0001" in page.text
 
+
+
+def test_drug_update_from_admin_page(client, auth):
+    drug = client.post(
+        "/drugs/",
+        json={"name": "管理台可改药", "spec": "旧规格", "base_price": 10.0},
+        headers=auth["admin"],
+    ).json()
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    r = client.post(
+        "/admin/master/drugs/update",
+        data={
+            "drug_id": str(drug["id"]),
+            "name": "管理台可改药",
+            "spec": "新规格",
+            "unit": "盒",
+            "base_price": "15.5",
+            "insurance_ratio": "0.8",
+            "antibiotic_level": "2",
+            "controlled_level": "",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 302
+    page = client.get("/admin/master/drugs")
+    assert "新规格" in page.text
+    assert "15.50" in page.text
+
+
+def test_supplier_admin_page_create_and_update(client, auth):
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    created = client.post(
+        "/admin/master/suppliers",
+        data={
+            "code": "SUP-ADMIN",
+            "name": "管理台供应商",
+            "contact": "王经理",
+            "phone": "13900139000",
+            "license_no": "沪药监经营许20260002",
+            "license_expiry": "2028-12-31",
+            "first_business_approved": "true",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+    page = client.get("/admin/master/suppliers")
+    assert "管理台供应商" in page.text
+    suppliers = client.get("/suppliers/", headers=auth["admin"]).json()
+    row = next(item for item in suppliers if item["code"] == "SUP-ADMIN")
+    assert row["first_business_approved"] is True
+    updated = client.post(
+        "/admin/master/suppliers/update",
+        data={
+            "supplier_id": str(row["id"]),
+            "name": "管理台供应商",
+            "contact": "王经理",
+            "status": "suspended",
+            "license_no": "沪药监经营许20260002",
+            "license_expiry": "2028-12-31",
+            "blacklist_reason": "",
+        },
+        follow_redirects=False,
+    )
+    assert updated.status_code == 302
+    refreshed = client.get(f"/suppliers/{row['id']}").json()
+    assert refreshed["status"] == "suspended"
+
+
+def test_public_health_admin_page_and_submit(client, auth):
+    patient = client.post(
+        "/patients/",
+        json={"name": "公卫患者", "id_number": "110101199001018888"},
+        headers=auth["cashier"],
+    ).json()
+    dept = client.post(
+        "/departments/", json={"name": "公卫科"}, headers=auth["admin"]
+    ).json()
+    doctor = client.post(
+        "/doctors/",
+        json={"name": "公卫医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    reg = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
+        headers=auth["cashier"],
+    ).json()
+    enc = client.post(
+        "/encounters/",
+        json={"registration_id": reg["id"], "diagnosis": "肺结核"},
+        headers=auth["doctor"],
+    ).json()
+    report = client.post(
+        "/public-health/reports",
+        json={
+            "encounter_id": enc["id"],
+            "disease_code": "TB-ADMIN",
+            "disease_name": "肺结核",
+            "report_unit": "演示医院公卫科",
+        },
+        headers=auth["doctor"],
+    ).json()
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    page = client.get("/admin/public-health")
+    assert page.status_code == 200
+    assert "肺结核" in page.text
+    submitted = client.post(
+        f"/admin/public-health/{report['id']}/submit",
+        follow_redirects=False,
+    )
+    assert submitted.status_code == 302
+    page = client.get("/admin/public-health")
+    assert "已上报" in page.text
+
+
+def test_imaging_template_admin_page(client, auth):
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    r = client.post(
+        "/admin/imaging-templates",
+        data={
+            "name": "头颅 CT 模板",
+            "body_part": "头颅",
+            "findings": "脑实质未见明显异常密度影。",
+            "impression": "头颅 CT 未见明显异常。",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 302
+    page = client.get("/admin/imaging-templates")
+    assert page.status_code == 200
+    assert "头颅 CT 模板" in page.text
+    assert "脑实质未见明显异常" in page.text
+
+
+def test_supplier_batch_suspend_expired(client, auth):
+    expired = client.post(
+        "/suppliers/",
+        json={
+            "code": "SUP-EXP-BATCH",
+            "name": "批量过期供应商",
+            "license_no": "EXP-BATCH",
+            "license_expiry": "2020-01-01",
+        },
+        headers=auth["admin"],
+    ).json()
+    client.cookies.clear()
+    assert login(client).status_code == 302
+    r = client.post(
+        "/admin/master/suppliers/suspend-expired", follow_redirects=False
+    )
+    assert r.status_code == 302
+    refreshed = client.get(f"/suppliers/{expired['id']}").json()
+    assert refreshed["status"] == "suspended"
+    assert "证照过期" in refreshed["blacklist_reason"]

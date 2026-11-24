@@ -90,6 +90,24 @@ class ApiClient:
     def delete_department(self, department_id: int) -> dict:
         return self._request("DELETE", f"/departments/{department_id}")
 
+    def create_catalog_proposal(self, payload: dict) -> dict:
+        return self._request("POST", "/catalog-proposals/", json=payload)
+
+    def list_my_catalog_proposals(self) -> list:
+        return self._request("GET", "/catalog-proposals/mine")
+
+    def list_catalog_proposals(self) -> list:
+        return self._request("GET", "/catalog-proposals/")
+
+    def review_catalog_proposal(
+        self, proposal_id: int, approve: bool, note: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/catalog-proposals/{proposal_id}/review",
+            json={"approve": approve, "note": note},
+        )
+
     def list_users(self) -> list:
         return self._request("GET", "/users/")
 
@@ -325,6 +343,13 @@ class ApiClient:
             "PUT", f"/encounters/{encounter_id}/medical-record", json=payload
         )
 
+    def request_record_revision(self, encounter_id: int, reason: str) -> dict:
+        return self._request(
+            "POST",
+            f"/encounters/{encounter_id}/medical-record/revisions",
+            json={"reason": reason},
+        )
+
     def sign_medical_record(self, encounter_id: int) -> dict:
         return self._request("POST", f"/encounters/{encounter_id}/medical-record/sign")
 
@@ -332,8 +357,112 @@ class ApiClient:
         return self._request("GET", f"/encounters/{encounter_id}/medical-record/quality")
 
     # ---- 处方 ----
+    def add_prescriptions_batch(self, encounter_id: int, items: list[dict]) -> list:
+        return self._request(
+            "POST",
+            f"/encounters/{encounter_id}/prescriptions/batch",
+            json={"items": items},
+        )
+
+    def update_prescription_item(
+        self, encounter_id: int, item_id: int, payload: dict
+    ) -> dict:
+        return self._request(
+            "PUT",
+            f"/encounters/{encounter_id}/prescriptions/items/{item_id}",
+            json=payload,
+        )
+
+    def delete_prescription(self, encounter_id: int, item_id: int) -> None:
+        self._request("DELETE", f"/encounters/{encounter_id}/prescriptions/{item_id}")
+
     def list_prescriptions(self, encounter_id: int) -> list:
         return self._request("GET", f"/encounters/{encounter_id}/prescriptions")
+
+    def upload_prescription_insurance(self, encounter_id: int, prescription_id: int) -> dict:
+        return self._request(
+            "POST",
+            f"/encounters/{encounter_id}/prescriptions/{prescription_id}/insurance-upload",
+        )
+
+    def set_narcotic_right(self, user_id: int, enabled: bool) -> dict:
+        return self._request(
+            "PUT",
+            f"/users/{user_id}/narcotic-right",
+            json={"enabled": enabled},
+        )
+
+    def prescription_center(self, encounter_id: int) -> dict:
+        return self._request("GET", f"/encounters/{encounter_id}/prescription-center")
+
+    def list_prescription_headers(self, encounter_id: int) -> list:
+        return self._request("GET", f"/encounters/{encounter_id}/prescriptions/headers")
+
+    def review_prescription(
+        self, encounter_id: int, prescription_id: int, approve: bool, note: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/encounters/{encounter_id}/prescriptions/{prescription_id}/review",
+            json={"approve": approve, "note": note},
+        )
+
+    def list_pending_prescription_reviews(self) -> list:
+        return self._request("GET", "/pharmacy/prescription-reviews")
+
+    def list_medical_record_versions(self, encounter_id: int) -> list:
+        return self._request("GET", f"/encounters/{encounter_id}/medical-record/versions")
+
+    def list_approval_inbox(self) -> list:
+        return self._request("GET", "/approvals/inbox")
+
+    def get_approval_flow(self, biz_type: str) -> list:
+        return self._request("GET", f"/approvals/flows/{biz_type}")
+
+    def set_approval_flow(self, biz_type: str, steps: list[dict]) -> list:
+        return self._request(
+            "PUT", f"/approvals/flows/{biz_type}", json={"steps": steps}
+        )
+
+    def act_approval(self, payload: dict) -> dict:
+        return self._request("POST", "/approvals/requests/action", json=payload)
+
+    def list_integrations(self) -> list:
+        return self._request("GET", "/integrations")
+
+    def set_integrations(self, values: dict) -> list:
+        return self._request("PUT", "/integrations", json={"values": values})
+
+    def list_notifications(self) -> list:
+        return self._request("GET", "/notifications")
+
+    def read_notification(self, notification_id: int) -> dict:
+        return self._request("POST", f"/notifications/{notification_id}/read")
+
+    def dispatch_notifications(self) -> dict:
+        return self._request("POST", "/notifications/dispatch")
+
+    def retry_notifications(self) -> dict:
+        return self._request("POST", "/notifications/retry")
+
+    def list_patient_access_log(self, patient_id: int) -> list:
+        return self._request("GET", f"/patients/{patient_id}/access-log")
+
+    def list_narcotic_ledger(self) -> list:
+        return self._request("GET", "/narcotic/ledger")
+
+    def list_inventory_checks(self) -> list:
+        return self._request("GET", "/narcotic/inventory-checks")
+
+    def create_inventory_check(self, payload: dict) -> dict:
+        return self._request("POST", "/narcotic/inventory-checks", json=payload)
+
+    def review_inventory_check(self, check_id: int, approve: bool, note: str) -> dict:
+        return self._request(
+            "POST",
+            f"/narcotic/inventory-checks/{check_id}/review",
+            json={"approve": approve, "note": note},
+        )
 
     def add_prescription(self, encounter_id: int, payload: dict) -> dict:
         return self._request(
@@ -513,6 +642,43 @@ class ApiClient:
             "POST",
             f"/pacs/encounters/{encounter_id}/imaging-requests",
             json={"item_id": item_id},
+        )
+
+    def list_imaging_templates(self) -> list:
+        return self._request("GET", "/pacs/templates")
+
+    def list_imaging_worklist(self, status: str = "pending") -> list:
+        return self._request("GET", "/pacs/worklist", params={"status": status})
+
+    def report_imaging(
+        self,
+        request_id: int,
+        report: str,
+        image_url: str = "",
+        impression: str = "",
+        study_uid: str = "",
+        series_uid: str = "",
+        modality: str = "",
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/pacs/requests/{request_id}/report",
+            json={
+                "report": report,
+                "findings": report,
+                "impression": impression,
+                "image_url": image_url,
+                "study_uid": study_uid,
+                "series_uid": series_uid,
+                "modality": modality,
+            },
+        )
+
+    def review_imaging(self, request_id: int, approve: bool, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/pacs/requests/{request_id}/review",
+            json={"approve": approve, "note": note},
         )
 
     def list_imaging_requests(self, encounter_id: int) -> list:
@@ -925,6 +1091,7 @@ class ApiClient:
         pickup_code: str = "",
         receiver_name: str = "",
         receiver_relation: str = "本人",
+        witness: str = "",
     ) -> dict:
         return self._request(
             "POST",
@@ -935,6 +1102,7 @@ class ApiClient:
                 "pickup_code": pickup_code,
                 "receiver_name": receiver_name,
                 "receiver_relation": receiver_relation,
+                "witness": witness,
             },
         )
 
@@ -976,6 +1144,15 @@ class ApiClient:
 
     def return_dispense(self, dispense_id: int) -> dict:
         return self._request("POST", f"/pharmacy/dispense/{dispense_id}/return")
+
+    def return_dispense_items(
+        self, dispense_id: int, items: list[dict], reason: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/pharmacy/dispense/{dispense_id}/return-items",
+            json={"items": items, "reason": reason},
+        )
 
     # ---- 分诊 ----
     def create_triage_ticket(
@@ -1046,6 +1223,9 @@ class ApiClient:
     # ---- 打印页 URL ----
     def prescription_print_url(self, encounter_id: int) -> str:
         return f"{self.base_url}/print/prescription/{encounter_id}"
+
+    def prescription_header_print_url(self, prescription_id: int) -> str:
+        return f"{self.base_url}/print/prescription-header/{prescription_id}"
 
     def receipt_print_url(self, payment_id: int) -> str:
         return f"{self.base_url}/print/receipt/{payment_id}"

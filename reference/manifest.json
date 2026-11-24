@@ -1,0 +1,319 @@
+{
+  "generated_at": "2026-11-22T14:15:00+08:00",
+  "note": "官方标准仅用于本地对照，不随产品分发；第三方仓库许可见各自 LICENSE。",
+  "files": [
+    {
+      "path": "comparison.md",
+      "bytes": 10936,
+      "sha256": "51f22dc154d523ee35e50f7c1db294b9f12b40015c3f1b067a725f3f955d96cd",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "index.html",
+      "bytes": 7867,
+      "sha256": "6adfbf1282fe4daadbdf0610b2537c81b8209508c59ee88ac224e22997a5fd78",
+      "source": "local generated",
+      "kind": "html"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 10845,
+      "sha256": "1a42e9c4409b42906815fb2a26f3d928191d68f5f5fd8660d6a0250393eea2df",
+      "source": "local generated",
+      "kind": "json"
+    },
+    {
+      "path": "manifest.md",
+      "bytes": 4733,
+      "sha256": "c49278661bed4250e2693739f78134dbc82233688dd5d3dcba9893ad58b146ed",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "official/EMR-2018-1079/combined-cn-standards.pdf",
+      "bytes": 6633866,
+      "sha256": "ffb79ddc64a21ef3aee5825a3d466dd3b6c91aa9f98033a38ad07acb3a03db3a",
+      "source": "official combined PDF; source page https://csmi.cma.org.cn/art/2019/1/3/art_723_25006.html",
+      "kind": "pdf"
+    },
+    {
+      "path": "official/EMR-2018-1079/combined-cn-standards.txt",
+      "bytes": 570355,
+      "sha256": "b1322a4a1bf031d2c1aab3dfe4327d8dde72ccf3533697f4ea9794a901488296",
+      "source": "derived from combined PDF",
+      "kind": "txt"
+    },
+    {
+      "path": "official/EMR-2018-1079/emr-projects.csv",
+      "bytes": 5589,
+      "sha256": "fdff86e134487f324c3460f13b4261434e81043b7b9223e8b2f15b668e3dd910",
+      "source": "derived from standard.txt",
+      "kind": "csv"
+    },
+    {
+      "path": "official/EMR-2018-1079/source.md",
+      "bytes": 848,
+      "sha256": "873cc97beac50b16f6fdc72ef37a043f5ba67446412231b238a5a0342c0fd099",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "official/EMR-2018-1079/standard.pdf",
+      "bytes": 1117169,
+      "sha256": "bdab8993ec183d3346078b5e78e311953ad6e8ce6786b78a4953172790b86bc9",
+      "source": "local/derived",
+      "kind": "pdf"
+    },
+    {
+      "path": "official/EMR-2018-1079/standard.txt",
+      "bytes": 153901,
+      "sha256": "20ddc409aa08053cd5e579fa9c3c554d6204c180bfb83722e973b9c287df6717",
+      "source": "derived from combined PDF pages 143+",
+      "kind": "txt"
+    },
+    {
+      "path": "official/NHC-2018-4/items.csv",
+      "bytes": 19120,
+      "sha256": "bc84785a048fcd8dc7a5774537d2fbe3cb7dac6be588fda774bece2548ee2ba6",
+      "source": "derived from official PDF",
+      "kind": "csv"
+    },
+    {
+      "path": "official/NHC-2018-4/source.md",
+      "bytes": 737,
+      "sha256": "c46a0faaaea30127c2ea4867be401aab040572efe419985a348cf9415b4c395a",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "official/NHC-2018-4/standard.pdf",
+      "bytes": 5097241,
+      "sha256": "6aa2dc96db64fbe920007c217e2878e29fdb8a5b116fed732cffaf32acf16664",
+      "source": "https://www.nmgyyxh.org.cn/uploadfiles/static_old/portal/20180604/1f213c59c9e98a5bf531408dd9e30bc1.pdf",
+      "kind": "pdf"
+    },
+    {
+      "path": "official/NHC-2018-4/standard.txt",
+      "bytes": 169655,
+      "sha256": "cab10d84d33a0fcee8e0f38d6b143b574ce00442217b2b06b8e67f09e897f358",
+      "source": "derived from official PDF",
+      "kind": "txt"
+    },
+    {
+      "path": "official/NHC-2018-4/table-of-contents.txt",
+      "bytes": 1573,
+      "sha256": "0f059420d4ad587d408a08127af2d5fe221fabe4fc808e0faac28699c24408ca",
+      "source": "derived from official PDF",
+      "kind": "txt"
+    },
+    {
+      "path": "official/README.md",
+      "bytes": 2114,
+      "sha256": "fbdc36fae64843e2d0514e77a9de76670fe134f140d83f389e8a3fdd85891e71",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "official/SmartService-2019-236/smart-projects.csv",
+      "bytes": 1981,
+      "sha256": "8de00b2976d4838d5303738dfdded4a328ec3f0fbcb3931ded2171b35e319d1d",
+      "source": "derived from standard.txt",
+      "kind": "csv"
+    },
+    {
+      "path": "official/SmartService-2019-236/source.md",
+      "bytes": 660,
+      "sha256": "fde4e374bb9d44a31c151c4a489b757ad4b0b923ce4f4937ec15e02de048fbe2",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "official/SmartService-2019-236/standard.pdf",
+      "bytes": 656163,
+      "sha256": "a2314a967008e21fccca7c4fb934bca88bc97b75b9274fc99d0165a241a507de",
+      "source": "local/derived",
+      "kind": "pdf"
+    },
+    {
+      "path": "official/SmartService-2019-236/standard.txt",
+      "bytes": 188834,
+      "sha256": "33a2bad4f0b1ab95860f690dc8ffcd0e42bc597438c2425a3d66c261d0ec37ea",
+      "source": "derived from combined PDF pages 208+",
+      "kind": "txt"
+    },
+    {
+      "path": "open-source/openhis-itai/LICENSE",
+      "bytes": 35187,
+      "sha256": "5a7a53dfa6ad919942057cbdf4efeab2e8fb76f41a494ed2b6d0cd59d9b85660",
+      "source": "local generated",
+      "kind": "file"
+    },
+    {
+      "path": "open-source/openhis-itai/openhis-itai-develop.zip",
+      "bytes": 8855274,
+      "sha256": "02c42dadecb90551f9d8c7a72d5b6db3b90e2f9744bb3be1406a096fe099f840",
+      "source": "https://gitee.com/tntlinking-opensource/openhis-itai/repository/archive/develop.zip",
+      "kind": "zip"
+    },
+    {
+      "path": "open-source/openhis-itai/README.md",
+      "bytes": 2910,
+      "sha256": "0e2f597205816977633c8902ca707375e478336affdb1046fcd70854f9dbcf05",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "open-source/openhis-itai/README.raw.md",
+      "bytes": 2910,
+      "sha256": "0e2f597205816977633c8902ca707375e478336affdb1046fcd70854f9dbcf05",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "open-source/openhis-itai/TREE.txt",
+      "bytes": 385,
+      "sha256": "12f88772313c92cfd8d42195c5a99478a9d66678a445b9b7cb4e93d513e0a6ff",
+      "source": "local generated",
+      "kind": "txt"
+    },
+    {
+      "path": "open-source/shanghai-his/hospital-information-systemhis-master.zip",
+      "bytes": 39219167,
+      "sha256": "17e55217f20e248e3ab547b11590d63610ccd19b125bf37aaaf20a8f5500c76e",
+      "source": "https://gitee.com/sh_kyoui_admin/hospital-information-systemhis/repository/archive/master.zip",
+      "kind": "zip"
+    },
+    {
+      "path": "open-source/shanghai-his/LICENSE",
+      "bytes": 11558,
+      "sha256": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
+      "source": "local generated",
+      "kind": "file"
+    },
+    {
+      "path": "open-source/shanghai-his/README.md",
+      "bytes": 89093,
+      "sha256": "cee89579fea16fdc9d9052476f6ec438df52a39eac49a18e3b4b6761e6310aaf",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "open-source/shanghai-his/TREE.txt",
+      "bytes": 296,
+      "sha256": "cfb88cab1e754226b1eda08393928dd1f8a537081430e89da33053c7e2eb32b7",
+      "source": "local generated",
+      "kind": "txt"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3171,
+      "sha256": "798011804db13b647e43dc7fd2f5b51a010132905aa7e765d532b3c1ae5a6fc2",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/emr-standard-notice.html",
+      "bytes": 13514,
+      "sha256": "8e7b560944601aabc1e671f49f171f8dfb8d4df766020637174fa528b0487d53",
+      "source": "https://csmi.cma.org.cn/art/2019/1/3/art_723_25006.html",
+      "kind": "html"
+    },
+    {
+      "path": "web/emr-standard-notice.md",
+      "bytes": 2994,
+      "sha256": "7892862b656f1d20d826d0d2abef47c1e3a5016228ddf5e59aca347a6a2c3861",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/nhc-standard-notice.html",
+      "bytes": 12845,
+      "sha256": "a6646748510316f257a19d0653e26e4c401d8c4790cef7caeb3ba25d57aacbc2",
+      "source": "https://www.nmgyyxh.org.cn/nmgyyxh/zcfg/686cdcc2f266ba2c90c83a77.shtml",
+      "kind": "html"
+    },
+    {
+      "path": "web/nhc-standard-notice.md",
+      "bytes": 1965,
+      "sha256": "dd9b309192f10de57fc61cb8fe288f05f17c76830608d2f787fa918dde44286e",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/openhis-docs-index.html",
+      "bytes": 1400,
+      "sha256": "5f2f2e9d0c1571ca3baca4e22b6570821dcb65698e1aa8378fe1294a605ca84b",
+      "source": "local generated",
+      "kind": "html"
+    },
+    {
+      "path": "web/openhis-gitee.html",
+      "bytes": 192750,
+      "sha256": "5ebfd61cdd188bb5e0b82179584cfc79de614e00f3d1af2b1e7b259752b24f87",
+      "source": "https://gitee.com/tntlinking-opensource/openhis-itai",
+      "kind": "html"
+    },
+    {
+      "path": "web/openhis-gitee.md",
+      "bytes": 45012,
+      "sha256": "e6eb3afbb4eb7f4b8cb5117e0b7e3fa22e9a703af25727e4b41403e08e7ede7a",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/openhis-product-center.html",
+      "bytes": 1400,
+      "sha256": "5f2f2e9d0c1571ca3baca4e22b6570821dcb65698e1aa8378fe1294a605ca84b",
+      "source": "local generated",
+      "kind": "html"
+    },
+    {
+      "path": "web/README.md",
+      "bytes": 1131,
+      "sha256": "db8f8338a0fc7bafbbe2bc52dbc0b8cb64ced483430cc8e9898a309467101a0e",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/shanghai-his-gitee.html",
+      "bytes": 264162,
+      "sha256": "ef6d777bd8cfd3f043f04a022e4ca7ffe0d4afd00fccbef77e961e99beee1f07",
+      "source": "https://gitee.com/sh_kyoui_admin/hospital-information-systemhis",
+      "kind": "html"
+    },
+    {
+      "path": "web/shanghai-his-gitee.md",
+      "bytes": 99880,
+      "sha256": "f9e51ef9502a9a637c1e01eac48ceacc4670460aef669efb15872d340f62a480",
+      "source": "local generated",
+      "kind": "md"
+    },
+    {
+      "path": "web/smart-service-notice.html",
+      "bytes": 98416,
+      "sha256": "22560c4d2e0b5c04756aa93996ef6b8d25acf6d58ca9db59cf4c2e9b9b5030ef",
+      "source": "https://wjw.fujian.gov.cn/xxgk/zfxxgkzl/zfxxgkml/wszh/yzgl/201904/t20190430_4861177.htm",
+      "kind": "html"
+    },
+    {
+      "path": "web/smart-service-notice.md",
+      "bytes": 12609,
+      "sha256": "2e06802901a6bcc9def0807d3a6c915cd2af4f1d52c3415b1ee1f4758ddd7578",
+      "source": "local generated",
+      "kind": "md"
+    }
+  ],
+  "repositories": {
+    "openhis-itai": {
+      "files": 3957,
+      "bytes": 22056107,
+      "path": "open-source/openhis-itai/repo/openhis-itai-develop"
+    },
+    "shanghai-his": {
+      "files": 2078,
+      "bytes": 106528850,
+      "path": "open-source/shanghai-his/repo/hospital-information-systemhis-master"
+    }
+  }
+}

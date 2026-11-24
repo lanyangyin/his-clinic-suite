@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     CertificateCreate,
@@ -21,7 +21,7 @@ from .service import (
     verify_seal,
 )
 
-router = APIRouter(prefix="/ca", tags=["ca"])
+router = APIRouter(prefix="/ca", tags=["ca"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/certificates", response_model=CertificateResponse, status_code=201)

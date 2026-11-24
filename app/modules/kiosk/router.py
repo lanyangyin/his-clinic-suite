@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+
+from app.modules.auth.security import require_kiosk_token
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,7 +14,7 @@ from .schemas import (
 )
 from .service import kiosk_payment, kiosk_registration
 
-router = APIRouter(prefix="/kiosk", tags=["kiosk"])
+router = APIRouter(prefix="/kiosk", tags=["kiosk"], dependencies=[Depends(require_kiosk_token)])
 
 
 @router.post(

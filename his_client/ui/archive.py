@@ -21,8 +21,11 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.print_preview import open_print_preview
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_picker import PatientPicker
+from his_client.ui.table_policy import set_column_layout
 
 STATUS = {
     "draft": "已建档",
@@ -74,7 +77,7 @@ class ArchiveWidget(QWidget):
             ["病案号", "患者", "类型", "页数", "状态", "库位", "建档时间"]
         )
         self.table.cellClicked.connect(self._select)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.table, stretch=(1, 2), contents=(0, 3, 4, 5, 6))
         left_layout.addWidget(self.table, 1)
         splitter.addWidget(left)
 
@@ -84,7 +87,13 @@ class ArchiveWidget(QWidget):
         create_box = QGroupBox("病案建档")
         form = QFormLayout(create_box)
         self.patient_id = QSpinBox()
-        self.patient_id.setRange(1, 10_000_000)
+        self.patient_id.setRange(0, 10_000_000)
+        self.patient_id.setSpecialValueText("请选择患者")
+        self.patient_id.setValue(0)
+        self.patient_picker = PatientPicker(self.api)
+        self.patient_picker.patient_selected.connect(
+            lambda patient: self.patient_id.setValue(int(patient["id"]))
+        )
         self.encounter_id = QSpinBox()
         self.encounter_id.setRange(0, 10_000_000)
         self.encounter_id.setSpecialValueText("不关联就诊")
@@ -94,6 +103,7 @@ class ArchiveWidget(QWidget):
         self.note = QLineEdit()
         create = QPushButton("建档")
         create.clicked.connect(self._create)
+        form.addRow("查患者", self.patient_picker)
         form.addRow("患者 ID", self.patient_id)
         form.addRow("就诊 ID（可选）", self.encounter_id)
         form.addRow("类型", self.record_type)
@@ -144,7 +154,7 @@ class ArchiveWidget(QWidget):
             ["病案号", "患者", "状态", "库位", "借阅人", "应还日期"]
         )
         self.borrow_table.cellClicked.connect(self._select_borrow)
-        self.borrow_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.borrow_table, stretch=(1, 4), contents=(0, 2, 3, 5))
         left_layout.addWidget(self.borrow_table, 1)
         splitter.addWidget(left)
         right = QWidget()
@@ -206,7 +216,7 @@ class ArchiveWidget(QWidget):
         self.seal_table = QTableWidget(0, 5)
         self.seal_table.setHorizontalHeaderLabels(["病案号", "患者", "状态", "库位", "备注"])
         self.seal_table.cellClicked.connect(self._select_seal)
-        self.seal_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.seal_table, stretch=(1, 4), contents=(0, 2, 3))
         left_layout.addWidget(self.seal_table, 1)
         splitter.addWidget(left)
         right = QWidget()
@@ -305,6 +315,9 @@ class ArchiveWidget(QWidget):
         return self.current
 
     def _create(self) -> None:
+        if self.patient_id.value() <= 0:
+            self.msg.setText("请先选择患者")
+            return
         try:
             record = self.api.create_archive_record(
                 {
@@ -382,8 +395,8 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.borrow_msg.setText(f"借阅失败（{e.status_code}）：{e.detail}")
             return
-        self.borrow_msg.setText("已借出")
         self._refresh_borrow()
+        self.borrow_msg.setText("已借出")
 
     def _return(self) -> None:
         record = self._selected(self.borrow_msg)
@@ -398,8 +411,8 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.borrow_msg.setText(f"归还失败（{e.status_code}）：{e.detail}")
             return
-        self.borrow_msg.setText("已归还")
         self._refresh_borrow()
+        self.borrow_msg.setText("已归还")
 
     def _copy(self) -> None:
         record = self._selected(self.borrow_msg)
@@ -418,8 +431,8 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.borrow_msg.setText(f"复印登记失败（{e.status_code}）：{e.detail}")
             return
-        self.borrow_msg.setText("复印申请已登记，待收费/完成")
         self._refresh_borrow()
+        self.borrow_msg.setText("复印申请已登记，待收费/完成")
 
     def _pick_destroy_attachment(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -458,8 +471,10 @@ class ArchiveWidget(QWidget):
         if not request_id:
             self.seal_msg.setText("请填写销毁申请 ID")
             return
-        QDesktopServices.openUrl(
-            QUrl(self.api.archive_destruction_print_url(request_id))
+        open_print_preview(
+            self,
+            self.api.archive_destruction_print_url(request_id),
+            "病案销毁审批表打印预览",
         )
 
     def _execute_destroy(self) -> None:
@@ -476,8 +491,8 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.seal_msg.setText(f"执行失败（{e.status_code}）：{e.detail}")
             return
-        self.seal_msg.setText("销毁已执行")
         self._refresh_seal()
+        self.seal_msg.setText("销毁已执行")
 
     def _refresh_seal(self) -> None:
         try:
@@ -517,8 +532,8 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.seal_msg.setText(f"封存失败（{e.status_code}）：{e.detail}")
             return
-        self.seal_msg.setText("已封存")
         self._refresh_seal()
+        self.seal_msg.setText("已封存")
 
     def _unseal(self) -> None:
         record = self._selected(self.seal_msg)
@@ -532,5 +547,5 @@ class ArchiveWidget(QWidget):
         except ApiError as e:
             self.seal_msg.setText(f"启封失败（{e.status_code}）：{e.detail}")
             return
-        self.seal_msg.setText("已启封")
         self._refresh_seal()
+        self.seal_msg.setText("已启封")

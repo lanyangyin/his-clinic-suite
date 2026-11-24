@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}供应商 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>供应商管理</h2>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if ok %}<p class="ok">已保存</p>{% endif %}
+<div class="panel">
+  <h3>新增供应商</h3>
+  <form class="inline" method="post" action="/admin/master/suppliers">
+    <label>编码 <input type="text" name="code" required maxlength="30"></label>
+    <label>名称 <input type="text" name="name" required maxlength="100"></label>
+    <label>联系人 <input type="text" name="contact" maxlength="50"></label>
+    <label>电话 <input type="text" name="phone" maxlength="20"></label>
+    <label>地址 <input type="text" name="address" maxlength="200"></label>
+    <label>证照号 <input type="text" name="license_no" maxlength="60"></label>
+    <label>证照有效期 <input type="date" name="license_expiry"></label>
+    <label>首营准入 <input type="checkbox" name="first_business_approved" value="true"></label>
+    <button type="submit">新增</button>
+  </form>
+
+  <h3>更新供应商</h3>
+  <form class="inline" method="post" action="/admin/master/suppliers/update">
+    <label>供应商 ID <input type="number" min="1" name="supplier_id" required style="width:90px"></label>
+    <label>名称 <input type="text" name="name" required maxlength="100"></label>
+    <label>联系人 <input type="text" name="contact" maxlength="50"></label>
+    <label>电话 <input type="text" name="phone" maxlength="20"></label>
+    <label>地址 <input type="text" name="address" maxlength="200"></label>
+    <label>证照号 <input type="text" name="license_no" maxlength="60"></label>
+    <label>证照有效期 <input type="date" name="license_expiry"></label>
+    <label>状态
+      <select name="status">
+        <option value="active">正常</option>
+        <option value="suspended">停用</option>
+        <option value="blacklist">黑名单</option>
+      </select>
+    </label>
+    <label>首营准入 <input type="checkbox" name="first_business_approved" value="true"></label>
+    <label>黑名单原因 <input type="text" name="blacklist_reason" maxlength="200"></label>
+    <button type="submit">更新</button>
+  </form>
+
+  <h3>证照预警（90 天内到期 / 已过期）</h3>
+  <form method="post" action="/admin/master/suppliers/suspend-expired" style="margin-bottom:8px">
+    <button type="submit">停用所有证照已过期供应商</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>证照号</th><th>有效期</th><th>状态</th></tr>
+    {% for row in expiring %}
+    <tr>
+      <td>{{ row.id }}</td><td>{{ row.name }}</td><td>{{ row.license_no or '—' }}</td>
+      <td>{{ row.license_expiry }}</td><td>{{ {'active':'正常','suspended':'停用','blacklist':'黑名单'}.get(row.status, row.status) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">暂无到期证照</td></tr>
+    {% endfor %}
+  </table>
+
+  <table>
+    <tr><th>ID</th><th>编码</th><th>名称</th><th>联系人</th><th>电话</th><th>证照号</th><th>有效期</th><th>首营</th><th>状态</th></tr>
+    {% for row in suppliers %}
+    <tr>
+      <td>{{ row.id }}</td><td>{{ row.code }}</td><td>{{ row.name }}</td>
+      <td>{{ row.contact or '—' }}</td><td>{{ row.phone or '—' }}</td>
+      <td>{{ row.license_no or '—' }}</td><td>{{ row.license_expiry or '—' }}</td>
+      <td>{{ '是' if row.first_business_approved else '否' }}</td>
+      <td>{{ {'active':'正常','suspended':'停用','blacklist':'黑名单'}.get(row.status, row.status) }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">暂无供应商</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -22,6 +22,7 @@ cp "$ROOT/pyproject.toml" "$PKG/pyproject.toml"
 cp "$ROOT/config.release.ini" "$PKG/config.ini"
 cp "$ROOT/config.release.ini" "$PKG/config.release.ini"
 cp "$ROOT/backup.sh" "$PKG/backup.sh"
+cp "$ROOT/start-termux.sh" "$PKG/start-termux.sh"
 cp "$ROOT/docs/Termux部署指南.md" "$PKG/DEPLOY-TERMUX.md"
 
 # 清掉 Python 缓存和本地运行数据
@@ -29,7 +30,7 @@ find "$PKG" -type d -name __pycache__ -prune -exec rm -rf {} +
 find "$PKG" -type f -name '*.pyc' -delete
 rm -rf "$PKG/app/modules/admin/templates/.cache" 2>/dev/null || true
 
-chmod +x "$PKG/scripts/run_server_linux.sh" "$PKG/backup.sh"
+chmod +x "$PKG/scripts/run_server_linux.sh" "$PKG/backup.sh" "$PKG/start-termux.sh"
 
 mkdir -p "$ROOT/dist"
 tar -czf "$OUT" -C "$STAGE" his-server

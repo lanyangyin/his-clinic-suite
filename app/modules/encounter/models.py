@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, ForeignKey
+from sqlalchemy import DateTime, Integer, String, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -29,6 +29,7 @@ class Encounter(Base):
     )
 
     items: Mapped[list["PrescriptionItem"]] = relationship()
+    prescriptions: Mapped[list["Prescription"]] = relationship(back_populates="encounter")
 
 
 class EncounterDiagnosis(Base):
@@ -57,12 +58,45 @@ class EncounterDiagnosis(Base):
     )
 
 
+class Prescription(Base):
+    """一张处方头。处方明细必须挂在处方头下，不能直接挂就诊。"""
+
+    __tablename__ = "prescriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), nullable=False, index=True
+    )
+    prescription_no: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
+    # western 普通西药/中成药；tcm_herb 中药饮片；narcotic 麻精；special 特殊
+    type: Mapped[str] = mapped_column(String(20), default="western", nullable=False)
+    # pending_review 待审方 / approved 已通过 / rejected 已退回 / dispensing 调配中 / dispensed 已发药 / cancelled 已作废
+    status: Mapped[str] = mapped_column(String(20), default="pending_review", nullable=False, index=True)
+    prescribed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    insurance_upload_status: Mapped[str] = mapped_column(
+        String(20), default="not_ready", server_default="not_ready", nullable=False
+    )
+    insurance_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    encounter: Mapped["Encounter"] = relationship(back_populates="prescriptions")
+    items: Mapped[list["PrescriptionItem"]] = relationship(
+        back_populates="prescription", cascade="all, delete-orphan"
+    )
+
+
 class PrescriptionItem(Base):
     __tablename__ = "prescription_items"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     encounter_id: Mapped[int] = mapped_column(
         ForeignKey("encounters.id"), nullable=False, index=True
+    )
+    prescription_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prescriptions.id"), nullable=True, index=True
     )
     drug_id: Mapped[int] = mapped_column(
         ForeignKey("drugs.id"), nullable=False, index=True
@@ -89,6 +123,7 @@ class PrescriptionItem(Base):
         String(300), nullable=True
     )
     allergy_override_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    prescription: Mapped["Prescription | None"] = relationship(back_populates="items")
 
     # 字符串关系：由同一 registry 解析，不跨模块 import models
     drug = relationship("Drug")
@@ -96,6 +131,47 @@ class PrescriptionItem(Base):
     @property
     def drug_name(self) -> str:
         return self.drug.name if self.drug else ""
+
+    @property
+    def prescription_no(self) -> str:
+        return self.prescription.prescription_no if self.prescription else ""
+
+    @property
+    def prescription_type(self) -> str:
+        return self.prescription.type if self.prescription else "western"
+
+    @property
+    def prescription_status(self) -> str:
+        return self.prescription.status if self.prescription else "approved"
+
+
+class PrescriptionLine(Base):
+    """统一处方明细：西药/中成药 kind=drug，中药饮片 kind=herb。
+
+    保留原明细表作为业务写模型，本表提供跨类型统一视图。
+    """
+
+    __tablename__ = "prescription_lines"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    prescription_id: Mapped[int] = mapped_column(
+        ForeignKey("prescriptions.id"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(10), default="drug", nullable=False)
+    drug_id: Mapped[int | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    herb_id: Mapped[int | None] = mapped_column(ForeignKey("tcm_herbs.id"), nullable=True)
+    source_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    spec: Mapped[str] = mapped_column(String(60), default="", nullable=False)
+    quantity: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    dosage: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    frequency: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    route: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    days: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    amount: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
 class MedicalRecord(Base):
@@ -124,6 +200,41 @@ class MedicalRecord(Base):
     signed_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
     signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+
+
+class MedicalRecordRevision(Base):
+    """病历签名后修订申请：医生提理由，管理员/院长审批后解锁。"""
+
+    __tablename__ = "medical_record_revisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(
+        ForeignKey("encounters.id"), nullable=False, index=True
+    )
+    reason: Mapped[str] = mapped_column(String(300), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    review_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class MedicalRecordVersion(Base):
+    """病历修改版本：签名前的每次保存都留 before/after 快照。"""
+
+    __tablename__ = "medical_record_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    record_id: Mapped[int] = mapped_column(
+        ForeignKey("medical_records.id"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    action: Mapped[str] = mapped_column(String(20), default="update", nullable=False)
+    before_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    after_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
 class AdverseReaction(Base):

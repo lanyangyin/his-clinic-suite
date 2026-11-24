@@ -6,7 +6,7 @@
 - 验收可登记不合格数量与原因，入库只入合格数量；
 - 供应商、随货同行单号、发票号留痕，供医保进销存上传与追溯。
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -110,8 +110,14 @@ def _build_items(db: Session, data: InboundOrderCreate) -> list[InboundItem]:
 def create_order(
     db: Session, data: InboundOrderCreate, received_by: str = ""
 ) -> InboundOrder:
-    if data.supplier_id and not get_supplier(db, data.supplier_id):
-        raise ValueError("供应商不存在")
+    if data.supplier_id:
+        supplier = get_supplier(db, data.supplier_id)
+        if not supplier:
+            raise ValueError("供应商不存在")
+        if supplier.status in ("suspended", "blacklist"):
+            raise ValueError("该供应商已停用/列入黑名单，不能入库")
+        if supplier.license_expiry and supplier.license_expiry < date.today():
+            raise ValueError("该供应商证照已过期，不能入库")
 
     items = _build_items(db, data)
     next_id = (db.query(InboundOrder.id).order_by(InboundOrder.id.desc()).first() or (0,))[0] + 1
@@ -171,9 +177,49 @@ def check_order(
         item.rejected_qty = check.rejected_qty
         item.reject_reason = check.reject_reason
 
+    claimed = (
+        db.query(InboundOrder)
+        .filter(InboundOrder.id == order_id, InboundOrder.status == "received")
+        .update({InboundOrder.status: "checking"}, synchronize_session=False)
+    )
+    if claimed != 1:
+        db.rollback()
+        raise ValueError("该入库单正在验收或已结束")
     order.status = "checked"
     order.checked_by = checked_by
     order.checked_at = checked_at
+    # 与入库验收同事务生成 GSP 验收记录，防止入库有、GSP 无
+    from app.modules.gsp.schemas import AcceptanceCreate, AcceptanceItemCreate
+    from app.modules.gsp.service import create_acceptance
+
+    rejected_any = any(item.rejected_qty > 0 for item in order.items)
+    create_acceptance(
+        db,
+        AcceptanceCreate(
+            supplier_id=order.supplier_id,
+            delivery_no=order.delivery_no,
+            transport_ok=not rejected_any,
+            result="unqualified" if rejected_any else "qualified",
+            note=f"入库单 {order.order_no}",
+            items=[
+                AcceptanceItemCreate(
+                    kind=item.kind,
+                    name=item.name,
+                    spec=item.spec,
+                    batch_no=item.batch_no,
+                    expiry=item.expiry,
+                    quantity=max(item.quantity - item.rejected_qty, 0),
+                    manufacturer=item.manufacturer,
+                    approval_no=item.approval_no,
+                    result="unqualified" if item.rejected_qty > 0 else "qualified",
+                    note=item.reject_reason,
+                )
+                for item in order.items
+            ],
+        ),
+        checked_by,
+        commit=False,
+    )
     db.commit()
     db.refresh(order)
     return order
@@ -186,6 +232,14 @@ def stock_order(db: Session, order_id: int) -> InboundOrder:
         raise ValueError("入库单不存在")
     if order.status != "checked":
         raise ValueError("仅已验收的入库单可以入库")
+    claimed = (
+        db.query(InboundOrder)
+        .filter(InboundOrder.id == order_id, InboundOrder.status == "checked")
+        .update({InboundOrder.status: "stocking"}, synchronize_session=False)
+    )
+    if claimed != 1:
+        db.rollback()
+        raise ValueError("该入库单正在入库或已结束")
 
     for item in order.items:
         quantity = item.quantity - item.rejected_qty
@@ -246,6 +300,8 @@ def cancel_order(db: Session, order_id: int) -> InboundOrder:
         raise ValueError("入库单不存在")
     if order.status == "stocked":
         raise ValueError("已入库的入库单不能取消")
+    if order.status in ("checking", "stocking"):
+        raise ValueError("入库单正在处理，不能取消")
     if order.status == "cancelled":
         raise ValueError("该入库单已取消")
     order.status = "cancelled"

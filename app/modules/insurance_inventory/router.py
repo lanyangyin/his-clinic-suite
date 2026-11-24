@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     InventoryPreviewResponse,
@@ -12,7 +12,7 @@ from .schemas import (
 )
 from .service import create_upload, get_upload, list_uploads, preview
 
-router = APIRouter(prefix="/insurance/inventory", tags=["insurance-inventory"])
+router = APIRouter(prefix="/insurance/inventory", tags=["insurance-inventory"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/preview", response_model=InventoryPreviewResponse)

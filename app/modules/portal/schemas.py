@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PortalRegistrationItem(BaseModel):
@@ -43,3 +43,19 @@ class PortalReportsResponse(BaseModel):
     patient_id: int
     labs: list[PortalLabItem]
     imaging: list[PortalImagingItem]
+
+
+class PortalAccessRequest(BaseModel):
+    id_number: str = Field(min_length=1, max_length=30)
+    phone: str = Field(min_length=1, max_length=20)
+    code: str = Field(default="", max_length=10)
+
+
+class PortalCodeRequest(BaseModel):
+    id_number: str = Field(min_length=1, max_length=30)
+    phone: str = Field(min_length=1, max_length=20)
+
+
+class PortalAccessResponse(BaseModel):
+    token: str
+    expires_in: int

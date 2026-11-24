@@ -132,3 +132,95 @@ def test_role_protection(client, auth):
     # 未登录
     r = client.post("/suppliers/", json={"code": "SUP98", "name": "X"})
     assert r.status_code == 401
+
+
+def test_supplier_license_and_suspension_blocks_inbound(client, auth):
+    supplier = client.post(
+        "/suppliers/",
+        json={
+            "code": "SUP-LIC",
+            "name": "证照供应商",
+            "license_no": "沪药监械经营许20260001",
+            "license_expiry": "2028-12-31",
+            "first_business_approved": True,
+        },
+        headers=auth["admin"],
+    ).json()
+    assert supplier["license_no"].startswith("沪药监")
+    assert supplier["first_business_approved"] is True
+    updated = client.put(
+        f"/suppliers/{supplier['id']}",
+        json={"status": "blacklist", "blacklist_reason": "证照过期"},
+        headers=auth["admin"],
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["status"] == "blacklist"
+    drug = make_drug(client, auth, "黑名单供应商药")
+    inbound = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "supplier_id": supplier["id"],
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "BLK-1",
+                    "expiry": "2027-12-31",
+                    "quantity": 1,
+                }
+            ],
+        },
+        headers=auth["warehouse"],
+    )
+    assert inbound.status_code == 400
+    assert "黑名单" in inbound.json()["detail"]
+
+
+def test_supplier_license_expiry_alert(client, auth):
+    expired = client.post(
+        "/suppliers/",
+        json={
+            "code": "SUP-EXP",
+            "name": "证照过期供应商",
+            "license_no": "EXP-001",
+            "license_expiry": "2020-01-01",
+        },
+        headers=auth["admin"],
+    ).json()
+    future = client.post(
+        "/suppliers/",
+        json={
+            "code": "SUP-FUT",
+            "name": "证照正常供应商",
+            "license_no": "FUT-001",
+            "license_expiry": "2099-12-31",
+        },
+        headers=auth["admin"],
+    ).json()
+    rows = client.get("/suppliers/expiring", headers=auth["admin"]).json()
+    ids = {row["id"] for row in rows}
+    assert expired["id"] in ids
+    assert future["id"] not in ids
+    page = client.get("/admin/master/suppliers")
+    assert page.status_code == 200
+    drug = make_drug(client, auth, "过期供应商药")
+    inbound = client.post(
+        "/inbound/orders",
+        json={
+            "order_type": "drug",
+            "supplier_id": expired["id"],
+            "items": [
+                {
+                    "kind": "drug",
+                    "drug_id": drug["id"],
+                    "batch_no": "EXP-1",
+                    "expiry": "2027-12-31",
+                    "quantity": 1,
+                }
+            ],
+        },
+        headers=auth["warehouse"],
+    )
+    assert inbound.status_code == 400
+    assert "证照已过期" in inbound.json()["detail"]

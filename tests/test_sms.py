@@ -94,3 +94,29 @@ def test_no_sms_without_phone(client, auth):
         headers=auth["radiology"],
     )
     assert client.get("/sms/messages", headers=auth["admin"]).json() == []
+
+
+def test_sms_mock_must_be_explicit(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "SMS_ALLOW_MOCK", False)
+    r = client.post(
+        "/sms/send",
+        json={"phone": "13900139000", "content": "不应发送", "template": "custom"},
+        headers=auth["admin"],
+    )
+    assert r.status_code == 503
+    assert "网关未配置" in r.json()["detail"]
+
+
+def test_sms_gateway_failure_is_503(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "SMS_GATEWAY_URL", "http://127.0.0.1:1")
+    r = client.post(
+        "/sms/send",
+        json={"phone": "13900139000", "content": "网关失败", "template": "custom"},
+        headers=auth["admin"],
+    )
+    assert r.status_code == 503
+    assert "短信网关" in r.json()["detail"]

@@ -174,11 +174,13 @@ class PatientInfoPanel(QFrame):
             return
         self.patient_id = int(patient.get("id") or 0)
         self.encounter_id = int(encounter_id or patient.get("encounter_id") or 0)
-        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(
+            patient.get("gender"), "性别不详"
+        )
         age = patient.get("age")
         self.name.setText(str(patient.get("name") or "未命名"))
         self.demo.setText(
-            f"{gender} / {age if age is not None else '—'}岁  "
+            f"{gender} / {age if age is not None else '年龄不详'}  "
             f"{patient.get('patient_no') or ''}"
         )
         allergy = patient.get("allergy_label") or "过敏史不详"

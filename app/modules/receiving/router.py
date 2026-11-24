@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import InboundCheckRequest, InboundOrderCreate, InboundOrderResponse
 from .service import (
@@ -14,7 +14,7 @@ from .service import (
     stock_order,
 )
 
-router = APIRouter(prefix="/inbound", tags=["receiving"])
+router = APIRouter(prefix="/inbound", tags=["receiving"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/orders", response_model=InboundOrderResponse, status_code=201)

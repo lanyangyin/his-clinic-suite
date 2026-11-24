@@ -2,6 +2,8 @@ from datetime import datetime
 from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException
+
+from app.modules.auth.security import require_login, require_print_access
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
@@ -15,11 +17,13 @@ from app.modules.print.documents import (
     render_western,
 )
 from app.modules.print.barcode import code128_svg
+from app.modules.print.models import PrintToken  # noqa: F401
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.pharmacy.retail_service import get_retail_sale
-from app.modules.pharmacy.service import get_dispense
+from app.modules.pharmacy.service import build_dispense_slip, get_dispense
 from app.modules.nursing.models import NursingOrder
 from app.modules.charges.service import list_charges
+from app.modules.encounter.models import Prescription
 from app.modules.encounter.service import (
     get_encounter,
     get_medical_record,
@@ -35,7 +39,7 @@ from app.modules.tcm.models import TcmPrescription
 from app.modules.registration.service import get_registration
 from app.modules.staff.service import get_doctor
 
-router = APIRouter(prefix="/print", tags=["print"])
+router = APIRouter(prefix="/print", tags=["print"], dependencies=[Depends(require_print_access)])
 
 
 def _clinic_meta() -> dict:
@@ -305,6 +309,34 @@ def render_receipt(data: dict) -> str:
 </body></html>"""
 
 
+@router.post("/tokens")
+def create_print_token(
+    kind: str = "",
+    ref_id: int | None = None,
+    ttl_seconds: int = 120,
+    db: Session = Depends(get_db),
+    user=Depends(require_login),
+) -> dict:
+    import hashlib
+    import secrets
+    from datetime import datetime, timedelta
+
+    from .models import PrintToken
+
+    raw = secrets.token_urlsafe(24)
+    db.add(
+        PrintToken(
+            token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+            kind=kind,
+            ref_id=ref_id,
+            expires_at=datetime.now() + timedelta(seconds=min(max(ttl_seconds, 10), 600)),
+            created_by=user.username,
+        )
+    )
+    db.commit()
+    return {"token": raw, "expires_in": min(max(ttl_seconds, 10), 600)}
+
+
 @router.get("/barcode/{code}.svg")
 def barcode_svg(code: str):
     try:
@@ -312,6 +344,57 @@ def barcode_svg(code: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return Response(content=svg, media_type="image/svg+xml")
+
+
+@router.get("/prescription-header/{prescription_id}", response_class=HTMLResponse)
+def print_prescription_header(prescription_id: int, db: Session = Depends(get_db)):
+    from app.modules.encounter.models import PrescriptionItem
+
+    header = db.get(Prescription, prescription_id)
+    if not header:
+        raise HTTPException(status_code=404, detail="处方不存在")
+    encounter = get_encounter(db, header.encounter_id)
+    registration = get_registration(db, encounter.registration_id) if encounter else None
+    patient = get_patient(db, registration.patient_id) if registration else None
+    doctor = get_doctor(db, registration.doctor_id) if registration else None
+    items = (
+        db.query(PrescriptionItem)
+        .filter(PrescriptionItem.prescription_id == prescription_id)
+        .order_by(PrescriptionItem.id)
+        .all()
+    )
+    rows = "".join(
+        f"<tr><td>{escape(item.drug_name)}</td><td>{escape(item.drug.spec if item.drug else '')}</td>"
+        f"<td>{item.quantity}</td><td>{escape(item.dosage)} {escape(item.frequency)} {escape(item.route)}</td>"
+        f"<td>{item.quantity * item.unit_price:.2f}</td></tr>"
+        for item in items
+    )
+    meta = _clinic_meta()
+    status = {
+        "pending_review": "待药师审核",
+        "approved": "已审核",
+        "rejected": "已退回",
+        "dispensing": "调配中",
+        "dispensed": "已发药",
+        "cancelled": "已作废",
+    }.get(header.status, header.status)
+    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>处方 {escape(header.prescription_no)}</title><style>{PRESCRIPTION_CSS}</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])}</h2>
+<p class="center big">门诊处方</p>
+<p>处方号：{escape(header.prescription_no)}　类型：{escape(header.type)}　状态：{escape(status)}</p>
+<p>患者：{escape(patient.name if patient else '—')}　
+   性别：{escape({'male':'男','female':'女'}.get(patient.gender if patient else '', '不详'))}　
+   年龄：{patient.age if patient and patient.age is not None else '年龄不详'}</p>
+<p>科室/医生：{escape(doctor.name if doctor else '—')}　开方：{escape(header.prescribed_by or '—')}</p>
+<div class="divider"></div>
+<table><tr><th>药品</th><th>规格</th><th>数量</th><th>用法</th><th>金额</th></tr>
+{rows or '<tr><td colspan="5">无明细</td></tr>'}</table>
+<div class="divider"></div>
+<p>审核药师：{escape(header.reviewed_by or '—')}　审核意见：{escape(header.review_note or '—')}</p>
+<p>医师签名：__________　日期：{header.created_at:%Y-%m-%d}</p>
+</body></html>""")
 
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)
@@ -418,6 +501,75 @@ def print_retail(sale_id: int, db: Session = Depends(get_db)):
 <p class="center">打印时间：{datetime.now():%Y-%m-%d %H:%M}</p>
 </body></html>"""
     )
+
+
+@router.get("/dispense-slip/{encounter_id}", response_class=HTMLResponse)
+def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db)):
+    try:
+        data = build_dispense_slip(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    meta = _clinic_meta()
+    rows = "".join(
+        f"<tr><td>{escape(item['drug_name'])}<br><span class='small'>"
+        f"{escape(item['spec'] or '')} {escape(item['dosage_form'] or '')}"
+        + (
+            f"　批号 {escape(item.get('batch_no'))}　效期 {escape(item.get('expiry'))}"
+            if item.get("batch_no")
+            else ""
+        )
+        + "</span></td>"
+        f"<td>{item['quantity']}{escape(item['unit'] or '')}</td>"
+        f"<td>{item['amount']:.2f}</td>"
+        f"<td>{escape(item['usage'])}</td></tr>"
+        for item in data["items"]
+    )
+    tcm = "".join(
+        f"<p>中药处方 {escape(rx['prescription_no'])}：{escape(rx['formula_name'] or '')}，"
+        f"{rx['packs']} 剂，{escape(rx['decoction_method'] or '')}</p>"
+        for rx in data["tcm_prescriptions"]
+    )
+    total = sum(item["amount"] for item in data["items"])
+    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>取药凭证</title><style>{RECEIPT_CSS}
+.small {{ color:#555; font-size:10px; }}
+</style></head><body>
+{_print_button()}
+<h2>{escape(meta['name'])}</h2>
+<p class="center big">取药凭证</p>
+<p class="center small">执行指引 + 用药核对清单</p>
+<div class="divider"></div>
+<p>患者：{escape(data['patient']['name'])}　
+   {escape(data['patient']['gender'])}　
+   {data['patient']['age'] if data['patient']['age'] is not None else '—'}岁</p>
+<p>就诊卡/患者号：{escape(str(data['patient']['patient_no'] or '—'))}　
+   就诊：{data['encounter_id']}</p>
+<p>科室：{escape(data['department'] or '—')}　医生：{escape(data['doctor_name'] or '—')}</p>
+<p>结算时间：{escape((data['settled_at'] or '—').replace('T', ' '))}　
+   仅限当日有效：{escape(data['valid_until'] or '—')}</p>
+<div class="divider"></div>
+<p class="big">取药指引</p>
+<p>药房：{escape(data['pharmacy_name'])}　窗口：{escape(data['window_no'] or '—')}</p>
+<p>取药号：<b>{escape(data['queue_no'] or '—')}</b>　
+   当前等待：{data['waiting_count']} 人　共 {data['prescription_count']} 张处方</p>
+<div class="divider"></div>
+<p>临床诊断：{escape(data['diagnosis'] or '—')}</p>
+<div class="divider"></div>
+<table><tr><th>药品</th><th>数量</th><th>金额</th><th>用法用量</th></tr>
+{rows or '<tr><td colspan="4">（无药品明细）</td></tr>'}
+</table>
+{tcm}
+<p class="right big">药品合计：{total:.2f} 元</p>
+<div class="divider"></div>
+<p>医师：{escape(data['signatures']['doctor'] or '—')}　
+   调配药师：{escape(data['signatures']['dispenser'] or '—')}　
+   核对药师：{escape(data['signatures']['checker'] or '—')}</p>
+<p>取药人：{escape(data['signatures']['receiver'] or '—')}　
+   发药时间：{escape((data['dispensed_at'] or '—').replace('T', ' '))}</p>
+<div class="divider"></div>
+{''.join(f'<p class="small">{escape(tip)}</p>' for tip in data['tips'])}
+<p class="center small">打印时间：{escape(data['printed_at'].replace('T', ' '))}</p>
+</body></html>""")
 
 
 @router.get("/dispense-label/{dispense_id}", response_class=HTMLResponse)

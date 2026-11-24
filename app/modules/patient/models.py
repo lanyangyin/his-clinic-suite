@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -83,6 +83,25 @@ class Patient(Base):
         if self.allergy_status == "present":
             return self.allergy_detail or "有过敏史"
         return "过敏史不详"
+
+class PatientAccessLog(Base):
+    """患者访问审计：谁在何时看了哪个患者。"""
+
+    __tablename__ = "patient_access_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    username: Mapped[str] = mapped_column(String(50), default="", nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("patients.id"), nullable=False, index=True
+    )
+    encounter_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    action: Mapped[str] = mapped_column(String(30), default="view", nullable=False)
+    path: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    method: Mapped[str] = mapped_column(String(10), default="GET", nullable=False)
+    ip: Mapped[str] = mapped_column(String(45), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
 
 class PatientCard(Base):
     """NFC 就诊卡：一张卡同一时间只能绑定一个患者。"""

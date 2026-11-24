@@ -1,0 +1,222 @@
+"""影像科工作站：待检查列表、报告回传。"""
+from PySide6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
+
+from his_client.api import ApiClient, ApiError
+from his_client.ui.theme import apply_theme
+
+
+class RadiologyWidget(QWidget):
+    def __init__(self, api: ApiClient, parent=None):
+        super().__init__(parent)
+        apply_theme(self)
+        self.api = api
+        self.rows: list[dict] = []
+        layout = QVBoxLayout(self)
+        top = QHBoxLayout()
+        title = QLabel("影像科工作站")
+        title.setStyleSheet("font-size:16px;font-weight:bold")
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("待检查", "pending")
+        self.status_filter.addItem("已报告", "reported")
+        self.status_filter.addItem("已审核", "reviewed")
+        self.template_combo = QComboBox()
+        self.template_combo.addItem("报告模板", None)
+        self.template_combo.currentIndexChanged.connect(self._apply_template)
+        self.status_filter.currentIndexChanged.connect(lambda _index: self._load())
+        refresh = QPushButton("刷新")
+        refresh.clicked.connect(self._load)
+        top.addWidget(title)
+        top.addStretch(1)
+        top.addWidget(self.template_combo)
+        top.addWidget(self.status_filter)
+        top.addWidget(refresh)
+        layout.addLayout(top)
+        splitter = QSplitter(Qt.Vertical)
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(
+            ["影像号", "患者", "检查项目", "申请医生", "时间", "状态", "报告人", "审核人"]
+        )
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.cellClicked.connect(self._select)
+        splitter.addWidget(self.table)
+        detail = QWidget()
+        dl = QVBoxLayout(detail)
+        self.info = QLabel("请选择一条检查申请")
+        self.report = QTextEdit()
+        self.report.setPlaceholderText("影像所见")
+        self.image_url = QLineEdit()
+        self.image_url.setPlaceholderText("PACS 图像地址（可选）")
+        view_image = QPushButton("打开图像")
+        view_image.clicked.connect(self._open_image)
+        submit = QPushButton("提交报告")
+        submit.clicked.connect(self._submit)
+        self.review_note = QLineEdit()
+        self.review_note.setPlaceholderText("审核意见 / 退回原因")
+        approve = QPushButton("审核通过")
+        approve.clicked.connect(lambda: self._review(True))
+        reject = QPushButton("退回报告")
+        reject.clicked.connect(lambda: self._review(False))
+        dl.addWidget(self.info)
+        dl.addWidget(self.report, 1)
+        self.impression = QTextEdit()
+        self.impression.setPlaceholderText("诊断意见")
+        dl.addWidget(self.impression)
+        image_row = QHBoxLayout()
+        image_row.addWidget(self.image_url, 1)
+        image_row.addWidget(view_image)
+        dl.addLayout(image_row)
+        dicom_row = QHBoxLayout()
+        self.study_uid = QLineEdit()
+        self.study_uid.setPlaceholderText("StudyUID")
+        self.series_uid = QLineEdit()
+        self.series_uid.setPlaceholderText("SeriesUID")
+        self.modality = QLineEdit()
+        self.modality.setPlaceholderText("Modality")
+        dicom_row.addWidget(self.study_uid, 2)
+        dicom_row.addWidget(self.series_uid, 2)
+        dicom_row.addWidget(self.modality, 1)
+        dl.addLayout(dicom_row)
+        dl.addWidget(self.review_note)
+        actions = QHBoxLayout()
+        actions.addWidget(submit)
+        actions.addWidget(approve)
+        actions.addWidget(reject)
+        dl.addLayout(actions)
+        self.msg = QLabel("")
+        dl.addWidget(self.msg)
+        splitter.addWidget(detail)
+        splitter.setSizes([320, 320])
+        layout.addWidget(splitter, 1)
+        self._load_templates()
+        self._load()
+
+    def _load_templates(self) -> None:
+        try:
+            templates = self.api.list_imaging_templates()
+        except ApiError:
+            return
+        for row in templates:
+            self.template_combo.addItem(row.get("name") or "模板", row)
+
+    def _apply_template(self, _index: int) -> None:
+        row = self.template_combo.currentData()
+        if not row:
+            return
+        self.report.setPlainText(row.get("findings") or "")
+        self.impression.setPlainText(row.get("impression") or "")
+
+    def _load(self) -> None:
+        try:
+            self.rows = self.api.list_imaging_worklist(self.status_filter.currentData() or "pending")
+        except ApiError as e:
+            self.msg.setText(f"加载失败：{e.detail}")
+            return
+        self.table.setRowCount(len(self.rows))
+        for i, item in enumerate(self.rows):
+            values = [
+                item.get("accession_no") or "",
+                f"{item.get('patient_name') or ''} {item.get('patient_no') or ''}",
+                item.get("item_name") or "",
+                item.get("requested_by") or "",
+                str(item.get("requested_at") or "")[:16].replace("T", " "),
+                {"pending": "待检查", "reported": "已报告", "reviewed": "已审核", "rejected": "已退回"}.get(item.get("status"), item.get("status") or ""),
+                item.get("reported_by") or "",
+                item.get("reviewed_by") or "",
+            ]
+            for j, value in enumerate(values):
+                self.table.setItem(i, j, QTableWidgetItem(str(value)))
+        label = {
+            "pending": "待检查",
+            "reported": "已报告",
+            "reviewed": "已审核",
+            "rejected": "已退回",
+        }.get(self.status_filter.currentData() or "pending", "检查")
+        self.msg.setText(f"{label} {len(self.rows)} 条")
+
+    def _select(self, row: int, _col: int) -> None:
+        if 0 <= row < len(self.rows):
+            item = self.rows[row]
+            self.info.setText(
+                f"{item.get('accession_no')}　{item.get('patient_name')}　"
+                f"{item.get('item_name')}　申请：{item.get('requested_by')}"
+            )
+            self.report.setPlainText(item.get("findings") or item.get("report") or "")
+            self.impression.setPlainText(item.get("impression") or "")
+            self.study_uid.setText(item.get("study_uid") or "")
+            self.series_uid.setText(item.get("series_uid") or "")
+            self.modality.setText(item.get("modality") or "")
+
+    def _open_image(self) -> None:
+        url = self.image_url.text().strip()
+        if not url:
+            self.msg.setText("该检查没有 PACS 图像地址")
+            return
+        if not QDesktopServices.openUrl(QUrl(url)):
+            self.msg.setText("无法打开图像地址，请复制到 PACS 客户端查看")
+
+    def _submit(self) -> None:
+        row = self.table.currentRow()
+        if not 0 <= row < len(self.rows):
+            self.msg.setText("请先选择检查申请")
+            return
+        text = self.report.toPlainText().strip()
+        if not text:
+            self.msg.setText("报告内容不能为空")
+            return
+        try:
+            self.api.report_imaging(
+                self.rows[row]["id"],
+                text,
+                self.image_url.text().strip(),
+                self.impression.toPlainText().strip(),
+                self.study_uid.text().strip(),
+                self.series_uid.text().strip(),
+                self.modality.text().strip(),
+            )
+        except ApiError as e:
+            self.msg.setText(f"提交失败：{e.detail}")
+            return
+        self.report.clear()
+        self.impression.clear()
+        self.image_url.clear()
+        self.study_uid.clear()
+        self.series_uid.clear()
+        self.modality.clear()
+        self._load()
+        self.msg.setText("报告已提交")
+
+    def _review(self, approve: bool) -> None:
+        row = self.table.currentRow()
+        if not 0 <= row < len(self.rows):
+            self.msg.setText("请先选择检查申请")
+            return
+        item = self.rows[row]
+        if item.get("status") != "reported":
+            self.msg.setText("只有已报告检查可以审核")
+            return
+        note = self.review_note.text().strip()
+        if not approve and not note:
+            self.msg.setText("退回报告必须填写原因")
+            return
+        try:
+            self.api.review_imaging(item["id"], approve, note)
+        except ApiError as e:
+            self.msg.setText(f"审核失败：{e.detail}")
+            return
+        self.review_note.clear()
+        self.msg.setText("报告已审核" if approve else "报告已退回")
+        self._load()

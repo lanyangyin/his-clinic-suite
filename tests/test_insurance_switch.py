@@ -62,3 +62,43 @@ def test_insurance_disabled_rejects_insurance_card(client, auth, monkeypatch):
     )
     assert response.status_code == 400
     assert "医保" in response.json()["detail"]
+
+
+def test_insurance_disabled_self_pay_drug_not_blocked(client, auth, monkeypatch):
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", False)
+    enc = _encounter(client, auth, "自费开方", "110101199001017003")
+    drug = client.post(
+        "/drugs/",
+        json={"name": "全额自费药", "base_price": 10.0, "insurance_ratio": 0},
+        headers=auth["admin"],
+    ).json()
+    added = client.post(
+        f"/encounters/{enc['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    assert added.status_code == 201, added.text
+
+
+def test_insurance_precheck_is_recorded(client, auth):
+    enc = _encounter(client, auth, "医保审计", "110101199001017004")
+    rows = client.get(
+        "/insurance/transactions",
+        params={"encounter_id": enc["id"]},
+        headers=auth["doctor"],
+    ).json()
+    assert rows
+    assert rows[0]["encounter_id"] == enc["id"]
+    assert rows[0]["drug_name"]
+    assert rows[0]["result"] in {"pass", "warn", "forbid", "unavailable"}
+
+
+def test_insurance_gateway_unavailable_degrades_to_self_pay(client, auth, monkeypatch):
+    monkeypatch.setattr(settings, "INSURANCE_GATEWAY_URL", "http://127.0.0.1:1")
+    enc = _encounter(client, auth, "网关降级", "110101199001017005")
+    rows = client.get(
+        "/insurance/transactions",
+        params={"encounter_id": enc["id"]},
+        headers=auth["doctor"],
+    ).json()
+    assert any(row["result"] == "unavailable" for row in rows)

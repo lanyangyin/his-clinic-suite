@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.pharmacy import PharmacyWidget  # noqa: E402
-from scripts.record_ui_windows import CaptionBar  # noqa: E402
+from scripts.record_ui_windows import CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "retail"
@@ -35,7 +35,7 @@ def headers(user, password):
     return {"Authorization": f"Basic {token}"}
 
 
-class RetailDemo(QMainWindow):
+class RetailDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("药房工作站 · 零售")
@@ -149,6 +149,8 @@ class RetailDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("pharmacist", "pharm123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)

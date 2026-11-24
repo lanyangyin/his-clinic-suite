@@ -1,0 +1,346 @@
+{
+  "domain": "HIS 运营与管理中台 12 个子系统只读审计（auth、staff、hr、approval、archive、admin、bi、finance、reports、performance、facility、dict）。依据：docs/标准逐条对照.md、docs/标准对照与差距.md、reference/comparison.md、reference/README.md、app/modules/<module>/{models,router,service,schemas}.py、tests/test_*.py、his_client/ui/*、app/modules/admin/templates/*。静态代码+文档比对，未执行 pytest（只读约束），不引用运行结果。",
+  "modules": [
+    {
+      "module": "auth",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "口令哈希与幂等中间件扎实，但两个数据接口完全无鉴权、审计缺 IP/GET 留痕、管理台会话签名密钥有公开缺省值且管理台写操作在审计表记为 anonymous，是本批最高优先级安全问题。",
+      "findings": [
+        "app/modules/auth/router.py:43-48 GET /users/{user_id} 无任何鉴权依赖，未登录即可按 ID 枚举用户名/角色/employee_id/doctor_id/narcotic_right。",
+        "app/modules/auth/router.py:67-69 GET /audit/logs 无任何鉴权依赖，未登录可读全量审计日志；tests/test_auth.py 只断言写接口 401/403，未覆盖这两个读接口。",
+        "app/modules/auth/security.py:49-65 require_role 内置 admin 恒通过；权限模型仅 User.role 单字符串（app/modules/auth/models.py:8-20），无角色-权限表、无科室/本人数据范围。",
+        "app/migrate.py:38-76 部署时写入固定口令 admin/admin123 与 director/director123，User 无 must_change_password 字段，schemas.UserCreate 无密码长度/复杂度校验。",
+        "app/settings.py:47-50 SECRET_KEY 缺省回退 'his-dev-secret-change-me-0123456789'，app/main.py:255 用它签名管理台 SessionMiddleware Cookie；未注入 HIS_SECRET_KEY 即可伪造管理台会话，启动不校验不拒启。",
+        "app/main.py:178-191 审计中间件只对 POST/PUT/PATCH/DELETE 记 method+path+status_code，无 IP、查询参数、请求体、患者标识；敏感 GET（报表/驾驶舱/日结/审计日志）不留痕。",
+        "app/modules/admin/router.py:247-256 _guard 未写 request.state.user_name，app/main.py:183-190 只读该字段 → 管理台 101 处守卫下的写操作在 audit_logs 记为 anonymous，审计归属断裂。",
+        "app/modules/auth/models.py:23-34 AuditLog 无 ip/patient_id/query/biz_id；跨模块 app/modules/patient/models.py:87-102 PatientAccessLog 亦无 ip，与 docs/标准逐条对照.md P0-4 验收项（含 ip）不符。",
+        "HTTP Basic（security.py:10）+ 默认 HOST=0.0.0.0（app/settings.py:45）且应用层无 TLS；无会话超时、无多因素、无登录失败锁定/限速，凭据在局域网明文。",
+        "应保留：service.py:14-27 PBKDF2-HMAC-SHA256+随机盐+compare_digest；router.py:51-64 麻精处方权仅 admin；main.py:89-152 幂等键重放保护。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(108)项 主数据注册服务、第(109)项 主数据管理（身份与主数据治理基础）",
+        "NHC-2018-4 第(117)项 单点登录管理（当前 ❌，无 SSO）",
+        "EMR-2018-1079 第35项 电子病历基础/基础设施与安全管控（身份、权限、审计、备份）",
+        "EMR-2018-1079 第34项 电子认证与签名（病历签名仍为字符串，未与 CA 强制绑定）",
+        "智慧服务-2019-236 第16项 基础与安全/安全管理（身份认证覆盖全部系统）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 OpenHIS core-admin/core-system 平台化权限分层（当前 auth 仅 4 文件/238 行）",
+        "reference/comparison.md §3.4 上海哲策 README '痕迹保留模式/CA 数字证书签名'（当前留痕粒度不足）",
+        "reference/comparison.md §6 证据索引（审计需能串起业务对象）"
+      ],
+      "recommendation": "本轮必做：① 两处开放 GET 加 require_role('admin','hr')；② 审计中间件补 ip/query/biz 标识，敏感 GET 留痕；③ _guard 同步 request.state.user_name；④ SECRET_KEY 仍为缺省值则拒启动；⑤ 首登强制改密+口令强度+登录限速；⑥ 文档标注 TLS 为生产准入。",
+      "not_optimize_reason": "不适用：已判定 optimize_now。未登录可读用户与审计日志、缺省 SECRET_KEY 可伪造管理台会话，均为可直接利用的越权/伪造风险，不可延后。"
+    },
+    {
+      "module": "staff",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "科室/医生两表是可用最小主数据，停用校验（有在职医生不能停科室、有未完成就诊不能停医生）是真实闭环；缺执业资质/职称字段、医生唯一约束与读接口鉴权，属可延后但必补的合规项。",
+      "findings": [
+        "app/modules/staff/models.py:6-24 仅 Department(name,active) 与 Doctor(name,department_id,active,current_encounter_id)：无科室编码/类型/上级/院区，无执业证书号/职称/执业范围/有效期，与 docs/标准逐条对照.md:241 自述“缺证照/资质有效期管理”一致。",
+        "医生无唯一约束（models.py:14-24），同名同科室可重复建档；科室有 name unique（models.py:10）；create_doctor 仅校验科室存在且 active（service.py:56-68）。",
+        "读写鉴权不对称：GET /doctors/、/departments/、/departments/{id}、/doctors/{id} 无鉴权（app/modules/staff/router.py:27-40、52-57、96-101），写接口限 admin/hr（router.py:43-49、60-69、84-93）。",
+        "真实闭环（保留）：service.py:39-53 科室停用检查在职医生；service.py:90-103 医生停用检查 open/paused 就诊。",
+        "医生-账号绑定只靠 User.doctor_id / User.employee_id 两个可空 Integer（app/modules/auth/models.py:17-18），无外键无唯一约束；app/migrate.py:79-107 自动建医生档案回填 doctor_id，说明绑定靠约定。",
+        "处方权不在员工档案：麻精处方权是账号布尔 User.narcotic_right（auth/models.py:19-20），特殊级抗菌药对所有角色硬拦截（app/modules/encounter/service.py:702-703），职称/分级授权无处记录。",
+        "客户端：his_client/ui/hr.py:237-314 医生管理仅姓名+科室+启停；his_client/api.py:71-85 只有 doctors/departments 的 GET。",
+        "测试：tests/test_staff.py(7)+tests/test_hr_management.py(2) 覆盖重复科室返回已有、科室不存在、软删除拦截；未覆盖读接口鉴权、同名医生、资质字段。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(107)项 档案管理",
+        "NHC-2018-4 第(105)项 日常管理",
+        "NHC-2018-4 第(108)(109)项 主数据注册/管理",
+        "EMR-2018-1079 第15项 门诊病历记录（诊断与医师身份可信）",
+        "智慧服务-2019-236 第16项 基础与安全/安全管理"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 模块边界对照（OpenHIS 组织人员属 core-system，当前 staff 仅 2 表）",
+        "reference/comparison.md §3.6 字段级对照（第三方均有医生主数据与处方权维度）"
+      ],
+      "recommendation": "Doctor 加 (name,department_id) 唯一约束及执业证书/职称/执业范围/有效期；Department 加 code/类型/院区；doctor_id/employee_id 改外键+唯一；读接口 require_login；narcotic_right 迁到员工/医师资质并带有效期。",
+      "not_optimize_reason": "延后的具体理由：问题集中在缺字段与缺鉴权，不阻断当前交易主流程；资质/职称模型会牵动 encounter 的处方权与抗菌药分级校验，须与 dict（编码字典）、hr（员工档案）一起做一次主数据改造，单独改 staff 会二次返工。"
+    },
+    {
+      "module": "hr",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "四张表+双唯一约束+离职状态机+统一审批接入是真实实现，但 7 个读接口完全无鉴权（未登录可读薪酬与手机邮箱），且离职只改员工状态不失效登录账号，属隐私与越权残留。",
+      "findings": [
+        "读接口全无鉴权：app/modules/hr/router.py:54-68 GET /hr/employees/ 与 /{id}、:97-113 GET /hr/attendance/ 与 /attendance/summary、:129-144 GET /hr/salary-requests 与 /{id}、:191-198 GET /hr/shifts；未登录可读 base/bonus/total/review_note 与手机邮箱。",
+        "离职不失效账号：app/modules/hr/service.py:37-49 resign() 只置 Employee.status/resigned_at，不动 users 中 employee_id 关联账号，离职者仍可 Basic 登录（auth/security.py:23-29 只校验用户名口令）。",
+        "薪资审批双入口权限不一致：hr/service.py:147-159 创建时 ensure_request(...,'admin')，hr/router.py:147-175 approve/reject 仅 admin；但 approval/service.py:152-169 把 salary_request 待办派给 hr/director，二者看得到批不了，只能绕 /approvals/requests/action。",
+        "唯一约束真实存在（attendance models.py:41-45、salary models.py:73-75、shift models.py:95-97），但服务层先查后插（service.py:61-71、128-137、233-242），并发 IntegrityError 未转 400。",
+        "金额固化：service.py:139-147 total_amount=round(base+bonus) 创建即固定，无重算/冲正、无发放（打款）状态、无工资条/个税/社保；status 仅 pending/approved/rejected（models.py:61-62）。",
+        "考勤只有 in/out 打卡（models.py:27-45、schemas.py:23-26），无请假/加班/年假/调休；attendance_summary 只数有打卡的日期（service.py:95-115）；培训/测评无实现。",
+        "客户端与管理台双缺：his_client/ui/hr.py 仅员工/医生/科室/账号四页签（main_window.py:48-50），无考勤/薪资/排班；app/modules/admin/templates 无 hr 模板、base.html 无链接 → 薪资审批任何界面不可达。",
+        "测试：tests/test_hr.py(9) 覆盖建员工/重复工号/离职/过滤/角色保护；tests/test_hr_management.py(2) 覆盖 hr 建账号与禁止建 admin/director（对应 auth/router.py:25-26）；未覆盖读接口鉴权、薪资多级、并发。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(106)项 绩效与薪酬管理（当前仅申请-审批，无核算）",
+        "NHC-2018-4 第(105)项 日常管理（工作时间、培训、考勤、测评）",
+        "NHC-2018-4 第(107)项 档案管理",
+        "EMR-2018-1079 第35项 基础设施与安全管控（权限与审计）",
+        "智慧服务-2019-236 第16项 基础与安全/安全管理"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 模块边界（OpenHIS 人事在 core-system；当前 hr 独立成包但只到申请审批）",
+        "docs/标准逐条对照.md:546 九、人力资源管理整改建议“补资质有效期、绩效核算”"
+      ],
+      "recommendation": "本轮必做：① 7 个读接口加 require_role('admin','hr')；② resign 联动禁用账号并强制改密；③ 薪资审批与 inbox 权限对齐，只保留一条写入路径；④ 员工-账号外键唯一。后续补请假/加班/工资条/发放状态与绩效权重。",
+      "not_optimize_reason": "不适用：已判定 optimize_now。未登录可读薪酬与 PII、离职账号不失效属隐私与越权问题，修复成本极低（加依赖+一处联动），不可推迟。"
+    },
+    {
+      "module": "approval",
+      "verdict": "optimize_later",
+      "priority": "P1",
+      "summary": "统一审批引擎方向正确（可配多级、转交、撤回、超时升级、通知入队），多级审方已有测试；但存在“已批准但不落库”的事务缺陷、升级无调度无界面、ensure_request 终态复用等状态机问题。",
+      "findings": [
+        "事务缺陷：app/modules/approval/service.py:348-473 advance_request 仅 flush，app/modules/approval/router.py:142-205 只在 biz_type ∈ {purchase_request, archive_destruction, salary_request} 或 prescription、或 transferred/cancelled 分支 commit。catalog_proposal 等走 /approvals/requests/action 时返回 result=approved 但 get_db（app/database.py:48-53）关闭即回滚，审批步骤丢失。",
+        "无自动超时升级：service.py:503-543 escalate_due 仅由 POST /approvals/escalate-due（router.py:218-223）手工触发；全仓库无 scheduler/BackgroundTasks，notify.dispatch_pending 亦仅手工端点（app/modules/notify/router.py:59）→ 24h 时限与升级实际不生效。",
+        "超时能力无客户端无测试：his_client/api.py 无 /approvals/overdue 或 escalate；his_client/ui/approval_inbox.py 表格仅 5 列不显示 due_at；tests 无 overdue/escalate-due 断言。",
+        "指派不参与鉴权：router.py:128-141 只比较 step['role_required'] 与 user.role，advance_request 写入的 step.assignee（service.py:385-403）从未校验，同角色任意账号可代批。",
+        "终态复用：service.py:249-258 ensure_request 命中同 (biz_type,biz_id) 即返回旧实例（含 rejected/cancelled）；调用方均靠“新建业务行→新 ID”（encounter/service.py:319-329、hr/service.py:150-159、archive/service.py:306-315、catalog_proposal/service.py:29-40、warehouse/service.py:832-841/930-939），将来支持同单据重提会静默落入已关闭流程。",
+        "事务穿透：service.py:185-204 record_event 内部 commit，可能在业务事务中途提交，后续抛错会造成时间线与业务状态不一致（如 router.py:186-194）。",
+        "无 schemas.py：模块仅 models/router/service/__init__（docs/子系统模块清单.md:9），FlowStepIn/FlowIn/ApprovalAction 内联在 router.py:22-38，与项目四件套约定不一致。",
+        "真实能力（保留）：多级配置 PUT /approvals/flows/{biz_type} 有测试（tests/test_clinical_refactor.py:310-357，药师→院长两级并断言 current_step=2）；非法动作 ValueError 转 400（service.py:426-427）；撤回限申请人（router.py:124-126）。",
+        "测试：无 tests/test_approval.py，覆盖散在 tests/test_clinical_refactor.py 与 tests/test_purchase_request.py（flows/action/inbox/history），属间接覆盖。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(115)项 业务规则流程管理（⚠️ 有可配步骤，无可视化编排与规则校验）",
+        "EMR-2018-1079 第35项 基础设施与安全管控（审批留痕）",
+        "智慧服务-2019-236 第17项 基础与安全/服务监督（过程记录与时限）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.3 审方（ReviewPrescriptionRecords.passFlag/reasonText/practitionerId 与 ApprovalStep 字段等价）",
+        "reference/comparison.md §4 状态机对照（ApprovalRequest.status/current_step 与建议处方状态的映射）"
+      ],
+      "recommendation": "先修三处：① 未处理 biz_type 统一 commit（或提交责任收敛到服务层）；② 后台/定时驱动 escalate-due 并把 overdue 展示进 inbox 与 api.py；③ assignee 参与鉴权、ensure_request 对终态请求新建实例。再补 schemas.py 与 record_event 事务化。",
+      "not_optimize_reason": "延后的具体理由：四条在用业务（处方、采购、病案、薪资）都落在已提交分支，未提交缺陷只影响 catalog_proposal 走通用 action 的旁路；升级缺失只是“没自动升级”，不产生错误审批，故不到 P0。"
+    },
+    {
+      "module": "archive",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "归档状态机与“院长审批+双人执行+清册打印”是本批最完整闭环；但同一模块并存旧销毁接口，病案管理员凭自由文本审批人即可置 destroyed，绕过院长审批且不可逆；复印费也不进收费系统。",
+      "findings": [
+        "销毁审批绕过（不可逆）：app/modules/archive/router.py:189-200 POST /archive/records/{id}/destroy 仅 require_role('archive')，service.py:231-252 destroy_record 只校验 approved_by 非空即置 destroyed，不查 ArchiveDestructionRequest；管理台同样暴露 POST /admin/archive/records/{id}/destroy（app/modules/admin/router.py:1794-1816）。",
+        "绕过已被测试固化：tests/test_archive.py:120-128 以 approved_by='医务科' 直接销毁并断言 200/status=destroyed；docs/院长审批工作站.md:38 明示“旧接口保留兼容”。",
+        "新流程达标（保留）：service.py:278-318 限 archived/draft、借出中禁止、同病案不得重复未完成申请；router.py:235-260 批准仅 director；service.py:362-393 执行要求 witness≠operator 并写 ArchiveDestruction 清册；router.py:327-367 清册打印做 HTML escape。",
+        "复印费不入账：ArchiveCopyRequest.fee（models.py:81）仅在 complete_copy（service.py:170-184）写值，全仓库无 EncounterCharge/Payment 关联 → 复印收费不产生收费记录、不进日结、不开票。",
+        "借阅无审批无逾期：service.py:107-128 borrow_record 将 approver 直接置为操作人；models.py:63-64 定义 overdue 但无代码置位，list/history 无逾期扫描。",
+        "页数为手工录入（service.py:85-104），与病历实际页数、completeness 无数据源关联；archive_no 由 BA+日期+自增 id 生成（service.py:31-33），唯一约束在列上（models.py:15）。",
+        "附件：后缀白名单+10MB（router.py:294-299），uuid 文件名落 data/archive_destructions，下载限 archive/director/admin（router.py:310-315）；无病毒扫描、无水印、无下载留痕。",
+        "客户端：his_client/ui/archive.py 覆盖建档/归档/借阅/复印/封存/销毁申请/执行/打印，但 _refresh_borrow 借阅人/应还日期两列恒空（archive.py:354-361），复印完成（fee）无入口；his_client/api.py:549-550 destroy_archive 为无 UI 调用的死代码。",
+        "测试：tests/test_archive.py(3)+tests/test_director_approvals.py(4) 覆盖全生命周期、完整性拦截、职责分离、驳回后重新申请；未覆盖并发 archive_no、复印费入账、逾期置位。"
+      ],
+      "standard_refs": [
+        "EMR-2018-1079 第32项 病历管理/电子病历文档应用（授权浏览、留痕）",
+        "EMR-2018-1079 第31项 病历管理/病历质量控制（整改闭环）",
+        "NHC-2018-4 第(46)项 电子病历质量管理（当前仅表单完整性检查）",
+        "NHC-2018-4 第(73)项 业务结算与收费（复印费未入收费/日结）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.4 病历留痕（上海哲策‘痕迹保留/CA 签名’，当前销毁仅账号留痕）",
+        "reference/comparison.md §4 状态机对照（当前处方/发药状态机写法可套用到病案）"
+      ],
+      "recommendation": "立即：① 下线或改造两条 /destroy 路由（仅创建销毁申请）；② tests/test_archive.py 改断言该接口 403/404；③ 复印费生成 EncounterCharge 并与 cashier 日结打通。其次：借阅审批+逾期扫描，修 UI 借阅台账两列。",
+      "not_optimize_reason": "不适用：已判定 optimize_now。病案销毁不可逆且绕过院长审批，属档案合规红线，不可延后。"
+    },
+    {
+      "module": "admin",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "管理台是事实上一体化后台（104 路由/44 模板，覆盖主数据、入库、医保、库房、被服、CSSD、GSP、病案、采购、盘点、报表、打印），会话守卫 100% 覆盖值得肯定；但单文件 2736 行、双仪表盘、审计归属缺失、与桌面端两套写入口，需结构化收敛。",
+      "findings": [
+        "规模：app/modules/admin/router.py 2736 行、104 条路由（正则统计），templates 44 个，base.html 33 条 /admin 导航链接；一个 router 同时承担主数据/入库/医保/库房/被服/CSSD/GSP/病案/采购/盘点/发票/报表/打印，与 reference/README.md“一模块一包”参照及 comparison.md §2 平台分层差距明显。",
+        "守卫完整：101 处 _guard，正则扫描仅 GET/POST /login 与 /logout 例外（router.py:267-297）；_guard 每次回查 users 确认 role=='admin'（router.py:247-256），降权即失效。",
+        "审计归属缺失：_guard 不写 request.state.user_name，main.py:183-190 只读该字段 → 管理台所有写操作在 audit_logs 记 anonymous；而管理台是改药品/收费项目/医保目录/发票的唯一入口。",
+        "双仪表盘：/admin（router.py:300-313 + dashboard.html + admin/service.py:16-53）与 /admin/dashboard（router.py:2653-2728 + operations_dashboard.html，聚合内联）同一看板两套代码。",
+        "收入口径与财务不一致：router.py:2681-2686 用 Payment.amount 且 status=='paid'，与 finance.daily_close、bi.executive 构成三套口径。",
+        "表单无 CSRF token，仅依赖 SessionMiddleware 默认 SameSite=Lax；销毁、盘点完成、发票关闭等不可逆操作无二次确认。",
+        "单一 admin 角色：_guard 只认 role=='admin'（router.py:253），director/hr/archive 均不可进；桌面端又把人事/审批/审计中心分给 hr/director，两套权限模型并存。",
+        "主数据双入口：/admin/master/departments 与 POST /departments/、/admin/master/drugs 与 POST /drugs/、/admin/users 与 POST /users/ 各自实现；users.html 无 narcotic_right 字段，PUT /users/{id}/narcotic-right 无界面可达。",
+        "测试：tests/test_admin.py(17)+tests/test_admin_pages.py(1) 覆盖登录/守卫/科室/医生/药品/收费项/用户/审计页/报表页/入库/库房/医保目录导入；linen/cssd/gsp/expiry/trace-codes 等由 tests/test_linen_cssd_admin.py 间接覆盖；无用例断言“管理台写操作在 audit_logs 的 username 归属”。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(108)(109)项 主数据注册/管理",
+        "NHC-2018-4 第(120)项 医院门户网站（⚠️ 管理台非完整门户）",
+        "NHC-2018-4 第(118)项 平台配置（可视化配置，❌）",
+        "EMR-2018-1079 第35项 基础设施与安全管控（审计）",
+        "智慧服务-2019-236 第16项 基础与安全/安全管理"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 OpenHIS core-admin/core-system/core-flowable 平台化拆分（对照当前 admin 单包）",
+        "reference/comparison.md §5.2 不直接借鉴（不引入 116 张平台表/流程引擎）",
+        "reference/README.md 使用边界（只读参考，不复制 GPL 代码）"
+      ],
+      "recommendation": "P2：① _guard 写 request.state 修审计归属（可与 auth 合并提交）；② 按域拆 router（master/warehouse/insurance/archive/report），模板不动；③ 合并两个仪表盘并复用统一收入函数；④ 不可逆动作加确认页与 CSRF token；⑤ 允许 director 只读访问报表/驾驶舱。",
+      "not_optimize_reason": "延后的具体理由：守卫 100% 覆盖、无未授权访问面，当前问题主要是可维护性与审计归属，不产生错误业务结果；拆 router 会同时改 44 个模板的 endpoint，风险集中在发布期，应与前端/部署同步排期，不排在临床核心之前。"
+    },
+    {
+      "module": "bi",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "BI 有 overview/趋势/诊断/药品四接口与院长驾驶舱+Excel 导出，指标真实可算；但仅 admin 可读（院长读不到“院长驾驶舱”）、收入口径漏 partially_refunded、Top 指标全时段与区间混用、聚合方式对大表不友好。",
+      "findings": [
+        "角色错配：app/modules/bi/router.py:15,24,34,43 与 executive_router.py:21,30 全部 require_role('admin')，director 无法读驾驶舱或导出；his_client/ui/main_window.py 无 BI 页签，his_client/api.py 无 /bi/ 方法。",
+        "口径漏部分退费：app/modules/bi/executive.py:35-45 只取 status=='paid'，而 app/modules/billing/service.py:337 会产出 partially_refunded → 当日部分退费后整笔收入被剔除；同仓库 billing/service.py:343-364 get_summary 用 paid∪partially_refunded+净额，口径冲突。",
+        "时间语义不一致：executive 按区间（executive.py:169-271，默认近 30 天），top_diagnoses/top_drugs 全时段（bi/service.py:111-146 无时间过滤）。",
+        "指标无定义层：无指标字典/口径说明；药占比 drug_revenue/revenue（executive.py:250-251）分子取 EncounterCharge 已收、分母取 Payment 净额，数据源不同。",
+        "性能：executive.py:176-188 全量 Encounter.all()+EncounterCharge.all()；executive.py:157-166 每行两次 get_drug（N+1）；executive.py:89-121 分组后逐行 db.get；阈值 <=10 硬编码（:97,:112）。",
+        "真实能力（保留）：/bi/executive/export.xlsx（executive_router.py:25-39）与 tests/test_report_export.py:45-59 断言工作表；overview 覆盖门诊收费、检验/检查申请、住院出入院（bi/service.py:22-79）。",
+        "测试：tests/test_bi.py(5) 覆盖 overview/趋势/诊断/药品/角色保护；未覆盖 executive（另在 test_report_export）与部分退费口径。"
+      ],
+      "standard_refs": [
+        "EMR-2018-1079 第38项 信息利用/医疗质量控制（⚠️ 仅工作量与收入指标）",
+        "NHC-2018-4 第(114)项 数据质量（❌）",
+        "NHC-2018-4 第(74)项 财务信息管理（⚠️）",
+        "智慧服务-2019-236 第17项 基础与安全/服务监督"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §5.1 OpenHIS“多维报表”（参考指标定义不照搬页面）",
+        "reference/comparison.md §3.6 字段级对照（报表应从处方头/发药明细取数）",
+        "docs/标准逐条对照.md:556 十九、大数据技术“先做运营指标，不建大数据平台”"
+      ],
+      "recommendation": "P2：① 收入聚合抽成共享函数（含 partially_refunded 与净额）供 bi/finance/admin/performance 复用；② director 加只读；③ top_* 加日期区间；④ 建指标口径文档（分子/分母/数据源）；⑤ executive 改 SQL 聚合与批量取名。",
+      "not_optimize_reason": "延后的具体理由：BI 只读，不影响交易与资金落账；口径错会误导决策但不改账，且修复依赖 finance 的 P0 统一函数先落地，先修 finance 再让 BI 复用可避免两处各改一遍。"
+    },
+    {
+      "module": "finance",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "财务日结仅 4 表/182 行，停在“按日汇总门诊 Payment + 住院 InpatientCharge”，却把部分退费整笔漏掉、跨日退款丢失、无冲正重算，且 3 个查询接口完全无鉴权；这是本批唯一直接导致账实不符的 P0。",
+      "findings": [
+        "日结漏部分退费：app/modules/finance/service.py:51-60 只统计 status=='paid' 与 'refunded'，而 app/modules/billing/service.py:337 会把部分退费置为 'partially_refunded' → 该笔收费从 paid 与 refunded 两个口径同时消失，日结差额等于全部部分退费金额。",
+        "退款跨日无处归属：日结按 Payment.created_at 取数（service.py:37-41），退款事件在 ChargeRefund.created_at（app/modules/billing/models.py:100-128），finance 从不读 ChargeRefund；FinanceClosure.close_date 唯一+“该日已日结”（models.py:12、service.py:28-34）→ 次日退款既不进原日结也不进退款日日结。",
+        "无冲正/反结账：FinanceClosure 无 reversed/reopened 字段（models.py:8-23），router.py 仅 4 条路由无重算/作废；monthly_summary 实时重算（service.py:86-122）与已固化日结之和可能不等且无核对报告。",
+        "读接口无鉴权：app/modules/finance/router.py:27-45 GET /finance/daily-closes、/daily-close/{date}、/monthly-summary 无任何依赖，未登录可读日结与月结金额。",
+        "角色错配+双日结：日结仅 require_role('admin')（router.py:19），收费员不能日结；app/modules/cashier 另有 CashierShift 交班/日结（his_client/ui/cashier.py:55,1236-1345 调 /cashier/shifts/open|close），两套互不核对。",
+        "医保不净：insurance_amount 取 p.insurance_amount（service.py:60）不减 refunded_insurance_amount；住院费用直接 InpatientCharge.amount 求和（service.py:42-49,62），与门诊 Payment 语义不可比却并表。",
+        "并发：close_date 有唯一约束但服务层先查后插（service.py:28-34），并发双击日结抛 IntegrityError 未转 400。",
+        "测试：tests/test_finance.py(9) 覆盖日结、全额退费后 paid_count=0、重复日结 400、月汇总、角色保护；未覆盖部分退费、跨日退费、反结账、读接口鉴权。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(73)项 业务结算与收费（收费/结算/医保/对账；真实医保为 Mock）",
+        "NHC-2018-4 第(74)项 财务信息管理（⚠️）",
+        "NHC-2018-4 第(76)项 全面预算管理（❌）、第(77)项 全成本（❌）",
+        "智慧服务-2019-236 第12项 全程服务/费用支付"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.6 字段级对照（退费需按明细 send_qty/return_qty，当前只到 Payment 头）",
+        "reference/comparison.md §4 状态机对照（paid/partially_refunded/refunded 应独立建模）",
+        "docs/标准逐条对照.md:495-503 (73) 结论“医保是 Mock，未达对账要求”"
+      ],
+      "recommendation": "P0：① 统一金额口径（净额+paid∪partially_refunded），ChargeRefund 按退款日期计入日结；② 3 个查询接口加 require_role('admin','cashier')；③ 加日结重算/冲正（新记录反向冲抵，原日结不改）；④ 与 CashierShift 对账。P1：医保金额净值化、住院/门诊分表。",
+      "not_optimize_reason": "不适用：已判定 optimize_now。日结可直接记错账（部分退费整笔漏记、跨日退款丢失），而部分退费（退 1 颗药，billing/service.py:241 明确支持）是实际运营常态。"
+    },
+    {
+      "module": "reports",
+      "verdict": "merge",
+      "priority": "P3",
+      "summary": "reports 实质只有“科室收入”一张报表+一个 xlsx 导出（2 路由/134 行），核心 service 已被 bi/executive 与 admin 报表页复用，无独立模型与生命周期，建议并入 bi。",
+      "findings": [
+        "能力范围：app/modules/reports/router.py 仅 GET /reports/departments/revenue 与 /export.xlsx；schemas.py 仅 DepartmentRevenueItem；无独立 models.py。",
+        "被跨模块复用：app/modules/bi/executive.py:15 与 app/modules/admin/router.py:48 均 import department_revenue → 报表逻辑事实属 bi/公共层，reports 只是路由壳。",
+        "科室归属是当前值非快照：reports/service.py:33-36 经 Registration→Doctor→Department 取 Doctor.department_id，EncounterCharge 无科室字段 → 医生调科后历史报表金额漂移，口径不可复现。",
+        "退费口径同病：service.py:61-71 只认 status=='refunded'（漏 partially_refunded）；refunded_amount 用 EncounterCharge.amount 而非实退金额，refunded_quantity 未参与（app/modules/charges/models.py 有该字段）。",
+        "全量内存聚合：service.py:24-71 先 query.all() 再 Python 求和，无 SQL group by。",
+        "口径已固化进测试：tests/test_reports.py:64-68 断言内科 paid_amount=10+20+25、drug_amount=25 等具体数字，调整口径需同步改断言。",
+        "鉴权：两条路由均 require_role('admin')（router.py:22,32），director/cashier 不可读；his_client/api.py 无 /reports/。",
+        "测试：tests/test_reports.py(3) 覆盖两科室归类/日期过滤/权限；tests/test_report_export.py:62-83 覆盖 xlsx 与权限；未覆盖调科漂移、部分退费、大数据量。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(74)项 财务信息管理（报表维度不足）",
+        "EMR-2018-1079 第38项 信息利用/医疗质量控制",
+        "智慧服务-2019-236 第17项 基础与安全/服务监督"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §1 上海哲策独立 his-module-report 与当前 2 路由报表的规模差",
+        "reference/comparison.md §3.6 字段级对照（第三方按处方头/发药明细出报表）"
+      ],
+      "recommendation": "并入 bi：department_revenue 移入 bi/service 或 bi/revenue.py，/reports/* 保留为兼容别名；在 bi 补科室维度快照（结算时写 department_id 或单独归集表）。",
+      "not_optimize_reason": "合并不立即优化的理由：模块本身不产生错误结果（仅口径与 finance 相同待修），合并属结构性整理；在 finance/bi 口径统一时顺带搬移，可避免现在为目录好看做一次无收益的引用点改动。"
+    },
+    {
+      "module": "performance",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "绩效仅 76 行/1 接口，统计医生接诊/处方/收入/住院/医嘱五项工作量，能算但只能出“开科以来累计”，收入用毛额且漏部分退费，无权重无评分，也无任何界面入口。",
+      "findings": [
+        "无时间维度：app/modules/performance/service.py:11-16 只按 doctor_id 过滤，router.py:13-19 无日期参数 → 无法月度/季度考核。",
+        "收入口径错：service.py:28-33 用 func.sum(Payment.amount) 且 status=='paid' → 毛额、漏 partially_refunded；tests/test_performance.py:88 断言 outpatient_revenue==20.0 把毛额口径固化。",
+        "只到工作量计数：service.py:47-58 返回 encounters/prescriptions/outpatient_revenue/admissions/orders，无权重/目标/得分/排名，也未与 hr.SalaryRequest（base/bonus 手工填，app/modules/hr/service.py:118-162）联动 → NHC (106) 仍停在申请-审批。",
+        "无界面：his_client/api.py 无 /performance/、his_client/ui 无页签、app/modules/admin/templates 无绩效模板、base.html 无链接 → 仅 /docs 或 curl 可用。",
+        "输出无分页/筛选：service.py:43-58 对 list_doctors(db) 全量逐条拼装，医生多时输出膨胀。",
+        "测试：tests/test_performance.py(4) 覆盖计数/过滤/空数据/权限；未覆盖日期区间、部分退费、权重。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(106)项 绩效与薪酬管理（⚠️ 缺完整绩效核算）",
+        "NHC-2018-4 第(105)项 日常管理",
+        "EMR-2018-1079 第38项 信息利用/医疗质量控制"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §1 上海哲策 his-module-report 多维报表（当前绩效仅 1 维）",
+        "docs/标准逐条对照.md:546 “补资质有效期、绩效核算”"
+      ],
+      "recommendation": "P2：加 start_date/end_date，收入改净额（复用 finance/bi 统一函数）；补权重与得分表；接 admin 页面或桌面页签；与薪资申请打通“绩效→奖金建议”。",
+      "not_optimize_reason": "延后的具体理由：绩效不参与交易与结算，算错不产生错账或越权；且其收入口径修复依赖 finance 的 P0 统一函数，现在单独改会形成第四套口径。"
+    },
+    {
+      "module": "facility",
+      "verdict": "keep",
+      "priority": "P3",
+      "summary": "院区/诊室两表 145 行，仅被挂号排班 room_id 引用，约束设计合理（code 唯一、campus+code 唯一、IntegrityError 兜底），无敏感数据；缺的是设备/资产/后勤域，属新域而非本模块缺陷。",
+      "findings": [
+        "边界明确：app/modules/facility/models.py 仅 Campus(code,name,address,active) 与 Room(campus_id,code,name,department_id,active)；无床位（床位在 app/modules/inpatient/models.py:15）、无设备台账/维保/计量、无库房/楼宇。",
+        "约束到位：Campus.code unique（models.py:12）、Room(campus_id,code) UniqueConstraint（models.py:32）+ create_room 捕获 IntegrityError 转 ValueError（service.py:42-46）；create_campus 只有先查后插无兜底（service.py:8-16）。",
+        "缺停用能力：两表都有 active，但 service.py 仅 create/get/list，router.py 仅 4 GET+2 POST，无 update/deactivate → 停用只能改库。",
+        "鉴权：写 admin（router.py:20-29,45-54），读全开（router.py:32-42,57-70）；院区/诊室非敏感，风险低但与本批一致性问题相同。",
+        "无界面：app/modules/admin/templates 无 campuses/rooms 模板、base.html 无链接；his_client/api.py 无 /campuses、/rooms（/surgery/rooms、/treatment-room/rooms 属别的域）→ 只能 API 建院区/诊室，再由 POST /schedules/ 的 room_id 使用（tests/test_facility.py:58-101 证明链路）。",
+        "测试：tests/test_facility.py(3) 覆盖院区/诊室 CRUD、重复编码、过滤、排班带 room_id 与非法 room 400；未覆盖并发与停用。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(78)项 医疗设备管理（⚠️ 由设备/资产模块而非 facility 承担）",
+        "NHC-2018-4 第(79)项 后勤设备管理（❌）",
+        "NHC-2018-4 第(80)项 资产信息管理（⚠️）",
+        "NHC-2018-4 第(108)(109)项 主数据注册/管理"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 上海哲策按床位/手术室/库房分层（当前 facility 只到院区/诊室）",
+        "docs/标准逐条对照.md:543 六、后勤管理“楼宇自控、废弃物、被服等不在软件 P0”"
+      ],
+      "recommendation": "保持现状；若要动只加 PUT /campuses/{id}、PUT /rooms/{id}（启停+换科室）并在 admin 或 hr 给最小维护页。设备/资产/后勤设备属新域，不要塞进 facility。",
+      "not_optimize_reason": "具体理由：仅 145 行、无敏感数据、无状态机，唯一依赖是 schedules.room_id（只读引用），不影响业务流程；缺的“停用接口”可在任何一次主数据改造中顺手加，而 NHC 78/79/80 是独立领域模型，强行扩表会造出无页面的空模块。"
+    },
+    {
+      "module": "dict",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "通用 (dict_type,code,name) 键值表结构正确、唯一约束有效，当前承担 ICD-10 诊断编码校验；但库里只有迁移种入的 20 条编码，超出即被拒，且无导入接口与任何维护界面，变更无版本无留痕。",
+      "findings": [
+        "结构可用：app/modules/dict/models.py:6-25 DictEntry(dict_type,code,name,category,sort_order,active)+UniqueConstraint('dict_type','code')；list_entries 按 sort_order,id 排序（service.py:40-46）。",
+        "ICD-10 仅 20 条：alembic/versions/0071_diagnosis_icd10.py:16-37 种入 20 个编码，而 app/modules/encounter/service.py:57-72 _resolve_diagnosis 要求 code 存在且 active，否则抛“诊断编码不存在或已停用” → 真实门诊多数诊断无法带编码，只能退化为纯文本（service.py:68-72 允许 name-only 返回空 code）。",
+        "无批量导入：dict/router.py 仅逐条 POST /{dict_type}/entries、PUT .../{code}、2 GET、GET /types（5 条路由，与 docs/子系统模块清单.md:19 一致），无 CSV/接口导入，无 ICD-10/ICD-9-CM3/医保目录映射字段。",
+        "无维护界面：app/modules/admin/templates 无 dict 模板、base.html 无链接；his_client 仅 api.py:322 读 /dict/diagnosis_icd10/entries，无增改入口 → 维护只能靠 /docs。",
+        "变更无留痕：service.py:62-74 update_entry 直接 setattr 后 commit，无版本表/ApprovalEvent/before-after；停用后历史病历仍存 code 字符串，无引用校验。",
+        "并发：create_entry 先查后插（service.py:10-16），唯一约束在库层但未捕获 IntegrityError → 并发重复提交 500。",
+        "读接口无鉴权：router.py:32-44、61-63 三条 GET 无依赖，可枚举任意 dict_type（数据非敏感，风险低但与本批一致性问题相同）。",
+        "测试：tests/test_dict.py(8) 覆盖唯一、跨类型同码、排序、停用过滤、类型统计、角色保护；未覆盖与 encounter 诊断编码联动、20 条上限、并发。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4 第(108)(109)项 主数据注册/管理（⚠️ 缺主数据治理）",
+        "NHC-2018-4 第(22)项 门急诊电子病历（诊断编码字典不完整，见逐条对照 4.1）",
+        "EMR-2018-1079 第15项 门诊病历记录（诊断编码与名称）",
+        "EMR-2018-1079 第33项 病历数据存储（主数据统一）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.6 字段级对照（第三方接完整诊断/医嘱字典，当前 ICD 有限）",
+        "docs/标准逐条对照.md:56 “ICD 字典仍有限”与 :242-243 信息平台基础整改建议"
+      ],
+      "recommendation": "P2（其中 ICD 数据补齐属 P1）：① 提供 ICD-10 批量导入（CSV/接口+去重校验）并导入国家临床版目录；② 加标准来源/版本/生效状态与变更版本表；③ 给 admin 一个最小字典维护页；④ 读接口加 require_login；⑤ 补 dict↔encounter 联动测试。",
+      "not_optimize_reason": "延后的具体理由：字典只在“用户主动填 code”时拦截，纯名称诊断仍可完成诊疗（encounter/service.py:68-72），不阻断交易；补全 ICD 目录属数据工程（需标准目录来源与授权），应先确认部署医院使用的编码版本再一次性导入，避免现在塞入不合规编码集。"
+    }
+  ]
+}

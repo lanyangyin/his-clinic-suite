@@ -63,6 +63,7 @@ def test_submit_report(client, auth):
     body = r.json()
     assert body["status"] == "submitted"
     assert body["submitted_at"] is not None
+    assert body["receipt_no"].startswith("MOCK-PH-")
 
     # 重复上报
     again = client.post(
@@ -116,3 +117,59 @@ def test_role_protection(client, auth):
         json={"encounter_id": encounter["id"], "disease_code": "Y", "disease_name": "Y"},
     )
     assert r.status_code == 401
+
+
+def test_report_card_elements(client, auth):
+    encounter = make_encounter(client, auth)
+    r = client.post(
+        "/public-health/reports",
+        json={
+            "encounter_id": encounter["id"],
+            "disease_code": "TB-CARD",
+            "disease_name": "肺结核",
+            "report_type": "confirmed",
+            "onset_date": "2026-11-01",
+            "diagnosis_date": "2026-11-20",
+            "report_unit": "演示医院感染科",
+            "reporter_phone": "13800138000",
+            "is_death": False,
+        },
+        headers=auth["doctor"],
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["report_type"] == "confirmed"
+    assert body["onset_date"] == "2026-11-01"
+    assert body["report_unit"] == "演示医院感染科"
+    assert body["reporter_phone"] == "13800138000"
+
+
+def test_submit_fails_closed_without_platform(client, auth, monkeypatch):
+    from app import settings
+
+    encounter = make_encounter(client, auth)
+    report = make_report(client, auth, encounter["id"], code="TB-CLOSED").json()
+    monkeypatch.setattr(settings, "PUBLIC_HEALTH_ALLOW_MOCK", False)
+    r = client.post(
+        f"/public-health/reports/{report['id']}/submit", headers=auth["admin"]
+    )
+    assert r.status_code == 503
+    assert "未配置" in r.json()["detail"]
+    row = client.get(f"/public-health/reports/{report['id']}").json()
+    assert row["status"] == "draft"
+    assert row["submit_error"]
+
+
+def test_gateway_failure_keeps_draft(client, auth, monkeypatch):
+    from app import settings
+
+    encounter = make_encounter(client, auth)
+    report = make_report(client, auth, encounter["id"], code="TB-GW").json()
+    monkeypatch.setattr(settings, "PUBLIC_HEALTH_GATEWAY_URL", "http://127.0.0.1:1")
+    r = client.post(
+        f"/public-health/reports/{report['id']}/submit", headers=auth["admin"]
+    )
+    assert r.status_code == 503
+    row = client.get(f"/public-health/reports/{report['id']}").json()
+    assert row["status"] == "draft"
+    assert row["submit_error"]

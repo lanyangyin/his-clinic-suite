@@ -12,12 +12,15 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLabel,
     QLineEdit,
+    QMenu,
+    QToolButton,
+    QHBoxLayout,
     QVBoxLayout,
 )
 
 from his_client.api import ApiClient, ApiError
 from his_client.config import ClientConfig
-from his_client.ui.theme import apply_theme, colors, register_theme_listener
+from his_client.ui.theme import apply_theme as apply_widget_theme, colors, refresh_theme, register_theme_listener
 from his_client.ui.window_theme import apply_light_titlebar
 
 
@@ -36,7 +39,7 @@ def _split_server(url: str) -> tuple[str, int, str]:
 class LoginDialog(QDialog):
     def __init__(self, config: ClientConfig, parent=None):
         super().__init__(parent)
-        apply_theme(self)
+        apply_widget_theme(self)
         self.setWindowTitle("HIS 客户端登录")
         self.setMinimumWidth(460)
         self.config = config
@@ -90,11 +93,26 @@ class LoginDialog(QDialog):
         buttons.button(QDialogButtonBox.Cancel).setText("退出")
         buttons.accepted.connect(self._try_login)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        bottom = QHBoxLayout()
+        self.settings_btn = QToolButton()
+        self.settings_btn.setText("设置")
+        self.settings_btn.setPopupMode(QToolButton.InstantPopup)
+        settings_menu = QMenu(self.settings_btn)
+        settings_menu.addAction("刷新主题", self._refresh_theme)
+        self.settings_btn.setMenu(settings_menu)
+        bottom.addWidget(self.settings_btn)
+        bottom.addStretch(1)
+        bottom.addWidget(buttons)
+        layout.addLayout(bottom)
         self.password_edit.returnPressed.connect(self._try_login)
         register_theme_listener(self)
 
+    def _refresh_theme(self) -> None:
+        refresh_theme()
+        self.update()
+
     def apply_theme(self) -> None:
+        apply_widget_theme(self)
         self.hint.setStyleSheet(f"color: {colors()['muted']};")
         self.error_label.setStyleSheet(f"color: {colors()['danger']};")
         self.update()

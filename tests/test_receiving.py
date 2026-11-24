@@ -85,10 +85,30 @@ def test_inbound_flow_stock_posted(client, auth):
     assert checked.status_code == 200
     assert checked.json()["status"] == "checked"
     assert checked.json()["checked_by"] == "warehouse"
+    checked_again = client.post(
+        f"/inbound/orders/{order['id']}/check",
+        json={"items": []},
+        headers=auth["warehouse"],
+    )
+    assert checked_again.status_code == 400
+    assert "验收" in checked_again.json()["detail"]
+    gsp = client.get("/gsp/acceptances", headers=auth["warehouse"]).json()
+    acceptance = next(row for row in gsp if row["delivery_no"] == "随货同行-001")
+    assert acceptance["result"] == "unqualified"
+    assert acceptance["transport_ok"] is False
+    gsp_items = {row["name"]: row for row in acceptance["items"]}
+    assert gsp_items["入库测试药"]["quantity"] == 8
+    assert gsp_items["入库测试药"]["result"] == "unqualified"
+    assert gsp_items["电子血压计"]["quantity"] == 5
 
     stocked = client.post(f"/inbound/orders/{order['id']}/stock", headers=auth["warehouse"])
     assert stocked.status_code == 200
     assert stocked.json()["status"] == "stocked"
+    stocked_again = client.post(
+        f"/inbound/orders/{order['id']}/stock", headers=auth["warehouse"]
+    )
+    assert stocked_again.status_code == 400
+    assert "已验收" in stocked_again.json()["detail"]
 
     # 入库进总库（药库）；药房库存需通过出库单领用
     warehouse = client.get(f"/warehouse/stocks?drug_id={drug['id']}").json()

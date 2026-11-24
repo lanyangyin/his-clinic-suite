@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     AttendanceCreate,
@@ -36,7 +36,7 @@ from .service import (
     resign,
 )
 
-router = APIRouter(prefix="/hr", tags=["hr"])
+router = APIRouter(prefix="/hr", tags=["hr"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/employees/", response_model=EmployeeResponse, status_code=201)

@@ -115,3 +115,75 @@ def test_portal_no_history(client, auth):
     reports = client.get("/portal/reports/110101199501011234").json()
     assert reports["labs"] == []
     assert reports["imaging"] == []
+
+
+def test_portal_requires_phone_token_when_anonymous_read_disabled(client, auth, monkeypatch):
+    from app import settings
+
+    patient, _ = setup_patient_with_history(client, auth)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_READ", False)
+    assert client.get(f"/portal/patients/{patient['id_number']}").status_code == 401
+    bad = client.post(
+        "/portal/access",
+        json={"id_number": patient["id_number"], "phone": "13800000000"},
+    )
+    assert bad.status_code == 401
+    good = client.post(
+        "/portal/access",
+        json={"id_number": patient["id_number"], "phone": patient["phone"]},
+    )
+    assert good.status_code == 200, good.text
+    token = good.json()["token"]
+    ok = client.get(
+        f"/portal/patients/{patient['id_number']}",
+        headers={"X-Portal-Token": token},
+    )
+    assert ok.status_code == 200, ok.text
+
+
+def test_portal_otp_required_and_single_use(client, auth, monkeypatch):
+    import re
+
+    from app import settings
+
+    patient, _ = setup_patient_with_history(client, auth)
+    monkeypatch.setattr(settings, "PORTAL_REQUIRE_OTP", True)
+    no_code = client.post(
+        "/portal/access",
+        json={"id_number": patient["id_number"], "phone": patient["phone"]},
+    )
+    assert no_code.status_code == 401
+    sent = client.post(
+        "/portal/request-code",
+        json={"id_number": patient["id_number"], "phone": patient["phone"]},
+    )
+    assert sent.status_code == 200, sent.text
+    again = client.post(
+        "/portal/request-code",
+        json={"id_number": patient["id_number"], "phone": patient["phone"]},
+    )
+    assert again.status_code == 200
+    messages = client.get(
+        "/sms/messages", params={"phone": patient["phone"]}, headers=auth["admin"]
+    ).json()
+    otp_messages = [row for row in messages if row["template"] == "portal_otp"]
+    assert len(otp_messages) == 1
+    code = re.search(r"\d{6}", otp_messages[0]["content"]).group(0)
+    ok = client.post(
+        "/portal/access",
+        json={
+            "id_number": patient["id_number"],
+            "phone": patient["phone"],
+            "code": code,
+        },
+    )
+    assert ok.status_code == 200, ok.text
+    reused = client.post(
+        "/portal/access",
+        json={
+            "id_number": patient["id_number"],
+            "phone": patient["phone"],
+            "code": code,
+        },
+    )
+    assert reused.status_code == 401

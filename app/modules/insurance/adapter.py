@@ -43,7 +43,37 @@ def _build_request(req_type: str, data: dict) -> dict:
 
 
 def _send(payload: dict, handler):
-    """发送报文（当前直连 Mock；生产替换为 HTTP POST）。"""
+    """发送报文：优先真实网关，其次显式 Mock；都不可用则降级。"""
+    from app import settings
+
+    gateway_url = (getattr(settings, "INSURANCE_GATEWAY_URL", "") or "").strip()
+    if gateway_url:
+        import urllib.request
+
+        request = urllib.request.Request(
+            gateway_url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": f"Bearer {getattr(settings, 'INSURANCE_GATEWAY_TOKEN', '')}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=8) as response:
+                if not 200 <= response.status < 300:
+                    raise InsuranceUnavailable(f"医保平台返回 {response.status}")
+                body = json.loads(response.read().decode("utf-8"))
+        except InsuranceUnavailable:
+            raise
+        except Exception as e:
+            raise InsuranceUnavailable(f"医保平台调用失败：{e}") from e
+        if not isinstance(body, dict) or "cipher" not in body or "sign" not in body:
+            raise InsuranceUnavailable("医保平台响应缺少密文/签名")
+        return body
+
+    if not getattr(settings, "INSURANCE_ALLOW_MOCK", False):
+        raise InsuranceUnavailable("医保平台未配置，已降级为自费")
     return handler(payload)
 
 

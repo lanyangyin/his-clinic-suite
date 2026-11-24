@@ -2,13 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
-from .schemas import DrugCreate, DrugInteractionCreate, DrugInteractionResponse, DrugResponse
+from .schemas import (
+    DrugCreate,
+    DrugInteractionCreate,
+    DrugInteractionResponse,
+    DrugResponse,
+    DrugUpdate,
+)
 from .models import DrugInteraction
-from .service import create_drug, get_drug, list_drugs
+from .service import create_drug, get_drug, list_drugs, update_drug
 
-router = APIRouter(prefix="/drugs", tags=["drugs"])
+router = APIRouter(prefix="/drugs", tags=["drugs"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/", response_model=DrugResponse, status_code=201)
@@ -23,6 +29,19 @@ def new_drug(
 @router.get("/", response_model=list[DrugResponse])
 def get_all(name: str | None = None, db: Session = Depends(get_db)):
     return list_drugs(db, name)
+
+
+@router.put("/{drug_id}", response_model=DrugResponse)
+def edit_drug(
+    drug_id: int,
+    data: DrugUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        return update_drug(db, drug_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/interactions", response_model=list[DrugInteractionResponse])

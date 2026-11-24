@@ -146,6 +146,17 @@ def create_salary_request(
         requested_by=requested_by,
     )
     db.add(request)
+    db.flush()
+    from app.modules.approval.service import ensure_request
+
+    ensure_request(
+        db,
+        "salary_request",
+        request.id,
+        f"薪资申请 {request.month}",
+        "admin",
+        applicant=requested_by,
+    )
     db.commit()
     db.refresh(request)
     return request
@@ -178,10 +189,20 @@ def _review(db: Session, request_id: int, status: str, note: str, reviewed_by: s
     if request.status != "pending":
         raise ValueError("该薪资申请已处理")
 
-    request.status = status
-    request.review_note = note
-    request.reviewed_at = datetime.now()
-    request.reviewed_by = reviewed_by
+    from app.modules.approval.service import advance_request, apply_business_result
+
+    result = advance_request(
+        db,
+        "salary_request",
+        request.id,
+        "approve" if status == "approved" else "reject",
+        reviewed_by,
+        note,
+    )
+    if result in ("approved", "rejected", "missing"):
+        apply_business_result(
+            db, "salary_request", request.id, status, reviewed_by, note
+        )
     db.commit()
     db.refresh(request)
     return request

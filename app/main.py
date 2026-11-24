@@ -18,6 +18,11 @@ from app.modules.billing.router import router as billing_router
 from app.modules.pharmacy.router import router as pharmacy_router
 from app.modules.staff.router import router as staff_router
 from app.modules.drug.router import router as drug_router
+from app.modules.catalog_proposal.router import router as catalog_proposal_router
+from app.modules.approval.router import router as approval_router
+from app.modules.narcotic.router import router as narcotic_router
+from app.modules.notify.router import router as notify_router
+from app.modules.integrations.router import router as integrations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.inpatient.router import router as inpatient_router
 from app.modules.triage.router import router as triage_router
@@ -70,6 +75,7 @@ from app.modules.download.router import router as download_router
 from app.modules.auth.service import log_action
 
 # 表结构由 Alembic 管理：uv run alembic upgrade head
+settings.validate_runtime_settings()
 app = FastAPI(title="HIS")
 
 
@@ -147,7 +153,14 @@ async def idempotency_middleware(request: Request, call_next):
     )
 
 
-def _write_audit_safely(username: str, role: str, method: str, path: str, status_code: int) -> None:
+def _write_audit_safely(
+    username: str,
+    role: str,
+    method: str,
+    path: str,
+    status_code: int,
+    ip: str = "",
+) -> None:
     """审计日志写入：并发锁冲突时重试，最终失败也不阻断业务响应。
 
     审计是旁路能力——不能因为日志写不进去就把已成功的业务请求变成 500。
@@ -162,6 +175,7 @@ def _write_audit_safely(username: str, role: str, method: str, path: str, status
                 method=method,
                 path=path,
                 status_code=status_code,
+                ip=ip,
             )
             return
         except OperationalError:
@@ -182,6 +196,7 @@ async def audit_middleware(request: Request, call_next):
             request.method,
             request.url.path,
             response.status_code,
+            request.client.host if request.client else "",
         )
     return response
 
@@ -194,6 +209,11 @@ app.include_router(billing_router)
 app.include_router(pharmacy_router)
 app.include_router(staff_router)
 app.include_router(drug_router)
+app.include_router(catalog_proposal_router)
+app.include_router(approval_router)
+app.include_router(narcotic_router)
+app.include_router(notify_router)
+app.include_router(integrations_router)
 app.include_router(auth_router)
 app.include_router(inpatient_router)
 app.include_router(triage_router)

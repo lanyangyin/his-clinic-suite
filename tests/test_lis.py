@@ -189,3 +189,37 @@ def test_role_protection(client, auth):
         f"/lab/encounters/{encounter['id']}/lab-requests", json={"item_id": item["id"]}
     )
     assert r.status_code == 401
+
+
+def test_report_requires_collected_and_received_in_production(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "LIS_REQUIRE_SAMPLE", True)
+    encounter = make_encounter(client, auth)
+    item = make_item(client, auth).json()
+    request = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    blocked = client.post(
+        f"/lab/requests/{request['id']}/report",
+        json={"result": "正常"},
+        headers=auth["lab"],
+    )
+    assert blocked.status_code == 400
+    assert "未采样" in blocked.json()["detail"] or "签收" in blocked.json()["detail"]
+    collected = client.post(
+        f"/lab/requests/{request['id']}/collect", json={}, headers=auth["nurse"]
+    )
+    assert collected.status_code == 200, collected.text
+    received = client.post(
+        f"/lab/requests/{request['id']}/receive", headers=auth["lab"]
+    )
+    assert received.status_code == 200, received.text
+    reported = client.post(
+        f"/lab/requests/{request['id']}/report",
+        json={"result": "正常"},
+        headers=auth["lab"],
+    )
+    assert reported.status_code == 200, reported.text

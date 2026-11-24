@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import BillingSummary, PaymentCreate, PaymentResponse, RefundRequest
 from .service import create_payment, get_payment, get_summary, list_payments, refund_payment
 
-router = APIRouter(prefix="/payments", tags=["payments"])
+router = APIRouter(prefix="/payments", tags=["payments"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/", response_model=PaymentResponse, status_code=201)
@@ -44,7 +44,7 @@ def refund(
     payment_id: int,
     data: RefundRequest | None = None,
     db: Session = Depends(get_db),
-    user=Depends(require_role("cashier")),
+    user=Depends(require_role("cashier", "admin", "director")),
 ):
     try:
         return refund_payment(
@@ -53,6 +53,7 @@ def refund(
             items=data.items if data else None,
             operator=user.username,
             reason=data.reason if data else "",
+            operator_role=user.role,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

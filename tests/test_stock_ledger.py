@@ -165,3 +165,11 @@ def test_ledger_filters_and_permissions(client, auth):
 
     inbound_only = client.get("/stock/ledger?direction=in", headers=auth["warehouse"]).json()
     assert all(row["direction"] == "in" for row in inbound_only)
+
+
+def test_stock_reconcile_clean_after_inbound(client, auth):
+    setup_stock(client, auth)
+    r = client.get("/stock/reconcile", headers=auth["admin"])
+    assert r.status_code == 200, r.text
+    assert r.json() == []
+    assert client.get("/stock/reconcile", headers=auth["cashier"]).status_code == 403

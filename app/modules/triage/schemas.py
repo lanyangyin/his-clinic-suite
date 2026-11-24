@@ -20,6 +20,9 @@ class TicketCreate(BaseModel):
 
 class TicketResponse(TicketCreate):
     id: int
+    patient_name: str = ""
+    patient_no: str = ""
+    doctor_id: int | None = None
     status: str
     assessed_by: str
     assessed_at: datetime | None

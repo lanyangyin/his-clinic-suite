@@ -116,10 +116,16 @@ def cancel_treatment(db: Session, order_id: int) -> TreatmentOrder:
 
     from app.modules.charges.service import list_charges
 
+    treatment_charges = [
+        charge
+        for charge in list_charges(db, order.encounter_id)
+        if charge.source_type == "treatment" and charge.source_id == order.id
+    ]
+    if any(charge.status in ("paid", "partially_refunded") for charge in treatment_charges):
+        raise ValueError("该治疗已收费，不能直接取消；请先按退费流程处理")
     order.status = "cancelled"
-    for charge in list_charges(db, order.encounter_id):
-        if charge.source_type == "treatment" and charge.source_id == order.id:
-            charge.status = "refunded"
+    for charge in treatment_charges:
+        charge.status = "refunded"
     db.commit()
     db.refresh(order)
     return order

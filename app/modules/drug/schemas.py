@@ -22,6 +22,25 @@ class DrugCreate(BaseModel):
     approval_no: str = ""
     manufacturer: str = ""
     dosage_form: str = ""
+    controlled_level: str = Field(default="", pattern="^(|narcotic|psychotropic1)$")
+
+
+class DrugUpdate(BaseModel):
+    name: str | None = None
+    spec: str | None = None
+    unit: str | None = None
+    base_price: float | None = Field(default=None, ge=0)
+    insurance_ratio: float | None = Field(default=None, ge=0, le=1)
+    antibiotic_level: int | None = Field(default=None, ge=0, le=3)
+    high_alert: bool | None = None
+    is_otc: bool | None = None
+    ingredient: str | None = None
+    barcode: str | None = None
+    insurance_code: str | None = None
+    approval_no: str | None = None
+    manufacturer: str | None = None
+    dosage_form: str | None = None
+    controlled_level: str | None = Field(default=None, pattern="^(|narcotic|psychotropic1)$")
 
 
 class DrugResponse(DrugCreate):

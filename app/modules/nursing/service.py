@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.modules.encounter.models import Encounter, PrescriptionItem
+from app.modules.encounter.models import Encounter, Prescription, PrescriptionItem
 from app.modules.encounter.service import get_encounter
 from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
@@ -36,7 +36,11 @@ def sync_orders(db: Session, encounter_id: int) -> list[NursingOrder]:
     created = []
     prescriptions = (
         db.query(PrescriptionItem)
-        .filter(PrescriptionItem.encounter_id == encounter_id)
+        .outerjoin(Prescription, PrescriptionItem.prescription_id == Prescription.id)
+        .filter(
+            PrescriptionItem.encounter_id == encounter_id,
+            (Prescription.id.is_(None)) | (Prescription.status == "approved"),
+        )
         .all()
     )
     for item in prescriptions:
@@ -162,6 +166,34 @@ def prepare(
         raise ValueError("执行单不存在")
     if order.status != "pending":
         raise ValueError("该执行单当前状态不可配药")
+    from app import settings
+
+    if settings.NURSING_REQUIRE_PAID_DISPENSED:
+        from app.modules.billing.models import Payment
+        from app.modules.pharmacy.models import Dispense
+
+        paid = (
+            db.query(Payment)
+            .filter(
+                Payment.encounter_id == order.encounter_id,
+                Payment.status.in_(("paid", "partially_refunded")),
+            )
+            .first()
+        )
+        if not paid:
+            raise ValueError("该执行单尚未收费，不能配药")
+        if order.source_type == "prescription":
+            dispensed = (
+                db.query(Dispense)
+                .filter(
+                    Dispense.encounter_id == order.encounter_id,
+                    Dispense.status.in_(("dispensed", "partially_returned")),
+                )
+                .first()
+            )
+            if not dispensed:
+                raise ValueError("该执行单尚未发药，不能配药")
+
     checked_by = (data.checked_by or "").strip()
     if order.high_alert:
         if not checked_by:

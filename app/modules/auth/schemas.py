@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     role: str
     display_name: str = ""
     employee_id: int | None = None
+    doctor_id: int | None = None
 
 
 class UserResponse(BaseModel):
@@ -17,7 +18,13 @@ class UserResponse(BaseModel):
     role: str
     display_name: str
     employee_id: int | None = None
+    doctor_id: int | None = None
+    narcotic_right: bool = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class NarcoticRightUpdate(BaseModel):
+    enabled: bool
 
 
 class AuditLogResponse(BaseModel):
@@ -27,5 +34,6 @@ class AuditLogResponse(BaseModel):
     method: str
     path: str
     status_code: int
+    ip: str = ""
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

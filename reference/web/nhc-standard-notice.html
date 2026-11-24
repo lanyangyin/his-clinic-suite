@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		    
+	<link rel="icon" href="/nmgyyxh/images/favicon.ico">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel="stylesheet" href="/css/bootstrap.min.css?version=20210722">
+		<link rel="stylesheet" href="/css/basic.css?version=20210722">
+		<link rel="stylesheet" href="/css/style.css?version=20210722">
+		<link rel="stylesheet" href="/css/hf.css?version=20210722">
+	</head>
+	<script src="/js/jquery.js"></script>
+
+	<body>
+		<!--<div style="display:none;"><img src="" alt=""></div>-->
+		
+		<!-- 头部 -->
+		<div class="header">
+	<div class="header-banner" style="box-sizing: border-box;">
+		<div class="container" style="padding: 0;">
+			<a href="/">
+				<img src="/image/gy_headlogo.png" alt="" style="float: left;">
+			</a>
+			<div class="search">
+				<span class="pull-left" style="padding-left: 8px;color: #ffffff">
+					<span id="date"></span>
+					<span class="line">|</span>
+				</span>
+				<div class="search-logo">
+					<a href="/nmgyyxh/lxwm/" style="color: #ffffff">联系我们</a>
+					<img src="/image/gy_headphone.png" alt="">
+					<span class="line">|</span>
+					<a href="/nmgyyxh/wzdt/" style="color: #ffffff">网站地图</a>
+					<img src="/image/gy_headlocation.png" alt="">
+				</div>
+				<div class="search-input">
+                    <div class="search-input-box">
+                        <form id="form1" name="queryform">
+                            <img src="/image/gy_zoom.png" alt="搜索图标">
+                            <input name="title" id="head_search_input" type="text" placeholder="请输入关键字查询">
+                        </form>
+                    </div>
+                    <a href="javascript:void(0);" id="head_search_btn">搜索</a>
+                </div>
+			</div>
+		</div>
+	</div>
+	<div class="header-nav">
+		<div class="container" style="padding: 0;">
+			<a href="/" class="nav-link">
+				<img class="nav-logo" src="/image/gy_headhome.png" alt=""> 网站首页</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/xhjj/" class="nav-link">协会介绍</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/gzdt/" class="nav-link">协会党建</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/tt/" class="nav-link">新闻中心</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/zmhs/" class="nav-link">创先争优</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/ztzl/" class="nav-link">专题专栏</a>
+			<img class="nav-line" src="/image/gy_line.png" alt="">
+			<a href="/nmgyyxh/hfbz/" class="nav-link">会员服务</a>
+		</div>
+	</div>
+</div>
+<script src="/nmgyyxh/js/gy.day.js"></script>
+<script>
+    function getWeek() {
+        var weekArray = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+        return weekArray[dayjs().day()];
+    }
+    
+    function getTime() {
+        return dayjs().year() + "年" + 
+               (dayjs().month() + 1) + "月" + 
+               dayjs().date() + "日" + " " + 
+               getWeek();
+    }
+    
+    // 使用纯JS方法
+    document.getElementById("date").textContent = getTime();
+</script>
+<script>
+    // 头部搜索 - 原生JS实现搜索逻辑
+    function performSearch() {
+        var input = document.getElementById('head_search_input');
+        var headSearch = input.value.trim();
+        if (headSearch) {
+            window.location.href = 'https://www.nmgyyxh.org.cn/nmgyyxh/fulltext_Searching/?headSearch=' + encodeURIComponent(headSearch);
+        } else {
+            alert("请输入搜索内容！");
+        }
+    }
+
+    // 点击搜索按钮触发
+    document.getElementById('head_search_btn').addEventListener('click', function () {
+        performSearch();
+    });
+
+    // 回车键触发搜索
+    document.getElementById('head_search_input').addEventListener('keyup', function (event) {
+        if (event.keyCode === 13) {
+            performSearch();
+        }
+    });
+</script>
+		<!-- 头部结束 -->
+	
+		<div class="container" style="margin: 28px auto;padding: 0">
+			<div class="content_top"></div>
+			<div class="content_center">
+				<!--面包屑-->
+				        <div class="g-top">
+            <img src="../../image/gy_location.png" alt="">
+            <span>当前位置 : </span><a href="/">首页</a> > 
+              <a href="/nmgyyxh/zcfg/">政策法规</a>
+        </div>
+				<!--面包屑-->
+				<div class="g-current clearfix">
+					<div>
+						<div class="current-right-top">
+							<img src="/image/gy_top_line2.png" alt="">
+							<span>
+									政策法规
+							</span>
+						</div>
+                            
+							<div style="border-bottom: 1px solid #dfdfdf;margin-bottom: 37px;">
+								<p class="tynry-title">关于印发全国医院信息化建设标准与规范（试行）的通知</p>
+								<p class="tynry-info">发布来源：国家卫生健康委员会网站　　 发布时间：2018-06-04 11:29:00</p>
+							</div>
+							<div class="gjw-con">
+								<p class="tynry-p "><p style="TEXT-ALIGN: center; LINE-HEIGHT: 200%"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">国卫办规划发〔2018〕4号</span></p>
+<p style="LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">各省、自治区、直辖市及计划单列市、新疆生产建设兵团卫生计生委，委机关各司局，委直属和联系单位，委属（管）医院：</span></p>
+<p style="LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">为促进和规范医院信息化建设，在《医院信息平台应用功能指引》和《医院信息化建设应用技术指引》基础上，我委制定了《全国医院信息化建设标准与规范（试行）》，明确医院信息化建设的建设内容和建设要求。现印发你们（可从国家卫生健康委员会网站下载），请参照执行。</span></p>
+<p style="LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">联 系 人：规划司 王泳、沈剑峰 </span></p>
+<p style="LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">联系电话：010-68792937、68791911 </span></p>
+<p style="TEXT-ALIGN: right; LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">                                  </span><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">国家卫生健康委员会办公厅</span></p>
+<p style="TEXT-ALIGN: right; LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">                                2018</span><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">年4月2日 </span></p>
+<p style="TEXT-ALIGN: left; LINE-HEIGHT: 200%; TEXT-INDENT: 32px"><span style="LINE-HEIGHT: 200%; FONT-FAMILY: 宋体; FONT-SIZE: 16px">附：全国医院信息化建设标准规范(试行)</span></p>
+<p><span style="font-size:18px">　<span style="font-family: 宋体">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 附件1.：<a href="/uploadfiles/static_old/portal/20180604/1f213c59c9e98a5bf531408dd9e30bc1.pdf" target="_blank" title="20180413162542120.pdf">20180413162542120.pdf</a></span></span></p><br/></p>
+							</div>
+					</div>
+				</div>
+			</div>
+			<div class="content_bottom"></div>
+		</div>
+		
+		<!-- 尾部 -->
+		<style type="text/css">
+	/* /初始化 */
+	    /* reset */
+	    * {
+	        margin: 0;
+	        padding: 0;
+	    }
+	    /* /reset */
+	    .f-cbw {
+	        color: #fff;
+	    }
+	
+	    .f-cb3 {
+	        color: #333;
+	    }
+	
+	    .f-fl {
+	        float: left;
+	    }
+	
+	    .f-fr {
+	        float: right;
+	    }
+	
+	    .f-fs15 {
+	        font-size: 15px;
+	    }
+	
+	    .f-fs20 {
+	        font-size: 20px;
+	    }
+	
+	    .u-caiejfwoh {
+	        margin-right: 60px;
+	    }
+	
+	    .m-csdjgwettr {
+	        height: auto;
+	    }
+	
+	    .m-cjdcvvgbsnq {
+	        padding-right: 45px;
+	    }
+	
+	    a.u-cjfkbviuww {
+	        width: 140px;
+	        background: none;
+	        background: url(/image/link_1.png) center right no-repeat;
+	        font-size: 18px;
+	        color: #000;
+	    }
+	
+	    a.link_hover {
+	        color: #5D82CF;
+	        background: url(/image/link_2.png) center right no-repeat;
+	    }
+	
+	    .wxf_link {
+	        overflow: hidden;
+	        width: 100%;
+	        background-color: #eeeeee;
+	    }
+	
+	    .wxf_link .wxf_link_wrap {
+	        width: 1300px;
+	        height: 230px;
+	        padding: 5px 0px;
+	        background-color: #F5F5F5;
+	        border-top: 2px solid #E1E1E1;
+	        margin: 0 auto 10px auto;
+	        overflow-y: scroll;
+	    }
+	    .wxf_link a {
+	        width: 197px;
+	        margin: 0px 8px;
+	        height: 46px;
+	        line-height: 46px;
+	        font-size: 16px;
+	        display: block;
+	        float: left;
+	        text-align: left;
+	        overflow: hidden;
+	        white-space: nowrap;
+	        text-overflow: ellipsis;
+	    }
+	
+	    .wxf_link a.astyle1 {
+	        width: 240px;
+	    }
+	
+	    .m-csdjgwettr {
+	        width: 100%;
+	        /*height: 110px;*/
+	        background: #eeeeee;
+	        min-width: 1300px;
+	    }
+	
+	   .m-cafnriows {
+	        width: 1300px;
+	        height: 88px;
+	        margin: 0 auto;
+	        background: url(/image/c_47.png) no-repeat 840px center;
+	        line-height: 88px;
+	    }
+	
+	    .u-caiejfwoh {
+	        display: block;
+	        width: 115px;
+	        background: url(/image/c_34.png) left center no-repeat;
+	        color: #3867c8;
+	        padding-left: 30px;
+	        margin-right: 36px;
+	    }
+	
+	    .m-cjdcvvgbsnq {
+	        width: 245px;
+	        padding-right: 35px;
+	    }
+	
+	    .u-cjfkbviuww {
+	        display: block;
+	        width: 205px;
+	        text-align: center;
+	        background: #fff;
+	    }
+	
+	    .m-carijfnlgnw {
+	        width: 100%;
+	        height: 60px;
+	        background: #3867c8;
+	        min-width: 1300px;
+	    }
+	
+	    .m-carfmoig {
+	        width: 1300px;
+	        height: 60px;
+	        margin: 0 auto;
+	    }
+	
+	    .u-cfgoidfjnm {
+	        display: block;
+	        width: 620px;
+	        height: 60px;
+	        line-height: 60px;
+	    }
+	
+	    .u-cvkjfdhroid {
+	        display: block;
+	        width: 360px;
+	        height: 60px;
+	        line-height: 60px;
+	    }
+</style>
+
+
+<div class="m-csdjgwettr">
+	<script type="text/javascript">
+		var currentIndex = -1;
+		    var setTimeOut1 = null;
+		    var setTimeOut2 = null;
+		
+		    $("#linkList .alink").hover(function () {
+		
+		        clearTimeout(setTimeOut1);
+		        clearTimeout(setTimeOut2);
+		
+		        currentIndex = $("#linkList .alink").index(this);
+		
+		        $("#linkList .alink").removeClass("link_hover");
+		        $("#linkList .alink").eq(currentIndex).addClass("link_hover");
+		
+		        $("#wxf_link .wxf_link_wrap").css("display", "none");
+		        $("#wxf_link .wxf_link_wrap").eq(currentIndex).css("display", "block");
+		
+		        $("html,body").animate({
+		            scrollTop: 3000
+		        }, 300);
+		
+		    }, function () {
+		        setTimeOut1 = setTimeout(function () {
+		            $("#linkList .alink").removeClass("link_hover");
+		            $("#wxf_link .wxf_link_wrap").css("display", "none");
+		        }, 300);
+		    });
+		
+		    $("#wxf_link .wxf_link_wrap").hover(function () {
+		        clearTimeout(setTimeOut1);
+		        clearTimeout(setTimeOut2);
+		    }, function () {
+		        setTimeOut2 = setTimeout(function () {
+		            $("#linkList .alink").removeClass("link_hover");
+		            $("#wxf_link .wxf_link_wrap").css("display", "none");
+		        }, 300);
+		    });
+	</script>
+	<div class="m-carijfnlgnw">
+		<div class="m-carfmoig">
+			<span class="u-cfgoidfjnm f-fl f-fs15 f-cbw">&copy;2018版权所有&nbsp;&nbsp;&nbsp;&nbsp;内蒙古医院协会&nbsp;&nbsp;&nbsp;&nbsp;蒙ICP备17003977号-1&nbsp;&nbsp;&nbsp;&nbsp;主办单位：内蒙古医院协会</span>
+			<span class="u-cvkjfdhroid f-fr f-fs15 f-cbw" style="width:50px; padding-top:20px; height:40px;line-height: 0;">
+			</span>
+		</div>
+	</div>
+</div>
+		<!-- 尾部结束 -->
+
+	</body>
+</html>

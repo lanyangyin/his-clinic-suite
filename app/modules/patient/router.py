@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.modules.auth.security import get_current_user, require_login, require_read_login, require_role
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import get_current_user, require_login, require_role
 
+from .access import record_access
+from .models import PatientAccessLog
 from .history import get_patient_history
 from .profile import patient_profile
 from .schemas import (
@@ -31,7 +35,7 @@ from .service import (
     update_patient,
 )
 
-router = APIRouter(prefix="/patients", tags=["patients"])
+router = APIRouter(prefix="/patients", tags=["patients"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/", response_model=PatientResponse, status_code=201)
@@ -100,9 +104,18 @@ def update_clinical(
 )
 def clinical_changes(
     patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("doctor", "admin")),
+    user=Depends(require_role("doctor", "admin")),
 ):
+    record_access(
+        db,
+        user,
+        patient_id,
+        action="view_clinical_changes",
+        path=f"/patients/{patient_id}/clinical-changes",
+        ip=request.client.host if request.client else "",
+    )
     return list_clinical_changes(db, patient_id)
 
 
@@ -167,34 +180,92 @@ def reissue(
 
 
 @router.get("/{patient_id}", response_model=PatientResponse)
-def get_one(patient_id: int, db: Session = Depends(get_db)):
+def get_one(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
     patient = get_patient(db, patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="患者不存在")
+    record_access(
+        db,
+        user,
+        patient_id,
+        path=f"/patients/{patient_id}",
+        ip=request.client.host if request.client else "",
+    )
     return patient
+
+
+@router.get("/{patient_id}/access-log")
+def access_log(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "director")),
+):
+    rows = (
+        db.query(PatientAccessLog)
+        .filter_by(patient_id=patient_id)
+        .order_by(PatientAccessLog.id.desc())
+        .limit(200)
+        .all()
+    )
+    return [
+        {
+            "id": row.id,
+            "username": row.username,
+            "role": row.role,
+            "action": row.action,
+            "path": row.path,
+            "ip": row.ip,
+            "encounter_id": row.encounter_id,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/{patient_id}/history")
 def get_history(
     patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("doctor", "admin")),
+    user=Depends(require_role("doctor", "admin")),
 ):
     """医生查看患者历史诊疗：历次病历、处方、检验、治疗、收费一次返回。"""
     history = get_patient_history(db, patient_id)
     if not history:
         raise HTTPException(status_code=404, detail="患者不存在")
+    record_access(
+        db,
+        user,
+        patient_id,
+        action="view_history",
+        path=f"/patients/{patient_id}/history",
+        ip=request.client.host if request.client else "",
+    )
     return history
 
 
 @router.get("/{patient_id}/profile")
 def get_profile(
     patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("doctor", "admin")),
+    user=Depends(require_role("doctor", "admin")),
 ):
     """患者 360：基本信息、就诊时间线、预约、病案、费用统计。"""
     data = patient_profile(db, patient_id)
     if not data:
         raise HTTPException(status_code=404, detail="患者不存在")
+    record_access(
+        db,
+        user,
+        patient_id,
+        action="view_profile",
+        path=f"/patients/{patient_id}/profile",
+        ip=request.client.host if request.client else "",
+    )
     return data

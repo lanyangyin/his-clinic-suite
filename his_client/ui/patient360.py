@@ -1,4 +1,5 @@
 """患者 360：基本信息、就诊时间线、预约、病案、收费。"""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -33,7 +34,7 @@ class Patient360Widget(QWidget):
         self.name = QLineEdit()
         self.name.setPlaceholderText("姓名")
         self.id_number = QLineEdit()
-        self.id_number.setPlaceholderText("身份证号")
+        self.id_number.setPlaceholderText("身份证号（仅检索，不显示）")
         button = QPushButton("查询患者")
         button.clicked.connect(self._search)
         search.addWidget(QLabel("姓名"))
@@ -44,7 +45,9 @@ class Patient360Widget(QWidget):
         layout.addLayout(search)
 
         self.patient_table = QTableWidget(0, 3)
-        self.patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号"])
+        self.patient_table.setHorizontalHeaderLabels(
+            ["患者编号", "姓名", "性别/年龄"]
+        )
         self.patient_table.setMaximumHeight(130)
         self.patient_table.cellClicked.connect(self._select_patient)
         layout.addWidget(self.patient_table)
@@ -93,9 +96,20 @@ class Patient360Widget(QWidget):
         self.patients = found
         self.patient_table.setRowCount(len(found))
         for row, patient in enumerate(found):
-            values = [str(patient["id"]), patient["name"], patient.get("id_number", "")]
+            gender = {"male": "男", "female": "女"}.get(
+                patient.get("gender"), "性别不详"
+            )
+            age = patient.get("age")
+            values = [
+                patient.get("patient_no") or str(patient["id"]),
+                patient["name"],
+                f"{gender}/{age if age is not None else '年龄不详'}",
+            ]
             for col, value in enumerate(values):
-                self.patient_table.setItem(row, col, QTableWidgetItem(value))
+                cell = QTableWidgetItem(str(value))
+                if col == 0:
+                    cell.setData(Qt.UserRole, patient["id"])
+                self.patient_table.setItem(row, col, cell)
         self.detail.setText(f"共 {len(found)} 位患者，点击选择查看 360")
 
     def _select_patient(self, row: int, _col: int) -> None:

@@ -3,7 +3,7 @@
 一套可运行、可打包分发的中小型门诊部信息系统：**FastAPI 后端 + Web 管理台 + PySide6 桌面客户端**。
 
 - 后端 30+ 业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
-- 674 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
+- 746 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
 - **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
 
@@ -26,7 +26,25 @@ his-clinic-suite/
 - [登录记忆与人事工作站](docs/登录记忆与人事工作站.md)
 - [客户端布局审计](docs/客户端布局审计.md)
 - [出生日期/年龄/身份证联动](docs/出生日期年龄联动.md)
-- [主题实时跟随系统](docs/主题实时跟随.md)
+- [主题手动刷新](docs/主题手动刷新.md)
+- [开方与目录治理评估](docs/开方与目录治理评估.md)
+- [管理员身份与快速建档](docs/管理员身份与快速建档.md)
+- [界面交互修正](docs/界面交互修正.md)
+- [处方单据架构](docs/处方单据架构.md)
+- [取药凭证与医技单据](docs/取药凭证与医技单据.md)
+- [标准对照与差距](docs/标准对照与差距.md)
+- [标准逐条对照（详细版）](docs/标准逐条对照.md)
+- [标准与示范工程资料包](reference/README.md)
+- [示范工程对照](reference/comparison.md)
+- [申请审核清单](docs/申请审核清单.md)
+- [临床核心重构落地](docs/临床核心重构落地.md)
+- [实际运营测试报告](docs/实际运营测试报告.md)
+- [多部门联合实操报告](docs/多部门联合实操报告.md)
+- [子系统逐模块审计](docs/子系统逐模块审计.md)
+- [前端逐模块审计](docs/前端逐模块审计.md)
+- [门诊工作站重构](docs/门诊工作站重构.md)
+- [打印预览](docs/打印预览.md)
+- [部门工作站与审批](docs/部门工作站与审批.md)
 
 ## 功能概览
 
@@ -69,7 +87,7 @@ cd /d D:\Documents\PycharmProjects\HIS
 .\dev_client.bat
 ```
 
-等价于：
+`dev_client.bat` 运行期间保留终端窗口便于看测试输出；客户端退出后终端自动关闭，仅异常退出时停顿。等价于：
 
 ```powershell
 .\.venv\Scripts\python.exe -m his_client
@@ -87,6 +105,23 @@ cd /d D:\Documents\PycharmProjects\HIS
 ```bash
 uv sync                       # 服务端不需要 PySide6
 ./start.sh                    # 初始化数据库并启动
+```
+
+### Android Termux
+
+```bash
+cd /sdcard/HIS
+chmod +x start-termux.sh
+./start-termux.sh             # 外层 Termux 会自动进入 proot Ubuntu
+```
+
+后台模式、停止和日志：
+
+```bash
+./start-termux.sh --background
+./start-termux.sh status
+./start-termux.sh stop
+./start-termux.sh logs
 ```
 
 ### 桌面客户端
@@ -134,7 +169,7 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 
 - `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`（首次启动自动建库并创建 `admin/admin123`）
 - `his-client.zip`：客户端，解压 → 改 `config.ini` 服务器地址 → 双击 `his-client.exe`
-- `his-server-termux-1.2.4.tar.gz`：Termux 专用服务端最小源码包，约 336 KB，不含客户端/测试/视频
+- `his-server-termux-1.2.5.tar.gz`：Termux 专用服务端最小源码包，约 336 KB，不含客户端/测试/视频
 
 源码与构建脚本都在本仓库；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 
@@ -145,7 +180,7 @@ app/                后端（modules/ 下按业务模块组织四件套 models/s
   modules/admin/    Web 管理台（Jinja2 模板）
 alembic/            Alembic 迁移（0001~0089）
 his_client/         PySide6 客户端（api/config/ui）
-tests/              pytest（668 个用例）
+tests/              pytest（680 个用例）
 scripts/            初始化、演示、并发检查、打包、服务安装脚本
 docs/               部署手册、试用手册、界面截图
 config.ini          服务端配置（端口/密钥/数据库）
@@ -154,7 +189,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 674 passed
+uv run pytest                                  # 746 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
@@ -170,7 +205,25 @@ uv run python scripts/check_concurrency.py     # 并发抢号验证
 - [登录记忆与人事工作站](docs/登录记忆与人事工作站.md)
 - [客户端布局审计](docs/客户端布局审计.md)
 - [出生日期/年龄/身份证联动](docs/出生日期年龄联动.md)
-- [主题实时跟随系统](docs/主题实时跟随.md)
+- [主题手动刷新](docs/主题手动刷新.md)
+- [开方与目录治理评估](docs/开方与目录治理评估.md)
+- [管理员身份与快速建档](docs/管理员身份与快速建档.md)
+- [界面交互修正](docs/界面交互修正.md)
+- [处方单据架构](docs/处方单据架构.md)
+- [取药凭证与医技单据](docs/取药凭证与医技单据.md)
+- [标准对照与差距](docs/标准对照与差距.md)
+- [标准逐条对照（详细版）](docs/标准逐条对照.md)
+- [标准与示范工程资料包](reference/README.md)
+- [示范工程对照](reference/comparison.md)
+- [申请审核清单](docs/申请审核清单.md)
+- [临床核心重构落地](docs/临床核心重构落地.md)
+- [实际运营测试报告](docs/实际运营测试报告.md)
+- [多部门联合实操报告](docs/多部门联合实操报告.md)
+- [子系统逐模块审计](docs/子系统逐模块审计.md)
+- [前端逐模块审计](docs/前端逐模块审计.md)
+- [门诊工作站重构](docs/门诊工作站重构.md)
+- [打印预览](docs/打印预览.md)
+- [部门工作站与审批](docs/部门工作站与审批.md)
 - [试用手册](docs/小诊所试用手册.md)
 
 ## 说明

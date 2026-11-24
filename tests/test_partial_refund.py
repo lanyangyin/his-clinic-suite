@@ -112,6 +112,8 @@ def test_partial_refund_one_pill(client, auth, monkeypatch):
     ).json()
     assert final["status"] == "refunded"
     assert final["refunded_amount"] == 25.0
+    assert final["invoice_status"] == "void"
+    assert final["invoice_void_reason"] == "全额退费自动红冲"
 
     again = client.post(f"/payments/{payment['id']}/refund", headers=auth["cashier"])
     assert again.status_code == 400
@@ -214,3 +216,73 @@ def test_insurance_card_channel_only_allows_full_refund(client, auth, monkeypatc
     full = client.post(f"/payments/{payment['id']}/refund", headers=auth["cashier"])
     assert full.status_code == 200
     assert full.json()["status"] == "refunded"
+
+
+def test_full_refund_reopens_encounter_and_allows_repayment(client, auth, monkeypatch):
+    allow_self_pay(monkeypatch)
+    drug_a = make_drug(client, auth, "重开A药", 10.0)
+    drug_b = make_drug(client, auth, "重开B药", 8.0)
+    encounter = make_encounter(client, auth, [(drug_a["id"], 1)])
+    first = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert first.status_code == 201, first.text
+    refunded = client.post(
+        f"/payments/{first.json()['id']}/refund", headers=auth["cashier"]
+    )
+    assert refunded.status_code == 200, refunded.text
+    assert refunded.json()["status"] == "refunded"
+    reopened = client.get(
+        f"/encounters/{encounter['id']}", headers=auth["doctor"]
+    ).json()
+    assert reopened["status"] == "open"
+    added = client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug_b["id"], "quantity": 2},
+        headers=auth["doctor"],
+    )
+    assert added.status_code == 201, added.text
+    second = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] != first.json()["id"]
+    assert second.json()["status"] == "paid"
+    assert second.json()["amount"] == 16.0
+
+
+def test_full_refund_unlocks_signed_record_for_correction(client, auth, monkeypatch):
+    allow_self_pay(monkeypatch)
+    drug = make_drug(client, auth, "解锁病历药", 10.0)
+    encounter = make_encounter(client, auth, [(drug["id"], 1)])
+    record = client.post(
+        f"/encounters/{encounter['id']}/medical-record",
+        json={"chief_complaint": "退费前病历", "treatment_advice": "原方案"},
+        headers=auth["doctor"],
+    )
+    assert record.status_code == 201, record.text
+    assert client.post(
+        f"/encounters/{encounter['id']}/medical-record/sign", headers=auth["doctor"]
+    ).status_code == 200
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert payment.status_code == 201, payment.text
+    refunded = client.post(
+        f"/payments/{payment.json()['id']}/refund", headers=auth["cashier"]
+    )
+    assert refunded.status_code == 200, refunded.text
+    unlocked = client.get(
+        f"/encounters/{encounter['id']}/medical-record", headers=auth["doctor"]
+    ).json()
+    assert unlocked["signed_at"] is None
+    versions = client.get(
+        f"/encounters/{encounter['id']}/medical-record/versions", headers=auth["doctor"]
+    ).json()
+    assert any(row["action"] == "unlock_refund" for row in versions)
+    updated = client.put(
+        f"/encounters/{encounter['id']}/medical-record",
+        json={"treatment_advice": "退费后修订方案"},
+        headers=auth["doctor"],
+    )
+    assert updated.status_code == 200, updated.text

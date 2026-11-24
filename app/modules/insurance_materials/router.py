@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.materials.schemas import MaterialItemResponse
 
 from .schemas import (
@@ -18,7 +18,7 @@ from .service import (
     sync_from_url,
 )
 
-router = APIRouter(prefix="/insurance/materials", tags=["insurance-materials"])
+router = APIRouter(prefix="/insurance/materials", tags=["insurance-materials"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/import", response_model=MaterialImportResult)

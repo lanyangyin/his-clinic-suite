@@ -36,9 +36,6 @@ def _setup_visit(client, auth):
         },
         headers=auth["doctor"],
     ).json()
-    client.post(
-        f"/encounters/{encounter['id']}/medical-record/sign", headers=auth["doctor"]
-    )
     drug = client.post(
         "/drugs/",
         json={"name": "历史降压药", "base_price": 10.0, "insurance_ratio": 0.8},
@@ -82,6 +79,9 @@ def _setup_visit(client, auth):
         json={"item_id": charge_item["id"], "quantity": 1},
         headers=auth["doctor"],
     ).json()
+    client.post(
+        f"/encounters/{encounter['id']}/medical-record/sign", headers=auth["doctor"]
+    )
     payment = client.post(
         "/payments/",
         json={"encounter_id": encounter["id"], "channel": "cash"},

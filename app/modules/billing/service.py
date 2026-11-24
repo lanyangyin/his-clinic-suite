@@ -13,6 +13,7 @@ from app.modules.encounter.service import (
     get_encounter,
     get_encounter_total,
     list_prescription_items,
+    unlock_medical_record_for_refund,
 )
 from app.modules.insurance.adapter import InsuranceUnavailable, settle_payment
 from app.modules.payment_gateway.service import CHANNELS, charge as charge_payment, refund
@@ -50,7 +51,12 @@ def create_payment(
         raise ValueError("就诊记录不存在")
 
     existing = (
-        db.query(Payment).filter(Payment.encounter_id == data.encounter_id).first()
+        db.query(Payment)
+        .filter(
+            Payment.encounter_id == data.encounter_id,
+            Payment.status.in_(("paid", "partially_refunded")),
+        )
+        .first()
     )
     if existing:
         raise ValueError("该就诊已收费")
@@ -188,8 +194,17 @@ def create_payment(
 
 
 def get_payment_by_encounter(db: Session, encounter_id: int) -> Payment | None:
-    """按就诊查收费记录；不存在时返回 None。"""
-    return db.query(Payment).filter(Payment.encounter_id == encounter_id).first()
+    """按就诊查收费记录；优先返回当前有效收费，其次最近一次。"""
+    rows = (
+        db.query(Payment)
+        .filter(Payment.encounter_id == encounter_id)
+        .order_by(Payment.id.desc())
+        .all()
+    )
+    for row in rows:
+        if row.status in ("paid", "partially_refunded"):
+            return row
+    return rows[0] if rows else None
 
 
 def get_payment(db: Session, payment_id: int) -> Payment | None:
@@ -210,7 +225,12 @@ def list_payments(
 
 
 def refund_payment(
-    db: Session, payment_id: int, items=None, operator: str = "", reason: str = ""
+    db: Session,
+    payment_id: int,
+    items=None,
+    operator: str = "",
+    reason: str = "",
+    operator_role: str = "",
 ) -> Payment:
     """退费：支持按费用明细/数量部分退费（可只退 1 颗药）。"""
     payment = get_payment(db, payment_id)
@@ -261,29 +281,75 @@ def refund_payment(
         raise ValueError("没有可退费用")
 
     total_amount = 0.0
-    total_insurance = 0.0
+    raw_insurance = 0.0
     for charge, quantity in plan:
         amount = round(charge.unit_price * quantity, 2)
         total_amount += amount
-        total_insurance += round(amount * charge.insurance_ratio, 2)
+        raw_insurance += round(amount * charge.insurance_ratio, 2)
     total_amount = round(total_amount, 2)
-    total_insurance = round(total_insurance, 2)
+    threshold = getattr(settings, "REFUND_APPROVAL_THRESHOLD", 500)
+    if (
+        threshold > 0
+        and total_amount >= threshold
+        and operator_role not in ("admin", "director")
+    ):
+        raise ValueError(f"退费金额 {total_amount:.2f} 达到 {threshold:.2f}，需院长/管理员审批")
+    raw_insurance = round(raw_insurance, 2)
+    # 不能退超过该笔收费实际收到的医保金额；自费/医保关闭时比例为 0
+    insurance_remaining = max(
+        round(payment.insurance_amount - payment.refunded_insurance_amount, 2), 0.0
+    )
+    insurance_factor = (
+        min(1.0, insurance_remaining / raw_insurance) if raw_insurance > 0 else 0.0
+    )
+    total_insurance = 0.0
+    for charge, quantity in plan:
+        amount = round(charge.unit_price * quantity, 2)
+        total_insurance += round(amount * charge.insurance_ratio * insurance_factor, 2)
+    total_insurance = round(
+        min(sum(
+            round(charge.unit_price * quantity * charge.insurance_ratio * insurance_factor, 2)
+            for charge, quantity in plan
+        ), insurance_remaining),
+        2,
+    )
     total_self_pay = round(total_amount - total_insurance, 2)
 
     if total_self_pay > 0:
-        refund_result = refund(
-            db,
-            payment.channel or "cash",
-            payment.channel_trade_no or "",
-            total_self_pay,
-        )
-        if refund_result["status"] != "success":
-            raise ValueError(f"退款失败：{refund_result['message']}")
+        if payment.channel == "mixed":
+            from .models import PaymentAllocation
+
+            allocations = (
+                db.query(PaymentAllocation)
+                .filter(PaymentAllocation.payment_id == payment.id)
+                .order_by(PaymentAllocation.id)
+                .all()
+            )
+            remaining = total_self_pay
+            for allocation in allocations:
+                if remaining <= 0:
+                    break
+                part = min(round(allocation.amount, 2), remaining)
+                result = refund(db, allocation.channel, "", part)
+                if result["status"] != "success":
+                    raise ValueError(f"退款失败：{result['message']}")
+                remaining = round(remaining - part, 2)
+            if remaining > 0:
+                raise ValueError("混合支付退款分配金额不足")
+        else:
+            refund_result = refund(
+                db,
+                payment.channel or "cash",
+                payment.channel_trade_no or "",
+                total_self_pay,
+            )
+            if refund_result["status"] != "success":
+                raise ValueError(f"退款失败：{refund_result['message']}")
 
     refund_no = f"RF{datetime.now():%Y%m%d%H%M%S}{payment.id:04d}"
     for charge, quantity in plan:
         amount = round(charge.unit_price * quantity, 2)
-        insurance = round(amount * charge.insurance_ratio, 2)
+        insurance = round(amount * charge.insurance_ratio * insurance_factor, 2)
         charge.refunded_quantity += quantity
         charge.status = (
             "refunded"
@@ -314,6 +380,16 @@ def refund_payment(
         charge.refunded_quantity >= charge.quantity for charge in charges.values()
     )
     payment.status = "refunded" if all_refunded else "partially_refunded"
+    if all_refunded and payment.invoice_status == "normal":
+        payment.invoice_status = "void"
+        payment.invoice_voided_at = datetime.now()
+        payment.invoice_voided_by = operator
+        payment.invoice_void_reason = "全额退费自动红冲"
+    if all_refunded:
+        encounter = get_encounter(db, payment.encounter_id)
+        if encounter:
+            encounter.status = "open"
+            unlock_medical_record_for_refund(db, encounter.id, operator)
     db.commit()
     db.refresh(payment)
     return payment

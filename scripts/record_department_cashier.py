@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.cashier import CashierWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "cashier"
@@ -31,7 +31,7 @@ VIDEO = VIDEO_DIR / "01_挂号收费.mp4"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class CashierDemo(QMainWindow):
+class CashierDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("挂号收费科 · cashier")
@@ -129,6 +129,8 @@ class CashierDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("cashier", "cashier123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.2)
@@ -140,15 +142,14 @@ class CashierDemo(QMainWindow):
             self.widget.qr_name.setText(f"快速患者{self.suffix}")
             self.widget.qr_gender.setCurrentIndex(1)
             self.widget.qr_phone.setText("13800005678")
-            self.click(reg_tab, "快速建档并挂号")
-            assert "快速挂号成功" in self.widget.reg_msg.text(), self.widget.reg_msg.text()
+            self.click(reg_tab, "快速建档")
+            assert "快速建档并挂号成功" in self.widget.reg_msg.text(), self.widget.reg_msg.text()
             self.scene(self.widget.reg_msg.text())
             self.scene("再演示完整 P0 建档与 NFC 发卡")
             patient_tab = self.tab("患者建档")
             self.widget.p_name.setText(f"收费演示患者{self.suffix}")
             self.widget.p_gender.setCurrentIndex(self.widget.p_gender.findData("male"))
             self.widget.p_id_number.setText(f"1101011997{self.suffix[-6:]}88")
-            self.widget.p_birth_date.setText("1997-05-20")
             self.widget.p_phone.setText("13800001234")
             self.widget.p_address.setText("北京市东城区演示街道 1 号")
             self.widget.p_special_history.setText("2型糖尿病 8 年；高血压 5 年")

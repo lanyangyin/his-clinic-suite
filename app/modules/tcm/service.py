@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.modules.charges.service import add_charge
-from app.modules.encounter.models import Encounter
+from app.modules.encounter.models import Encounter, Prescription, PrescriptionLine
+from app.modules.charges.models import EncounterCharge
 from app.modules.encounter.service import get_encounter
 from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
@@ -87,17 +88,42 @@ def create_prescription(
     )
     db.add(prescription)
     db.flush()
+    header = Prescription(
+        encounter_id=encounter_id,
+        prescription_no=f"TCM{datetime.now():%Y%m%d}{prescription.id:06d}",
+        type="tcm_herb",
+        status="pending_review",
+        prescribed_by=doctor,
+    )
+    db.add(header)
+    db.flush()
+    prescription.prescription_id = header.id
     total = 0.0
     for item, herb in herbs:
         total += herb.price_per_g * item.dose_g * data.packs
+        tcm_item = TcmPrescriptionItem(
+            prescription_id=prescription.id,
+            herb_id=herb.id,
+            herb_name=herb.name,
+            dose_g=item.dose_g,
+            special=item.special,
+            note=item.note,
+        )
+        db.add(tcm_item)
+        db.flush()
         db.add(
-            TcmPrescriptionItem(
-                prescription_id=prescription.id,
+            PrescriptionLine(
+                prescription_id=header.id,
+                kind="herb",
                 herb_id=herb.id,
-                herb_name=herb.name,
-                dose_g=item.dose_g,
-                special=item.special,
-                note=item.note,
+                source_item_id=tcm_item.id,
+                name=herb.name,
+                spec=herb.spec,
+                quantity=item.dose_g,
+                unit=herb.unit,
+                days=data.packs,
+                unit_price=herb.price_per_g,
+                amount=round(herb.price_per_g * item.dose_g * data.packs, 2),
             )
         )
     prescription.total_amount = round(total, 2)
@@ -175,6 +201,100 @@ def get_prescription(db: Session, prescription_id: int) -> TcmPrescription | Non
     return db.get(TcmPrescription, prescription_id)
 
 
+def _recalc_total(db: Session, prescription: TcmPrescription) -> None:
+    items = (
+        db.query(TcmPrescriptionItem)
+        .filter(TcmPrescriptionItem.prescription_id == prescription.id)
+        .all()
+    )
+    total = 0.0
+    for item in items:
+        herb = get_herb(db, item.herb_id)
+        if herb:
+            total += herb.price_per_g * item.dose_g * prescription.packs
+    prescription.total_amount = round(total, 2)
+    charge = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.source_type == "tcm_prescription",
+            EncounterCharge.source_id == prescription.id,
+        )
+        .first()
+    )
+    if charge and charge.status == "paid":
+        raise ValueError("该中药处方已收费，不能修改剂量；请先退费")
+    if charge:
+        charge.quantity = prescription.packs
+        charge.unit_price = round(total / prescription.packs, 2) if prescription.packs else total
+        charge.amount = prescription.total_amount
+
+
+def update_prescription_item(
+    db: Session, prescription_id: int, item_id: int, data, operator: str = ""
+) -> TcmPrescription:
+    prescription = get_prescription(db, prescription_id)
+    if not prescription:
+        raise ValueError("中药处方不存在")
+    if prescription.status != "pending":
+        raise ValueError("只有待审核中药处方可以修改饮片")
+    item = db.get(TcmPrescriptionItem, item_id)
+    if not item or item.prescription_id != prescription_id:
+        raise ValueError("饮片明细不存在")
+    item.dose_g = data.dose_g
+    item.special = data.special
+    item.note = data.note
+    line = (
+        db.query(PrescriptionLine)
+        .filter(
+            PrescriptionLine.kind == "herb",
+            PrescriptionLine.source_item_id == item.id,
+        )
+        .first()
+    )
+    if line:
+        herb = get_herb(db, item.herb_id)
+        line.quantity = item.dose_g
+        line.amount = round((herb.price_per_g if herb else 0) * item.dose_g * prescription.packs, 2)
+    _recalc_total(db, prescription)
+    db.commit()
+    db.refresh(prescription)
+    return prescription
+
+
+def delete_prescription_item(db: Session, prescription_id: int, item_id: int) -> TcmPrescription:
+    prescription = get_prescription(db, prescription_id)
+    if not prescription:
+        raise ValueError("中药处方不存在")
+    if prescription.status != "pending":
+        raise ValueError("只有待审核中药处方可以删除饮片")
+    item = db.get(TcmPrescriptionItem, item_id)
+    if not item or item.prescription_id != prescription_id:
+        raise ValueError("饮片明细不存在")
+    item_count = (
+        db.query(TcmPrescriptionItem)
+        .filter(TcmPrescriptionItem.prescription_id == prescription_id)
+        .count()
+    )
+    if item_count <= 1:
+        raise ValueError("中药处方至少保留一味饮片")
+    line = (
+        db.query(PrescriptionLine)
+        .filter(
+            PrescriptionLine.kind == "herb",
+            PrescriptionLine.source_item_id == item.id,
+        )
+        .first()
+    )
+    if line:
+        db.delete(line)
+    db.delete(item)
+    db.flush()
+    _recalc_total(db, prescription)
+    db.commit()
+    db.refresh(prescription)
+    return prescription
+
+
 def review_prescription(
     db: Session, prescription_id: int, operator: str = ""
 ) -> TcmPrescription:
@@ -186,6 +306,13 @@ def review_prescription(
     prescription.status = "reviewed"
     prescription.review_by = operator
     prescription.reviewed_at = datetime.now()
+    if prescription.prescription_id:
+        header = db.get(Prescription, prescription.prescription_id)
+        if header:
+            header.status = "approved"
+            header.reviewed_by = operator
+            header.reviewed_at = datetime.now()
+            header.updated_at = datetime.now()
     db.commit()
     db.refresh(prescription)
     return prescription
@@ -202,6 +329,11 @@ def dispense_prescription(
     prescription.status = "dispensed"
     prescription.dispense_by = operator
     prescription.dispensed_at = datetime.now()
+    if prescription.prescription_id:
+        header = db.get(Prescription, prescription.prescription_id)
+        if header:
+            header.status = "dispensing" if prescription.decoct_service == "decoct" else "dispensed"
+            header.updated_at = datetime.now()
     if prescription.decoct_service == "decoct":
         encounter = get_encounter(db, prescription.encounter_id)
         registration = db.get(Registration, encounter.registration_id) if encounter else None

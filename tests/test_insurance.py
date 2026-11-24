@@ -218,3 +218,13 @@ def test_payment_degrades_to_self_pay(client, auth, monkeypatch):
     body = r.json()
     assert body["insurance_amount"] == 0.0
     assert body["self_pay_amount"] == 30.0
+
+
+def test_insurance_mock_must_be_explicit(monkeypatch):
+    import pytest
+    from app import settings
+    from app.modules.insurance.adapter import InsuranceUnavailable, check_prescription
+
+    monkeypatch.setattr(settings, "INSURANCE_ALLOW_MOCK", False)
+    with pytest.raises(InsuranceUnavailable):
+        check_prescription(diagnosis="感冒", drug_name="A药", quantity=1, ratio=0.8)

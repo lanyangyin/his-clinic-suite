@@ -24,6 +24,8 @@ from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_picker import PatientPicker
+from his_client.ui.table_policy import set_column_layout
 
 
 class TreatmentRoomWidget(QWidget):
@@ -62,7 +64,7 @@ class TreatmentRoomWidget(QWidget):
         self.table.setHorizontalHeaderLabels(
             ["处置号", "患者", "类型", "处置", "治疗室", "优先级", "状态", "费用"]
         )
-        self.table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.table, stretch=(1, 3), contents=(0, 2, 4, 5, 6, 7))
         self.table.cellClicked.connect(self._select_case)
         self.table.horizontalHeader().setStretchLastSection(True)
         left_layout.addWidget(self.table, 1)
@@ -88,7 +90,13 @@ class TreatmentRoomWidget(QWidget):
         case_box = QGroupBox("新建处置")
         form = QFormLayout(case_box)
         self.patient_id = QSpinBox()
-        self.patient_id.setRange(1, 10_000_000)
+        self.patient_id.setRange(0, 10_000_000)
+        self.patient_id.setSpecialValueText("请选择患者")
+        self.patient_id.setValue(0)
+        self.patient_picker = PatientPicker(self.api)
+        self.patient_picker.patient_selected.connect(
+            lambda patient: self.patient_id.setValue(int(patient["id"]))
+        )
         self.encounter_id = QSpinBox()
         self.encounter_id.setRange(0, 10_000_000)
         self.encounter_id.setSpecialValueText("不关联就诊")
@@ -107,6 +115,7 @@ class TreatmentRoomWidget(QWidget):
         self.price.setPlaceholderText("费用，空=收费项目价")
         create = QPushButton("创建处置")
         create.clicked.connect(self._create_case)
+        form.addRow("查患者", self.patient_picker)
         form.addRow("患者 ID", self.patient_id)
         form.addRow("就诊 ID", self.encounter_id)
         form.addRow("治疗室", self.room)
@@ -138,7 +147,9 @@ class TreatmentRoomWidget(QWidget):
         layout = QVBoxLayout(page)
         row = QHBoxLayout()
         self.case_id = QSpinBox()
-        self.case_id.setRange(1, 10_000_000)
+        self.case_id.setRange(0, 10_000_000)
+        self.case_id.setSpecialValueText("请选择处置")
+        self.case_id.setValue(0)
         load = QPushButton("载入处置")
         load.clicked.connect(self._load_case)
         row.addWidget(QLabel("处置 ID"))
@@ -342,12 +353,12 @@ class TreatmentRoomWidget(QWidget):
             patient = None
         if patient:
             self.banner.set_patient(patient, case.get("encounter_id"), case.get("status") or "")
-            gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+            gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "性别不详")
             age = patient.get("age")
             allergy = patient.get("allergy_label") or "不详"
             self.case_info.setText(
                 self.case_info.text()
-                + f" · {gender}/{age if age is not None else '—'}岁 · 过敏：{allergy}"
+                + f" · {gender}/{age if age is not None else '年龄不详'} · 过敏：{allergy}"
             )
             if patient.get("allergy_status") == "present":
                 self.case_info.setStyleSheet("color:#ef4444;font-weight:bold")
@@ -414,8 +425,8 @@ class TreatmentRoomWidget(QWidget):
         except ApiError as e:
             self.handle_msg.setText(f"开始失败（{e.status_code}）：{e.detail}")
             return
-        self.handle_msg.setText("处置已开始")
         self._load_case()
+        self.handle_msg.setText("处置已开始")
 
     def _complete(self) -> None:
         try:
@@ -433,8 +444,8 @@ class TreatmentRoomWidget(QWidget):
         except ApiError as e:
             self.handle_msg.setText(f"完成失败（{e.status_code}）：{e.detail}")
             return
-        self.handle_msg.setText("处置已完成")
         self._load_case()
+        self.handle_msg.setText("处置已完成")
 
     def _cancel(self) -> None:
         try:
@@ -641,7 +652,7 @@ class TreatmentRoomWidget(QWidget):
         self.wb_cases.setHorizontalHeaderLabels(
             ["处置号", "患者", "处置", "状态", "优先级", "费用"]
         )
-        self.wb_cases.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.wb_cases, stretch=(1, 2), contents=(0, 3, 4, 5))
         self.wb_cases.cellClicked.connect(self._select_wb_case)
         layout.addWidget(self.wb_cases, 1)
 

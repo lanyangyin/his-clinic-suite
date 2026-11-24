@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     EnrollmentResponse,
@@ -25,7 +25,7 @@ from .service import (
     withdraw,
 )
 
-router = APIRouter(prefix="/pathways", tags=["pathway"])
+router = APIRouter(prefix="/pathways", tags=["pathway"], dependencies=[Depends(require_read_login)])
 
 _NOT_FOUND = {"临床路径不存在", "住院记录不存在", "入径记录不存在"}
 

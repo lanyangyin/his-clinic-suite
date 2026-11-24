@@ -11,7 +11,7 @@ from .models import StockMovement
 
 
 def _drug_balance(db: Session, drug_id: int, batch_no: str, warehouse: str) -> int:
-    if warehouse == "总库":
+    if warehouse in ("总库", "药库"):
         row = (
             db.query(WarehouseStock)
             .filter(
@@ -155,3 +155,64 @@ def list_movements(
         .limit(min(max(limit, 1), 500))
         .all()
     )
+
+
+def reconcile_stock(db: Session) -> list[dict]:
+    """将当前批次库存与最近一笔流水结存比对，返回账实差异。"""
+    mismatches: list[dict] = []
+
+    def latest(kind: str, entity_id: int | None, batch_no: str, warehouse: str):
+        query = db.query(StockMovement).filter(
+            StockMovement.kind == kind,
+            StockMovement.warehouse == warehouse,
+            StockMovement.batch_no == batch_no,
+        )
+        if kind == "drug":
+            query = query.filter(StockMovement.drug_id == entity_id)
+        else:
+            query = query.filter(StockMovement.material_id == entity_id)
+        return query.order_by(StockMovement.id.desc()).first()
+
+    for row in db.query(WarehouseStock).all():
+        movement = latest("drug", row.drug_id, row.batch_no, "总库")
+        ledger = movement.balance_after if movement else 0
+        if ledger != row.quantity:
+            mismatches.append(
+                {
+                    "kind": "drug",
+                    "name": movement.name if movement else f"药品 {row.drug_id}",
+                    "batch_no": row.batch_no,
+                    "warehouse": "总库",
+                    "stock_quantity": row.quantity,
+                    "ledger_balance": ledger,
+                }
+            )
+    for row in db.query(DrugStock).all():
+        movement = latest("drug", row.drug_id, row.batch_no, "药房")
+        ledger = movement.balance_after if movement else 0
+        if ledger != row.quantity:
+            mismatches.append(
+                {
+                    "kind": "drug",
+                    "name": movement.name if movement else f"药品 {row.drug_id}",
+                    "batch_no": row.batch_no,
+                    "warehouse": "药房",
+                    "stock_quantity": row.quantity,
+                    "ledger_balance": ledger,
+                }
+            )
+    for row in db.query(MaterialStock).all():
+        movement = latest("material", row.item_id, "", row.warehouse)
+        ledger = movement.balance_after if movement else 0
+        if ledger != row.quantity:
+            mismatches.append(
+                {
+                    "kind": "material",
+                    "name": movement.name if movement else f"物资 {row.item_id}",
+                    "batch_no": "",
+                    "warehouse": row.warehouse,
+                    "stock_quantity": row.quantity,
+                    "ledger_balance": ledger,
+                }
+            )
+    return mismatches

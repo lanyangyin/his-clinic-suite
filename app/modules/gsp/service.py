@@ -27,7 +27,9 @@ def _next_no(db: Session, model, prefix: str) -> str:
     return f"{prefix}{datetime.now():%Y%m%d}{(last[0] if last else 0) + 1:04d}"
 
 
-def create_acceptance(db: Session, data: AcceptanceCreate, operator: str = "") -> GspAcceptance:
+def create_acceptance(
+    db: Session, data: AcceptanceCreate, operator: str = "", commit: bool = True
+) -> GspAcceptance:
     supplier_name = data.supplier_name
     if data.supplier_id is not None:
         supplier = get_supplier(db, data.supplier_id)
@@ -65,8 +67,11 @@ def create_acceptance(db: Session, data: AcceptanceCreate, operator: str = "") -
                 note=item.note,
             )
         )
-    db.commit()
-    db.refresh(acceptance)
+    if commit:
+        db.commit()
+        db.refresh(acceptance)
+    else:
+        db.flush()
     return acceptance
 
 

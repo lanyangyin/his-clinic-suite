@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     CompleteRequest,
@@ -26,7 +26,7 @@ from .service import (
     sync_orders,
 )
 
-router = APIRouter(prefix="/nursing", tags=["nursing"])
+router = APIRouter(prefix="/nursing", tags=["nursing"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/encounters/{encounter_id}/sync", response_model=list[NursingOrderResponse])

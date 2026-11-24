@@ -126,3 +126,26 @@ def test_role_protection(client, auth):
     # 未登录不能日结
     r = client.post("/finance/daily-close", json={"close_date": TODAY})
     assert r.status_code == 401
+
+
+def test_daily_close_counts_partial_refund(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", False)
+    payment = make_encounter_with_payment(client, auth, drug_price=10.0, quantity=2)
+    charges = client.get(f"/charges/encounters/{payment['encounter_id']}", headers=auth['cashier']).json()
+    charge = next(row for row in charges if row['status'] == 'paid')
+    refunded = client.post(
+        f"/payments/{payment['id']}/refund",
+        json={"items": [{"charge_id": charge['id'], "quantity": 1}]},
+        headers=auth["cashier"],
+    )
+    assert refunded.status_code == 200, refunded.text
+    body = client.post(
+        "/finance/daily-close", json={"close_date": TODAY}, headers=auth["admin"]
+    ).json()
+    assert body["outpatient_paid_count"] == 1
+    assert body["outpatient_paid_amount"] == 10.0
+    assert body["outpatient_refunded_count"] == 1
+    assert body["outpatient_refunded_amount"] == 10.0
+    assert body["insurance_amount"] == 0.0

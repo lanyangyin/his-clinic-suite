@@ -114,6 +114,16 @@ def test_report_imaging_result(client, auth):
     assert "双肺纹理" in body["report"]
     assert body["image_url"].endswith(".dcm")
     assert body["reported_at"] is not None
+    assert body["reported_by"] == "radiology"
+
+    reviewed = client.post(
+        f"/pacs/requests/{request['id']}/review",
+        json={"approve": True, "note": "报告规范"},
+        headers=auth["admin"],
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["status"] == "reviewed"
+    assert reviewed.json()["reviewed_by"] == "admin"
 
     again = client.post(
         f"/pacs/requests/{request['id']}/report",
@@ -193,3 +203,82 @@ def test_role_protection(client, auth):
         json={"item_id": item["id"]},
     )
     assert r.status_code == 401
+
+
+def test_radiology_worklist_and_report(client, auth):
+    encounter = make_encounter(client, auth)
+    item = make_item(client, auth).json()
+    request = client.post(
+        f"/pacs/encounters/{encounter['id']}/imaging-requests",
+        json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    work = client.get("/pacs/worklist", headers=auth["radiology"])
+    assert work.status_code == 200, work.text
+    assert any(row["id"] == request["id"] for row in work.json())
+    reported = client.post(
+        f"/pacs/requests/{request['id']}/report",
+        json={"report": "双肺纹理清晰", "image_url": "http://pacs.local/1"},
+        headers=auth["radiology"],
+    )
+    assert reported.status_code == 200, reported.text
+    assert reported.json()["status"] == "reported"
+
+
+def test_structured_imaging_report(client, auth):
+    encounter = make_encounter(client, auth)
+    item = make_item(client, auth, code="CT-STRUCT", name="胸部 CT").json()
+    request = client.post(
+        f"/pacs/encounters/{encounter['id']}/imaging-requests",
+        json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    r = client.post(
+        f"/pacs/requests/{request['id']}/report",
+        json={
+            "findings": "双肺纹理增粗，未见明显实变。",
+            "impression": "支气管炎可能，建议结合临床。",
+            "template_name": "胸部CT默认模板",
+            "study_uid": "1.2.3.4.5",
+            "series_uid": "1.2.3.4.5.1",
+            "modality": "CT",
+        },
+        headers=auth["radiology"],
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["findings"].startswith("双肺纹理")
+    assert body["impression"].startswith("支气管炎")
+    assert "支气管炎" in body["report"]
+    assert body["template_name"] == "胸部CT默认模板"
+    assert body["study_uid"] == "1.2.3.4.5"
+    assert body["series_uid"] == "1.2.3.4.5.1"
+    assert body["modality"] == "CT"
+
+
+def test_imaging_report_template(client, auth):
+    created = client.post(
+        "/pacs/templates",
+        json={
+            "name": "胸部 CT 默认模板",
+            "body_part": "胸部",
+            "findings": "双肺纹理清晰，未见明显实变。",
+            "impression": "胸部 CT 未见明显异常。",
+        },
+        headers=auth["admin"],
+    )
+    assert created.status_code == 201, created.text
+    rows = client.get("/pacs/templates", headers=auth["radiology"]).json()
+    assert any(row["name"] == "胸部 CT 默认模板" for row in rows)
+    duplicate = client.post(
+        "/pacs/templates",
+        json={"name": "胸部 CT 默认模板", "findings": "x"},
+        headers=auth["admin"],
+    )
+    assert duplicate.status_code == 400
+    denied = client.post(
+        "/pacs/templates",
+        json={"name": "医生不能建"},
+        headers=auth["doctor"],
+    )
+    assert denied.status_code == 403

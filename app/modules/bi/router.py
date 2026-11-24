@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import OverviewResponse, RevenueTrendItem, TopDiagnosisItem, TopDrugItem
 from .service import overview, revenue_trend, top_diagnoses, top_drugs
 
-router = APIRouter(prefix="/bi", tags=["bi"])
+router = APIRouter(prefix="/bi", tags=["bi"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/overview", response_model=OverviewResponse)

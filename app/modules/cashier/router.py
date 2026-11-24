@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import ShiftClose, ShiftOpen, ShiftResponse
 from .service import close_shift, daily, list_shifts, open_shift
 
-router = APIRouter(prefix="/cashier", tags=["cashier"])
+router = APIRouter(prefix="/cashier", tags=["cashier"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/daily")

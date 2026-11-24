@@ -11,7 +11,7 @@ import uvicorn  # noqa: E402
 
 from app.settings import BASE_DIR, DATABASE_URL, HOST, PORT  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
-from app.migrate import ensure_initial_admin, ensure_initial_director, ensure_schema  # noqa: E402
+from app.migrate import ensure_admin_doctor, ensure_initial_admin, ensure_initial_director, ensure_schema  # noqa: E402
 
 
 def main() -> int:
@@ -24,6 +24,7 @@ def main() -> int:
     try:
         ensure_initial_admin(db)
         ensure_initial_director(db)
+        ensure_admin_doctor(db)
     finally:
         db.close()
     uvicorn.run("app.main:app", host=HOST, port=PORT, reload=False)

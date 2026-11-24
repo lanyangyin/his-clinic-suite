@@ -55,6 +55,10 @@ class Drug(Base):
     dosage_form: Mapped[str] = mapped_column(
         String(30), default="", server_default="", nullable=False
     )
+    # 管制等级："" 普通 / narcotic 麻醉药品 / psychotropic1 第一类精神药品
+    controlled_level: Mapped[str] = mapped_column(
+        String(20), default="", server_default="", nullable=False
+    )
 
 
 class DrugInteraction(Base):

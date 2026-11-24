@@ -116,3 +116,27 @@ def test_kiosk_payment_missing_encounter(client, auth):
     r = client.post("/kiosk/payments", json={"encounter_id": 999})
     assert r.status_code == 400
     assert r.json()["detail"] == "就诊记录不存在"
+
+
+def test_kiosk_requires_terminal_token_when_not_demo(client, auth, monkeypatch):
+    from app import settings
+
+    patient, doctor, _ = setup_data(client, auth)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_READ", False)
+    monkeypatch.setattr(settings, "KIOSK_TOKEN", "")
+    resp = client.post(
+        "/kiosk/registrations",
+        json={"patient_id_number": patient["id_number"], "doctor_id": doctor["id"]},
+    )
+    assert resp.status_code == 503
+    monkeypatch.setattr(settings, "KIOSK_TOKEN", "terminal-secret")
+    assert client.post(
+        "/kiosk/registrations",
+        json={"patient_id_number": patient["id_number"], "doctor_id": doctor["id"]},
+    ).status_code == 401
+    ok = client.post(
+        "/kiosk/registrations",
+        json={"patient_id_number": patient["id_number"], "doctor_id": doctor["id"]},
+        headers={"X-Kiosk-Token": "terminal-secret"},
+    )
+    assert ok.status_code == 201, ok.text

@@ -10,6 +10,20 @@ class DispenseRequest(BaseModel):
     pickup_code: str = ""
     receiver_name: str = ""
     receiver_relation: str = "本人"
+    witness: str = ""
+
+
+class DispenseItemResponse(BaseModel):
+    id: int
+    drug_id: int | None = None
+    drug_name: str = ""
+    spec: str = ""
+    batch_no: str = ""
+    quantity: int
+    returned_quantity: int = 0
+    unit_price: float = 0.0
+    amount: float = 0.0
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DispenseResponse(DispenseRequest):
@@ -20,6 +34,7 @@ class DispenseResponse(DispenseRequest):
     verified_at: datetime | None = None
     signature_path: str = ""
     signed_at: datetime | None = None
+    items: list[DispenseItemResponse] = []
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -116,3 +131,13 @@ class RetailSaleResponse(BaseModel):
     created_at: datetime
     items: list[RetailItemResponse]
     model_config = ConfigDict(from_attributes=True)
+
+
+class DispenseReturnItem(BaseModel):
+    line_id: int
+    quantity: int = Field(gt=0)
+
+
+class DispenseReturnRequest(BaseModel):
+    items: list[DispenseReturnItem]
+    reason: str = ""

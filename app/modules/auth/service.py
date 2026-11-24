@@ -47,6 +47,7 @@ def create_user(db: Session, data: UserCreate) -> User:
         role=data.role,
         display_name=data.display_name or data.username,
         employee_id=data.employee_id,
+        doctor_id=data.doctor_id,
     )
     db.add(user)
     db.commit()
@@ -87,6 +88,7 @@ def log_action(
     method: str,
     path: str,
     status_code: int,
+    ip: str = "",
 ) -> None:
     """写操作日志：由调用方传入会话并提交，业务失败也照记。"""
     db.add(
@@ -96,6 +98,7 @@ def log_action(
             method=method,
             path=path,
             status_code=status_code,
+            ip=ip,
         )
     )
     db.commit()

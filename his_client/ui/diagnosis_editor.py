@@ -69,6 +69,10 @@ class DiagnosisEditor(QWidget):
         actions.addWidget(self.msg, 1)
         layout.addLayout(actions)
 
+    def set_read_only(self, read_only: bool) -> None:
+        for widget in (self.code, self.name, self.note, self.add_btn, self.remove_btn, self.up_btn, self.down_btn):
+            widget.setEnabled(not read_only)
+
     def set_options(self, rows: list[dict]) -> None:
         current = self.code.currentData()
         self.code.blockSignals(True)

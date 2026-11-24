@@ -227,3 +227,37 @@ def test_barcode_status_paid(client, auth):
     assert body["is_dispensed"] is False
     assert body["pending_amount"] == 0
     assert body["status_text"] == "已收费，可发药"
+
+
+def test_print_requires_login_when_anonymous_read_disabled(client, auth, monkeypatch):
+    from app import settings
+
+    encounter, _ = setup_paid_encounter(client, auth)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_READ", False)
+    assert client.get(f"/print/prescription/{encounter['id']}").status_code == 401
+    ok = client.get(f"/print/prescription/{encounter['id']}", headers=auth["doctor"])
+    assert ok.status_code == 200
+
+
+def test_print_one_time_token(client, auth, monkeypatch):
+    from app import settings
+
+    encounter, payment = setup_paid_encounter(client, auth)
+    monkeypatch.setattr(settings, "ALLOW_ANONYMOUS_READ", False)
+    no_token = client.get(f"/print/prescription/{encounter['id']}")
+    assert no_token.status_code == 401
+    created = client.post(
+        "/print/tokens",
+        params={"kind": "prescription", "ref_id": encounter["id"]},
+        headers=auth["admin"],
+    )
+    assert created.status_code == 200, created.text
+    token = created.json()["token"]
+    first = client.get(
+        f"/print/prescription/{encounter['id']}", params={"token": token}
+    )
+    assert first.status_code == 200, first.text
+    second = client.get(
+        f"/print/prescription/{encounter['id']}", params={"token": token}
+    )
+    assert second.status_code == 401

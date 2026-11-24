@@ -117,12 +117,24 @@ def test_archive_full_lifecycle(client, auth):
     assert unsealed.status_code == 201
     assert unsealed.json()["action"] == "unseal"
 
-    destroyed = client.post(
-        f"/archive/records/{record['id']}/destroy",
-        json={"reason": "保存期满", "approved_by": "医务科", "note": "销毁清册 2026-001"},
+    request = client.post(
+        f"/archive/records/{record['id']}/destruction-requests",
+        json={"reason": "保存期满", "note": "销毁清册 2026-001"},
         headers=auth["archive"],
     )
-    assert destroyed.status_code == 200
+    assert request.status_code == 201, request.text
+    approved = client.post(
+        f"/archive/destruction-requests/{request.json()['id']}/approve",
+        json={"note": "同意销毁"},
+        headers=auth["director"],
+    )
+    assert approved.status_code == 200, approved.text
+    executed = client.post(
+        f"/archive/destruction-requests/{request.json()['id']}/execute",
+        json={"witness": "医务科"},
+        headers=auth["archive"],
+    )
+    assert executed.status_code == 200, executed.text
     assert client.get(
         f"/archive/records/{record['id']}", headers=auth["archive"]
     ).json()["status"] == "destroyed"

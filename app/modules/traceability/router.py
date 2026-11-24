@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import TraceCodeResponse, TraceScanRequest, TraceScanResult
 from .service import (
@@ -15,7 +15,7 @@ from .service import (
     summary,
 )
 
-router = APIRouter(prefix="/trace", tags=["traceability"])
+router = APIRouter(prefix="/trace", tags=["traceability"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/scan/inbound", response_model=TraceScanResult)

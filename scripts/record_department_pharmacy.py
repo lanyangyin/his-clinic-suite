@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.pharmacy import PharmacyWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "pharmacy"
@@ -31,7 +31,7 @@ SIGNATURE = ROOT / "docs" / "dept_preview" / "signature_demo.png"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class PharmacyDemo(QMainWindow):
+class PharmacyDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("药房 · pharmacist")
@@ -146,9 +146,14 @@ class PharmacyDemo(QMainWindow):
             "POST", "/encounters/",
             json={"registration_id": reg["id"], "diagnosis": "药房演示"},
         )
-        self.doctor_api.call(
+        rx = self.doctor_api.call(
             "POST", f"/encounters/{self.encounter['id']}/prescriptions",
             json={"drug_id": self.drug["id"], "quantity": 2},
+        )
+        self.pharmacist_api.call(
+            "POST",
+            f"/encounters/{self.encounter['id']}/prescriptions/{rx['prescription_id']}/review",
+            json={"approve": True},
         )
         self.payment = self.cashier.call(
             "POST", "/payments/", json={"encounter_id": self.encounter["id"], "channel": "cash"}
@@ -160,6 +165,8 @@ class PharmacyDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("pharmacist", "pharm123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)
@@ -202,8 +209,9 @@ class PharmacyDemo(QMainWindow):
             self.scroll.ensureWidgetVisible(self.widget.receiver_name)
             self.scene("执行核对发药")
             self.click(disp, "核对发药")
+            print("DISPMSG", self.widget.disp_msg.text(), "ENC", self.widget.disp_encounter_id.value(), flush=True)
             records = self.pharmacist_api.call("GET", "/pharmacy/worklist")
-            assert all(x["encounter_id"] != self.encounter["id"] for x in records)
+            assert all(x["encounter_id"] != self.encounter["id"] for x in records), records
             self.scene("发药成功；再次扫码应提示已发药")
             self.widget.disp_scan.setText(f"RX{self.encounter['id']:06d}")
             self.click(disp, "扫码定位")
@@ -214,7 +222,7 @@ class PharmacyDemo(QMainWindow):
             self.click(disp, "退药（库存回补）")
             assert "退药成功" in self.widget.return_msg.text(), self.widget.return_msg.text()
             stock = self.pharmacist_api.call("GET", f"/pharmacy/stocks?drug_id={self.drug['id']}")
-            assert sum(x["quantity"] for x in stock) == 10
+            assert sum(x["quantity"] for x in stock) == 10, stock
             self.scene("药房演示完成：队列/叫号/错误码/核对/签字/发药/拦截/退药")
             self.wait(3.0)
             self.timer.stop()

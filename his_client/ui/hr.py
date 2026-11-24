@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.theme import apply_theme
+from his_client.ui.table_policy import set_column_layout
 
 ROLE_OPTIONS = [
     ("doctor", "医生"),
@@ -112,7 +113,7 @@ class HrWidget(QWidget):
         self.emp_table.setHorizontalHeaderLabels(
             ["工号", "姓名", "科室", "岗位", "手机", "状态", "入职"]
         )
-        self.emp_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.emp_table, stretch=(1, 2, 3), contents=(0, 4, 5, 6))
         layout.addWidget(self.emp_table, 1)
         actions = QHBoxLayout()
         resign = QPushButton("办理离职")
@@ -212,7 +213,9 @@ class HrWidget(QWidget):
         self.emp_name.clear()
         self.emp_username.clear()
         self.emp_password.clear()
+        message = self.emp_msg.text()
         self._refresh_all()
+        self.emp_msg.setText(message)
 
     def _resign_employee(self) -> None:
         row = self.emp_table.currentRow()
@@ -247,7 +250,7 @@ class HrWidget(QWidget):
         layout.addWidget(box)
         self.doc_table = QTableWidget(0, 4)
         self.doc_table.setHorizontalHeaderLabels(["ID", "姓名", "科室", "状态"])
-        self.doc_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.doc_table, stretch=(1,), contents=(0, 2, 3))
         layout.addWidget(self.doc_table, 1)
         actions = QHBoxLayout()
         dismiss = QPushButton("停用/辞退医生")
@@ -326,7 +329,7 @@ class HrWidget(QWidget):
         layout.addWidget(box)
         self.dept_table = QTableWidget(0, 3)
         self.dept_table.setHorizontalHeaderLabels(["ID", "名称", "状态"])
-        self.dept_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.dept_table, stretch=(1,), contents=(0, 2))
         layout.addWidget(self.dept_table, 1)
         actions = QHBoxLayout()
         disable = QPushButton("停用科室")
@@ -398,6 +401,9 @@ class HrWidget(QWidget):
         self.acc_employee = QSpinBox()
         self.acc_employee.setRange(0, 10_000_000)
         self.acc_employee.setSpecialValueText("不关联员工")
+        self.acc_doctor = QSpinBox()
+        self.acc_doctor.setRange(0, 10_000_000)
+        self.acc_doctor.setSpecialValueText("不关联医生")
         add = QPushButton("创建账号")
         add.clicked.connect(self._add_account)
         form.addRow("账号", self.acc_username)
@@ -405,11 +411,14 @@ class HrWidget(QWidget):
         form.addRow("显示名", self.acc_display)
         form.addRow("角色", self.acc_role)
         form.addRow("关联员工 ID", self.acc_employee)
+        form.addRow("关联医生 ID", self.acc_doctor)
         form.addRow("", add)
         layout.addWidget(box)
-        self.acc_table = QTableWidget(0, 5)
-        self.acc_table.setHorizontalHeaderLabels(["ID", "账号", "显示名", "角色", "员工 ID"])
-        self.acc_table.horizontalHeader().setStretchLastSection(True)
+        self.acc_table = QTableWidget(0, 6)
+        self.acc_table.setHorizontalHeaderLabels(
+            ["ID", "账号", "显示名", "角色", "员工 ID", "医生 ID"]
+        )
+        set_column_layout(self.acc_table, stretch=(1, 2, 3), contents=(0, 4, 5))
         layout.addWidget(self.acc_table, 1)
         actions = QHBoxLayout()
         refresh = QPushButton("刷新账号")
@@ -435,6 +444,7 @@ class HrWidget(QWidget):
                 row.get("display_name") or "",
                 role_names.get(row.get("role"), row.get("role", "")),
                 str(row.get("employee_id") or ""),
+                str(row.get("doctor_id") or ""),
             ]
             for col, value in enumerate(values):
                 self.acc_table.setItem(i, col, QTableWidgetItem(str(value)))
@@ -452,6 +462,7 @@ class HrWidget(QWidget):
             "role": self.acc_role.currentData(),
             "display_name": self.acc_display.text().strip() or username,
             "employee_id": self.acc_employee.value() or None,
+            "doctor_id": self.acc_doctor.value() or None,
         }
         try:
             self.api.create_user(payload)

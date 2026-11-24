@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.table_policy import set_column_layout
+from his_client.ui.print_preview import open_print_preview
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 
@@ -72,7 +74,7 @@ class LabWidget(QWidget):
         self.table.setHorizontalHeaderLabels(
             ["申请", "标本号", "患者", "项目", "状态", "加急", "申请时间", "结果"]
         )
-        self.table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.table, stretch=(2, 3, 7), contents=(0, 1, 4, 5, 6))
         self.table.cellClicked.connect(self._select_row)
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
@@ -172,7 +174,7 @@ class LabWidget(QWidget):
         self.reviewed_table.setHorizontalHeaderLabels(
             ["报告号", "患者", "项目", "结果", "异常", "审核人", "报告时间"]
         )
-        self.reviewed_table.horizontalHeader().setStretchLastSection(True)
+        set_column_layout(self.reviewed_table, stretch=(1, 2, 3), contents=(0, 4, 5, 6))
         self.reviewed_table.cellClicked.connect(self._select_reviewed)
         layout.addWidget(self.reviewed_table, 1)
         self.query_msg = QLabel("")
@@ -232,8 +234,8 @@ class LabWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"操作失败（{e.status_code}）：{e.detail}")
             return
-        self.msg.setText(success)
         self._refresh()
+        self.msg.setText(success)
 
     def _collect(self) -> None:
         self._run(self.api.collect_lab, "已采样")
@@ -256,8 +258,8 @@ class LabWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"拒收失败（{e.status_code}）：{e.detail}")
             return
-        self.msg.setText("已拒收，通知重新采样")
         self._refresh()
+        self.msg.setText("已拒收，通知重新采样")
 
     def _report(self) -> None:
         request_id = self._selected_id()
@@ -290,8 +292,8 @@ class LabWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"报告失败（{e.status_code}）：{e.detail}")
             return
-        self.msg.setText("报告已出具，等待审核")
         self._refresh()
+        self.msg.setText("报告已出具，等待审核")
 
     def _review(self) -> None:
         self._run(self.api.review_lab, "报告已审核")
@@ -310,15 +312,17 @@ class LabWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"登记失败（{e.status_code}）：{e.detail}")
             return
-        self.msg.setText("危急值已登记")
         self._refresh()
+        self.msg.setText("危急值已登记")
 
     def _print_report(self) -> None:
         request_id = self._selected_id()
         if request_id is None:
             return
-        QDesktopServices.openUrl(
-            QUrl(f"{self.api.base_url}/print/lab-report/{request_id}")
+        open_print_preview(
+            self,
+            f"{self.api.base_url}/print/lab-report/{request_id}",
+            "检验报告打印预览",
         )
 
     def _refresh_reviewed(self) -> None:

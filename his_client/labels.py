@@ -95,6 +95,11 @@ LABELS: dict[str, dict[str, str]] = {
         "material": "材料费",
         "other": "其他",
     },
+    "encounter_status": {
+        "open": "接诊中",
+        "closed": "已收费",
+        "paused": "已挂起",
+    },
     "payment_channel": {
         "cash": "现金",
         "wechat": "微信支付",

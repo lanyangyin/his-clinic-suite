@@ -60,9 +60,47 @@ class PrescriptionItemCreate(BaseModel):
     allergy_override_reason: str = Field(default="", max_length=300)
 
 
+class PrescriptionItemUpdate(BaseModel):
+    quantity: int | None = Field(default=None, ge=1, le=999)
+    dosage: str = Field(default="", max_length=50)
+    frequency: str = Field(default="", max_length=20)
+    route: str = Field(default="", max_length=20)
+    days: int = Field(default=1, ge=1, le=365)
+
+
+class PrescriptionBatchCreate(BaseModel):
+    items: list[PrescriptionItemCreate] = Field(min_length=1, max_length=20)
+
+
+class PrescriptionReviewRequest(BaseModel):
+    approve: bool
+    note: str = Field(default="", max_length=300)
+
+
+class PrescriptionHeaderResponse(BaseModel):
+    id: int
+    encounter_id: int
+    prescription_no: str
+    type: str
+    status: str
+    prescribed_by: str
+    reviewed_by: str
+    reviewed_at: datetime | None = None
+    review_note: str
+    insurance_upload_status: str = "not_ready"
+    insurance_uploaded_at: datetime | None = None
+    created_at: datetime
+    item_count: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PrescriptionItemResponse(BaseModel):
     id: int
     encounter_id: int
+    prescription_id: int | None = None
+    prescription_no: str = ""
+    prescription_type: str = "western"
+    prescription_status: str = "approved"
     drug_id: int
     drug_name: str
     quantity: int
@@ -133,4 +171,26 @@ class AdverseReactionResponse(AdverseReactionCreate):
     encounter_id: int
     reported_by: str
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RecordRevisionCreate(BaseModel):
+    reason: str = Field(min_length=1, max_length=300)
+
+
+class RecordRevisionReview(BaseModel):
+    approve: bool
+    note: str = Field(default="", max_length=300)
+
+
+class RecordRevisionResponse(BaseModel):
+    id: int
+    encounter_id: int
+    reason: str
+    status: str
+    requested_by: str
+    reviewed_by: str
+    review_note: str
+    created_at: datetime
+    reviewed_at: datetime | None
     model_config = ConfigDict(from_attributes=True)

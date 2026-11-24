@@ -4,12 +4,21 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import StockMovementResponse
-from .service import list_movements
+from .service import list_movements, reconcile_stock
 
-router = APIRouter(prefix="/stock", tags=["stock-ledger"])
+router = APIRouter(prefix="/stock", tags=["stock-ledger"], dependencies=[Depends(require_read_login)])
+
+
+@router.get("/reconcile")
+def reconcile(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("warehouse", "admin")),
+):
+    """库存账实对账：当前批次库存 vs 最近流水结存。"""
+    return reconcile_stock(db)
 
 
 @router.get("/ledger", response_model=list[StockMovementResponse])

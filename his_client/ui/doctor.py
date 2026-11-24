@@ -4,6 +4,7 @@ from datetime import date, datetime
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
+    QAbstractItemView,
     QComboBox,
     QCompleter,
     QFormLayout,
@@ -18,6 +19,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QLineEdit,
     QPushButton,
+    QRadioButton,
+    QButtonGroup,
+    QScrollArea,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -36,6 +40,17 @@ from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.birth_age import BirthAgeEditor, parse_id_birth
+from his_client.ui.catalog_proposal import CatalogProposalDialog
+from his_client.ui.prescription_dialog import PrescriptionQuickDialog
+from his_client.ui.print_preview import open_print_preview
+from his_client.ui.prescription_edit import PrescriptionEditDialog
+from his_client.ui.table_policy import set_column_layout
+
+try:
+    from pypinyin import Style, lazy_pinyin
+except ImportError:  # 未安装拼音依赖时退化为药名/规格搜索
+    Style = None
+    lazy_pinyin = None
 from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.patient_clinical_dialog import PatientClinicalDialog
@@ -55,6 +70,30 @@ _RECORD_FIELDS = [
 ]
 
 
+RX_STATUS_LABELS = {
+    "pending_review": "待审方",
+    "approved": "已审方",
+    "rejected": "已退回",
+    "dispensing": "调配中",
+    "dispensed": "已发药",
+    "returned": "已退药",
+    "cancelled": "已作废",
+}
+TCM_STATUS_LABELS = {
+    "pending": "待审核",
+    "reviewed": "已审核",
+    "dispensed": "已发药",
+    "decocting": "煎药中",
+    "completed": "已完成",
+    "cancelled": "已取消",
+}
+TREATMENT_STATUS_LABELS = {
+    "pending": "待执行",
+    "done": "已执行",
+    "cancelled": "已取消",
+}
+
+
 class DoctorWidget(QWidget):
     def __init__(self, api: ApiClient, parent=None):
         super().__init__(parent)
@@ -64,16 +103,20 @@ class DoctorWidget(QWidget):
         self.insurance_enabled = self.config.insurance_enabled
         self.banner = PatientBanner()
         self.tabs = SidebarTabs()
-        self.tabs.addTab(self._build_workbench_tab(), "候诊队列")
+        self.tabs.addTab(self._build_workbench_tab(), "门诊队列")
+        self.tabs.addTab(self._build_reception_tab(), "接诊登记")
         self.tabs.addTab(self._build_register_tab(), "挂号")
-        self.tabs.addTab(self._build_reception_tab(), "接诊")
         self.tabs.addTab(self._build_record_tab(), "病历")
         self.tabs.addTab(self._build_history_tab(), "历史诊疗")
         self.tabs.addTab(self._build_prescription_tab(), "开方")
-        self.payment_panel = PaymentPanel(api)
-        self.tabs.addTab(self.payment_panel, "收费")
         self.tabs.addTab(self._build_exam_tab(), "检验 / 检查")
         self.tabs.addTab(self._build_treatment_tab(), "治疗")
+        self.payment_panel = PaymentPanel(api, compact=True)
+        self.payment_panel.payment_completed.connect(self._on_payment_completed)
+        self.tabs.addTab(self.payment_panel, "收费")
+        self.tabs.setTabToolTip(0, "门诊队列：总览待接诊、接诊中、治疗中、挂起、已收费，双击开始接诊")
+        self.tabs.setTabToolTip(1, "接诊登记：给已挂号患者创建就诊记录，也可开始接诊")
+        self.tabs.setTabToolTip(4, "历史诊疗：无需挂号/接诊，只读查询患者历史")
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
         self.critical_badge = QPushButton("")
@@ -126,6 +169,8 @@ class DoctorWidget(QWidget):
         self.side_panel.setFixedWidth(300)
         self.side_panel.setVisible(True)
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        self._set_patient_actions(False)
+        self._set_clinical_tabs(False, False)
         register_theme_listener(self)
 
     def _style_critical_badge(self) -> None:
@@ -145,16 +190,29 @@ class DoctorWidget(QWidget):
 
     def _on_tab_changed(self, _index: int) -> None:
         # 侧栏始终保留固定宽度，避免切页时内容整体左右跳动
-        if "开方" in self.tabs.tabText(self.tabs.currentIndex()) and not hasattr(self, "drug_rows"):
-            self._load_drugs()
+        label = self.tabs.tabText(self.tabs.currentIndex())
+        if "开方" in label:
+            if not hasattr(self, "drug_rows"):
+                self._load_drugs()
+            if self.banner.encounter_id:
+                self._refresh_prescriptions()
+        elif "病历" in label and self.banner.encounter_id:
+            self._load_record()
+        elif "检验" in label:
+            if self.banner.encounter_id:
+                self._load_lab_items()
+                self._load_imaging_items()
+                self._refresh_exam_requests()
+        elif "收费" in label:
+            self._sync_payment_panel(self.banner.encounter_id)
 
     def _print_current(self) -> None:
         encounter_id = self.banner.encounter_id
         if not encounter_id:
             self.wb_summary.setText("请先选择患者并接诊")
             return
-        QDesktopServices.openUrl(
-            QUrl(self.api.prescription_print_url(encounter_id))
+        open_print_preview(
+            self, self.api.prescription_print_url(encounter_id), "处方打印预览"
         )
 
     def _install_shortcuts(self) -> None:
@@ -177,6 +235,15 @@ class DoctorWidget(QWidget):
             self.wb_search.clear()
 
     def _auto_refresh(self) -> None:
+        current = getattr(self, "wb_current", None)
+        if current and current.get("encounter_id"):
+            try:
+                encounter = self.api.get_encounter(current["encounter_id"])
+            except ApiError:
+                encounter = None
+            if encounter and encounter.get("status") == "closed":
+                self._on_payment_completed()
+                return
         if self.tabs.currentIndex() == 0 and self.isVisible():
             self._load_workbench()
 
@@ -210,12 +277,21 @@ class DoctorWidget(QWidget):
             self.wb_status_tabs.addTab(label)
         self.wb_status_tabs.currentChanged.connect(self._filter_workbench)
         queue_layout.addWidget(self.wb_status_tabs)
+        queue_hint = QLabel("总览：待接诊 / 接诊中 / 治疗中 / 挂起 / 已收费；双击行开始接诊")
+        queue_hint.setStyleSheet("color:#64748b;")
+        queue_layout.addWidget(queue_hint)
+        self.wb_empty = QLabel("暂无匹配患者\n调整搜索条件或点击刷新")
+        self.wb_empty.setAlignment(Qt.AlignCenter)
+        self.wb_empty.setStyleSheet("color:#64748b;padding:24px;font-size:14px")
+        self.wb_empty.setVisible(False)
+        queue_layout.addWidget(self.wb_empty)
 
-        self.wb_table = QTableWidget(0, 6)
+        self.wb_table = QTableWidget(0, 7)
         self.wb_table.setHorizontalHeaderLabels(
-            ["挂号", "患者", "医生", "就诊", "诊断", "待缴"]
+            ["挂号", "患者", "类型", "挂号状态", "就诊", "诊断", "待缴"]
         )
-        self.wb_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # 医生看自己的队列，医生列不重复占用宽度；患者/诊断优先
+        set_column_layout(self.wb_table, stretch=(1, 5), contents=(0, 2, 3, 4, 6))
         self.wb_table.cellClicked.connect(self._select_workbench)
         self.wb_table.cellDoubleClicked.connect(
             lambda row, _col: self._start_workbench_row(row)
@@ -303,20 +379,20 @@ class DoctorWidget(QWidget):
         context_layout.addWidget(self.wb_followup_hint)
         context_layout.addStretch(1)
 
-        right_layout.addWidget(self.wb_context, 1)
+        # 危急值跨患者，固定在工作台右下角，与当前患者操作区分割，高度可调并记忆。
+        self.critical_splitter = QSplitter(Qt.Vertical)
+        self.critical_splitter.addWidget(self.wb_context)
+        self.critical_splitter.addWidget(self.critical_box)
+        self.critical_splitter.setChildrenCollapsible(False)
+        self.critical_splitter.setStretchFactor(0, 3)
+        self.critical_splitter.setStretchFactor(1, 1)
+        self.critical_splitter.splitterMoved.connect(self._save_critical_split)
+        right_layout.addWidget(self.critical_splitter, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([800, 520])
-        # 危急值跨患者，横跨整个工作台底部；与上方队列/操作区分割，高度可调并记忆。
-        self.critical_splitter = QSplitter(Qt.Vertical)
-        self.critical_splitter.addWidget(splitter)
-        self.critical_splitter.addWidget(self.critical_box)
-        self.critical_splitter.setChildrenCollapsible(False)
-        self.critical_splitter.setStretchFactor(0, 4)
-        self.critical_splitter.setStretchFactor(1, 1)
-        self.critical_splitter.splitterMoved.connect(self._save_critical_split)
-        layout.addWidget(self.critical_splitter, 1)
+        layout.addWidget(splitter, 1)
         self._restore_critical_split()
         return page
 
@@ -362,6 +438,53 @@ class DoctorWidget(QWidget):
             f"患者史已更新并留痕：{updated.get('allergy_label') or '过敏不详'}"
         )
 
+    def _set_rx_enabled(self, enabled: bool) -> None:
+        for name in ("rx_table", "rx_edit", "rx_delete", "tcm_inj_table", "tcm_inj_rx_table"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.setEnabled(enabled)
+
+    def _set_clinical_tabs(self, has_patient: bool, has_encounter: bool) -> None:
+        allowed = {
+            "病历": has_encounter,
+            # 历史诊疗是独立只读查询：不需要挂号/接诊，始终可用
+            "历史诊疗": True,
+            "开方": has_encounter,
+            "收费": has_encounter,
+            "检验 / 检查": has_encounter,
+            "治疗": has_encounter,
+        }
+        for text, enabled in allowed.items():
+            for index in range(self.tabs.count()):
+                if self.tabs.tabText(index) == text:
+                    self.tabs.setTabEnabled(index, enabled)
+                    break
+        current = self.tabs.currentIndex()
+        if current >= 0 and not self.tabs.isTabEnabled(current):
+            self.tabs.setCurrentIndex(0)
+
+    def _on_payment_completed(self) -> None:
+        """收费即完诊：回队列，清空当前患者，等待选择下一位。"""
+        self.wb_current = None
+        self.wb_table.clearSelection()
+        self.banner.clear()
+        self.side_info.clear()
+        self._set_patient_actions(False)
+        self._set_clinical_tabs(False, False)
+        self._load_workbench()
+        self.tabs.setCurrentIndex(0)
+        self.wb_summary.setText("收费完成，请选择下一位患者")
+
+    def _set_patient_actions(self, enabled: bool) -> None:
+        """没有选中患者时，右侧所有临床动作不可用。"""
+        self._set_rx_enabled(enabled)
+        for name in ("wb_start", "wb_convert"):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.setEnabled(enabled)
+        for button in getattr(self, "wb_action_buttons", {}).values():
+            button.setEnabled(enabled)
+
     def _load_workbench(self) -> None:
         try:
             self.workbench_all = self.api.doctor_worklist()
@@ -402,24 +525,33 @@ class DoctorWidget(QWidget):
                 or term in str(item.get("registration_id", "")).lower()
             ]
         self.workbench_rows = rows
+        self.wb_empty.setVisible(not rows)
+        self.wb_table.setVisible(bool(rows))
         self.wb_table.setRowCount(len(rows))
         for row, item in enumerate(rows):
-            gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+            gender = {"male": "男", "female": "女"}.get(
+                item.get("gender"), "性别不详"
+            )
             age = item.get("age")
-            allergy = item.get("allergy_label") or "不详"
+            allergy = item.get("allergy_label") or "过敏史不详"
+            allergy_present = item.get("allergy_status") == "present"
             level = item.get("triage_level")
             level_text = f"[{level}级]" if level else ""
+            compact_patient = f"{level_text}{item['patient_name']}"
+            compact_patient += f" {age}岁" if age is not None else " 年龄不详"
+            if allergy_present:
+                compact_patient += " ⚠过敏"
+            full_patient = (
+                f"{item['patient_name']} {gender}/"
+                f"{age if age is not None else '年龄不详'} 过敏：{allergy}"
+            )
             values = [
                 str(item["registration_id"]),
-                f"{level_text}{item['patient_name']} · {gender}/{age if age is not None else '—'} · {allergy}",
+                compact_patient,
                 "复诊" if item.get("visit_type") == "follow_up" else "初诊",
-                item["doctor_name"],
                 zh("registration_status", item["registration_status"]),
                 (
-                    (
-                        f"{item['encounter_date']} " if item.get("cross_day") else ""
-                    )
-                    + f"{item.get('encounter_id')} "
+                    f"{item.get('encounter_id')} "
                     f"{ {'open':'进行中','paused':'已挂起','closed':'已收费'}.get(item.get('encounter_status'), item.get('encounter_status') or '') }".strip()
                     if item.get("encounter_id") else "—"
                 ),
@@ -430,7 +562,15 @@ class DoctorWidget(QWidget):
                 f"{item.get('pending_amount', 0):.2f}",
             ]
             for col, value in enumerate(values):
-                self.wb_table.setItem(row, col, QTableWidgetItem(str(value)))
+                cell = QTableWidgetItem(str(value))
+                if col == 1:
+                    cell.setToolTip(full_patient)
+                if col == 4 and item.get("encounter_date"):
+                    cell.setToolTip(
+                        f"就诊日期：{item['encounter_date']}；"
+                        f"状态：{item.get('encounter_status') or '—'}"
+                    )
+                self.wb_table.setItem(row, col, cell)
         total = len(getattr(self, "workbench_all", rows))
         cross_count = sum(1 for item in all_rows if item.get("cross_day"))
         suffix = f"（含跨日未完成 {cross_count}）" if cross_count else ""
@@ -479,7 +619,7 @@ class DoctorWidget(QWidget):
         if settings is None:
             self.critical_splitter.setSizes([320, 260])
             return
-        value = settings.value("workbench/critical_split_v2", [320, 260])
+        value = settings.value("workbench/critical_split_v3", [320, 260])
         try:
             sizes = [int(x) for x in list(value)]
         except (TypeError, ValueError):
@@ -491,7 +631,7 @@ class DoctorWidget(QWidget):
     def _save_critical_split(self, *_args) -> None:
         settings = self._critical_settings()
         if settings is not None:
-            settings.setValue("workbench/critical_split_v2", self.critical_splitter.sizes())
+            settings.setValue("workbench/critical_split_v3", self.critical_splitter.sizes())
             settings.sync()
 
     def _load_critical_alerts(self) -> None:
@@ -596,6 +736,7 @@ class DoctorWidget(QWidget):
             status = "待治疗"
         else:
             status = "已接诊" if item.get("encounter_id") else "待接诊"
+        self._set_patient_actions(True)
         self.banner.set_patient(patient, item.get("encounter_id"), status)
         self.patient_info.set_patient(
             patient,
@@ -612,11 +753,14 @@ class DoctorWidget(QWidget):
             f"生命体征：{item.get('vital_summary') or '未测'}",
         )
         self._load_side_history(item.get("patient_id"))
-        gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(
+            item.get("gender"), "性别不详"
+        )
         age = item.get("age")
-        allergy = item.get("allergy_label") or "不详"
+        allergy = item.get("allergy_label") or "过敏史不详"
         self.wb_patient.setText(
-            f"{item['patient_name']} · {gender}/{age if age is not None else '—'}岁 · "
+            f"{item['patient_name']} · {gender}/"
+            f"{age if age is not None else '年龄不详'} · "
             f"{'复诊' if item.get('visit_type') == 'follow_up' else '初诊'} · "
             f"过敏：{allergy} · 分诊 {item.get('triage_level') or '—'} 级 · "
             f"{item.get('vital_summary') or '未测生命体征'} · "
@@ -641,9 +785,17 @@ class DoctorWidget(QWidget):
         status = item.get("encounter_status") or ""
         self.wb_start.setEnabled(not item.get("encounter_id") or status == "paused")
         if hasattr(self, "wb_action_buttons"):
+            has_encounter = bool(item.get("encounter_id"))
+            self._set_clinical_tabs(True, has_encounter)
+            self._set_rx_enabled(has_encounter)
+            for text in ("写病历", "开方", "开检验", "开治疗", "历史诊疗"):
+                self.wb_action_buttons[text].setEnabled(has_encounter)
             self.wb_action_buttons["挂起当前"].setEnabled(status == "open")
             self.wb_action_buttons["继续接诊"].setEnabled(status == "paused")
-            self.wb_action_buttons["药物反应 / 换药"].setEnabled(bool(item.get("encounter_id")))
+            self.wb_action_buttons["药物反应 / 换药"].setEnabled(has_encounter)
+            if has_encounter and status == "closed":
+                for text in ("写病历", "开方", "开检验", "开治疗", "挂起当前", "继续接诊", "药物反应 / 换药"):
+                    self.wb_action_buttons[text].setEnabled(False)
         if item.get("encounter_id"):
             self._set_encounter_everywhere(item["encounter_id"])
             self._load_workbench_summary(item["encounter_id"])
@@ -739,6 +891,8 @@ class DoctorWidget(QWidget):
         )
         self._side_history_patient_id = None
         self._load_side_history(item.get("patient_id"))
+        # 接诊成功直接进入病历，避免停在队列页以为没反应
+        self._wb_record()
 
     def _pause_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
@@ -801,7 +955,8 @@ class DoctorWidget(QWidget):
     def _switch_tab(self, text: str) -> None:
         for index in range(self.tabs.count()):
             if text in self.tabs.tabText(index):
-                self.tabs.setCurrentIndex(index)
+                if self.tabs.isTabEnabled(index):
+                    self.tabs.setCurrentIndex(index)
                 return
 
     def _load_side_history(self, patient_id: int | None) -> None:
@@ -868,10 +1023,20 @@ class DoctorWidget(QWidget):
             spin = getattr(self, attr, None)
             if spin is not None:
                 spin.setValue(int(encounter_id or 0))
-        if hasattr(self, "exam_table"):
-            self._refresh_exam_requests()
-        if hasattr(self, "treat_table"):
-            self._refresh_treatments()
+            label = getattr(self, f"{attr.replace('_id', '_label')}", None)
+            if label is not None:
+                label.setText(str(encounter_id) if encounter_id else "未接诊")
+        if encounter_id:
+            if hasattr(self, "rx_encounter_id"):
+                self._refresh_prescriptions()
+            if hasattr(self, "exam_table"):
+                self._refresh_exam_requests()
+            if hasattr(self, "treat_table"):
+                self._refresh_treatments()
+            if hasattr(self, "payment_panel"):
+                self._sync_payment_panel(encounter_id)
+        elif hasattr(self, "rx_table"):
+            self.rx_table.setRowCount(0)
         if not hasattr(self, "side_info"):
             return
         if not encounter_id:
@@ -898,28 +1063,67 @@ class DoctorWidget(QWidget):
         )
         self._load_side_history(summary.get("patient_id"))
 
+    def _sync_payment_panel(self, encounter_id: int | None) -> None:
+        panel = getattr(self, "payment_panel", None)
+        if panel is None:
+            return
+        if not encounter_id:
+            panel.encounter_id.setValue(0)
+            panel.charge_table.setRowCount(0)
+            panel.charge_empty.setVisible(True)
+            return
+        panel.encounter_id.setValue(int(encounter_id))
+        current = getattr(self, "wb_current", None) or {}
+        patient = {
+            "id": current.get("patient_id"),
+            "patient_no": current.get("patient_no"),
+            "name": current.get("patient_name"),
+            "gender": current.get("gender"),
+            "age": current.get("age"),
+            "phone": current.get("phone"),
+        }
+        if patient.get("id"):
+            panel.patient_picker.set_patient(patient)
+        try:
+            panel._load_charges()
+        except Exception:
+            pass
+
     def _wb_record(self) -> None:
+        if not self.wb_current or not self.wb_current.get("encounter_id"):
+            self.wb_summary.setText("请先开始接诊，再打开病历")
+            return
         self._switch_tab("病历")
-        if hasattr(self, "mr_encounter_id") and self.wb_current:
+        if hasattr(self, "mr_encounter_id"):
             self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
             self._load_record()
 
     def _wb_prescribe(self) -> None:
+        if not self.wb_current or not self.wb_current.get("encounter_id"):
+            self.wb_summary.setText("请先开始接诊，再开方")
+            return
         self._switch_tab("开方")
-        if self.wb_current:
-            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
-            self._load_drugs()
+        self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+        self._load_drugs()
+        self._refresh_prescriptions()
 
     def _wb_exam(self) -> None:
+        if not self.wb_current or not self.wb_current.get("encounter_id"):
+            self.wb_summary.setText("请先开始接诊，再开检验/检查")
+            return
         self._switch_tab("检验")
-        if self.wb_current:
-            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+        self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+        self._load_lab_items()
+        self._load_imaging_items()
+        self._refresh_exam_requests()
 
     def _wb_treat(self) -> None:
+        if not self.wb_current or not self.wb_current.get("encounter_id"):
+            self.wb_summary.setText("请先开始接诊，再开治疗")
+            return
         self._switch_tab("治疗")
-        if self.wb_current:
-            self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
-            self._load_treatment_items()
+        self._set_encounter_everywhere(self.wb_current.get("encounter_id"))
+        self._load_treatment_items()
 
     def _wb_history(self) -> None:
         self._switch_tab("历史诊疗")
@@ -935,13 +1139,13 @@ class DoctorWidget(QWidget):
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        search_box = QGroupBox("查询患者（未建档可在右侧快速建档挂号）")
+        search_box = QGroupBox("查询患者（可用身份证检索，结果不显示证件号/电话）")
         search_layout = QVBoxLayout(search_box)
         row = QHBoxLayout()
         self.reg_patient_name = QLineEdit()
         self.reg_patient_name.setPlaceholderText("姓名（可空）")
         self.reg_patient_id_number = QLineEdit()
-        self.reg_patient_id_number.setPlaceholderText("身份证号（可空）")
+        self.reg_patient_id_number.setPlaceholderText("身份证号（仅检索，不显示）")
         search = QPushButton("查询患者")
         search.clicked.connect(self._search_registration_patients)
         row.addWidget(QLabel("姓名"))
@@ -950,8 +1154,9 @@ class DoctorWidget(QWidget):
         row.addWidget(self.reg_patient_id_number)
         row.addWidget(search)
         search_layout.addLayout(row)
-        self.reg_patient_table = QTableWidget(0, 4)
-        self.reg_patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号", "电话"])
+        self.reg_patient_table = QTableWidget(0, 3)
+        self.reg_patient_table.setHorizontalHeaderLabels(["患者编号", "姓名", "性别/年龄"])
+        self.reg_patient_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         search_layout.addWidget(self.reg_patient_table, 1)
         left_layout.addWidget(search_box, 1)
         splitter.addWidget(left)
@@ -973,13 +1178,23 @@ class DoctorWidget(QWidget):
         self.qr_id_number = QLineEdit()
         self.qr_id_number.setPlaceholderText("身份证号（可后补，填完自动带出出生日期）")
         self.qr_id_number.editingFinished.connect(self._quick_id_changed)
-        quick_btn = QPushButton("快速建档并挂号")
+        self.qr_mode_only = QRadioButton("仅建档，暂不挂号")
+        self.qr_mode_register = QRadioButton("建档后立即挂号")
+        self.qr_mode_register.setChecked(True)
+        self.qr_mode_group = QButtonGroup(self)
+        self.qr_mode_group.addButton(self.qr_mode_only)
+        self.qr_mode_group.addButton(self.qr_mode_register)
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(self.qr_mode_only)
+        mode_row.addWidget(self.qr_mode_register)
+        quick_btn = QPushButton("快速建档")
         quick_btn.clicked.connect(self._quick_create_and_register)
         quick_form.addRow("姓名", self.qr_name)
         quick_form.addRow("手机号", self.qr_phone)
         quick_form.addRow("性别", self.qr_gender)
         quick_form.addRow("身份证", self.qr_id_number)
         quick_form.addRow("", self.qr_birth_age)
+        quick_form.addRow("处理方式", mode_row)
         quick_form.addRow("", quick_btn)
         right_layout.addWidget(quick_box)
 
@@ -987,7 +1202,10 @@ class DoctorWidget(QWidget):
         form = QFormLayout(box)
         self.reg_patient_id = QLineEdit()
         self.reg_patient_id.setReadOnly(True)
+        self.reg_patient_id.setVisible(False)
         self.reg_patient_id.setPlaceholderText("在左侧选择患者")
+        self.reg_selected_label = QLabel("未选择患者")
+        self.reg_selected_label.setWordWrap(True)
         self.reg_doctor = QComboBox()
         self.reg_doctor.currentIndexChanged.connect(self._confirm_doctor_change)
         load_doctors = QPushButton("刷新医生")
@@ -999,7 +1217,7 @@ class DoctorWidget(QWidget):
         self.reg_msg.setWordWrap(True)
         submit = QPushButton("挂号")
         submit.clicked.connect(self._create_registration)
-        form.addRow("患者 ID", self.reg_patient_id)
+        form.addRow("已选患者", self.reg_selected_label)
         form.addRow("医生", doctor_row)
         form.addRow("", submit)
         form.addRow("", self.reg_msg)
@@ -1023,22 +1241,47 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.reg_msg.setText(f"查询患者失败（{e.status_code}）：{e.detail}")
             return
+        self.reg_search_patients = patients
         self.reg_patient_table.setRowCount(len(patients))
         for row, patient in enumerate(patients):
+            gender = {"male": "男", "female": "女"}.get(
+                patient.get("gender"), "性别不详"
+            )
+            age = patient.get("age")
             values = [
-                str(patient["id"]),
+                patient.get("patient_no") or str(patient["id"]),
                 patient["name"],
-                patient.get("id_number", ""),
-                patient.get("phone", ""),
+                f"{gender}/{age if age is not None else '年龄不详'}",
             ]
             for col, value in enumerate(values):
-                self.reg_patient_table.setItem(row, col, QTableWidgetItem(value))
-        self.reg_msg.setText(f"共 {len(patients)} 位患者")
+                cell = QTableWidgetItem(str(value))
+                if col == 0:
+                    cell.setData(Qt.UserRole, patient["id"])
+                self.reg_patient_table.setItem(row, col, cell)
+        self.reg_msg.setText(f"共 {len(patients)} 位患者（点击选择）")
 
     def _select_registration_patient(self, row: int, _col: int) -> None:
         item = self.reg_patient_table.item(row, 0)
-        if item:
-            self.reg_patient_id.setText(item.text())
+        if not item:
+            return
+        patient_id = item.data(Qt.UserRole)
+        if patient_id is None:
+            return
+        patient = next(
+            (p for p in getattr(self, "reg_search_patients", []) if p["id"] == patient_id),
+            None,
+        )
+        self.reg_patient_id.setText(str(patient_id))
+        if patient:
+            gender = {"male": "男", "female": "女"}.get(
+                patient.get("gender"), "性别不详"
+            )
+            age = patient.get("age")
+            self.reg_selected_label.setText(
+                f"{patient.get('patient_no') or patient_id} "
+                f"{patient['name']} · {gender}/"
+                f"{age if age is not None else '年龄不详'}"
+            )
 
     def _load_registration_doctors(self) -> None:
         try:
@@ -1059,7 +1302,15 @@ class DoctorWidget(QWidget):
             me = self.api.me()
         except ApiError:
             me = {}
-        if me.get("role") == "doctor":
+        doctor_id = me.get("doctor_id")
+        if doctor_id:
+            for index, doctor in enumerate(doctors):
+                if doctor.get("id") == doctor_id:
+                    self.reg_doctor.setCurrentIndex(index)
+                    self._default_doctor_id = doctor["id"]
+                    self._default_doctor_name = str(doctor.get("name") or "")
+                    break
+        if self._default_doctor_id is None and me.get("role") == "doctor":
             display = str(me.get("display_name") or me.get("username") or "").strip()
             for index, doctor in enumerate(doctors):
                 name = str(doctor.get("name") or "")
@@ -1115,13 +1366,16 @@ class DoctorWidget(QWidget):
         if not name or not phone:
             self.reg_msg.setText("快速建档至少填写姓名和手机号")
             return
-        doctor_id = self.reg_doctor.currentData()
-        if not doctor_id:
-            self._load_registration_doctors()
+        register_now = self.qr_mode_register.isChecked()
+        doctor_id = None
+        if register_now:
             doctor_id = self.reg_doctor.currentData()
-        if not doctor_id:
-            self.reg_msg.setText("请先在右侧刷新医生并选择挂号医生")
-            return
+            if not doctor_id:
+                self._load_registration_doctors()
+                doctor_id = self.reg_doctor.currentData()
+            if not doctor_id:
+                self.reg_msg.setText("立即挂号需要先选择挂号医生")
+                return
         id_number = self.qr_id_number.text().strip()
         birth_date = self.qr_birth_age.birth_date_text() or None
         payload = {
@@ -1142,17 +1396,33 @@ class DoctorWidget(QWidget):
         }
         try:
             patient = self.api.create_patient(payload=payload)
-            registration = self.api.create_registration(patient["id"], doctor_id)
+            registration = (
+                self.api.create_registration(patient["id"], doctor_id)
+                if register_now
+                else None
+            )
         except ApiError as e:
-            self.reg_msg.setText(f"快速建档挂号失败（{e.status_code}）：{e.detail}")
+            self.reg_msg.setText(f"快速建档失败（{e.status_code}）：{e.detail}")
             return
         self.reg_patient_id.setText(str(patient["id"]))
+        self.reg_selected_label.setText(
+            f"{patient.get('patient_no') or patient['id']} {patient['name']} · "
+            f"{ {'male':'男','female':'女'}.get(patient.get('gender'), '性别不详') }/"
+            f"{patient.get('age') if patient.get('age') is not None else '年龄不详'}"
+        )
         self.banner.set_patient(patient)
         self.side_info.set_patient(patient)
-        self.reg_msg.setText(
-            f"快速建档挂号成功：{patient['name']}，患者号 {patient.get('patient_no') or patient['id']}，"
-            f"挂号 ID {registration['id']}；证件/地址可后补"
-        )
+        if registration is not None:
+            self.reg_msg.setText(
+                f"快速建档并挂号成功：{patient['name']}，患者号 "
+                f"{patient.get('patient_no') or patient['id']}，挂号 ID {registration['id']}；"
+                "证件/地址可后补"
+            )
+        else:
+            self.reg_msg.setText(
+                f"快速建档成功：{patient['name']}，患者号 "
+                f"{patient.get('patient_no') or patient['id']}；已按“仅建档”处理，未挂号"
+            )
         self.qr_name.clear()
         self.qr_phone.clear()
         self.qr_id_number.clear()
@@ -1185,39 +1455,66 @@ class DoctorWidget(QWidget):
     def _build_reception_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
+        splitter = QSplitter(Qt.Horizontal)
 
-        row = QHBoxLayout()
-        refresh = QPushButton("刷新待接诊挂号")
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        top = QHBoxLayout()
+        title = QLabel("待接诊挂号")
+        title.setStyleSheet("font-size:15px;font-weight:bold")
+        self.reception_count = QLabel("")
+        self.reception_count.setStyleSheet("color:#64748b")
+        refresh = QPushButton("刷新")
         refresh.clicked.connect(self._load_pending_registrations)
-        row.addWidget(refresh)
-        layout.addLayout(row)
+        top.addWidget(title)
+        top.addWidget(self.reception_count)
+        top.addStretch(1)
+        top.addWidget(refresh)
+        left_layout.addLayout(top)
 
         self.reg_table = QTableWidget(0, 6)
         self.reg_table.setHorizontalHeaderLabels(
             ["挂号", "患者", "性别/年龄", "医生", "分诊", "状态"]
         )
-        self.reg_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        set_column_layout(self.reg_table, stretch=(1,), contents=(0, 2, 3, 4, 5))
         self.reg_table.cellClicked.connect(self._select_reception_patient)
-        layout.addWidget(self.reg_table, 1)
+        left_layout.addWidget(self.reg_table, 1)
+        self.reception_empty = QLabel("暂无待接诊挂号")
+        self.reception_empty.setAlignment(Qt.AlignCenter)
+        self.reception_empty.setStyleSheet("color:#64748b;padding:12px")
+        self.reception_empty.setVisible(False)
+        left_layout.addWidget(self.reception_empty)
+        splitter.addWidget(left)
 
-        box = QGroupBox("接诊")
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(12, 0, 0, 0)
+        box = QGroupBox("接诊详情")
         form = QFormLayout(box)
         self.reg_id = QSpinBox()
-        self.reg_id.setRange(1, 10_000_000)
+        self.reg_id.setRange(0, 10_000_000)
+        self.reg_id.setSpecialValueText("请选择挂号")
+        self.reg_id.setValue(0)
         self.reception_patient = QLabel("未选择患者")
         self.reception_patient.setWordWrap(True)
+        self.reception_patient.setStyleSheet("font-weight:bold")
         start = QPushButton("开始接诊")
         start.clicked.connect(self._start_encounter)
         form.addRow("挂号 ID", self.reg_id)
         form.addRow("患者", self.reception_patient)
         form.addRow("诊断", QLabel("接诊后到「病历」页填写"))
         form.addRow("", start)
-        layout.addWidget(box)
-
+        right_layout.addWidget(box)
         self.reception_msg = QLabel("")
         self.reception_msg.setWordWrap(True)
-        layout.addWidget(self.reception_msg)
-        layout.addStretch(1)
+        right_layout.addWidget(self.reception_msg)
+        right_layout.addStretch(1)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([820, 400])
+        layout.addWidget(splitter, 1)
         return page
 
     def _load_pending_registrations(self) -> None:
@@ -1231,14 +1528,18 @@ class DoctorWidget(QWidget):
             self.reception_msg.setText(f"加载失败：{e.detail}")
             return
         self.pending_registrations = rows
+        self.reception_count.setText(f"{len(rows)} 人")
+        self.reception_empty.setVisible(not rows)
         self.reg_table.setRowCount(len(rows))
         for index, reg in enumerate(rows):
-            gender = {"male": "男", "female": "女"}.get(reg.get("gender"), "不详")
+            gender = {"male": "男", "female": "女"}.get(
+                reg.get("gender"), "性别不详"
+            )
             age = reg.get("age")
             values = [
                 str(reg["registration_id"]),
                 reg.get("patient_name") or "",
-                f"{gender}/{age if age is not None else '—'}",
+                f"{gender}/{age if age is not None else '年龄不详'}",
                 reg.get("doctor_name") or "",
                 f"{reg.get('triage_level') or '—'} 级",
                 zh("registration_status", reg.get("registration_status", "")),
@@ -1257,14 +1558,20 @@ class DoctorWidget(QWidget):
             return
         item = rows[row]
         self.reg_id.setValue(item["registration_id"])
-        gender = {"male": "男", "female": "女"}.get(item.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(
+            item.get("gender"), "性别不详"
+        )
         age = item.get("age")
         self.reception_patient.setText(
-            f"{item.get('patient_name') or ''} · {gender}/{age if age is not None else '—'}岁 · "
+            f"{item.get('patient_name') or ''} · {gender}/"
+            f"{age if age is not None else '年龄不详'} · "
             f"医生 {item.get('doctor_name') or '—'} · 挂号 {item['registration_id']}"
         )
 
     def _start_encounter(self) -> None:
+        if self.reg_id.value() <= 0:
+            self.reception_msg.setText("请先选择待接诊挂号")
+            return
         try:
             encounter = self.api.create_encounter(self.reg_id.value())
         except ApiError as e:
@@ -1273,7 +1580,29 @@ class DoctorWidget(QWidget):
         self.reception_msg.setText(
             f"接诊成功：就诊 ID {encounter['id']}；请到「病历」页填写诊断"
         )
+        row = next(
+            (
+                item
+                for item in getattr(self, "pending_registrations", [])
+                if item.get("registration_id") == self.reg_id.value()
+            ),
+            None,
+        )
+        if row:
+            try:
+                patient = self.api.get_patient(row["patient_id"])
+                self.banner.set_patient(patient, encounter["id"], "已接诊")
+                self.patient_info.set_patient(patient, encounter["id"], "已接诊")
+                self._load_side_history(row["patient_id"])
+            except ApiError:
+                pass
+        self._set_encounter_everywhere(encounter["id"])
+        self._set_patient_actions(True)
+        self._set_clinical_tabs(True, True)
         self._load_pending_registrations()
+        # 接诊成功后跳到病历，保留顶部患者条和左侧患者卡
+        self._switch_tab("病历")
+        self._load_record()
 
     # ---------- 病历 ----------
     def _build_record_tab(self) -> QWidget:
@@ -1284,12 +1613,17 @@ class DoctorWidget(QWidget):
         self.mr_encounter_id = QSpinBox()
         self.mr_encounter_id.setRange(0, 10_000_000)
         self.mr_encounter_id.setSpecialValueText("未接诊")
-        self.mr_encounter_id.setReadOnly(True)
         self.mr_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.mr_encounter_id.lineEdit().setReadOnly(True)
+        self.mr_encounter_id.setFocusPolicy(Qt.NoFocus)
+        self.mr_encounter_id.setMinimumWidth(86)
+        self.mr_encounter_id.setAlignment(Qt.AlignCenter)
         load = QPushButton("载入病历")
         load.clicked.connect(self._load_record)
+        self.mr_encounter_label = self._encounter_label()
+        self.mr_encounter_id.hide()
         top.addWidget(QLabel("就诊 ID"))
-        top.addWidget(self.mr_encounter_id)
+        top.addWidget(self.mr_encounter_label)
         top.addWidget(load)
         self.record_template = QComboBox()
         self.record_template.addItem("选择病历模板", "")
@@ -1304,14 +1638,17 @@ class DoctorWidget(QWidget):
         self.record_diagnosis.setStyleSheet("font-weight:bold")
         top.addWidget(self.record_diagnosis, 1)
         layout.addLayout(top)
+        self.record_state = QLabel("")
+        self.record_state.setWordWrap(True)
+        layout.addWidget(self.record_state)
 
         diagnosis_box = QGroupBox("诊断（第一行为主诊断，按重要性排序）")
         diagnosis_layout = QVBoxLayout(diagnosis_box)
         self.record_diagnosis_editor = DiagnosisEditor()
         diagnosis_layout.addWidget(self.record_diagnosis_editor)
-        save_diag = QPushButton("保存全部诊断")
-        save_diag.clicked.connect(self._save_record_diagnoses)
-        diagnosis_layout.addWidget(save_diag)
+        self.record_save_diag = QPushButton("保存全部诊断")
+        self.record_save_diag.clicked.connect(self._save_record_diagnoses)
+        diagnosis_layout.addWidget(self.record_save_diag)
         layout.addWidget(diagnosis_box)
 
         self.record_edits: dict[str, QTextEdit] = {}
@@ -1353,14 +1690,17 @@ class DoctorWidget(QWidget):
         layout.addLayout(grid, 1)
 
         buttons = QHBoxLayout()
-        save = QPushButton("保存 / 更新")
-        save.clicked.connect(self._save_record)
-        sign = QPushButton("签名锁定")
-        sign.clicked.connect(self._sign_record)
+        self.record_save = QPushButton("保存 / 更新")
+        self.record_save.clicked.connect(self._save_record)
+        self.record_sign = QPushButton("签名锁定")
+        self.record_sign.clicked.connect(self._sign_record)
+        self.record_revision = QPushButton("申请修订")
+        self.record_revision.clicked.connect(self._request_record_revision)
         quality = QPushButton("质控评分")
         quality.clicked.connect(self._check_quality)
-        buttons.addWidget(save)
-        buttons.addWidget(sign)
+        buttons.addWidget(self.record_save)
+        buttons.addWidget(self.record_sign)
+        buttons.addWidget(self.record_revision)
         buttons.addWidget(quality)
         buttons.addStretch(1)
         layout.addLayout(buttons)
@@ -1368,7 +1708,32 @@ class DoctorWidget(QWidget):
         self.record_msg = QLabel("")
         self.record_msg.setWordWrap(True)
         layout.addWidget(self.record_msg)
-        return page
+        # 病历字段多，必须独立滚动，否则会把整个门诊工作站撑到超过 768 高
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setWidget(page)
+        return scroll
+
+    @staticmethod
+    def _encounter_label() -> QLabel:
+        label = QLabel("未接诊")
+        label.setMinimumWidth(72)
+        label.setStyleSheet("font-weight:bold;padding:4px 8px;background:#f8fafc;border:1px solid #dbe7f3;border-radius:5px;")
+        return label
+
+    def _set_record_editable(self, editable: bool, signed: bool = False) -> None:
+        for edit in getattr(self, "record_edits", {}).values():
+            edit.setReadOnly(not editable)
+        editor = getattr(self, "record_diagnosis_editor", None)
+        if editor is not None and hasattr(editor, "set_read_only"):
+            editor.set_read_only(not editable)
+        for attr in ("record_save", "record_sign", "record_save_diag"):
+            button = getattr(self, attr, None)
+            if button is not None:
+                button.setEnabled(editable)
+        if hasattr(self, "record_revision"):
+            self.record_revision.setEnabled(signed)
 
     def _apply_record_template(self) -> None:
         code = self.record_template.currentData()
@@ -1448,10 +1813,30 @@ class DoctorWidget(QWidget):
             self.record_diagnosis_editor.set_items(rows)
         for key, _label, _limit in _RECORD_FIELDS:
             self.record_edits[key].setPlainText(record.get(key) or "")
-        self.record_msg.setText(
-            f"病历已载入（书写：{record.get('written_by') or '—'}，"
-            f"签名：{record.get('signed_by') or '未签名'}）"
-        )
+        signed = bool(record.get("signed_at"))
+        closed = encounter.get("status") == "closed"
+        self._set_record_editable(not signed and not closed, signed=signed)
+        if hasattr(self, "record_state"):
+            if signed:
+                self.record_state.setText("【只读】病历已签名；可申请修订或全额退费后自动解锁")
+                self.record_state.setStyleSheet("color:#b45309;font-weight:bold")
+            elif closed:
+                self.record_state.setText("【只读】就诊已收费；全额退费后自动重开")
+                self.record_state.setStyleSheet("color:#b45309;font-weight:bold")
+            else:
+                self.record_state.setText("可编辑病历")
+                self.record_state.setStyleSheet("color:#64748b")
+        if signed:
+            self.record_msg.setText(
+                f"病历已签名（{record.get('signed_by') or '—'}），当前只读；"
+                "可点「申请修订」，审批通过后解锁；全额退费也会自动解锁"
+            )
+        elif closed:
+            self.record_msg.setText("就诊已收费，病历只读；全额退费后自动重开")
+        else:
+            self.record_msg.setText(
+                f"病历可编辑（书写：{record.get('written_by') or '—'}）"
+            )
 
     def _save_record_diagnoses(self) -> None:
         encounter_id = self.mr_encounter_id.value()
@@ -1510,6 +1895,25 @@ class DoctorWidget(QWidget):
             return
         self.record_msg.setText(f"已签名锁定：{record.get('signed_by')}")
 
+    def _request_record_revision(self) -> None:
+        encounter_id = self.mr_encounter_id.value()
+        if not encounter_id:
+            self.record_msg.setText("请先选择就诊")
+            return
+        reason, ok = QInputDialog.getText(
+            self, "申请病历修订", "修订理由（提交后由管理员/院长审批）："
+        )
+        if not ok or not reason.strip():
+            return
+        try:
+            row = self.api.request_record_revision(encounter_id, reason.strip())
+        except ApiError as e:
+            self.record_msg.setText(f"申请失败（{e.status_code}）：{e.detail}")
+            return
+        self.record_msg.setText(
+            f"修订申请已提交（#{row['id']}，{row['status']}），等待审批"
+        )
+
     def _check_quality(self) -> None:
         try:
             quality = self.api.medical_record_quality(self.mr_encounter_id.value())
@@ -1530,7 +1934,7 @@ class DoctorWidget(QWidget):
         self.history_name = QLineEdit()
         self.history_name.setPlaceholderText("患者姓名（可空）")
         self.history_id_number = QLineEdit()
-        self.history_id_number.setPlaceholderText("身份证号（可空）")
+        self.history_id_number.setPlaceholderText("身份证号（仅检索，不显示）")
         search = QPushButton("查询患者")
         search.clicked.connect(self._search_history_patients)
         row.addWidget(QLabel("姓名"))
@@ -1541,7 +1945,9 @@ class DoctorWidget(QWidget):
         layout.addLayout(row)
 
         self.history_patient_table = QTableWidget(0, 3)
-        self.history_patient_table.setHorizontalHeaderLabels(["患者 ID", "姓名", "身份证号"])
+        self.history_patient_table.setHorizontalHeaderLabels(
+            ["患者编号", "姓名", "性别/年龄"]
+        )
         self.history_patient_table.setMaximumHeight(130)
         self.history_patient_table.cellClicked.connect(self._select_history_patient)
         layout.addWidget(self.history_patient_table)
@@ -1571,6 +1977,7 @@ class DoctorWidget(QWidget):
         self.history_lab_table = self._history_table(
             ["项目", "状态", "结果", "参考范围", "异常", "报告时间"]
         )
+        self.history_lab_table.cellDoubleClicked.connect(self._show_lab_trend)
         detail.addTab(self.history_lab_table, "检验")
         self.history_treat_table = self._history_table(["项目", "数量", "状态", "执行人"])
         detail.addTab(self.history_treat_table, "治疗")
@@ -1602,17 +2009,31 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.history_msg.setText(f"查询失败（{e.status_code}）：{e.detail}")
             return
+        self.history_search_patients = patients
         self.history_patient_table.setRowCount(len(patients))
         for row, patient in enumerate(patients):
-            values = [str(patient["id"]), patient["name"], patient.get("id_number", "")]
+            gender = {"male": "男", "female": "女"}.get(
+                patient.get("gender"), "性别不详"
+            )
+            age = patient.get("age")
+            values = [
+                patient.get("patient_no") or str(patient["id"]),
+                patient["name"],
+                f"{gender}/{age if age is not None else '年龄不详'}",
+            ]
             for col, value in enumerate(values):
-                self.history_patient_table.setItem(row, col, QTableWidgetItem(value))
+                cell = QTableWidgetItem(str(value))
+                if col == 0:
+                    cell.setData(Qt.UserRole, patient["id"])
+                self.history_patient_table.setItem(row, col, cell)
         self.history_msg.setText(f"共 {len(patients)} 位患者，点击选择查看历史")
 
     def _select_history_patient(self, row: int, _col: int) -> None:
         item = self.history_patient_table.item(row, 0)
         if item:
-            self._load_history(int(item.text()))
+            patient_id = item.data(Qt.UserRole)
+            if patient_id is not None:
+                self._load_history(int(patient_id))
 
     def _load_history(self, patient_id: int) -> None:
         try:
@@ -1623,10 +2044,21 @@ class DoctorWidget(QWidget):
         self.history_data = data
         patient = data["patient"]
         self.history_patient_label.setText(
-            f"患者：{patient['name']}（ID {patient['id']}）  "
-            f"历史就诊 {len(data['encounters'])} 次"
+            f"患者：{patient.get('patient_no') or patient['id']} "
+            f"{patient['name']}  历史就诊 {len(data['encounters'])} 次"
         )
-        self.history_msg.setText("点击就诊行查看该次病历、处方、检验、治疗、收费")
+        self.history_msg.setText("点击就诊行查看详情；双击检验行查看同名项目趋势")
+        self.history_patient_table.setRowCount(1)
+        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "性别不详")
+        age = patient.get("age")
+        self.history_patient_table.setItem(
+            0, 0, QTableWidgetItem(str(patient.get("patient_no") or patient["id"]))
+        )
+        self.history_patient_table.setItem(0, 1, QTableWidgetItem(patient["name"]))
+        self.history_patient_table.setItem(
+            0, 2, QTableWidgetItem(f"{gender}/{age if age is not None else '年龄不详'}")
+        )
+        self.history_patient_table.selectRow(0)
         table = self.history_enc_table
         table.setRowCount(len(data["encounters"]))
         for row, encounter in enumerate(data["encounters"]):
@@ -1652,6 +2084,70 @@ class DoctorWidget(QWidget):
                 self.history_pay_table,
             ):
                 widget.setRowCount(0)
+
+    def _show_lab_trend(self, row: int, _col: int) -> None:
+        rows = getattr(self, "history_lab_rows", [])
+        if not 0 <= row < len(rows):
+            return
+        item = rows[row]
+        name = item.get("item_name") or ""
+        history = getattr(self, "history_data", {}).get("encounters", [])
+        values = []
+        numeric: list[tuple[str, float]] = []
+        unit = ""
+        reference_low = None
+        reference_high = None
+        for encounter in history:
+            for lab in encounter.get("lab_requests", []):
+                if (lab.get("item_name") or "") != name:
+                    continue
+                result = (
+                    f"{lab['result_value']:g} {lab.get('result_unit') or ''}".strip()
+                    if lab.get("result_value") is not None
+                    else lab.get("result") or "—"
+                )
+                unit = lab.get("result_unit") or unit
+                if lab.get("reference_low") is not None and reference_low is None:
+                    reference_low = float(lab["reference_low"])
+                if lab.get("reference_high") is not None and reference_high is None:
+                    reference_high = float(lab["reference_high"])
+                if lab.get("result_value") is not None:
+                    numeric.append((str(encounter.get("visited_at") or "")[:10], float(lab["result_value"])))
+                values.append(
+                    (
+                        str(encounter.get("visited_at") or "")[:10],
+                        result,
+                        f"{lab.get('reference_low') or '—'}–{lab.get('reference_high') or '—'}",
+                        {"H": "偏高", "L": "偏低", "N": "正常"}.get(
+                            lab.get("abnormal_flag") or "", "—"
+                        ),
+                    )
+                )
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"检验趋势 · {name}")
+        dialog.resize(700, 520)
+        layout = QVBoxLayout(dialog)
+        if numeric:
+            layout.addWidget(
+                TrendChart(
+                    [item[0] for item in numeric],
+                    [item[1] for item in numeric],
+                    unit,
+                    reference_low,
+                    reference_high,
+                )
+            )
+        table = QTableWidget(len(values), 4)
+        table.setHorizontalHeaderLabels(["日期", "结果", "参考范围", "异常"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        for i, row_values in enumerate(values):
+            for j, value in enumerate(row_values):
+                table.setItem(i, j, QTableWidgetItem(str(value)))
+        layout.addWidget(table)
+        close = QPushButton("关闭")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close)
+        dialog.exec()
 
     def _history_select(self, row: int, _col: int) -> None:
         encounters = getattr(self, "history_data", {}).get("encounters", [])
@@ -1690,6 +2186,7 @@ class DoctorWidget(QWidget):
                 for item in encounter["prescriptions"]
             ],
         )
+        self.history_lab_rows = encounter["lab_requests"]
         self._fill_history_table(
             self.history_lab_table,
             [
@@ -1769,12 +2266,15 @@ class DoctorWidget(QWidget):
         self.rx_encounter_id = QSpinBox()
         self.rx_encounter_id.setRange(0, 10_000_000)
         self.rx_encounter_id.setSpecialValueText("未接诊")
-        self.rx_encounter_id.setReadOnly(True)
         self.rx_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.rx_encounter_id.lineEdit().setReadOnly(True)
+        self.rx_encounter_id.setFocusPolicy(Qt.NoFocus)
         load = QPushButton("刷新药品目录")
         load.clicked.connect(self._load_drugs)
+        self.rx_encounter_label = self._encounter_label()
+        self.rx_encounter_id.hide()
         top.addWidget(QLabel("就诊 ID"))
-        top.addWidget(self.rx_encounter_id)
+        top.addWidget(self.rx_encounter_label)
         top.addWidget(load)
         self.rx_search = QLineEdit()
         self.rx_search.setPlaceholderText("搜索药名/规格（输入即筛选）")
@@ -1792,13 +2292,16 @@ class DoctorWidget(QWidget):
             self.rx_form_filter.addItem(label, value)
         self.rx_form_filter.currentIndexChanged.connect(self._filter_drugs)
         top.addWidget(self.rx_form_filter)
+        suggest_drug = QPushButton("建议新增药品")
+        suggest_drug.clicked.connect(lambda: self._suggest_catalog("drug"))
+        top.addWidget(suggest_drug)
         layout.addLayout(top)
 
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Vertical)
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 16, 0)
-        left_title = QLabel("药品目录")
+        left_title = QLabel("药品目录（只读，双击加入处方）")
         left_title.setStyleSheet("font-weight:bold")
         left_layout.addWidget(left_title)
         self.drug_table = QTableWidget(0, 8)
@@ -1808,66 +2311,50 @@ class DoctorWidget(QWidget):
         if not self.insurance_enabled:
             self.drug_table.setColumnHidden(6, True)
             self.drug_table.setColumnHidden(7, True)
-        self.drug_table.cellClicked.connect(self._pick_drug_row)
-        self.drug_table.cellDoubleClicked.connect(self._pick_drug_row)
+        set_column_layout(
+            self.drug_table, stretch=(1, 2), contents=(0, 3, 4, 5, 6, 7)
+        )
+        self.drug_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.drug_table.cellClicked.connect(self._catalog_clicked)
+        self.drug_table.cellDoubleClicked.connect(self._catalog_double_clicked)
         left_layout.addWidget(self.drug_table, 1)
         splitter.addWidget(left)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(8, 0, 0, 0)
-        box = QGroupBox("开立处方")
-        form = QFormLayout(box)
-        self.rx_drug_id = QLineEdit()
-        self.rx_drug_id.setReadOnly(True)
-        self.rx_quantity = QSpinBox()
-        self.rx_quantity.setRange(1, 100)
-        self.rx_dosage = QLineEdit()
-        self.rx_dosage.setPlaceholderText("如 0.5g")
-        self.rx_frequency = QLineEdit()
-        self.rx_frequency.setPlaceholderText("如 bid / tid")
-        self.rx_frequency.setCompleter(
-            QCompleter(["qd", "bid", "tid", "qid", "q8h", "q12h", "prn", "st"])
+        right_layout.setContentsMargins(0, 8, 0, 0)
+        rx_title = QLabel("处方")
+        rx_title.setStyleSheet("font-weight:bold")
+        right_layout.addWidget(rx_title)
+        self.rx_table = QTableWidget(0, 6)
+        self.rx_table.setHorizontalHeaderLabels(
+            ["药品", "数量", "单价", "用法", "金额", "状态"]
         )
-        self.rx_route = QLineEdit()
-        self.rx_route.setPlaceholderText("如 口服 / 静滴")
-        self.rx_route.setCompleter(
-            QCompleter(["口服", "静滴", "肌注", "皮下", "外用", "舌下", "雾化", "滴眼"])
-        )
-        self.rx_days = QSpinBox()
-        self.rx_days.setRange(1, 365)
-        self.rx_days.setValue(3)
-        submit = QPushButton("开方")
-        submit.clicked.connect(self._add_prescription)
-        form.addRow("药品 ID", self.rx_drug_id)
-        form.addRow("数量", self.rx_quantity)
-        form.addRow("每次剂量", self.rx_dosage)
-        form.addRow("频次", self.rx_frequency)
-        form.addRow("途径", self.rx_route)
-        form.addRow("天数", self.rx_days)
-        form.addRow("", submit)
-        right_layout.addWidget(box)
-
+        set_column_layout(self.rx_table, stretch=(0, 3), contents=(1, 2, 4, 5))
+        right_layout.addWidget(self.rx_table, 1)
+        rx_actions = QHBoxLayout()
+        self.rx_edit = QPushButton("编辑选中处方")
+        self.rx_edit.clicked.connect(self._edit_selected_rx)
+        self.rx_delete = QPushButton("删除选中处方")
+        self.rx_delete.clicked.connect(self._delete_selected_rx)
+        rx_actions.addStretch(1)
+        rx_actions.addWidget(self.rx_edit)
+        rx_actions.addWidget(self.rx_delete)
+        right_layout.addLayout(rx_actions)
         self.rx_msg = QLabel("")
         self.rx_msg.setWordWrap(True)
         right_layout.addWidget(self.rx_msg)
-
-        rx_title = QLabel("本次处方")
-        rx_title.setStyleSheet("font-weight:bold")
-        right_layout.addWidget(rx_title)
-        self.rx_table = QTableWidget(0, 5)
-        self.rx_table.setHorizontalHeaderLabels(["药品", "数量", "单价", "用法", "金额"])
-        self.rx_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        right_layout.addWidget(self.rx_table, 1)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([680, 460])
+        splitter.setSizes([560, 300])
         layout.addWidget(splitter, 1)
 
         rx_tabs = QTabWidget()
         rx_tabs.addTab(page, "西药 / 中成药 / 注射")
         rx_tabs.addTab(self._build_tcm_prescription_page(), "中药饮片")
+        rx_tabs.addTab(self._build_tcm_injection_page(), "中药注射")
+        rx_tabs.addTab(self._build_prescription_center_page(), "处方中心")
         self.rx_type_tabs = rx_tabs
         rx_tabs.currentChanged.connect(self._on_rx_type_changed)
         outer = QWidget()
@@ -1893,7 +2380,7 @@ class DoctorWidget(QWidget):
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 16, 0)
+        left_layout.setContentsMargins(0, 0, 12, 0)
         left_title = QLabel("中药饮片目录（双击加入）")
         left_title.setStyleSheet("font-weight:bold")
         left_layout.addWidget(left_title)
@@ -1906,7 +2393,7 @@ class DoctorWidget(QWidget):
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(16, 0, 0, 0)
+        right_layout.setContentsMargins(12, 0, 0, 0)
         form_box = QGroupBox("开中药处方")
         form = QFormLayout(form_box)
         self.tcm_formula = QLineEdit()
@@ -1936,6 +2423,11 @@ class DoctorWidget(QWidget):
         right_layout.addWidget(selected_title)
         self.tcm_table = QTableWidget(0, 4)
         self.tcm_table.setHorizontalHeaderLabels(["ID", "饮片", "剂量g", "煎法"])
+        # 剂量需要医生直接修改；其余业务表格仍由全局策略设为只读
+        self.tcm_table.setProperty("allow_cell_edit", True)
+        self.tcm_table.setEditTriggers(
+            QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed
+        )
         self.tcm_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         right_layout.addWidget(self.tcm_table, 1)
         self.tcm_msg = QLabel("")
@@ -1951,16 +2443,268 @@ class DoctorWidget(QWidget):
         row.addWidget(submit)
         right_layout.addLayout(row)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setSizes([650, 520])
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
+        splitter.setSizes([460, 700])
         layout.addWidget(splitter, 1)
         self.tcm_items: list[dict] = []
         return page
 
-    def _on_rx_type_changed(self, _index: int) -> None:
-        if not hasattr(self, "tcm_herb_rows"):
+    def _build_prescription_center_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        title = QLabel("本次诊疗处方中心")
+        title.setStyleSheet("font-size:15px;font-weight:bold")
+        refresh = QPushButton("刷新")
+        refresh.clicked.connect(self._refresh_prescription_center)
+        top.addWidget(title)
+        top.addStretch(1)
+        top.addWidget(refresh)
+        layout.addLayout(top)
+        hint = QLabel("只读汇总：西药/中成药处方、中药饮片、治疗单")
+        hint.setStyleSheet("color:#64748b;")
+        layout.addWidget(hint)
+        self.rx_center_table = QTableWidget(0, 5)
+        self.rx_center_table.setHorizontalHeaderLabels(
+            ["类别", "单据号/项目", "状态", "内容", "审核"]
+        )
+        self.rx_center_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.rx_center_table.cellDoubleClicked.connect(self._open_center_row)
+        layout.addWidget(self.rx_center_table, 1)
+        actions = QHBoxLayout()
+        self.rx_center_print = QPushButton("打印选中处方")
+        self.rx_center_print.clicked.connect(self._print_center_prescription)
+        self.rx_center_edit = QPushButton("编辑选中处方")
+        self.rx_center_edit.clicked.connect(self._edit_center_prescription)
+        self.rx_center_upload = QPushButton("上传选中处方医保")
+        self.rx_center_upload.clicked.connect(self._upload_center_prescription)
+        actions.addStretch(1)
+        actions.addWidget(self.rx_center_edit)
+        actions.addWidget(self.rx_center_upload)
+        actions.addWidget(self.rx_center_print)
+        layout.addLayout(actions)
+        self.rx_center_msg = QLabel("")
+        layout.addWidget(self.rx_center_msg)
+        return page
+
+    def _refresh_prescription_center(self) -> None:
+        table = getattr(self, "rx_center_table", None)
+        encounter_id = self.rx_encounter_id.value()
+        if table is None or not encounter_id:
+            return
+        try:
+            data = self.api.prescription_center(encounter_id)
+        except ApiError as e:
+            self.rx_center_msg.setText(f"加载失败：{e.detail}")
+            return
+        rows = []
+        self.rx_center_rows = []
+        for row in data.get("western", []):
+            self.rx_center_rows.append({"kind": "western", "id": row.get("id")})
+            rows.append(
+                (
+                    "西药/中成药" if row.get("type") == "western" else row.get("type"),
+                    row.get("prescription_no") or "",
+                    RX_STATUS_LABELS.get(row.get("status"), row.get("status") or ""),
+                    f"{row.get('item_count', 0)} 种",
+                    row.get("reviewed_by") or "未审",
+                )
+            )
+        for row in data.get("tcm", []):
+            self.rx_center_rows.append({"kind": "tcm", "id": row.get("id")})
+            rows.append(
+                (
+                    "中药饮片",
+                    row.get("prescription_no") or "",
+                    TCM_STATUS_LABELS.get(row.get("status"), row.get("status") or ""),
+                    f"{row.get('formula_name') or '方剂'} / {row.get('item_count', 0)} 味",
+                    "中药房",
+                )
+            )
+        for row in data.get("treatments", []):
+            self.rx_center_rows.append({"kind": "treatment", "id": row.get("id")})
+            rows.append(
+                (
+                    "治疗/处置",
+                    row.get("item_name") or "",
+                    TREATMENT_STATUS_LABELS.get(row.get("status"), row.get("status") or ""),
+                    f"×{row.get('quantity', 1)}",
+                    "治疗室",
+                )
+            )
+        table.setRowCount(len(rows))
+        for i, values in enumerate(rows):
+            for j, value in enumerate(values):
+                table.setItem(i, j, QTableWidgetItem(str(value)))
+        self.rx_center_msg.setText(f"共 {len(rows)} 张处方/治疗单")
+
+    def _open_center_row(self, row: int, _col: int) -> None:
+        rows = getattr(self, "rx_center_rows", [])
+        if not 0 <= row < len(rows):
+            return
+        kind = rows[row]["kind"]
+        if kind == "western":
+            self.rx_type_tabs.setCurrentIndex(0)
+            self.rx_center_msg.setText("已切换到西药处方页，可继续查看/删除明细")
+        elif kind == "tcm":
+            self.rx_type_tabs.setCurrentIndex(1)
+            self.rx_center_msg.setText("已切换到中药饮片页")
+        else:
+            self.rx_center_msg.setText("治疗单请到治疗室工作站处理")
+
+    def _print_center_prescription(self) -> None:
+        row = self.rx_center_table.currentRow()
+        rows = getattr(self, "rx_center_rows", [])
+        if not 0 <= row < len(rows):
+            self.rx_center_msg.setText("请先选择一张处方")
+            return
+        target = rows[row]
+        if target["kind"] != "western":
+            self.rx_center_msg.setText("中药/治疗单请在对应页签打印")
+            return
+        open_print_preview(
+            self,
+            self.api.prescription_header_print_url(target["id"]),
+            "单张处方打印预览",
+        )
+
+    def _edit_center_prescription(self) -> None:
+        row = self.rx_center_table.currentRow()
+        rows = getattr(self, "rx_center_rows", [])
+        if not 0 <= row < len(rows):
+            self.rx_center_msg.setText("请先选择一张处方")
+            return
+        target = rows[row]
+        if target["kind"] != "western":
+            self.rx_center_msg.setText("中药/治疗单请在对应页签编辑")
+            return
+        dialog = PrescriptionEditDialog(
+            self.api, self.rx_encounter_id.value(), target["id"], self
+        )
+        dialog.exec()
+        self._refresh_prescriptions()
+        self._refresh_prescription_center()
+
+    def _upload_center_prescription(self) -> None:
+        row = self.rx_center_table.currentRow()
+        rows = getattr(self, "rx_center_rows", [])
+        if not 0 <= row < len(rows):
+            self.rx_center_msg.setText("请先选择一张处方")
+            return
+        target = rows[row]
+        if target["kind"] != "western":
+            self.rx_center_msg.setText("仅西药/中成药处方支持医保逐张上传")
+            return
+        try:
+            self.api.upload_prescription_insurance(
+                self.rx_encounter_id.value(), target["id"]
+            )
+        except ApiError as e:
+            self.rx_center_msg.setText(f"上传失败：{e.detail}")
+            return
+        self.rx_center_msg.setText("已按处方头上传医保")
+        self._refresh_prescription_center()
+
+    def _build_tcm_injection_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        title = QLabel("中药注射剂目录")
+        title.setStyleSheet("font-weight:bold")
+        refresh = QPushButton("刷新注射剂目录")
+        refresh.clicked.connect(self._load_tcm_injection_drugs)
+        top.addWidget(title)
+        top.addStretch(1)
+        top.addWidget(refresh)
+        layout.addLayout(top)
+        hint = QLabel("按剂型/名称筛选中成药注射剂；需在药品目录维护规范名称。双击加入处方。")
+        hint.setStyleSheet("color:#64748b;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        splitter = QSplitter(Qt.Vertical)
+        catalog = QWidget()
+        catalog_layout = QVBoxLayout(catalog)
+        catalog_layout.setContentsMargins(0, 0, 0, 8)
+        self.tcm_inj_table = QTableWidget(0, 5)
+        self.tcm_inj_table.setHorizontalHeaderLabels(["ID", "药品", "规格", "剂型", "单价"])
+        self.tcm_inj_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tcm_inj_table.cellDoubleClicked.connect(self._tcm_inj_double_clicked)
+        catalog_layout.addWidget(self.tcm_inj_table, 1)
+        splitter.addWidget(catalog)
+
+        rx_box = QWidget()
+        rx_layout = QVBoxLayout(rx_box)
+        rx_layout.setContentsMargins(0, 8, 0, 0)
+        rx_layout.addWidget(QLabel("中药注射处方"))
+        self.tcm_inj_rx_table = QTableWidget(0, 4)
+        self.tcm_inj_rx_table.setHorizontalHeaderLabels(["药品", "数量", "单价", "天数"])
+        self.tcm_inj_rx_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        rx_layout.addWidget(self.tcm_inj_rx_table, 1)
+        self.tcm_inj_msg = QLabel("")
+        self.tcm_inj_msg.setWordWrap(True)
+        rx_layout.addWidget(self.tcm_inj_msg)
+        splitter.addWidget(rx_box)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([430, 260])
+        layout.addWidget(splitter, 1)
+        return page
+
+    def _load_tcm_injection_drugs(self) -> None:
+        if not hasattr(self, "drug_rows"):
+            self._load_drugs()
+        rows = [
+            drug
+            for drug in getattr(self, "drug_rows", [])
+            if self._is_tcm_injection(drug)
+        ]
+        self.tcm_inj_rows = rows
+        if not hasattr(self, "tcm_inj_table"):
+            return
+        self.tcm_inj_table.setRowCount(len(rows))
+        for row, drug in enumerate(rows):
+            values = (
+                str(drug["id"]),
+                drug.get("name") or "",
+                drug.get("spec") or "—",
+                drug.get("dosage_form") or "—",
+                f"{float(drug.get('base_price') or 0):.2f}",
+            )
+            for col, value in enumerate(values):
+                self.tcm_inj_table.setItem(row, col, QTableWidgetItem(value))
+        self.tcm_inj_msg.setText(f"注射剂 {len(rows)} 种")
+        self._refresh_injection_rx()
+
+    def _tcm_inj_double_clicked(self, row: int, _col: int) -> None:
+        if 0 <= row < len(getattr(self, "tcm_inj_rows", [])):
+            self._quick_add_drug(self.tcm_inj_rows[row]["id"])
+
+    def _on_rx_type_changed(self, index: int) -> None:
+        if index == 3:
+            self._refresh_prescription_center()
+        elif index == 2:
+            self._load_tcm_injection_drugs()
+        elif not hasattr(self, "tcm_herb_rows"):
             self._load_tcm_herbs()
+
+    def _suggest_catalog(self, kind: str) -> None:
+        dialog = CatalogProposalDialog(kind, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            row = self.api.create_catalog_proposal(dialog.payload())
+        except ApiError as e:
+            QMessageBox.warning(self, "提交失败", f"{e.status_code}：{e.detail}")
+            return
+        QMessageBox.information(
+            self,
+            "建议已提交",
+            f"建议编号 {row['id']} 已提交。\n"
+            "药品：药事审核 → 库房审核；治疗项目：院长审批。\n"
+            "医生不能直接修改目录。",
+        )
 
     def _load_drugs(self) -> None:
         try:
@@ -1976,9 +2720,19 @@ class DoctorWidget(QWidget):
             )
         self.drug_rows = []
         for drug in drugs:
+            name = str(drug.get("name") or "")
+            spec = str(drug.get("spec") or "")
+            search_text = f"{name}{spec}"
+            if lazy_pinyin is not None:
+                try:
+                    search_text += "".join(lazy_pinyin(name))
+                    search_text += "".join(lazy_pinyin(name, style=Style.FIRST_LETTER))
+                except Exception:
+                    pass
             self.drug_rows.append(
                 {
                     **drug,
+                    "search_text": search_text.lower(),
                     "stock": stock_by_drug.get(drug["id"], 0),
                     "self_pay": round(
                         drug["base_price"]
@@ -1998,7 +2752,8 @@ class DoctorWidget(QWidget):
             rows = [
                 drug
                 for drug in rows
-                if term in str(drug.get("name", "")).lower()
+                if term in str(drug.get("search_text") or drug.get("name", "")).lower()
+                or term in str(drug.get("name", "")).lower()
                 or term in str(drug.get("spec", "")).lower()
             ]
         form = self.rx_form_filter.currentData() if hasattr(self, "rx_form_filter") else ""
@@ -2165,67 +2920,112 @@ class DoctorWidget(QWidget):
             f"金额 {prescription['total_amount']:.2f} 元"
         )
 
-    def _pick_drug_row(self, row: int, _col: int) -> None:
-        cell = self.drug_table.item(row, 0)
-        if not cell:
-            return
-        self.rx_drug_id.setText(cell.text())
-        if not self.rx_frequency.text().strip():
-            self.rx_frequency.setText("bid")
-        if not self.rx_route.text().strip():
-            dosage = self.drug_table.item(row, 1).text() if self.drug_table.item(row, 1) else ""
-            self.rx_route.setText("静滴" if "注射" in dosage else "口服")
-
-    def _add_prescription(self) -> None:
-        drug_id = self.rx_drug_id.text().strip()
-        if not drug_id:
-            self.rx_msg.setText("请先在药品目录中点击选择药品")
-            return
-        payload = {
-            "drug_id": int(drug_id),
-            "quantity": self.rx_quantity.value(),
-            "dosage": self.rx_dosage.text().strip(),
-            "frequency": self.rx_frequency.text().strip(),
-            "route": self.rx_route.text().strip(),
-            "days": self.rx_days.value(),
-        }
-        try:
-            item = self.api.add_prescription(self.rx_encounter_id.value(), payload)
-        except ApiError as e:
-            if e.status_code == 400 and "过敏" in (e.detail or ""):
-                reason, ok = QInputDialog.getText(
-                    self,
-                    "过敏史冲突",
-                    f"{e.detail}\n\n如确认可继续使用，请填写 override 理由：",
-                )
-                if not ok or not reason.strip():
-                    self.rx_msg.setText(f"已取消开方：{e.detail}")
-                    return
-                payload["allergy_override_reason"] = reason.strip()
-                try:
-                    item = self.api.add_prescription(
-                        self.rx_encounter_id.value(), payload
-                    )
-                except ApiError as retry_error:
-                    self.rx_msg.setText(
-                        f"开方失败（{retry_error.status_code}）：{retry_error.detail}"
-                    )
-                    return
-            else:
-                self.rx_msg.setText(f"开方失败（{e.status_code}）：{e.detail}")
-                return
-        warning = f"；医保提醒：{item['insurance_warning']}" if self.insurance_enabled and item.get("insurance_warning") else ""
-        allergy = f"；过敏冲突已 override：{item['allergy_warning']}" if item.get("allergy_warning") else ""
-        self.rx_msg.setText(
-            f"开方成功：{item['drug_name']} × {item['quantity']}{warning}{allergy}"
+    def _is_tcm_injection(self, drug: dict) -> bool:
+        text = f"{drug.get('name') or ''}{drug.get('dosage_form') or ''}"
+        return "注射" in text and any(
+            key in text
+            for key in (
+                "注射液",
+                "注射用",
+                "丹参",
+                "参麦",
+                "血必净",
+                "喜炎平",
+                "醒脑静",
+                "银杏",
+                "黄芪",
+                "生脉",
+                "热毒宁",
+                "痰热清",
+            )
         )
+
+    def _quick_add_drug(self, drug_id: int) -> None:
+        encounter_id = self.rx_encounter_id.value()
+        if not encounter_id:
+            msg = "请先选择已接诊患者"
+            self.rx_msg.setText(msg)
+            if hasattr(self, "tcm_inj_msg"):
+                self.tcm_inj_msg.setText(msg)
+            return
+        drug = next(
+            (x for x in getattr(self, "drug_rows", []) if x["id"] == drug_id),
+            None,
+        )
+        if drug is None:
+            return
+        if int(drug.get("stock") or 0) <= 0:
+            self.rx_msg.setText(f"{drug.get('name')} 当前库存为 0，不能开方；请先请领")
+            return
+        dialog = PrescriptionQuickDialog(drug, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        payload = dialog.payload()
+        stock = int(drug.get("stock") or 0)
+        if payload["quantity"] > stock:
+            self.rx_msg.setText(
+                f"{drug.get('name')} 库存仅 {stock}，开方数量 {payload['quantity']}，请先请领或调整数量"
+            )
+            return
+        try:
+            item = self.api.add_prescription(encounter_id, payload)
+        except ApiError as e:
+            self.rx_msg.setText(f"加入处方失败（{e.status_code}）：{e.detail}")
+            return
+        status_text = {
+            "pending_review": "待药师审核后发药",
+            "approved": "已审方",
+            "rejected": "已退回",
+        }.get(item.get("prescription_status"), item.get("prescription_status") or "")
+        self.rx_msg.setText(
+            f"已加入处方：{item['drug_name']} × {item['quantity']}（{status_text}）"
+        )
+        if hasattr(self, "tcm_inj_msg"):
+            self.tcm_inj_msg.setText(
+                f"已加入处方：{item['drug_name']} × {item['quantity']}"
+            )
         self._refresh_prescriptions()
+
+    def _catalog_clicked(self, row: int, _col: int) -> None:
+        # 单击只选中，双击才入方，避免误触
+        pass
+
+    def _catalog_double_clicked(self, row: int, _col: int) -> None:
+        cell = self.drug_table.item(row, 0)
+        if cell:
+            self._quick_add_drug(int(cell.text()))
+
+    def _refresh_injection_rx(self) -> None:
+        table = getattr(self, "tcm_inj_rx_table", None)
+        if table is None:
+            return
+        injection_ids = {
+            drug["id"]
+            for drug in getattr(self, "drug_rows", [])
+            if self._is_tcm_injection(drug)
+        }
+        rows = [
+            item
+            for item in getattr(self, "rx_rows", [])
+            if item.get("drug_id") in injection_ids
+        ]
+        table.setRowCount(len(rows))
+        for row, item in enumerate(rows):
+            values = (
+                item.get("drug_name") or "",
+                str(item.get("quantity") or ""),
+                f"{item.get('unit_price', 0):.2f}",
+                str(item.get("days") or ""),
+            )
+            for col, value in enumerate(values):
+                table.setItem(row, col, QTableWidgetItem(value))
 
     def _refresh_prescriptions(self) -> None:
         try:
             items = self.api.list_prescriptions(self.rx_encounter_id.value())
         except ApiError:
             return
+        self.rx_rows = items
         self.rx_table.setRowCount(len(items))
         for row, item in enumerate(items):
             usage = " ".join(
@@ -2245,6 +3045,55 @@ class DoctorWidget(QWidget):
             self.rx_table.setItem(
                 row, 4, QTableWidgetItem(f"{item['quantity'] * item['unit_price']:.2f}")
             )
+            status = {
+                "pending_review": "待审方",
+                "approved": "已审方",
+                "rejected": "已退回",
+                "dispensing": "调配中",
+                "dispensed": "已发药",
+                "cancelled": "已作废",
+            }.get(item.get("prescription_status"), item.get("prescription_status") or "")
+            self.rx_table.setItem(row, 5, QTableWidgetItem(status))
+        if not items:
+            self.rx_msg.setText("当前没有处方；双击左侧药品加入")
+        self._refresh_injection_rx()
+        self._refresh_prescription_center()
+
+    def _edit_selected_rx(self) -> None:
+        row = self.rx_table.currentRow()
+        items = getattr(self, "rx_rows", [])
+        if not 0 <= row < len(items):
+            self.rx_msg.setText("请先选择一条本次处方")
+            return
+        item = items[row]
+        prescription_id = item.get("prescription_id")
+        if not prescription_id:
+            self.rx_msg.setText("该明细没有处方头，不能编辑")
+            return
+        dialog = PrescriptionEditDialog(
+            self.api, self.rx_encounter_id.value(), int(prescription_id), self
+        )
+        dialog.exec()
+        self._refresh_prescriptions()
+
+    def _delete_selected_rx(self) -> None:
+        row = self.rx_table.currentRow()
+        items = getattr(self, "rx_rows", [])
+        if not 0 <= row < len(items):
+            self.rx_msg.setText("请先选择一条本次处方")
+            return
+        item = items[row]
+        if QMessageBox.question(
+            self, "删除处方", f"确认删除 {item.get('drug_name') or '该药品'}？"
+        ) != QMessageBox.Yes:
+            return
+        try:
+            self.api.delete_prescription(self.rx_encounter_id.value(), item["id"])
+        except ApiError as e:
+            self.rx_msg.setText(f"删除失败（{e.status_code}）：{e.detail}")
+            return
+        self.rx_msg.setText("处方已删除，对应未收费费用已同步取消")
+        self._refresh_prescriptions()
 
     # ---------- 检验 / 检查 ----------
     def _build_exam_tab(self) -> QWidget:
@@ -2254,11 +3103,14 @@ class DoctorWidget(QWidget):
         self.exam_encounter_id = QSpinBox()
         self.exam_encounter_id.setRange(0, 10_000_000)
         self.exam_encounter_id.setSpecialValueText("未接诊")
-        self.exam_encounter_id.setReadOnly(True)
         self.exam_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.exam_encounter_id.lineEdit().setReadOnly(True)
+        self.exam_encounter_id.setFocusPolicy(Qt.NoFocus)
         row = QHBoxLayout()
+        self.exam_encounter_label = self._encounter_label()
+        self.exam_encounter_id.hide()
         row.addWidget(QLabel("就诊 ID"))
-        row.addWidget(self.exam_encounter_id)
+        row.addWidget(self.exam_encounter_label)
         layout.addLayout(row)
 
         lab_box = QGroupBox("检验开单")
@@ -2316,9 +3168,13 @@ class DoctorWidget(QWidget):
                     (
                         "检验",
                         request.get("item_name") or "",
-                        request.get("status") or "",
+                        zh("lab_status", request.get("status")),
                         request.get("result") or "",
-                        str(request.get("created_at") or "")[:16].replace("T", " "),
+                        str(
+                            request.get("reported_at")
+                            or request.get("requested_at")
+                            or ""
+                        )[:16].replace("T", " "),
                     )
                 )
             for request in self.api.list_imaging_requests(encounter_id):
@@ -2326,9 +3182,13 @@ class DoctorWidget(QWidget):
                     (
                         "检查",
                         request.get("item_name") or "",
-                        request.get("status") or "",
+                        zh("lab_status", request.get("status")),
                         request.get("report") or request.get("result") or "",
-                        str(request.get("created_at") or "")[:16].replace("T", " "),
+                        str(
+                            request.get("reported_at")
+                            or request.get("requested_at")
+                            or ""
+                        )[:16].replace("T", " "),
                     )
                 )
         except ApiError as e:
@@ -2424,8 +3284,9 @@ class DoctorWidget(QWidget):
         self.treat_encounter_id = QSpinBox()
         self.treat_encounter_id.setRange(0, 10_000_000)
         self.treat_encounter_id.setSpecialValueText("未接诊")
-        self.treat_encounter_id.setReadOnly(True)
         self.treat_encounter_id.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.treat_encounter_id.lineEdit().setReadOnly(True)
+        self.treat_encounter_id.setFocusPolicy(Qt.NoFocus)
         self.treat_combo = QComboBox()
         self.treat_quantity = QSpinBox()
         self.treat_quantity.setRange(1, 100)
@@ -2435,11 +3296,16 @@ class DoctorWidget(QWidget):
         load.clicked.connect(self._load_treatment_items)
         submit = QPushButton("开治疗单")
         submit.clicked.connect(self._create_treatment)
-        form.addRow("就诊 ID", self.treat_encounter_id)
+        self.treat_encounter_label = self._encounter_label()
+        self.treat_encounter_id.hide()
+        form.addRow("就诊 ID", self.treat_encounter_label)
         form.addRow("治疗项目", self.treat_combo)
         form.addRow("数量", self.treat_quantity)
         form.addRow("备注", self.treat_note)
+        suggest = QPushButton("建议新增治疗项目")
+        suggest.clicked.connect(lambda: self._suggest_catalog("treatment"))
         form.addRow("", load)
+        form.addRow("", suggest)
         form.addRow("", submit)
         layout.addWidget(box)
 

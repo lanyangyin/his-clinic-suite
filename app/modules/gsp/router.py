@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     AcceptanceCreate,
@@ -31,7 +31,7 @@ from .service import (
     list_storage_logs,
 )
 
-router = APIRouter(prefix="/gsp", tags=["gsp"])
+router = APIRouter(prefix="/gsp", tags=["gsp"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/acceptances", response_model=AcceptanceResponse, status_code=201)

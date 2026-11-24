@@ -55,6 +55,15 @@ class _LightTitleBarFilter(QObject):
         return False
 
 
+def refresh_titlebars(app) -> None:
+    """手动刷新主题后同步重绘所有已存在窗口的原生标题栏/边框。"""
+    if sys.platform != "win32":
+        return
+    for widget in app.topLevelWidgets():
+        if isinstance(widget, (QMainWindow, QDialog)):
+            apply_light_titlebar(widget)
+
+
 def install_light_titlebars(app) -> None:
     """应用级：所有后续弹出的 QDialog/QMainWindow 都用浅色标题栏。"""
     if sys.platform != "win32":

@@ -74,3 +74,34 @@ def ensure_initial_director(db) -> bool:
         ),
     )
     return True
+
+
+def ensure_admin_doctor(db) -> bool:
+    """给 admin 建立/关联一个临床医生档案，供管理员现场挂号默认使用。"""
+    from app.modules.auth.service import get_user_by_username
+    from app.modules.staff.models import Department, Doctor
+
+    admin = get_user_by_username(db, "admin")
+    if not admin:
+        return False
+    if admin.doctor_id:
+        return False
+    name = (admin.display_name or "管理员").strip() or "管理员"
+    doctor = db.query(Doctor).filter(Doctor.name == name).first()
+    if not doctor:
+        dept = (
+            db.query(Department)
+            .filter(Department.active.is_(True))
+            .order_by(Department.id)
+            .first()
+        )
+        if not dept:
+            dept = Department(name="综合门诊")
+            db.add(dept)
+            db.flush()
+        doctor = Doctor(name=name, department_id=dept.id)
+        db.add(doctor)
+        db.flush()
+    admin.doctor_id = doctor.id
+    db.commit()
+    return True

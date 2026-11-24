@@ -257,3 +257,17 @@ def test_doctor_and_pharmacist_can_pay(client, auth):
     )
     assert denied.status_code == 403
     assert "cashier/doctor/pharmacist" in denied.json()["detail"]
+
+
+def test_unconfigured_external_channel_fails_closed(client, auth, monkeypatch):
+    from app import settings
+
+    enc = make_encounter_with_charge(client, auth)
+    monkeypatch.setattr(settings, "PAYMENT_ALLOW_MOCK", False)
+    resp = client.post(
+        "/payments/",
+        json={"encounter_id": enc, "channel": "wechat", "auth_code": "MOCK"},
+        headers=auth["cashier"],
+    )
+    assert resp.status_code == 400, resp.text
+    assert "未配置真实通道" in resp.text

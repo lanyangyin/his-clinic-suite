@@ -15,7 +15,7 @@ class Stocktake(Base):
     # drug 药品 / material 耗材
     kind: Mapped[str] = mapped_column(String(10), nullable=False)
     warehouse: Mapped[str] = mapped_column(String(30), default="总库", nullable=False)
-    # counting 盘点中 / completed 已完成 / cancelled 已取消
+    # counting 盘点中 / completing 完成处理中 / completed 已完成 / cancelled 已取消
     status: Mapped[str] = mapped_column(String(20), default="counting", nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)

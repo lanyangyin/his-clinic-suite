@@ -72,3 +72,42 @@ def test_doctor_workbench_permissions(client, auth):
         ).status_code
         == 403
     )
+
+
+def test_worklist_filters_by_linked_doctor(client, auth):
+    patient, reg, encounter, doctor = _setup(client, auth)
+    dept = client.post(
+        "/departments/", json={"name": "工作台外科"}, headers=auth["admin"]
+    ).json()
+    other = client.post(
+        "/doctors/",
+        json={"name": "其他医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    other_patient = client.post(
+        "/patients/",
+        json={"name": "其他患者", "id_number": "110101199202028888"},
+        headers=auth["cashier"],
+    ).json()
+    client.post(
+        "/registrations/",
+        json={"patient_id": other_patient["id"], "doctor_id": other["id"]},
+        headers=auth["cashier"],
+    )
+    created = client.post(
+        "/users/",
+        json={
+            "username": "filterdoc",
+            "password": "filter123",
+            "role": "doctor",
+            "display_name": "工作台医生",
+            "doctor_id": doctor["id"],
+        },
+        headers=auth["admin"],
+    )
+    assert created.status_code == 201, created.text
+    rows = client.get(
+        "/encounters/worklist", auth=("filterdoc", "filter123")
+    ).json()
+    assert any(item["registration_id"] == reg["id"] for item in rows)
+    assert all(item["doctor_name"] == "工作台医生" for item in rows)

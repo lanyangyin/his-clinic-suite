@@ -1,6 +1,6 @@
 [project]
 name = "his"
-version = "1.2.4"
+version = "1.2.5"
 requires-python = ">=3.12"
 license = {text = "GPL-3.0-only"}
 dependencies = [
@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # 桌面客户端依赖（服务端部署不需要）：uv sync --extra client
-client = ["pyside6>=6.12.0"]
+client = ["pyside6>=6.12.0", "pypinyin>=0.55"]
 
 [dependency-groups]
 dev = [

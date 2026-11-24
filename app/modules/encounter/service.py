@@ -1,8 +1,10 @@
+import json
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app import settings
 from app.modules.charges.service import (
     CONSULTATION_FEE_CODE,
     REGISTRATION_FEE_CODE,
@@ -30,7 +32,11 @@ from .models import (
     Encounter,
     EncounterDiagnosis,
     MedicalRecord,
+    MedicalRecordRevision,
+    MedicalRecordVersion,
+    Prescription,
     PrescriptionItem,
+    PrescriptionLine,
 )
 from .schemas import (
     EncounterCreate,
@@ -176,6 +182,9 @@ def replace_encounter_diagnoses(
         raise ValueError("就诊记录不存在")
     if encounter.status == "closed":
         raise EncounterClosedError("就诊已收费，不能再修改诊断")
+    record = get_medical_record(db, encounter_id)
+    if record and record.signed_at:
+        raise ValueError("病历已签名，不能修改诊断")
     if len(items) > 20:
         raise ValueError("诊断最多 20 条")
     normalized = []
@@ -258,8 +267,356 @@ def update_diagnosis(
     return encounter
 
 
+MAX_WESTERN_DRUGS = 5
+
+
+def _next_prescription_no(db: Session, encounter_id: int) -> str:
+    count = db.query(func.count(Prescription.id)).filter(
+        Prescription.encounter_id == encounter_id
+    ).scalar() or 0
+    return f"RX{datetime.now():%Y%m%d}{encounter_id:06d}{count + 1:02d}"
+
+
+def get_or_create_western_prescription(
+    db: Session, encounter_id: int, operator: str = "", rx_type: str = "western"
+) -> Prescription:
+    """复用待审处方；已批准/已发药的处方不能继续追加，必须新开一张。"""
+    prescription = (
+        db.query(Prescription)
+        .filter(
+            Prescription.encounter_id == encounter_id,
+            Prescription.type == rx_type,
+            Prescription.status.in_(("pending_review", "draft")),
+        )
+        .order_by(Prescription.id.desc())
+        .first()
+    )
+    if prescription:
+        return prescription
+    if not getattr(settings, "REQUIRE_PRESCRIPTION_REVIEW", True):
+        # 兼容“审方关闭”的部署：继续在同一张已批准处方上追加
+        prescription = (
+            db.query(Prescription)
+            .filter(
+                Prescription.encounter_id == encounter_id,
+                Prescription.type == rx_type,
+                Prescription.status == "approved",
+            )
+            .order_by(Prescription.id.desc())
+            .first()
+        )
+        if prescription:
+            return prescription
+    prescription = Prescription(
+        encounter_id=encounter_id,
+        prescription_no=_next_prescription_no(db, encounter_id),
+        type=rx_type,
+        status=(
+            "pending_review"
+            if getattr(settings, "REQUIRE_PRESCRIPTION_REVIEW", True)
+            else "approved"
+        ),
+        prescribed_by=operator,
+    )
+    db.add(prescription)
+    db.flush()
+    if prescription.status == "pending_review":
+        from app.modules.approval.service import ensure_request
+
+        ensure_request(
+            db,
+            "prescription",
+            prescription.id,
+            f"处方审方 {prescription.prescription_no}",
+            "pharmacist",
+            applicant=operator,
+        )
+    return prescription
+
+
+def get_prescription(db: Session, prescription_id: int) -> Prescription | None:
+    return db.get(Prescription, prescription_id)
+
+
+def list_prescription_lines(db: Session, encounter_id: int) -> list[PrescriptionLine]:
+    return (
+        db.query(PrescriptionLine)
+        .join(Prescription, PrescriptionLine.prescription_id == Prescription.id)
+        .filter(Prescription.encounter_id == encounter_id)
+        .order_by(PrescriptionLine.id)
+        .all()
+    )
+
+
+def list_prescription_headers(db: Session, encounter_id: int) -> list[Prescription]:
+    return (
+        db.query(Prescription)
+        .filter(Prescription.encounter_id == encounter_id)
+        .order_by(Prescription.id.desc())
+        .all()
+    )
+
+
+def _reject_prescription_lines(db: Session, row: Prescription) -> None:
+    from app.modules.charges.models import EncounterCharge
+
+    for item in list(row.items):
+        charge = (
+            db.query(EncounterCharge)
+            .filter(
+                EncounterCharge.source_type == "prescription",
+                EncounterCharge.source_id == item.id,
+            )
+            .first()
+        )
+        if charge and charge.status == "paid":
+            raise ValueError("处方已收费，不能直接驳回；请先退费")
+        if charge:
+            db.delete(charge)
+        db.delete(item)
+
+
+def finalize_prescription_approval(
+    db: Session,
+    row: Prescription,
+    approved: bool,
+    reviewer: str,
+    note: str,
+) -> Prescription:
+    if not approved:
+        _reject_prescription_lines(db, row)
+        row.status = "rejected"
+    else:
+        row.status = "approved"
+    row.reviewed_by = reviewer
+    row.reviewed_at = datetime.now()
+    row.review_note = (note or "").strip()
+    row.updated_at = datetime.now()
+    db.flush()
+    return row
+
+
+def review_prescription(
+    db: Session,
+    encounter_id: int,
+    prescription_id: int,
+    approve: bool,
+    note: str,
+    reviewer: str,
+) -> Prescription:
+    row = (
+        db.query(Prescription)
+        .filter(
+            Prescription.id == prescription_id,
+            Prescription.encounter_id == encounter_id,
+        )
+        .first()
+    )
+    if not row:
+        raise ValueError("处方不存在")
+    if row.status != "pending_review":
+        raise ValueError("仅待审处方可以审核")
+    if not approve and not (note or "").strip():
+        raise ValueError("驳回必须填写原因")
+
+    from app.modules.approval.service import advance_request, record_event
+
+    result = advance_request(
+        db,
+        "prescription",
+        row.id,
+        "approve" if approve else "reject",
+        reviewer,
+        note,
+    )
+    if result in ("pending", "transferred"):
+        row.review_note = (note or "").strip()
+        row.updated_at = datetime.now()
+        db.commit()
+        db.refresh(row)
+        return row
+    if result == "missing":
+        result = "approved" if approve else "rejected"
+
+    finalize_prescription_approval(
+        db, row, result == "approved", reviewer, note
+    )
+    record_event(
+        db,
+        "prescription",
+        row.id,
+        "approve" if result == "approved" else "reject",
+        reviewer,
+        row.review_note,
+        step="pharmacist_review",
+    )
+    if result == "approved":
+        try:
+            from app.modules.nursing.service import sync_orders
+
+            sync_orders(db, encounter_id)
+        except Exception:
+            pass
+    db.refresh(row)
+    return row
+
+
+def upload_prescription_insurance(
+    db: Session, encounter_id: int, prescription_id: int, operator: str = ""
+) -> Prescription:
+    """按处方头逐张上传医保（当前为状态/审计接口，真实报文由适配器替换）。"""
+    row = (
+        db.query(Prescription)
+        .filter(
+            Prescription.id == prescription_id,
+            Prescription.encounter_id == encounter_id,
+        )
+        .first()
+    )
+    if not row:
+        raise ValueError("处方不存在")
+    if row.status != "approved":
+        raise ValueError("仅审方通过的处方可以上传医保")
+    from app.modules.insurance.prescription_upload import upload_prescription
+
+    result = upload_prescription(row, list(row.items), db)
+    # 未配置真实地址时只记录本地模拟，不能冒充医保已接收
+    row.insurance_upload_status = "uploaded" if result.get("mode") == "http" else "local"
+    row.insurance_uploaded_at = datetime.now()
+    row.updated_at = datetime.now()
+    db.flush()
+    from app.modules.approval.service import record_event
+
+    record_event(
+        db,
+        "prescription",
+        row.id,
+        "insurance_upload",
+        operator,
+        "按处方头上传医保",
+        step="insurance",
+    )
+    db.refresh(row)
+    return row
+
+
+def prescription_center(db: Session, encounter_id: int) -> dict:
+    """统一处方中心：西药/中成药处方头、中药饮片、治疗单的只读聚合。"""
+    from app.modules.tcm.models import TcmPrescription
+    from app.modules.treatment.models import TreatmentOrder
+
+    encounter = get_encounter(db, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    headers = list_prescription_headers(db, encounter_id)
+    from collections import Counter
+
+    line_counts = Counter(
+        line.prescription_id for line in list_prescription_lines(db, encounter_id)
+    )
+    western = []
+    for row in headers:
+        if row.type == "tcm_herb":
+            continue
+        western.append(
+            {
+                "id": row.id,
+                "prescription_no": row.prescription_no,
+                "type": row.type,
+                "status": row.status,
+                "prescribed_by": row.prescribed_by,
+                "reviewed_by": row.reviewed_by,
+                "review_note": row.review_note,
+                "item_count": line_counts.get(row.id) or len(row.items),
+                "line_count": line_counts.get(row.id, 0),
+                "insurance_upload_status": row.insurance_upload_status,
+                "created_at": row.created_at,
+            }
+        )
+    tcm = [
+        {
+            "id": row.id,
+            "prescription_no": row.prescription_no,
+            "formula_name": row.formula_name,
+            "status": row.status,
+            "packs": row.packs,
+            "item_count": line_counts.get(row.prescription_id) or len(row.items),
+            "line_count": line_counts.get(row.prescription_id, 0),
+            "prescription_id": row.prescription_id,
+        }
+        for row in db.query(TcmPrescription)
+        .filter(TcmPrescription.encounter_id == encounter_id)
+        .order_by(TcmPrescription.id)
+        .all()
+    ]
+    treatments = [
+        {
+            "id": row.id,
+            "item_name": row.item_name,
+            "status": row.status,
+            "quantity": row.quantity,
+        }
+        for row in db.query(TreatmentOrder)
+        .filter(TreatmentOrder.encounter_id == encounter_id)
+        .order_by(TreatmentOrder.id)
+        .all()
+    ]
+    return {
+        "encounter_id": encounter_id,
+        "western": western,
+        "tcm": tcm,
+        "treatments": treatments,
+    }
+
+
+def list_pending_prescription_reviews(db: Session) -> list[dict]:
+    """药师审方工作台：待审处方 + 患者/医生/明细数。"""
+    from app.modules.patient.models import Patient
+    from app.modules.registration.models import Registration
+    from app.modules.staff.models import Doctor
+
+    rows = (
+        db.query(Prescription, Encounter, Registration, Patient, Doctor)
+        .join(Encounter, Prescription.encounter_id == Encounter.id)
+        .join(Registration, Encounter.registration_id == Registration.id)
+        .join(Patient, Registration.patient_id == Patient.id)
+        .join(Doctor, Registration.doctor_id == Doctor.id)
+        .filter(
+            Prescription.status == "pending_review",
+            Prescription.type != "tcm_herb",
+        )
+        .order_by(Prescription.id)
+        .all()
+    )
+    result = []
+    for rx, encounter, registration, patient, doctor in rows:
+        result.append(
+            {
+                "id": rx.id,
+                "encounter_id": encounter.id,
+                "prescription_no": rx.prescription_no,
+                "type": rx.type,
+                "status": rx.status,
+                "prescribed_by": rx.prescribed_by,
+                "created_at": rx.created_at,
+                "patient_id": patient.id,
+                "patient_no": patient.patient_no,
+                "patient_name": patient.name,
+                "gender": patient.gender,
+                "age": patient.age,
+                "doctor_name": doctor.name,
+                "item_count": len(rx.items),
+            }
+        )
+    return result
+
+
 def add_prescription_item(
-    db: Session, encounter_id: int, data: PrescriptionItemCreate, operator: str = ""
+    db: Session,
+    encounter_id: int,
+    data: PrescriptionItemCreate,
+    operator: str = "",
+    commit: bool = True,
 ) -> PrescriptionItem:
     """给就诊添加一条处方明细：单价取药品基准价（快照进明细）。
 
@@ -271,10 +628,34 @@ def add_prescription_item(
 
     if encounter.status == "closed":
         raise EncounterClosedError("就诊已收费，不能再开处方")
+    record = get_medical_record(db, encounter_id)
+    if record and record.signed_at:
+        raise ValueError("病历已签名，不能再开处方")
 
     drug = get_drug(db, data.drug_id)
     if not drug:
         raise ValueError("药品不存在")
+
+    controlled = getattr(drug, "controlled_level", "") or ""
+    rx_type = "narcotic" if controlled in ("narcotic", "psychotropic1") else "western"
+    if rx_type == "narcotic":
+        from app.modules.auth.service import get_user_by_username
+
+        prescriber = get_user_by_username(db, operator) if operator else None
+        if prescriber and prescriber.role != "admin" and not getattr(prescriber, "narcotic_right", False):
+            raise PrescriptionRuleError("当前医师无麻醉/第一类精神药品处方权")
+
+    # 《处方管理办法》：每张西药/中成药处方不得超过 5 种药品（按处方头计数）
+    prescription = get_or_create_western_prescription(db, encounter_id, operator, rx_type)
+    current_count = (
+        db.query(PrescriptionItem)
+        .filter(PrescriptionItem.prescription_id == prescription.id)
+        .count()
+    )
+    if current_count >= MAX_WESTERN_DRUGS:
+        raise PrescriptionRuleError(
+            f"每张西药/中成药处方不得超过 {MAX_WESTERN_DRUGS} 种药品"
+        )
 
     # 合理用药：重复开立同一药品拦截
     existing_item = (
@@ -345,25 +726,59 @@ def add_prescription_item(
     # 医保目录校验：按贯标码/名称+剂型+规格确定甲乙丙类与报销比例
     category, insurance_ratio, catalog_warning = resolve_prescription_insurance(db, drug)
 
-    # 医保事前提醒：同步阻塞调用（禁止→拒开，提醒→记录，不可用→降级放行）
-    try:
-        review = check_prescription(
-            diagnosis=encounter.diagnosis,
-            drug_name=drug.name,
-            quantity=data.quantity,
-            ratio=insurance_ratio,
-        )
-    except InsuranceUnavailable:
-        warning = "医保服务不可用，已按自费放行"
-    else:
-        if review["result"] == "forbid":
-            if insurance_ratio <= 0 and catalog_warning:
-                # 目录内丙类/目录外（已对码）：允许自费开方，不拦截
-                warning = catalog_warning
-            else:
-                raise InsuranceForbiddenError(review["message"])
+    # 医保事前提醒：医保总开关关闭时不应调用 Mock 平台，否则自费药可能被误判禁止
+    warning = None
+    if settings.INSURANCE_ENABLED:
+        from app.modules.insurance.audit import record_check
+
+        try:
+            review = check_prescription(
+                diagnosis=encounter.diagnosis,
+                drug_name=drug.name,
+                quantity=data.quantity,
+                ratio=insurance_ratio,
+            )
+        except InsuranceUnavailable:
+            warning = "医保服务不可用，已按自费放行"
+            record_check(
+                db,
+                encounter_id=encounter_id,
+                drug_name=drug.name,
+                quantity=data.quantity,
+                ratio=insurance_ratio,
+                result="unavailable",
+                message=warning,
+                operator=operator,
+            )
         else:
-            warning = review["message"] if review["result"] == "warn" else None
+            if review["result"] == "forbid":
+                record_check(
+                    db,
+                    encounter_id=encounter_id,
+                    drug_name=drug.name,
+                    quantity=data.quantity,
+                    ratio=insurance_ratio,
+                    result="forbid",
+                    message=review["message"],
+                    operator=operator,
+                )
+                if insurance_ratio <= 0 and catalog_warning:
+                    # 目录内丙类/目录外（已对码）：允许自费开方，不拦截
+                    warning = catalog_warning
+                else:
+                    raise InsuranceForbiddenError(review["message"])
+            else:
+                warning = review["message"] if review["result"] == "warn" else None
+                record_check(
+                    db,
+                    encounter_id=encounter_id,
+                    drug_name=drug.name,
+                    quantity=data.quantity,
+                    ratio=insurance_ratio,
+                    result=review["result"],
+                    message=review["message"],
+                    operator=operator,
+                )
 
     warnings: list[str] = []
     for text in (catalog_warning, warning):
@@ -371,6 +786,7 @@ def add_prescription_item(
             warnings.append(text)
     item = PrescriptionItem(
         encounter_id=encounter_id,
+        prescription_id=prescription.id,
         drug_id=data.drug_id,
         quantity=data.quantity,
         unit_price=drug.base_price,
@@ -388,6 +804,24 @@ def add_prescription_item(
     )
     db.add(item)
     db.flush()
+    db.add(
+        PrescriptionLine(
+            prescription_id=prescription.id,
+            kind="drug",
+            drug_id=drug.id,
+            source_item_id=item.id,
+            name=drug.name,
+            spec=drug.spec,
+            quantity=data.quantity,
+            unit=drug.unit,
+            dosage=data.dosage,
+            frequency=data.frequency,
+            route=data.route,
+            days=data.days,
+            unit_price=drug.base_price,
+            amount=round(data.quantity * drug.base_price, 2),
+        )
+    )
 
     # 计费：药品费（单价快照 + 医保比例快照）
     add_charge(
@@ -406,6 +840,153 @@ def add_prescription_item(
     db.commit()
     db.refresh(item)
     return item
+
+
+
+
+def update_prescription_item(
+    db: Session,
+    encounter_id: int,
+    item_id: int,
+    data,
+    operator: str = "",
+) -> PrescriptionItem:
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise EncounterClosedError("就诊已收费，不能修改处方")
+    item = (
+        db.query(PrescriptionItem)
+        .filter(
+            PrescriptionItem.id == item_id,
+            PrescriptionItem.encounter_id == encounter_id,
+        )
+        .first()
+    )
+    if not item:
+        raise ValueError("处方明细不存在")
+    if item.prescription and item.prescription.status != "pending_review":
+        raise ValueError("只有待审处方可以修改用法；已审方请新开处方")
+    from app.modules.charges.models import EncounterCharge
+
+    charge = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.source_type == "prescription",
+            EncounterCharge.source_id == item.id,
+        )
+        .first()
+    )
+    if charge and charge.status == "paid":
+        raise ValueError("该处方明细已收费，不能修改数量；请先退费")
+    if data.quantity is not None:
+        item.quantity = data.quantity
+        if charge:
+            charge.quantity = data.quantity
+            charge.amount = round(data.quantity * charge.unit_price, 2)
+    item.dosage = data.dosage
+    item.frequency = data.frequency
+    item.route = data.route
+    item.days = data.days
+    line = (
+        db.query(PrescriptionLine)
+        .filter(
+            PrescriptionLine.kind == "drug",
+            PrescriptionLine.source_item_id == item.id,
+        )
+        .first()
+    )
+    if line:
+        line.quantity = item.quantity
+        line.dosage = item.dosage
+        line.frequency = item.frequency
+        line.route = item.route
+        line.days = item.days
+        line.amount = round(item.quantity * item.unit_price, 2)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_prescription_item(db: Session, encounter_id: int, item_id: int) -> None:
+    """删除未收费的处方明细，并同步删除未收费的药品费用。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status == "closed":
+        raise EncounterClosedError("就诊已收费，不能删除处方")
+    item = (
+        db.query(PrescriptionItem)
+        .filter(
+            PrescriptionItem.id == item_id,
+            PrescriptionItem.encounter_id == encounter_id,
+        )
+        .first()
+    )
+    if not item:
+        raise ValueError("处方明细不存在")
+    from app.modules.charges.models import EncounterCharge
+
+    charge = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.source_type == "prescription",
+            EncounterCharge.source_id == item.id,
+        )
+        .first()
+    )
+    if charge and charge.status == "paid":
+        raise ValueError("该处方已收费，不能直接删除；请先退费")
+    if charge:
+        db.delete(charge)
+    prescription_id = item.prescription_id
+    line = (
+        db.query(PrescriptionLine)
+        .filter(
+            PrescriptionLine.kind == "drug",
+            PrescriptionLine.source_item_id == item.id,
+        )
+        .first()
+    )
+    if line:
+        db.delete(line)
+    db.delete(item)
+    db.flush()
+    if prescription_id:
+        remaining = (
+            db.query(PrescriptionItem)
+            .filter(PrescriptionItem.prescription_id == prescription_id)
+            .count()
+        )
+        if remaining == 0:
+            header = db.get(Prescription, prescription_id)
+            if header:
+                db.delete(header)
+    db.commit()
+
+
+def add_prescription_items_batch(
+    db: Session,
+    encounter_id: int,
+    items: list[PrescriptionItemCreate],
+    operator: str = "",
+) -> list[PrescriptionItem]:
+    """批量开方：任一药品失败则整批回滚，避免半张处方和半套费用。"""
+    if not items:
+        raise ValueError("处方不能为空")
+    try:
+        created = [
+            add_prescription_item(db, encounter_id, data, operator, commit=False)
+            for data in items
+        ]
+        db.commit()
+        for row in created:
+            db.refresh(row)
+        return created
+    except Exception:
+        db.rollback()
+        raise
 
 
 def get_encounter(db: Session, encounter_id: int) -> Encounter | None:
@@ -436,6 +1017,22 @@ def close_encounter(db: Session, encounter: Encounter) -> None:
         doctor.current_encounter_id = None
 
 
+def list_dispensable_prescription_items(
+    db: Session, encounter_id: int
+) -> list[PrescriptionItem]:
+    """只返回已审方通过的处方明细；拒绝/待审处方不进入发药。"""
+    return (
+        db.query(PrescriptionItem)
+        .outerjoin(Prescription, PrescriptionItem.prescription_id == Prescription.id)
+        .filter(
+            PrescriptionItem.encounter_id == encounter_id,
+            (Prescription.id.is_(None)) | (Prescription.status == "approved"),
+        )
+        .order_by(PrescriptionItem.id)
+        .all()
+    )
+
+
 def list_prescription_items(
     db: Session, encounter_id: int
 ) -> list[PrescriptionItem]:
@@ -455,6 +1052,66 @@ def get_encounter_total(db: Session, encounter_id: int) -> float:
         .scalar()
     )
     return float(total or 0)
+
+
+_RECORD_SNAPSHOT_FIELDS = (
+    "chief_complaint",
+    "present_illness",
+    "past_history",
+    "personal_history",
+    "marital_history",
+    "family_history",
+    "physical_exam",
+    "auxiliary_exam",
+    "treatment_advice",
+)
+
+
+def _record_snapshot(record: MedicalRecord | None) -> str:
+    if not record:
+        return ""
+    return json.dumps(
+        {key: getattr(record, key, "") or "" for key in _RECORD_SNAPSHOT_FIELDS},
+        ensure_ascii=False,
+    )
+
+
+def _add_record_version(
+    db: Session,
+    record: MedicalRecord,
+    *,
+    action: str,
+    changed_by: str,
+    before: str = "",
+) -> None:
+    version = (
+        db.query(func.count(MedicalRecordVersion.id))
+        .filter(MedicalRecordVersion.record_id == record.id)
+        .scalar()
+        or 0
+    ) + 1
+    db.add(
+        MedicalRecordVersion(
+            record_id=record.id,
+            version=version,
+            action=action,
+            changed_by=changed_by,
+            before_json=before,
+            after_json=_record_snapshot(record),
+        )
+    )
+
+
+def list_medical_record_versions(db: Session, encounter_id: int) -> list[MedicalRecordVersion]:
+    record = get_medical_record(db, encounter_id)
+    if not record:
+        raise ValueError("病历不存在")
+    return (
+        db.query(MedicalRecordVersion)
+        .filter(MedicalRecordVersion.record_id == record.id)
+        .order_by(MedicalRecordVersion.version)
+        .all()
+    )
 
 
 def create_medical_record(
@@ -481,6 +1138,8 @@ def create_medical_record(
         **data.model_dump(),
     )
     db.add(record)
+    db.flush()
+    _add_record_version(db, record, action="create", changed_by=written_by)
     db.commit()
     db.refresh(record)
     return record
@@ -494,8 +1153,27 @@ def get_medical_record(db: Session, encounter_id: int) -> MedicalRecord | None:
     )
 
 
+def unlock_medical_record_for_refund(
+    db: Session, encounter_id: int, operator: str = ""
+) -> None:
+    """全额退费后解锁病历：保留签名前快照和版本，允许医生修订。"""
+    record = get_medical_record(db, encounter_id)
+    if not record or not record.signed_at:
+        return
+    before = _record_snapshot(record)
+    record.signed_at = None
+    record.signed_by = ""
+    _add_record_version(
+        db,
+        record,
+        action="unlock_refund",
+        changed_by=operator,
+        before=before,
+    )
+
+
 def update_medical_record(
-    db: Session, encounter_id: int, data: MedicalRecordUpdate
+    db: Session, encounter_id: int, data: MedicalRecordUpdate, operator: str = ""
 ) -> MedicalRecord:
     """修改病历：就诊关闭或病历已签名后不可修改。"""
     encounter = get_encounter(db, encounter_id)
@@ -510,9 +1188,14 @@ def update_medical_record(
     if record.signed_at:
         raise ValueError("病历已签名，不能修改")
 
+    before = _record_snapshot(record)
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(record, field, value)
     record.updated_at = datetime.now()
+    db.flush()
+    _add_record_version(
+        db, record, action="update", changed_by=operator, before=before
+    )
     db.commit()
     db.refresh(record)
     return record
@@ -528,11 +1211,100 @@ def sign_medical_record(
     if record.signed_at:
         raise ValueError("病历已签名")
 
+    before = _record_snapshot(record)
     record.signed_by = signed_by
     record.signed_at = datetime.now()
+    _add_record_version(db, record, action="sign", changed_by=signed_by, before=before)
     db.commit()
     db.refresh(record)
     return record
+
+
+def request_record_revision(
+    db: Session, encounter_id: int, reason: str, requested_by: str = ""
+) -> MedicalRecordRevision:
+    record = get_medical_record(db, encounter_id)
+    if not record:
+        raise ValueError("病历不存在")
+    if not record.signed_at:
+        raise ValueError("病历未签名，无需申请修订")
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("修订理由不能为空")
+    pending = (
+        db.query(MedicalRecordRevision)
+        .filter(
+            MedicalRecordRevision.encounter_id == encounter_id,
+            MedicalRecordRevision.status == "pending",
+        )
+        .first()
+    )
+    if pending:
+        raise ValueError("该病历已有待审批修订申请")
+    row = MedicalRecordRevision(
+        encounter_id=encounter_id,
+        reason=reason,
+        status="pending",
+        requested_by=requested_by,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_record_revisions(
+    db: Session, status: str | None = None
+) -> list[MedicalRecordRevision]:
+    query = db.query(MedicalRecordRevision)
+    if status:
+        query = query.filter(MedicalRecordRevision.status == status)
+    return query.order_by(MedicalRecordRevision.id.desc()).all()
+
+
+def review_record_revision(
+    db: Session, revision_id: int, approve: bool, reviewer: str, note: str = ""
+) -> MedicalRecordRevision:
+    row = db.get(MedicalRecordRevision, revision_id)
+    if not row:
+        raise ValueError("修订申请不存在")
+    if row.status != "pending":
+        raise ValueError("该修订申请已处理")
+    if not approve and not (note or "").strip():
+        raise ValueError("驳回必须填写原因")
+    claimed = (
+        db.query(MedicalRecordRevision)
+        .filter(
+            MedicalRecordRevision.id == revision_id,
+            MedicalRecordRevision.status == "pending",
+        )
+        .update({MedicalRecordRevision.status: "reviewing"}, synchronize_session=False)
+    )
+    if claimed != 1:
+        db.rollback()
+        raise ValueError("该修订申请正在处理")
+    row.status = "approved" if approve else "rejected"
+    row.reviewed_by = reviewer
+    row.review_note = (note or "").strip()
+    row.reviewed_at = datetime.now()
+    if approve:
+        record = get_medical_record(db, row.encounter_id)
+        if not record:
+            db.rollback()
+            raise ValueError("病历不存在")
+        before = _record_snapshot(record)
+        record.signed_at = None
+        record.signed_by = ""
+        _add_record_version(
+            db,
+            record,
+            action="unlock_revision",
+            changed_by=reviewer,
+            before=before,
+        )
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 def get_medical_record_quality(db: Session, encounter_id: int) -> dict:
@@ -557,7 +1329,7 @@ def get_medical_record_quality(db: Session, encounter_id: int) -> dict:
         "missing_fields": missing,
     }
 
-def worklist(db: Session) -> list[dict]:
+def worklist(db: Session, doctor_id: int | None = None) -> list[dict]:
     """医生门诊队列：待接诊 + 今日已接诊，带费用预览。"""
     from datetime import date
 
@@ -567,13 +1339,14 @@ def worklist(db: Session) -> list[dict]:
     from app.modules.staff.models import Doctor
     from app.modules.triage.models import TriageTicket
 
-    rows = (
+    query = (
         db.query(Registration, Patient, Doctor)
         .join(Patient, Registration.patient_id == Patient.id)
         .join(Doctor, Registration.doctor_id == Doctor.id)
-        .order_by(Registration.id.desc())
-        .all()
     )
+    if doctor_id:
+        query = query.filter(Registration.doctor_id == doctor_id)
+    rows = query.order_by(Registration.id.desc()).all()
     # 治疗中/待治疗状态是就诊状态的补充：医生挂起后患者可能正在输液
     from app.modules.treatment.models import TreatmentOrder
     from app.modules.treatment_room.models import TreatmentRoomCase
@@ -634,6 +1407,7 @@ def worklist(db: Session) -> list[dict]:
                 "age": patient.age,
                 "birth_date": patient.birth_date,
                 "allergy_label": patient.allergy_label,
+                "allergy_status": patient.allergy_status,
                 "special_history": patient.special_history,
                 "triage_level": ticket.triage_level if ticket else None,
                 "temperature": ticket.temperature if ticket else None,

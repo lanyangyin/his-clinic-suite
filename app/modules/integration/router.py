@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.patient.service import get_patient
 
 from .schemas import Hl7Message, Hl7Result, IntegrationLogResponse
 from .service import handle_hl7_adt, list_logs, to_fhir_patient
 
-router = APIRouter(prefix="/integration", tags=["integration"])
+router = APIRouter(prefix="/integration", tags=["integration"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/fhir/Patient/{patient_id}")

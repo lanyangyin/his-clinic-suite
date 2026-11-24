@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.staff.service import get_doctor
 
 from .schemas import (
@@ -24,7 +24,7 @@ from .service import (
     list_schedules,
 )
 
-router = APIRouter(prefix="/registrations", tags=["registrations"])
+router = APIRouter(prefix="/registrations", tags=["registrations"], dependencies=[Depends(require_read_login)])
 schedule_router = APIRouter(tags=["schedules"])
 
 _NOT_FOUND_MESSAGES = {"患者不存在", "医生不存在", "排班不存在"}

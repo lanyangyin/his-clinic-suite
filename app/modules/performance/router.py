@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import DoctorPerformanceItem
 from .service import doctor_performance
 
-router = APIRouter(prefix="/performance", tags=["performance"])
+router = APIRouter(prefix="/performance", tags=["performance"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/doctors", response_model=list[DoctorPerformanceItem])

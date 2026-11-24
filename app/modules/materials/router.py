@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     MaterialItemCreate,
@@ -22,7 +22,7 @@ from .service import (
     use_material,
 )
 
-router = APIRouter(prefix="/materials", tags=["materials"])
+router = APIRouter(prefix="/materials", tags=["materials"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/items/", response_model=MaterialItemResponse, status_code=201)

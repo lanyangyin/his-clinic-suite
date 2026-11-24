@@ -5,13 +5,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import DepartmentRevenueItem
 from .service import department_revenue
 from app.modules.bi.export import department_workbook
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(prefix="/reports", tags=["reports"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/departments/revenue", response_model=list[DepartmentRevenueItem])

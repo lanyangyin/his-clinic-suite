@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}传染病报告 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>传染病报告卡</h2>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if ok %}<p class="ok">已上报</p>{% endif %}
+<div class="panel">
+  <table>
+    <tr><th>ID</th><th>疾病</th><th>病例分类</th><th>发病日期</th><th>诊断日期</th><th>报告单位</th><th>状态</th><th>操作</th></tr>
+    {% for row in reports %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.disease_name }}（{{ row.disease_code }}）</td>
+      <td>{{ {'confirmed':'确诊','suspected':'疑似','clinical':'临床诊断'}.get(row.report_type, row.report_type) }}</td>
+      <td>{{ row.onset_date or '—' }}</td>
+      <td>{{ row.diagnosis_date or '—' }}</td>
+      <td>{{ row.report_unit or '—' }}</td>
+      <td>{{ '已上报' if row.status == 'submitted' else '草稿' }}</td>
+      <td>
+        {% if row.status == 'draft' %}
+        <form method="post" action="/admin/public-health/{{ row.id }}/submit" style="display:inline">
+          <button type="submit">上报</button>
+        </form>
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无报告卡</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

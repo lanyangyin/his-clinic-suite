@@ -1,17 +1,26 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
 class Payment(Base):
     __tablename__ = "payments"
+    __table_args__ = (
+        Index(
+            "uq_payments_active_encounter",
+            "encounter_id",
+            unique=True,
+            sqlite_where=text("status IN ('paid', 'partially_refunded')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     # MVP：一次就诊只允许一笔收费
+    # 全额退费后允许同一就诊重新收费，故不做唯一约束
     encounter_id: Mapped[int] = mapped_column(
-        ForeignKey("encounters.id"), unique=True, nullable=False, index=True
+        ForeignKey("encounters.id"), nullable=False, index=True
     )
     amount: Mapped[float] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="paid", nullable=False)

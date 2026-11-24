@@ -1,10 +1,11 @@
 """跟随系统的浅色/深色主题。HIS_THEME=light|dark 可强制覆盖。"""
 import os
+import sys
 import weakref
 
-from PySide6.QtCore import QEvent, QObject, QTimer, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QMainWindow
 
 LIGHT_QSS = """
 QWidget { color: #1e293b; font-family: "Microsoft YaHei"; font-size: 13px; }
@@ -49,16 +50,23 @@ QScrollBar:vertical { background: #f4f8fd; width: 10px; }
 QScrollBar::handle:vertical { background: #b7cde3; border-radius: 5px; min-height: 24px; }
 QSplitter::handle { background: #dbe7f3; width: 3px; }
 QTabWidget::pane { border: 1px solid #dbe7f3; background: #ffffff; }
+QTabWidget#sidebarTabs { background: #f4f8fd; }
+QTabWidget#sidebarTabs::pane { border: 1px solid #dbe7f3; background: #ffffff; }
+QTabWidget#sidebarTabs QTabBar { background: #f4f8fd; }
+QTabWidget#sidebarTabs QTabBar::tab {
+    padding: 8px 16px; margin-right: 2px; color: #1e293b;
+    background: #eaf3ff; border: 1px solid #dbe7f3; border-bottom: none;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+}
+QTabWidget#sidebarTabs QTabBar::tab:selected {
+    background: #ffffff; color: #0f172a; font-weight: bold;
+    border-top: 3px solid #6366f1;
+}
+QTabWidget#sidebarTabs QTabBar::tab:hover:!selected { background: #dbeafe; }
+QTabWidget#sidebarTabs QTabBar::tab:disabled { color: #94a3b8; background: #f1f5f9; }
 QStatusBar { color: #64748b; }
 QToolTip { background: #ffffff; color: #1e293b; border: 1px solid #cfdff0; }
 QCheckBox, QRadioButton { color: #1e293b; }
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 14px; height: 14px; border: 1px solid #b7cde3;
-    border-radius: 3px; background: #ffffff;
-}
-QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #2563eb; border: 1px solid #2563eb;
-}
 QComboBox QAbstractItemView {
     background: #ffffff; color: #1e293b; border: 1px solid #cfdff0;
     selection-background-color: #dbeafe; selection-color: #0f172a;
@@ -111,16 +119,23 @@ QScrollBar:vertical { background: #0b1220; width: 10px; }
 QScrollBar::handle:vertical { background: #475569; border-radius: 5px; min-height: 24px; }
 QSplitter::handle { background: #1f2937; width: 3px; }
 QTabWidget::pane { border: 1px solid #334155; background: #111827; }
+QTabWidget#sidebarTabs { background: #0f172a; }
+QTabWidget#sidebarTabs::pane { border: 1px solid #334155; background: #111827; }
+QTabWidget#sidebarTabs QTabBar { background: #0f172a; }
+QTabWidget#sidebarTabs QTabBar::tab {
+    padding: 8px 16px; margin-right: 2px; color: #e2e8f0;
+    background: #1e293b; border: 1px solid #334155; border-bottom: none;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+}
+QTabWidget#sidebarTabs QTabBar::tab:selected {
+    background: #111827; color: #f8fafc; font-weight: bold;
+    border-top: 3px solid #6366f1;
+}
+QTabWidget#sidebarTabs QTabBar::tab:hover:!selected { background: #4f46e5; }
+QTabWidget#sidebarTabs QTabBar::tab:disabled { color: #64748b; background: #0f172a; }
 QStatusBar { color: #94a3b8; }
 QToolTip { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
 QCheckBox, QRadioButton { color: #e2e8f0; }
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 14px; height: 14px; border: 1px solid #475569;
-    border-radius: 3px; background: #0b1220;
-}
-QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #4f46e5; border: 1px solid #6366f1;
-}
 QComboBox QAbstractItemView {
     background: #111827; color: #e2e8f0; border: 1px solid #334155;
     selection-background-color: #4f46e5; selection-color: #ffffff;
@@ -131,10 +146,30 @@ QTextEdit { background: #0b1220; border: 1px solid #334155; border-radius: 6px; 
 """
 
 
+def _windows_dark() -> bool | None:
+    """直接读 Windows 应用主题，避免 Qt colorScheme 不刷新时误判。"""
+    if sys.platform != "win32":
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        ) as key:
+            value, _kind = winreg.QueryValueEx(key, "AppsUseLightTheme")
+        return int(value) == 0
+    except (OSError, ValueError, TypeError):
+        return None
+
+
 def is_dark() -> bool:
     forced = os.environ.get("HIS_THEME", "").strip().lower()
     if forced in ("dark", "light"):
         return forced == "dark"
+    windows = _windows_dark()
+    if windows is not None:
+        return windows
     app = QGuiApplication.instance()
     if app is not None:
         try:
@@ -166,10 +201,7 @@ def colors() -> dict:
 
 
 _theme_listeners: list[weakref.ReferenceType] = []
-_notifying_theme = False
-_theme_filter = None
-_theme_timer = None
-_last_dark = None
+_refreshing_theme = False
 
 
 def _theme_palette(widget) -> QPalette:
@@ -194,7 +226,10 @@ def _theme_palette(widget) -> QPalette:
 def _apply_widget_theme(widget) -> None:
     widget.setObjectName("workstationRoot")
     widget.setPalette(_theme_palette(widget))
-    widget.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
+    # 子页面不要再各自保存一份完整 QSS，否则系统切换后只有外层更新，
+    # 内层旧样式表会覆盖新的全局样式。全局 QSS 由 QApplication 统一维护。
+    if isinstance(widget, (QMainWindow, QDialog)):
+        widget.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
     widget.update()
 
 
@@ -215,15 +250,15 @@ def register_theme_listener(widget) -> None:
     _theme_listeners.append(weakref.ref(widget))
 
 
-def notify_theme_changed() -> None:
-    """系统浅色/深色切换时重新应用全局 QSS、调色板和自定义控件。"""
-    global _notifying_theme, _last_dark
-    if _notifying_theme:
+def refresh_theme() -> None:
+    """手动刷新主题：读取当前 Windows/系统深浅色并重绘全部界面。"""
+    global _refreshing_theme
+    if _refreshing_theme:
         return
     app = QApplication.instance()
     if app is None:
         return
-    _notifying_theme = True
+    _refreshing_theme = True
     try:
         app.setPalette(_theme_palette(app))
         app.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
@@ -237,49 +272,22 @@ def notify_theme_changed() -> None:
                 pass
         for widget in app.topLevelWidgets():
             try:
-                if widget.isWindow():
+                if isinstance(widget, QMainWindow):
+                    widget.setStyleSheet("")
                     widget.setPalette(_theme_palette(widget))
-                    widget.setStyleSheet(DARK_QSS if is_dark() else LIGHT_QSS)
                     widget.update()
             except RuntimeError:
                 continue
-    finally:
-        _last_dark = is_dark()
-        _notifying_theme = False
-
-
-class _ThemeEventFilter(QObject):
-    def eventFilter(self, obj, event):
-        if event.type() in (QEvent.ThemeChange, QEvent.ApplicationPaletteChange):
-            notify_theme_changed()
-        return False
-
-
-def _check_theme_change() -> None:
-    global _last_dark
-    current = is_dark()
-    if _last_dark is None:
-        _last_dark = current
-        return
-    if current != _last_dark:
-        notify_theme_changed()
-
-
-def install_theme_watcher(app) -> None:
-    """监听系统主题变化；信号 + 事件 + 低频轮询三重兜底。"""
-    global _theme_filter, _theme_timer, _last_dark
-    _last_dark = is_dark()
-    hints = app.styleHints()
-    if hasattr(hints, "colorSchemeChanged"):
         try:
-            hints.colorSchemeChanged.connect(lambda *_args: notify_theme_changed())
-        except (TypeError, RuntimeError):
+            from his_client.ui.window_theme import refresh_titlebars
+
+            refresh_titlebars(app)
+        except (ImportError, AttributeError, RuntimeError):
             pass
-    if _theme_filter is None:
-        _theme_filter = _ThemeEventFilter(app)
-        app.installEventFilter(_theme_filter)
-    if _theme_timer is None:
-        _theme_timer = QTimer(app)
-        _theme_timer.setInterval(1500)
-        _theme_timer.timeout.connect(_check_theme_change)
-        _theme_timer.start()
+    finally:
+        _refreshing_theme = False
+
+
+# 兼容旧调用名；不再自动监听系统主题。
+def notify_theme_changed() -> None:
+    refresh_theme()

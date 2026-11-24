@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
@@ -63,3 +65,66 @@ def require_role(*roles: str):
         return user
 
     return checker
+
+
+def require_read_login(user: User | None = Depends(get_current_user)) -> User | None:
+    """敏感读接口默认要求登录；仅测试/演示可显式放开匿名读。"""
+    from app import settings
+
+    if getattr(settings, "ALLOW_ANONYMOUS_READ", False):
+        return user
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="需要登录",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return user
+
+
+def require_kiosk_token(request: Request) -> None:
+    """自助机终端鉴权；未配置令牌且非演示模式时拒绝。"""
+    from app import settings
+
+    expected = getattr(settings, "KIOSK_TOKEN", "")
+    if expected:
+        supplied = request.headers.get("X-Kiosk-Token", "")
+        if not hmac.compare_digest(supplied, expected):
+            raise HTTPException(status_code=401, detail="自助机终端令牌无效")
+        return
+    if getattr(settings, "ALLOW_ANONYMOUS_READ", False):
+        return
+    raise HTTPException(status_code=503, detail="自助机终端未配置令牌")
+
+
+def require_print_access(
+    request: Request,
+    user: User | None = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """打印访问：已登录 Basic，或 URL 中的一次性 token。"""
+    if user is not None:
+        return user
+    from app import settings
+
+    if getattr(settings, "ALLOW_ANONYMOUS_READ", False):
+        return None
+    supplied = request.query_params.get("token", "").strip()
+    if not supplied:
+        raise HTTPException(
+            status_code=401,
+            detail="需要登录或打印令牌",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    import hashlib
+    from datetime import datetime
+
+    from app.modules.print.models import PrintToken
+
+    token_hash = hashlib.sha256(supplied.encode()).hexdigest()
+    row = db.query(PrintToken).filter(PrintToken.token_hash == token_hash).first()
+    if not row or row.used or row.expires_at < datetime.now():
+        raise HTTPException(status_code=401, detail="打印令牌无效或已过期")
+    row.used = True
+    db.commit()
+    return None

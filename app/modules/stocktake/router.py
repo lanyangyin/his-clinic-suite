@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import StocktakeCounts, StocktakeCreate, StocktakeResponse
 from .service import (
@@ -14,7 +14,7 @@ from .service import (
     save_counts,
 )
 
-router = APIRouter(prefix="/stocktakes", tags=["stocktakes"])
+router = APIRouter(prefix="/stocktakes", tags=["stocktakes"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("", response_model=StocktakeResponse, status_code=201)

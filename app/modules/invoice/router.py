@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import InvoiceBatchCreate, InvoiceBatchResponse
 from .service import close_batch, create_batch, list_batches
 
-router = APIRouter(prefix="/invoices", tags=["invoices"])
+router = APIRouter(prefix="/invoices", tags=["invoices"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/batches", response_model=InvoiceBatchResponse, status_code=201)
@@ -49,7 +49,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import InvoicePrintResponse, InvoiceVoid
 from .service_ops import operations, print_invoice, usage, void_invoice

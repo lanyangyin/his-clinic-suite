@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.procedure_materials.schemas import (
     ProcedureMaterialCreate,
     ProcedureMaterialResponse,
@@ -45,7 +45,7 @@ from .service import (
     start_case,
 )
 
-router = APIRouter(prefix="/surgery", tags=["surgery"])
+router = APIRouter(prefix="/surgery", tags=["surgery"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/rooms", response_model=RoomResponse, status_code=201)

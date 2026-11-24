@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import ClosureResponse, DailyCloseRequest, MonthlySummaryResponse
 from .service import daily_close, get_closure, list_closures, monthly_summary
 
-router = APIRouter(prefix="/finance", tags=["finance"])
+router = APIRouter(prefix="/finance", tags=["finance"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/daily-close", response_model=ClosureResponse, status_code=201)

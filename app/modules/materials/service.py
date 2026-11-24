@@ -99,10 +99,19 @@ def use_material(db: Session, data: UsageCreate, used_by: str = "") -> MaterialU
         )
         .first()
     )
-    if not stock or stock.quantity < 1:
+    if not stock:
         raise ValueError("该库房物资库存不足")
-
-    stock.quantity -= 1
+    affected = (
+        db.query(MaterialStock)
+        .filter(MaterialStock.id == stock.id, MaterialStock.quantity >= 1)
+        .update(
+            {MaterialStock.quantity: MaterialStock.quantity - 1},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        raise ValueError("该库房物资库存不足")
+    db.expire(stock)
     usage = MaterialUsage(
         item_id=data.item_id,
         serial_no=data.serial_no,

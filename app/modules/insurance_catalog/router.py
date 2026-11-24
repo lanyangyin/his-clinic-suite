@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     CatalogImportResult,
@@ -24,7 +24,7 @@ from .service import (
 from app.modules.drug.service import get_drug
 from app.modules.drug.schemas import DrugResponse
 
-router = APIRouter(prefix="/insurance/catalog", tags=["insurance-catalog"])
+router = APIRouter(prefix="/insurance/catalog", tags=["insurance-catalog"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/import", response_model=CatalogImportResult)

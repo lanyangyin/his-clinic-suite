@@ -45,7 +45,7 @@ def create_stocktake(db: Session, data: StocktakeCreate, operator: str = "") -> 
                     name=drug.name,
                     spec=drug.spec,
                     batch_no=stock.batch_no,
-                    warehouse="药库",
+                    warehouse="总库",
                     book_quantity=stock.quantity,
                     unit_price=drug.base_price,
                 )
@@ -116,6 +116,14 @@ def complete_stocktake(db: Session, take_id: int, operator: str = "") -> Stockta
     uncounted = [row.name for row in take.items if row.actual_quantity is None]
     if uncounted:
         raise ValueError(f"还有 {len(uncounted)} 项未录入实盘数")
+    claimed = (
+        db.query(Stocktake)
+        .filter(Stocktake.id == take_id, Stocktake.status == "counting")
+        .update({Stocktake.status: "completing"}, synchronize_session=False)
+    )
+    if claimed != 1:
+        db.rollback()
+        raise ValueError("盘点单正在完成或已结束")
     for row in take.items:
         diff = (row.actual_quantity or 0) - row.book_quantity
         if diff == 0:
@@ -130,13 +138,16 @@ def complete_stocktake(db: Session, take_id: int, operator: str = "") -> Stockta
                 .first()
             )
             if stock:
-                stock.quantity = row.actual_quantity or 0
+                target = stock.quantity + diff
+                if target < 0:
+                    raise ValueError(f"盘点调整后库存为负：{row.name}")
+                stock.quantity = target
             drug = db.get(Drug, row.drug_id)
             if drug:
                 record_drug(
                     db,
                     drug,
-                    warehouse="药库",
+                    warehouse="总库",
                     direction="in" if diff > 0 else "out",
                     quantity=abs(diff),
                     batch_no=row.batch_no,
@@ -161,7 +172,11 @@ def complete_stocktake(db: Session, take_id: int, operator: str = "") -> Stockta
                     item_id=row.material_id, warehouse=row.warehouse, quantity=0
                 )
                 db.add(stock)
-            stock.quantity = row.actual_quantity or 0
+            if stock:
+                target = stock.quantity + diff
+                if target < 0:
+                    raise ValueError(f"盘点调整后库存为负：{row.name}")
+                stock.quantity = target
             item = db.get(MaterialItem, row.material_id)
             if item:
                 record_material(

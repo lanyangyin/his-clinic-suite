@@ -48,16 +48,19 @@ def daily_close(db: Session, data: DailyCloseRequest, closed_by: str = "") -> Fi
         .all()
     )
 
-    paid = [p for p in payments if p.status == "paid"]
-    refunded = [p for p in payments if p.status == "refunded"]
+    # 原始收费（含已部分退/全退）与退款分开统计，避免部分退费整笔消失
+    refunded = [p for p in payments if (p.refunded_amount or 0) > 0]
+    paid = [p for p in payments if p.net_amount > 0]
 
     closure = FinanceClosure(
         close_date=data.close_date,
         outpatient_paid_count=len(paid),
-        outpatient_paid_amount=round(sum(p.amount for p in paid), 2),
+        outpatient_paid_amount=round(sum(p.net_amount for p in paid), 2),
         outpatient_refunded_count=len(refunded),
-        outpatient_refunded_amount=round(sum(p.amount for p in refunded), 2),
-        insurance_amount=round(sum(p.insurance_amount for p in paid), 2),
+        outpatient_refunded_amount=round(sum(p.refunded_amount for p in refunded), 2),
+        insurance_amount=round(
+            sum(p.insurance_amount - p.refunded_insurance_amount for p in paid), 2
+        ),
         inpatient_charge_count=len(charges),
         inpatient_charge_amount=round(sum(c.amount for c in charges), 2),
         closed_by=closed_by,
@@ -98,8 +101,8 @@ def monthly_summary(db: Session, month: str) -> dict:
         )
         .all()
     )
-    paid = [p for p in payments if p.status == "paid"]
-    refunded = [p for p in payments if p.status == "refunded"]
+    refunded = [p for p in payments if (p.refunded_amount or 0) > 0]
+    paid = [p for p in payments if p.net_amount > 0]
     closed_days = (
         db.query(FinanceClosure)
         .filter(
@@ -112,10 +115,12 @@ def monthly_summary(db: Session, month: str) -> dict:
     return {
         "month": month,
         "outpatient_paid_count": len(paid),
-        "outpatient_paid_amount": round(sum(p.amount for p in paid), 2),
+        "outpatient_paid_amount": round(sum(p.net_amount for p in paid), 2),
         "outpatient_refunded_count": len(refunded),
-        "outpatient_refunded_amount": round(sum(p.amount for p in refunded), 2),
-        "insurance_amount": round(sum(p.insurance_amount for p in paid), 2),
+        "outpatient_refunded_amount": round(sum(p.refunded_amount for p in refunded), 2),
+        "insurance_amount": round(
+            sum(p.insurance_amount - p.refunded_insurance_amount for p in paid), 2
+        ),
         "inpatient_charge_count": len(charges),
         "inpatient_charge_amount": round(sum(c.amount for c in charges), 2),
         "closed_days": closed_days,

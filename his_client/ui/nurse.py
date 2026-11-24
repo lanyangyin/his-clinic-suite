@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.print_preview import open_print_preview
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
@@ -63,7 +64,10 @@ class NurseWidget(QWidget):
         box = QGroupBox("预检分诊登记")
         grid = QGridLayout(box)
         self.triage_reg_id = QSpinBox()
-        self.triage_reg_id.setRange(1, 10_000_000)
+        self.triage_reg_id.setRange(0, 10_000_000)
+        self.triage_reg_id.setSpecialValueText("请选择/扫码挂号")
+        self.triage_reg_id.setValue(0)
+        self.triage_reg_id.valueChanged.connect(self._lookup_triage_registration)
         self.triage_level = QComboBox()
         for value, label in (
             (1, "1 级 濒危"), (2, "2 级 危重"), (3, "3 级 急症"), (4, "4 级 非急症")
@@ -127,11 +131,13 @@ class NurseWidget(QWidget):
         queue_row.addStretch(1)
         layout.addLayout(queue_row)
 
-        self.queue_table = QTableWidget(0, 7)
+        self.queue_table = QTableWidget(0, 8)
         self.queue_table.setHorizontalHeaderLabels(
-            ["叫号单", "挂号", "级别", "体温", "血压", "SpO2", "状态"]
+            ["叫号单", "患者", "挂号", "级别", "体温", "血压", "SpO2", "状态"]
         )
-        self.queue_table.horizontalHeader().setStretchLastSection(True)
+        from his_client.ui.table_policy import set_column_layout
+
+        set_column_layout(self.queue_table, stretch=(1,), contents=(0, 2, 3, 4, 5, 6, 7))
         self.queue_table.cellClicked.connect(self._select_ticket_patient)
         layout.addWidget(self.queue_table)
 
@@ -152,9 +158,15 @@ class NurseWidget(QWidget):
         return int(item.text()) if item else None
 
     def _select_ticket_patient(self, row: int, _col: int) -> None:
-        reg_item = self.queue_table.item(row, 1)
+        reg_item = self.queue_table.item(row, 2)
         if not reg_item:
             return
+        try:
+            reg_id = int(reg_item.text())
+            if self.triage_reg_id.value() != reg_id:
+                self.triage_reg_id.setValue(reg_id)
+        except ValueError:
+            pass
         try:
             registration = self.api.get_registration(int(reg_item.text()))
             patient = self.api.get_patient(registration["patient_id"])
@@ -162,22 +174,49 @@ class NurseWidget(QWidget):
             detail = e.detail if isinstance(e, ApiError) else str(e)
             self.triage_patient.setText(f"患者信息加载失败：{detail}")
             return
-        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "性别不详")
         age = patient.get("age")
         allergy = patient.get("allergy_label") or "不详"
-        self.banner.set_patient(patient, status=f"分诊 {self.queue_table.item(row, 2).text()}")
+        self.banner.set_patient(patient, status=f"分诊 {self.queue_table.item(row, 3).text()}")
         self.triage_patient.setText(
             f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
-            f"{gender}/{age if age is not None else '—'}岁 · 过敏：{allergy} · "
-            f"分诊：{self.queue_table.item(row, 2).text()} · "
-            f"体温 {self.queue_table.item(row, 3).text()} · "
-            f"血压 {self.queue_table.item(row, 4).text()} · "
-            f"SpO2 {self.queue_table.item(row, 5).text()}"
+            f"{gender}/{age if age is not None else '年龄不详'} · 过敏：{allergy} · "
+            f"分诊：{self.queue_table.item(row, 3).text()} · "
+            f"体温 {self.queue_table.item(row, 4).text()} · "
+            f"血压 {self.queue_table.item(row, 5).text()} · "
+            f"SpO2 {self.queue_table.item(row, 6).text()}"
         )
         if patient.get("allergy_status") == "present":
             self.triage_patient.setStyleSheet("color:#ef4444;font-weight:bold")
         else:
             self.triage_patient.setStyleSheet("")
+
+    def _lookup_triage_registration(self, registration_id: int) -> None:
+        if not registration_id:
+            self.banner.set_patient(None)
+            self.triage_patient.setText("")
+            return
+        try:
+            registration = self.api.get_registration(int(registration_id))
+            patient = self.api.get_patient(registration["patient_id"])
+        except (ApiError, KeyError, ValueError) as e:
+            detail = e.detail if isinstance(e, ApiError) else str(e)
+            self.banner.set_patient(None)
+            self.triage_patient.setText(f"患者信息加载失败：{detail}")
+            return
+        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "性别不详")
+        age = patient.get("age")
+        allergy = patient.get("allergy_label") or "不详"
+        self.banner.set_patient(patient, status="待分诊")
+        self.triage_patient.setText(
+            f"患者：{patient.get('patient_no') or patient['id']} {patient['name']} · "
+            f"{gender}/{age if age is not None else '年龄不详'} · 过敏：{allergy}"
+        )
+        self.triage_patient.setStyleSheet(
+            "color:#ef4444;font-weight:bold"
+            if patient.get("allergy_status") == "present"
+            else ""
+        )
 
     def _parse_number(self, field: QLineEdit, label: str, cast=float):
         text = field.text().strip()
@@ -189,6 +228,9 @@ class NurseWidget(QWidget):
             raise ValueError(f"{label}必须是数字") from None
 
     def _create_ticket(self) -> None:
+        if self.triage_reg_id.value() <= 0:
+            self.triage_msg.setText("请先选择/扫码挂号记录")
+            return
         try:
             temperature = self._parse_number(self.triage_temp, "体温")
             pulse = self._parse_number(self.triage_pulse, "脉搏", int)
@@ -236,6 +278,7 @@ class NurseWidget(QWidget):
         for row, ticket in enumerate(tickets):
             values = [
                 str(ticket["id"]),
+                ticket.get("patient_name") or "—",
                 str(ticket["registration_id"]),
                 f"{ticket.get('triage_level') or 4} 级",
                 f"{ticket['temperature']:g}℃" if ticket.get("temperature") is not None else "—",
@@ -328,10 +371,10 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.treat_msg.setText(f"执行失败（{e.status_code}）：{e.detail}")
             return
+        self._load_pending_treatments()
         self.treat_msg.setText(
             f"已执行：{order['item_name']}（执行人 {order.get('executed_by') or '—'}）"
         )
-        self._load_pending_treatments()
 
 
     # ---------- 输液/医嘱执行 ----------
@@ -522,15 +565,17 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.nursing_msg.setText(f"配药失败（{e.status_code}）：{e.detail}")
             return
-        self.nursing_msg.setText("配药完成")
         self._load_nursing()
+        self.nursing_msg.setText("配药完成")
 
     def _print_nursing_label(self) -> None:
         order = self._selected_nursing()
         if not order:
             return
-        QDesktopServices.openUrl(
-            QUrl(f"{self.api.base_url}/print/nursing-label/{order['id']}")
+        open_print_preview(
+            self,
+            f"{self.api.base_url}/print/nursing-label/{order['id']}",
+            "护理执行单打印预览",
         )
 
     def _rate_value(self) -> float | None:
@@ -554,8 +599,8 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.nursing_msg.setText(f"开始失败（{e.status_code}）：{e.detail}")
             return
-        self.nursing_msg.setText("已开始执行")
         self._load_nursing()
+        self.nursing_msg.setText("已开始执行")
 
     def _observe_nursing(self) -> None:
         order = self._selected_nursing()
@@ -573,8 +618,8 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.nursing_msg.setText(f"巡视失败（{e.status_code}）：{e.detail}")
             return
-        self.nursing_msg.setText("巡视已记录")
         self._load_nursing()
+        self.nursing_msg.setText("巡视已记录")
 
     def _complete_nursing(self) -> None:
         order = self._selected_nursing()
@@ -591,8 +636,8 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.nursing_msg.setText(f"完成失败（{e.status_code}）：{e.detail}")
             return
-        self.nursing_msg.setText("执行完成")
         self._load_nursing()
+        self.nursing_msg.setText("执行完成")
 
     def _skip_nursing(self) -> None:
         order = self._selected_nursing()

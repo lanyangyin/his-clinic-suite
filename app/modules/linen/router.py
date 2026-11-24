@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
     CurtainCreate,
@@ -28,7 +28,7 @@ from .service import (
     summary,
 )
 
-router = APIRouter(prefix="/linen", tags=["linen"])
+router = APIRouter(prefix="/linen", tags=["linen"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/batches", response_model=LinenBatchResponse, status_code=201)

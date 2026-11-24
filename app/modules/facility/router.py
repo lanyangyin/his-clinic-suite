@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import CampusCreate, CampusResponse, RoomCreate, RoomResponse
 from .service import (
@@ -14,7 +14,7 @@ from .service import (
     list_rooms,
 )
 
-router = APIRouter(tags=["facility"])
+router = APIRouter(tags=["facility"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/campuses/", response_model=CampusResponse, status_code=201)

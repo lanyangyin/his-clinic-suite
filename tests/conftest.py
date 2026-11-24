@@ -5,6 +5,14 @@ from pathlib import Path
 
 # 测试环境默认开启医保，覆盖生产 config.ini 的关闭开关（必须在导入 app 前设置）
 os.environ["HIS_INSURANCE_ENABLED"] = "1"
+# 旧用例在开方后直接发药；处方审方的阻断行为由专门用例显式打开
+os.environ["HIS_REQUIRE_PRESCRIPTION_REVIEW"] = "0"
+os.environ["HIS_PAYMENT_ALLOW_MOCK"] = "1"
+os.environ["HIS_INSURANCE_ALLOW_MOCK"] = "1"
+os.environ["HIS_SMS_ALLOW_MOCK"] = "1"
+os.environ["HIS_PUBLIC_HEALTH_ALLOW_MOCK"] = "1"
+# 旧用例有大量匿名 GET；安全关闭态由专门测试覆盖
+os.environ["HIS_ALLOW_ANONYMOUS_READ"] = "1"
 
 import pytest
 from fastapi.testclient import TestClient

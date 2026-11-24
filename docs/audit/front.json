@@ -1,0 +1,343 @@
+{
+  "domain": "门诊 HIS 子系统只读代码级审计（patient、registration、appointment、triage、encounter、cashier、billing、charges、invoice、print、catalog_proposal、inpatient；后两者为覆盖检查补充）。依据：docs/标准逐条对照.md、docs/标准对照与差距.md、reference/comparison.md、reference/README.md、十个模块 models/router/service/schemas、tests/test_*.py、his_client/ui 与 app/modules/admin。共同根因：大量匿名读接口、管理台会话签名密钥默认占位、外部通道（医保/支付/短信）为 Mock、测试默认关闭处方审方（tests/conftest.py:9），因此文档中的“闭环”在默认测试分支下未被验证。",
+  "modules": [
+    {
+      "module": "patient",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "患者主档是十模块中数据模型最完整的一块：身份证推导生日/性别、建档查重、NFC 就诊卡、过敏与特殊既往史、患者级临床修改留痕（PatientClinicalChange）、患者访问审计表（PatientAccessLog）、历史诊疗与患者 360 聚合都已落地并有用例（tests/test_patient.py、test_patient_cards.py、test_patient_history.py、test_patient_profile.py、test_patient_clinical_edit.py）。真正的问题不在模型，而在读接口鉴权和主索引合并：匿名即可拉取全院 PII，审计缺 IP，merged_into_id 是死字段。",
+      "findings": [
+        "匿名读取 PII：`GET /patients/`（[patient/router.py:60](app/modules/patient/router.py#L60)）与 `GET /patients/by-card/{card_uid}`（[patient/router.py:114](app/modules/patient/router.py#L114)）没有任何鉴权依赖；`list_patients` 无分页（[patient/service.py:115](app/modules/patient/service.py#L115)），`PatientResponse` 返回 id_number、phone、address、special_history。`tests/test_patient.py:38` 用无凭据 GET 断言 200，把匿名读固化进测试。",
+        "`GET /patients/{patient_id}` 只挂了可选鉴权 `get_current_user`（[patient/router.py:174](app/modules/patient/router.py#L174)），未带凭据时 `user=None`，`record_access` 直接 return（[patient/access.py:16](app/modules/patient/access.py#L16)），因此“匿名可读且不留痕”。",
+        "访问审计缺 IP：`PatientAccessLog` 只有 username/role/patient_id/encounter_id/action/path/method/created_at（[patient/models.py:87](app/modules/patient/models.py#L87)），而 docs/标准逐条对照.md §六 P0-4 的验收明确要求记录 ip；`auth.models.AuditLog` 同样没有 ip 字段。",
+        "EMPI 合并未实现：`Patient.merged_into_id` 只有字段（[patient/models.py:56](app/modules/patient/models.py#L56)）与迁移（[0069_patient_profile.py:85](alembic/versions/0069_patient_profile.py#L85)），全仓库无任何读写引用，无合并/交叉索引接口与页面；标准逐条对照.md 第 110 项“患者主索引”只能算 ⚠️。",
+        "现金收费端“特殊既往史”输入是死字段：`_patient_payload`（[his_client/ui/cashier.py:253](his_client/ui/cashier.py#L253)）没有 special_history 键，表单里填了也不会进 create/update 请求（只有 [cashier.py:369](his_client/ui/cashier.py#L369) 清空和 [cashier.py:509](his_client/ui/cashier.py#L509) 回填）；目前只有医生端 PatientClinicalDialog 通过 `/patients/{id}/clinical-profile` 写入并留痕（[patient/router.py:86](app/modules/patient/router.py#L86)）。",
+        "重复建档风险：快速挂号 `_quick_register`（[his_client/ui/cashier.py:707](his_client/ui/cashier.py#L707)）不调用查重，默认 address 为“待补录”、常无证件号；`create_patient` 仅在证件号命中时复用（[patient/service.py:35](app/modules/patient/service.py#L35)），无证件号的同名同电话患者会不断新增，且没有合并入口。",
+        "过敏安全网偏窄：只有 `allergy_status` 为 present 才拦截（[encounter/service.py:709](app/modules/encounter/service.py#L709)），“不详”不提示；匹配是关键词表初筛（[patient/allergy.py:46](app/modules/patient/allergy.py#L46)），不含皮试结果/交叉过敏规则库。",
+        "门户加重泄露面：`/portal/patients/{id_number}`、`/portal/reports/{id_number}` 完全匿名（[portal/router.py:12](app/modules/portal/router.py#L12)），直接返回姓名、证件号、电话、诊断与检验报告（[portal/service.py:41](app/modules/portal/service.py#L41)），以身份证号本身当身份凭据。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（14）实名认证 —— docs/标准逐条对照.md 第 148 行",
+        "NHC-2018-4（110）患者主索引 —— docs/标准逐条对照.md 第 244 行",
+        "NHC-2018-4（205）个人隐私保护 —— docs/标准逐条对照.md 第 339 行",
+        "EMR 评价项目 #35 基础设施与安全管控（身份、权限、审计） —— docs/标准逐条对照.md 第 76 行",
+        "智慧服务 #16 安全管理（身份认证覆盖全部系统） —— docs/标准逐条对照.md 第 113 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.6 字段级对照（当前仅有患者主索引字段，缺 EMPI 合并）",
+        "reference/comparison.md §3.4 病历留痕（第三方有 CA/痕迹保留）",
+        "reference/README.md 使用边界（不引入第三方患者端/平台能力）"
+      ],
+      "recommendation": "P0：① 给 `/patients/`、`/patients/by-card`、`/patients/{id}` 加 `require_login`（PySide6 客户端所有请求已带 Basic，[his_client/api.py:33](his_client/api.py#L33)，不会破客户端），list 增分页与最小字段集；② PatientAccessLog 增 ip（AuditLog 同步），并让匿名请求无法触达记录；③ 明确 EMPI 策略：要么实现合并/交叉索引（含被合并档案的跳转与审计），要么删除 merged_into_id 并在文档中不宣称；④ 现金端 special_history 要么进 payload，要么移除输入；⑤ quick_register 走查重；⑥ portal 改为一次性凭据/短信验证码，禁止裸 id_number 查询。验收：未登录 GET /patients/ 返回 401；审计行含 ip；同名同电话第二次快速建档会触发查重确认。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "registration",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "挂号主链可用：号源占位用条件 UPDATE 防超卖（有并发用例覆盖），挂号置 visited 由接诊推进，初诊/复诊与上次就诊关联、免挂号费规则都已实现（tests/test_visit_type.py）。但状态机只有 registered→visited 两态、没有退号/取消，挂号记录没有时间与操作人，排班只能手输 ID，管理处也没有排班维护页面。",
+      "findings": [
+        "状态机缺退号：`Registration` 只有 patient_id/doctor_id/status/schedule_id/visit_type/original_registration_id（[registration/models.py:26](app/modules/registration/models.py#L26)），无 created_at/created_by/cancelled_at；标签表里有 `cancelled`（[labels.py:81](app/modules/labels.py#L81)）但全仓库没有任何接口能把状态改成 cancelled，也没有退号/作废入口，挂号一旦建立不可撤销。",
+        "挂号无时间戳导致统计失真：管理台“挂号数”实际统计的是今日 Encounter 去重数（[admin/router.py:2669](app/modules/admin/router.py#L2669)），未接诊、爽约、退号都不计入；Registration 表本身也无法按挂号时间做报表。",
+        "排班无库级唯一约束：`create_schedule` 只在应用层查同日同段是否已存在（[registration/service.py:12](app/modules/registration/service.py#L12)），`doctor_schedules` 只有普通索引（0010_schedules.py、0033_appointment.py），并发可建出重复排班。",
+        "号源与挂号不是同一原子语句：`create_registration` 先 `take_schedule_slot` 再校验复诊（[registration/service.py:114](app/modules/registration/service.py#L114)），复诊校验抛错时依赖会话关闭回滚；`take_schedule_slot` 本身是正确的条件 UPDATE（[registration/service.py:63](app/modules/registration/service.py#L63)，tests/test_concurrency.py::test_schedule_no_oversell 覆盖 10 并发只成功 capacity 个）。",
+        "匿名读：`GET /registrations/`（[registration/router.py:64](app/modules/registration/router.py#L64)）与 `GET /registrations/{id}`（[registration/router.py:74](app/modules/registration/router.py#L74)）无鉴权，返回患者 ID 与医生、就诊类型。",
+        "挂号费推迟到接诊才收：`create_encounter` 里 `add_dict_fee(REG)`（[encounter/service.py:140](app/modules/encounter/service.py#L140)），因此挂号窗口没有独立收费动作，挂号量与收入不同步；排班不可在界面维护——收费端只有一个手输“排班 ID（可选）”数字框（[his_client/ui/cashier.py:588](his_client/ui/cashier.py#L588)），`list_schedules` 仅存在于 API 封装且无任何 UI 调用（[his_client/api.py:133](his_client/api.py#L133)）。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（4）预约内容（实名制挂号/预约） —— docs/标准逐条对照.md 第 138 行",
+        "NHC-2018-4（5）预约签到（人工/自助机/移动终端） —— docs/标准逐条对照.md 第 139 行",
+        "NHC-2018-4（6）挂号方式（医院号源统一管理） —— docs/标准逐条对照.md 第 140 行",
+        "智慧服务 #1 诊疗预约（院外预约、号源共享、分时段预约） —— docs/标准逐条对照.md 第 98 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §4 状态机对照（当前 registration: registered → visited，无取消/退号）",
+        "reference/README.md 对照结论（门诊主线优先）"
+      ],
+      "recommendation": "P1：① 补 Registration.created_at/created_by/cancelled_at 与退号接口（退号释放号源、写审计，不涉及已收费时直接拒绝）；② 给 doctor_schedules 加 (doctor_id, schedule_date, period) 唯一约束；③ 把号源查询、排班维护、剩余号展示放进收费/管理台，取消手输 ID；④ 管理台挂号量改统计 Registration 而非 Encounter。验收：退号后 booked 减 1、状态为 cancelled、同一排班重复创建返回 409；收费端不输入 ID 也能选到当日有号源的排班。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "appointment",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "预约模块在 API 层是真实实现而非占位：占号（take_schedule_slot）、取号生成挂号、取消/爽约释放号源，四态 booked/checked_in/no_show/cancelled 齐全，tests/test_appointment.py 8 条用例覆盖重复预约、取号、取消、爽约、号满。但它没有任何使用者：客户端、自助机、门户都没有预约入口，短信是落库 Mock，排班只有上午/下午粒度。",
+      "findings": [
+        "零客户端入口：`his_client/api.py` 没有 create_appointment/list_appointments/cancel 等方法（只有 list_schedules，[his_client/api.py:133](his_client/api.py#L133)），[his_client/ui/cashier.py](his_client/ui/cashier.py) 与 [his_client/ui/nurse.py](his_client/ui/nurse.py) 无预约页签；唯一调用方是 scripts/e2e_full_flow.py 与测试。患者 360 只读展示 appointment（[his_client/ui/patient360.py:152](his_client/ui/patient360.py#L152)），实际不会产生数据。",
+        "短信不真发：`send_sms` 自述“Mock 网关：仅落库”（[sms/service.py:8](app/modules/sms/service.py#L8)）；tests/test_appointment.py:42 只断言 `/sms/messages` 有记录，预约成功通知并未送达患者。",
+        "号源粒度过粗：`DoctorSchedule` 只有 schedule_date + period(morning/afternoon) + capacity（[registration/models.py:16](app/modules/registration/models.py#L16)），无分时段号、无号序；与智慧服务 3 级“分时段预约、号源共享”不符。",
+        "缺库级唯一约束：appointments 只有 id/patient_id 索引（0033_appointment.py:44-62），(patient_id, schedule_id) 仅应用层查重（[appointment/service.py:38](app/modules/appointment/service.py#L38)），并发可重复预约。",
+        "无爽约信用与停诊：没有爽约累计/黑名单（NHC 15 信用管理），没有取消原因、停诊通知、预约改期；`check_in` 不记录操作人（[appointment/service.py:97](app/modules/appointment/service.py#L97)）。",
+        "匿名读：`GET /appointments/`（[appointment/router.py:32](app/modules/appointment/router.py#L32)）与 `GET /appointments/{id}`（[appointment/router.py:48](app/modules/appointment/router.py#L48)）无鉴权。"
+      ],
+      "standard_refs": [
+        "智慧服务 #1 诊疗预约（3 级：线上注册、院外预约、号源共享、分时段预约） —— docs/标准逐条对照.md 第 98 行",
+        "智慧服务 #4 信息推送（取药/报告/危急值告知） —— docs/标准逐条对照.md 第 101 行",
+        "NHC-2018-4（1）服务内容（基于互联网提供挂号/查询） —— docs/标准逐条对照.md 第 135 行",
+        "NHC-2018-4（15）信用管理（爽约/欠费两类患者） —— docs/标准逐条对照.md 第 149 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §4 状态机对照（建议 dispense/prescription 分层，本模块状态独立）",
+        "reference/README.md 使用边界（患者端/门户属后续阶段）"
+      ],
+      "recommendation": "不立即大改。待 registration 的号源池与排班维护页面落地后，把预约入口接到收费端（代客预约）与门户/自助机（患者自助），同期补 (patient_id, schedule_id) 唯一约束、分时段号源、取消原因与停诊通知；短信接真实网关，未配置时界面明示“仅记录”。在那之前只需做两件低成本事：读接口加鉴权、给唯一约束。验收：收费端可为患者预约并看到剩余号；爽约三次在预约时提示。",
+      "not_optimize_reason": "现在优化没有使用场景：模块缺的不是代码，而是前置的号源维护界面、患者端账号/自助机鉴权与真实短信通道；十模块中它属于标准里的诊前 P2，若先于处方审方、病历留痕、收费对账投入，只会继续维护一套无人调用的 API。且已有测试覆盖其正确性，短期风险低于其余九个模块。"
+    },
+    {
+      "module": "triage",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "预检分诊是真实业务实现：1–4 级分级、体温/脉搏/呼吸/血压/SpO2/疼痛评分/隔离标记、候诊→叫号→过号→接诊自动完成，tests/test_triage.py 9 条用例覆盖入队、重复入队、叫号、过号、角色保护。核心缺陷是“分级不参与排队”：护士队列与医生工作台都按入队/挂号顺序，1 级濒危会排在 4 级之后；且无复评、无召回、读接口匿名。",
+      "findings": [
+        "分级不排序：`list_queue` 按 `TriageTicket.id` 排序（[triage/service.py:59](app/modules/triage/service.py#L59)），tests/test_triage.py:81 明确断言“按入队顺序”；护士端表格按接口顺序渲染（[his_client/ui/nurse.py:230](his_client/ui/nurse.py#L230)），1 级濒危不会置顶。",
+        "医生工作台同样不看级别：`worklist` 的排序键是 (是否已接诊, registration_id)（[encounter/service.py:1291](app/modules/encounter/service.py#L1291)），只在行里附带 triage_level 展示（[encounter/service.py:1264](app/modules/encounter/service.py#L1264)）。",
+        "无复评/更新：只有 `POST /triage/tickets`（[triage/router.py:19](app/modules/triage/router.py#L19)），而 registration_id 有唯一约束（[triage/models.py:14](app/modules/triage/models.py#L14)），体征恶化或分级调整只能改库；无召回/重呼、无按医生或诊室分区排队。",
+        "无完成/取消接口：`complete_ticket_for_registration` 仅在接诊时被调用（[encounter/service.py:134](app/modules/encounter/service.py#L134)），护士端没有“完成/退号”动作；`pass_ticket` 后无重新入队路径。",
+        "并发不设防：`call_ticket`/`pass_ticket` 是读-改-写（[triage/service.py:69](app/modules/triage/service.py#L69)、[triage/service.py:84](app/modules/triage/service.py#L84)），两护士可同时叫同一号，与 registration 用条件 UPDATE 的写法不一致。",
+        "匿名读：`GET /triage/queue`（[triage/router.py:40](app/modules/triage/router.py#L40)）与 `GET /triage/tickets/{id}`（[triage/router.py:32](app/modules/triage/router.py#L32)）无鉴权，队列含主诉、体温、血压、SpO2、隔离标记。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（7）排队叫号（门诊分诊、检验、检查、取药、门诊治疗） —— docs/标准逐条对照.md 第 141 行",
+        "NHC-2018-4（49）危急值管理（分级通知与超时升级，作为分诊预警参照） —— docs/标准逐条对照.md 第 183 行",
+        "EMR 评价项目 #8/#9 护士执行与护理记录 —— docs/标准逐条对照.md 第 49-50 行",
+        "智慧服务 #4 信息推送（就诊状态告知） —— docs/标准逐条对照.md 第 101 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §4 状态机对照（第三方按状态分层的做法）",
+        "reference/README.md（门诊主线优先，不照搬大医院）"
+      ],
+      "recommendation": "P1：① 队列与工作台统一改 `ORDER BY triage_level, created_at`（或叫号优先队列+人工置顶），并在护士端把 1/2 级标红置顶；② 增 PATCH 复评接口（级别/体征/主诉可改，写变更留痕）；③ 增完成/召回/重新入队；④ 叫号改条件 UPDATE；⑤ 读接口加 require_role(nurse/doctor)。验收：插入 4 级后再插入 1 级，队列第一条为 1 级；同一叫号单并发两次叫号只有一次成功。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "encounter",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "encounter 是十模块中最完整的一块，docs 宣称的 P0 闭环基本存在：prescriptions 处方头/处方号/类型/状态、药师审方状态机（pending_review→approved/rejected，含多级审批与超时升级）、按处方头 5 种上限、过敏 override 留痕、医保事前提醒、处方明细快照、病历版本与签名、多诊断、不良反应、处方中心与单张处方打印，tests/test_clinical_refactor.py 15 条用例覆盖。问题集中在“收费即关闭就诊”引发的状态死锁、签名覆盖范围、编号生成和双接诊入口不一致。",
+      "findings": [
+        "收费关闭后病历无法补写：`create_payment` 调 `close_encounter`（[billing/service.py:167](app/modules/billing/service.py#L167)），而 `create_medical_record`/`update_medical_record` 在 closed 时直接拒绝（[encounter/service.py:1083](app/modules/encounter/service.py#L1083)、[encounter/service.py:1122](app/modules/encounter/service.py#L1122)）；`sign_medical_record` 反而不校验 closed（[encounter/service.py:1144](app/modules/encounter/service.py#L1144)），出现“已收费但病历永远写不了 / 已收费还能签名”的不一致。",
+        "审方退回在已收费时无解：`_reject_prescription_lines` 对已收费明细抛“处方已收费，不能直接驳回；请先退费”（[encounter/service.py:356](app/modules/encounter/service.py#L356)），但 `create_payment` 不校验审方状态（tests/test_clinical_refactor.py:105-108 明确先收费再审方），退费后 encounter 仍 closed 且无 reopen 代码路径，医生无法重开、药师无法退回 → 错误处方卡死。",
+        "签名锁不覆盖诊断与处方：`replace_encounter_diagnoses` 只校验 closed（[encounter/service.py:172](app/modules/encounter/service.py#L172)），病历签名后仍可改诊断且不写 MedicalRecordVersion；`add_prescription_item` 只被 closed 拦截（[encounter/service.py:625](app/modules/encounter/service.py#L625)），签名后仍可新增处方。",
+        "处方号可撞：`_next_prescription_no` 用“日期+encounter+count+1”（[encounter/service.py:269](app/modules/encounter/service.py#L269)），无并发/删除保护；当同就诊存在两张已批处方、删掉第一张明细后再开方，会重新生成 02 号并撞上 `prescriptions.prescription_no` 唯一约束（[0093_clinical_audit_refactor.py:32](alembic/versions/0093_clinical_audit_refactor.py#L32)），路径上没有 IntegrityError 处理，表现为 500。",
+        "双接诊入口规则不一致：`POST /encounters/`（[encounter/router.py:72](app/modules/encounter/router.py#L72)）不传 enforce_lock，只有 `POST /encounters/start`（[encounter/router.py:213](app/modules/encounter/router.py#L213)）加“同一医生只能有一个开立就诊”的锁；客户端走 start（[his_client/api.py:289](his_client/api.py#L289)），但 tests 与 scripts 走前者，锁可被任一脚本/集成方绕过（tests/test_consult_lock.py 只测 start）。",
+        "工作台越权与性能：`worklist` 不按医生/科室过滤，返回全部挂号患者的姓名、过敏、特殊既往史、分诊生命体征（[encounter/service.py:1195](app/modules/encounter/service.py#L1195)），并为每行调用 list_charges（N+1）；任何 doctor 账号可见全院患者。",
+        "用药安全规则不完整：相互作用只拦截 severity 为 block，warn 级规则直接丢弃（[encounter/service.py:696](app/modules/encounter/service.py#L696)）；过敏仅 present 拦截、unknown 放行（[encounter/service.py:709](app/modules/encounter/service.py#L709)）；特殊级抗菌药一律拒绝而无会诊审批路径（[encounter/service.py:702](app/modules/encounter/service.py#L702)）。",
+        "质控与医保仍是初筛：`get_medical_record_quality` 仅 5 项必填各 20 分（[encounter/service.py:1163](app/modules/encounter/service.py#L1163)），无规则库/整改任务；医保事前提醒/结算走 Mock（[insurance/adapter.py:45](app/modules/insurance/adapter.py#L45) `_send` 直连 mock_platform），`upload_prescription_insurance` 仅区分 local/http（[encounter/service.py:480](app/modules/encounter/service.py#L480)）。",
+        "匿名读：`GET /encounters/`（[encounter/router.py:85](app/modules/encounter/router.py#L85)）、`/{id}`（:274）、`/{id}/prescriptions`（:390）、`/{id}/medical-record`（:432）、`/{id}/diagnoses`（:174）、`/{id}/medical-record/quality`（:495）、`/{id}/adverse-reactions`（:266）均无鉴权，病历与诊断可被匿名读取。",
+        "测试默认关闭审方：tests/conftest.py:9 设 `HIS_REQUIRE_PRESCRIPTION_REVIEW=0`，因此 test_encounter/test_billing/test_closed_loop 等主流程走的是“免审方”分支，生产默认（config.ini:21 prescription_review = true）仅由 test_clinical_refactor 的少数用例覆盖。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（22）门急诊电子病历 —— docs/标准逐条对照.md 第 156 行",
+        "NHC-2018-4（23）门急诊处方和处置管理 —— docs/标准逐条对照.md 第 157 行",
+        "NHC-2018-4（24）门诊合理用药 —— docs/标准逐条对照.md 第 158 行",
+        "NHC-2018-4（29）（30）非药品/药品医嘱执行 —— docs/标准逐条对照.md 第 163-164 行",
+        "EMR 评价项目 #10 处方书写、#15 门诊病历记录、#29 门诊药品调剂、#32 电子病历文档应用、#34 电子认证与签名 —— docs/标准逐条对照.md 第 51/56/70/73/75 行",
+        "docs/标准逐条对照.md §六 P0-1 处方头、P0-2 审方状态机、P0-3 病历修改留痕的验收标准"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.1 处方头（MedicationRequest.prescriptionNo/statusEnum）",
+        "reference/comparison.md §3.3 审方（ReviewPrescriptionRecords.passFlag/reasonText/practitionerId）",
+        "reference/comparison.md §4 状态机对照（处方与发药状态分层）",
+        "reference/comparison.md §7 结论（剩余差距：麻精处方权、注射执行单派生）"
+      ],
+      "recommendation": "P1：① 把“计费关闭”与“病历关闭”拆开，或允许 closed 后补写/补签病历并留痕；② 处方退回改为“退回待改”业务态，允许医生在同就诊重开，或在退费后 reopen 就诊；③ 签名时同时锁诊断与处方明细，并对诊断变更写版本；④ 处方号改序列/时间戳并捕获唯一冲突重试；⑤ 合并两个接诊入口，统一 enforce_lock（或删除无锁入口）；⑥ worklist 按 doctor_id/department 过滤并批量取费用；⑦ warn 级相互作用提示、过敏不详弹确认。验收：已收费就诊可补写病历且版本表有记录；药师退回已收费处方后医生能重开；并发开方不出现 500。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "cashier",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "收费员交班/门诊日结已落地：开班（备用金）、按现金渠道计算应收与差异、跨天未交班记录、按渠道汇总、管理台可打印日结（tests/test_cashier_daily.py、tests/test_invoice_and_scope.py::test_cashier_daily_isolation）。但只对现金抽屉对账，待收费金额是全院全局值，自助机与空 created_by 的收费不进入任何交班，退费也没有限额与审批。",
+      "findings": [
+        "待收费金额未按收费员/日期过滤：`daily` 的 pending_amount 直接 sum 全部 `EncounterCharge.status` 为 pending 的记录（[cashier/service.py:149](app/modules/cashier/service.py#L149)），与返回值里的 `scope: cashier` 自相矛盾，收费员日结会显示全院全部历史欠费。",
+        "自助机收费不进交班：`close_shift` 只统计 `Payment.created_by` 等于本收费员且 `channel` 为 cash（[cashier/service.py:53](app/modules/cashier/service.py#L53)）；而 `/kiosk/payments` 创建的 Payment 的 created_by 为空（[kiosk/service.py:28](app/modules/kiosk/service.py#L28) 直接调 create_payment，未传 created_by），这类“已收费”永远不会出现在任何收费员的应收现金里。",
+        "非现金渠道无交班对账：微信/支付宝/POS 只在日结报表展示（[cashier/service.py:130](app/modules/cashier/service.py#L130)），交班单只记现金；混合支付的 PaymentAllocation 也不参与交班。",
+        "开班可并发重复：`open_shift` 仅应用层查“该收费员是否有 open 班”（[cashier/service.py:23](app/modules/cashier/service.py#L23)），`cashier_shifts` 无 (cashier, status) 唯一约束；`shift_no` 先写 TMP 再 flush 更新（[cashier/service.py:31](app/modules/cashier/service.py#L31)），中途异常会留脏号。",
+        "交班无交接双方签字与上缴：页面只有“收费员/财务/日期”横线（[cashier_daily.html:61](app/modules/admin/templates/cashier_daily.html#L61)），ShiftClose 只有 counted_cash 与 note（[cashier/schemas.py:11](app/modules/cashier/schemas.py#L11)），无缴款/备用金回收记录。",
+        "退费无审批无限额：`POST /payments/{id}/refund` 只要求 role=cashier（[billing/router.py:42](app/modules/billing/router.py#L42)），任何人都可对任意历史收费全额退，日结只能事后看差异。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（73）业务结算与收费 —— docs/标准逐条对照.md 第 207 行",
+        "NHC-2018-4（74）财务信息管理 —— docs/标准逐条对照.md 第 208 行",
+        "智慧服务 #12 费用支付（窗口移动支付/患者设备支付） —— docs/标准逐条对照.md 第 109 行",
+        "EMR 评价项目 #35 基础设施与安全管控（岗位权限与审计） —— docs/标准逐条对照.md 第 76 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §5 值得借鉴（第三方财务/对账设计）",
+        "reference/README.md（门诊交易闭环已具备，短板在证据链）"
+      ],
+      "recommendation": "P1：① pending_amount 按 scope（cashier）与报表日期过滤；② 交班汇总纳入全渠道与自助机（按设备号/created_by 规则），或明确把自助机单独出一张对账单；③ CashierShift 加 (cashier,status=open) 唯一约束，shift_no 生成改一次写入；④ ShiftClose 增缴款额/交接人/签字；⑤ 退费按角色限额（如超 X 元需 director 审批）并进审计。验收：收费员日结的待收金额只含本人；自助机收费在日结中出现且可对账。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "billing",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "收费主链真实存在：按费用明细汇总、医保按明细比例、混合支付分渠道校验合计、折扣需 admin/director 且必填原因、部分退费按明细数量、发票号段占用、重复收费靠唯一约束兜底（tests/test_billing.py 12 条、test_mixed_payment.py、test_partial_refund.py）。但“支付真实性”与“收费记录”解耦：未配置通道直接模拟成功并落 paid，自助机匿名可造现金收费；退费与发票、就诊状态互不联动。",
+      "findings": [
+        "未配置支付通道直接算成功：`payment_gateway.charge` 对微信/支付宝/POS 在未配置时返回 success + MOCK 交易号（[payment_gateway/service.py:143](app/modules/payment_gateway/service.py#L143)），`create_payment` 只判断 `status` 为 success 就落 `Payment.status` 为 paid（[billing/service.py:128](app/modules/billing/service.py#L128)），即“没收到钱也记为已收费”，并继续生成取药码与发票号。",
+        "匿名自助缴费可造现金收费：`/kiosk/payments` 无鉴权（[kiosk/router.py:43](app/modules/kiosk/router.py#L43)），`kiosk_payment` 用默认 `PaymentCreate`（channel=cash）调 create_payment（[kiosk/service.py:28](app/modules/kiosk/service.py#L28)）；任何人可把任一 encounter 标成已收现金、关闭就诊、占用发票号，且 created_by 为空不进交班。",
+        "一次就诊只能一笔收费：`Payment.encounter_id` 唯一且注释“MVP：一次就诊只允许一笔收费”（[billing/models.py:12](app/modules/billing/models.py#L12)），没有补缴/二次收费；全额退费后 encounter 仍 closed（[billing/service.py:334](app/modules/billing/service.py#L334) 只改 payment 状态，无 reopen），无法重新计费或重开处方。",
+        "收费不校验就诊与审方状态：`create_payment` 不看 encounter.status（paused 也能收）也不看处方是否 approved；tests/test_clinical_refactor.py:105-108 固化了“先收费、后审方”，收费同时 `_ensure_pickup_code`（[billing/service.py:24](app/modules/billing/service.py#L24)）生成取药码并打印在收据上（[print/router.py:288](app/modules/print/router.py#L288)），与 docs P0-2 验收“审方未通过不能生成发药凭证”冲突。",
+        "退费与发票不联动：`refund_payment` 不改 `invoice_status`；`void_invoice` 也不退款（[invoice/service_ops.py:47](app/modules/invoice/service_ops.py#L47)），可同时出现“已退费/发票正常”和“发票已作废/钱未退”。",
+        "退费无审批：只需 cashier 角色即可退（[billing/router.py:42](app/modules/billing/router.py#L42)），只有可选 reason；无金额阈值、无院长/财务节点、无退款单号审批链（refund_no 是时间戳）。",
+        "发票号并发：`allocate` 读-改-写（[invoice/service.py:54](app/modules/invoice/service.py#L54)），`payments.invoice_no` 有唯一索引（[0033_appointment.py:67](alembic/versions/0033_appointment.py#L67)），并发撞号时被 `except IntegrityError` 转成“该就诊已收费”（[billing/service.py:182](app/modules/billing/service.py#L182)），错误信息误导且整笔回滚。",
+        "医保仍是 Mock：`settle_payment`/`check_prescription` 经 `_send` 直连 mock_platform（[insurance/adapter.py:45](app/modules/insurance/adapter.py#L45)），收费单的 insurance_amount 由 Mock 规则算出；`config.ini:18 insurance = false` 时全额自费，患者 insurance_type 不参与结算（patient/models.py 有字段但 billing 不使用）。",
+        "匿名读：`GET /payments/`（[billing/router.py:28](app/modules/billing/router.py#L28)）、`/payments/summary`（:37）、`/payments/{id}`（:61）无鉴权，收费金额、渠道、发票号可被匿名读取。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（9）便民结算（诊间/床旁/移动） —— docs/标准逐条对照.md 第 143 行",
+        "NHC-2018-4（10）支付方式 —— docs/标准逐条对照.md 第 144 行",
+        "NHC-2018-4（73）业务结算与收费（收费/结算/医保/财务对账） —— docs/标准逐条对照.md 第 207 行",
+        "NHC-2018-4（74）财务信息管理 —— docs/标准逐条对照.md 第 208 行",
+        "智慧服务 #12 费用支付 —— docs/标准逐条对照.md 第 109 行",
+        "docs/标准逐条对照.md §六 P1-4 医保患者类型进入结算（insurance_type 参与结算、Mock 与真实接口明确区分）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.2 发药明细与处方状态分层（收费/发药/处方状态不应共用一个状态）",
+        "reference/comparison.md §4 状态机对照（prescription 与 dispense 分层）",
+        "reference/README.md（不把 Mock 说成已接入医保）"
+      ],
+      "recommendation": "P0：① 支付未配置时不得落 paid——改为 fail closed，或落 unpaid_mock 且禁止关闭就诊/发取药码/占发票号；② 给 kiosk 加终端鉴权与签名，禁用现金通道（或强制生成对账单并计交班）；③ 收费前校验 encounter.status 与处方审方状态；④ 退费接审批并联动发票红冲/作废；⑤ 支持补缴与退费后重开就诊（拆分计费关闭/病历关闭）；⑥ `invoice.allocate` 改原子 UPDATE 并重试，错误信息区分撞号；⑦ 读接口加鉴权。验收：未配置通道时微信支付返回失败且不生成 Payment；kiosk 无签名无法收费；退费后发票状态同步。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "charges",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "费用明细结构合理：`EncounterCharge` 以 (source_type, source_id) 唯一约束保证一次来源只计费一次（[charges/models.py:79](app/modules/charges/models.py#L79)），接诊自动计挂号/诊疗费、处方/检验/检查/治疗各自落费、收费按 pending 明细汇总，测试 8 条覆盖自动计费、药品/检验/检查联动、收费聚合与退费状态。主要问题是收费项目只能新增不能改价/停用、汇总丢部分退费、读接口全匿名。",
+      "findings": [
+        "收费项目不可维护：`POST /charges/items/` 之外只有查询（[charges/router.py:26](app/modules/charges/router.py#L26)），无 PATCH/PUT/停用；管理台同一页面也只有新增表单（[charge_items.html:6](app/modules/admin/templates/charge_items.html#L6)），改价必须改库，且无生效日期、价格版本、调价审计。",
+        "汇总漏部分退费：`summary` 只累计 pending/paid/refunded 三个键（[charges/service.py:129](app/modules/charges/service.py#L129)），`partially_refunded` 明细的金额从三个合计中全部消失；而标签表明确有该状态（[app/labels.py](app/modules/labels.py) 的 charge_status），说明是遗漏。",
+        "金额一致性靠两处手写：改处方数量时同时改 `PrescriptionItem`、`PrescriptionLine` 与 `EncounterCharge`（[encounter/service.py:842](app/modules/encounter/service.py#L842)），charges 层没有“按来源同步金额”的统一入口，任何新调用方漏改就会账实不符。",
+        "退费可退量校验散落在 billing：`remaining = quantity - refunded_quantity` 与部分退费状态转移在 `refund_payment`（[billing/service.py:253](app/modules/billing/service.py#L253)），charges 服务自身不提供可退量/退款状态机，复用时有重复实现风险。",
+        "匿名读：`GET /charges/items/`、`/items/by-code/{code}`、`/items/{id}`、`/encounters/{id}`、`/encounters/{id}/summary` 全部无鉴权（[charges/router.py:38](app/modules/charges/router.py#L38)、:43、:51、:59、:68）。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（23）处方和处置管理（处方-费用联动） —— docs/标准逐条对照.md 第 157 行",
+        "NHC-2018-4（73）业务结算与收费 —— docs/标准逐条对照.md 第 207 行",
+        "EMR 评价项目 #29 门诊药品调剂（处方-调配-发药关联） —— docs/标准逐条对照.md 第 70 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.6 字段级对照（处方/明细/费用关联）",
+        "reference/README.md（门诊交易闭环完整，证据链偏薄）"
+      ],
+      "recommendation": "P1：① 增收费项目改价/停用（带生效时间、操作人、旧价留存），调价走审计；② summary 改为四态净额（pending/paid/partially_refunded/refunded）；③ 把“来源数量变更→金额同步”收敛成 charges 服务函数，供 encounter/treatment 等调用；④ 读接口加 require_login。验收：部分退费后 summary 三项之和等于净额；改价后历史 charge 不受影响且可追溯。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "invoice",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "发票号段与使用台账是真实实现：按收费员分配号段、收费时顺序占用并写 invoice_no/invoice_batch_id、打印与作废都写 InvoiceOperation、管理台有号段页与使用明细页（tests/test_invoice_and_scope.py 3 条覆盖分配、打印计数、作废、使用明细）。缺口在财务闭环：作废不退款、退款不作废、作废无审批，使用明细按前缀子串归属，号段并发抢占。",
+      "findings": [
+        "作废与收费脱钩：`void_invoice` 只置 `invoice_status` 为 void 并留痕（[invoice/service_ops.py:47](app/modules/invoice/service_ops.py#L47)），不触发退款、不回滚 Payment；收费员可直接作废本人发票（[invoice/router.py:76](app/modules/invoice/router.py#L76) require_role 含 cashier），无财务/院长审批。",
+        "退款不作废发票：`refund_payment` 完全不改 invoice_status/不写 InvoiceOperation（[billing/service.py:212](app/modules/billing/service.py#L212)），已退费仍显示“正常”，使用明细（[invoice/service_ops.py:89](app/modules/invoice/service_ops.py#L89)）也不显示退费。",
+        "号段归属用子串匹配：`usage` 用 `batch.prefix in invoice_no`（[invoice/service_ops.py:107](app/modules/invoice/service_ops.py#L107)），前缀为 A/INV 时会把其他号段与内部流水号（INV+日期+流水，[billing/service.py:178](app/modules/billing/service.py#L178)）算进本号段，批次统计失真。",
+        "重叠号段可共存：`create_batch` 只对同 prefix + 同 assigned_to + active 查重叠（[invoice/service.py:10](app/modules/invoice/service.py#L10)），同 prefix 不同收费员的重叠号段可同时 active，两个收费员会发出同一发票号（唯一索引拦截后表现为收费失败）。",
+        "分配非原子：`allocate` 读 next_no 再 +1（[invoice/service.py:54](app/modules/invoice/service.py#L54)），无行锁/条件 UPDATE；并发撞号被 billed 层吞成“该就诊已收费”（[billing/service.py:182](app/modules/billing/service.py#L182)）。",
+        "没有正式发票/收费票据模板：print 模块只有 58mm 收据（[print/router.py:269](app/modules/print/router.py#L269)），“发票打印”只是计数（[invoice/service_ops.py:27](app/modules/invoice/service_ops.py#L27)），无发票版式、无重打/作废标识。",
+        "管理台依赖默认会话密钥：管理台用 SessionMiddleware + `_guard`（[admin/router.py:247](app/modules/admin/router.py#L247)），而 config.ini/config.release.ini 的 `secret_key` 是占位值 CHANGE_ME_TO_A_RANDOM_LONG_STRING（[config.ini:7](config.ini#L7)，settings.py 也有同名 fallback），未改则会话可伪造，发票/日结/打印中心等 admin 页面全部失守。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（73）业务结算与收费（财务对账） —— docs/标准逐条对照.md 第 207 行",
+        "NHC-2018-4（74）财务信息管理 —— docs/标准逐条对照.md 第 208 行",
+        "智慧服务 #12 费用支付 —— docs/标准逐条对照.md 第 109 行",
+        "EMR 评价项目 #35 基础设施与安全管控（票据与审计） —— docs/标准逐条对照.md 第 76 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §5 值得借鉴（财务核算/多维报表）",
+        "reference/README.md（票据属财务交付，不照搬平台）"
+      ],
+      "recommendation": "P1：① 发票作废必须联动退款或走财务/院长审批，退款自动红冲/作废并写 InvoiceOperation；② 号段重叠校验改为 (prefix, start_no, end_no) 全局，`allocate` 改原子 UPDATE 并重试；③ usage 按 invoice_batch_id 归属，不用子串；④ 增正式发票/收费票据打印模板与“作废/重打”标识；⑤ 部署校验强制修改 SECRET_KEY（启动时拒绝占位值）。验收：退款后发票状态为 void 且有操作记录；两收费员并发收费不撞号；未改密钥时服务拒绝启动或告警。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "print",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "打印覆盖面广且模板可用：门诊病历、西药/中药处方笺、取药凭证、发药袋标签、输液瓶签、检验报告、收费收据、零售小票，字段、条码（含 code128 SVG）、页脚提示齐全，tests/test_print.py 8 条覆盖多文档渲染、条码解析与收费状态。最严重问题是 12 个打印路由全部无鉴权且不写访问审计，任何人可按自增 ID 遍历打印含姓名/身份证/住址/诊断/检验结果的患者文档；其次是处方笺用“就诊号伪处方号”、已签名病历与待审处方无区分标识。",
+      "findings": [
+        "全部打印接口匿名：[print/router.py](app/modules/print/router.py) 的 12 个 GET（barcode、prescription-header、prescription、medical-record、western-prescription、tcm-prescription、receipt、retail、dispense-slip、dispense-label、nursing-label、lab-report）都没有任何 Depends，tests/test_print.py:44 等用无凭据 GET 断言 200；按自增 encounter_id/payment_id 即可枚举全院患者身份与病历。",
+        "打印不留痕：打印路由不写 `patient_access_logs`（对比 [patient/router.py:183](app/modules/patient/router.py#L183) 的 record_access），也无打印流水；只有发票打印计数（[invoice/service_ops.py:27](app/modules/invoice/service_ops.py#L27)），病历/处方重打无“谁在何时打印第几次”的记录。",
+        "处方号与库内不一致：处方笺编号 `rx_no = RX{encounter_id:06d}`（[print/documents.py:162](app/modules/print/documents.py#L162)），与库内 `Prescription.prescription_no`（RX+日期+就诊+序号，[encounter/service.py:269](app/modules/encounter/service.py#L269)）不是同一个号；只有 `/print/prescription-header/{id}` 打真号（[print/router.py:318](app/modules/print/router.py#L318)），同一患者可能拿到两个处方号，与 docs P0-1 验收“打印能拿到处方号”不符；tests/test_print.py:163 还把 RX{encounter} 条码固化为扫码入口。",
+        "打印不看处方状态：`_collect` 取全部 PrescriptionItem（[print/router.py:61](app/modules/print/router.py#L61)），待审/已退回处方也能打成“处方笺”，模板只有空白药师签名（[print/documents.py:187](app/modules/print/documents.py#L187)），无“待审/作废/补打”水印。",
+        "签名状态不可见：病历页只有“医师签名：__________”（[print/documents.py:146](app/modules/print/documents.py#L146)），已签名与未签名打印件无法区分，CA 签名/验签没有参与打印（ca 模块未被 print 引用）。",
+        "纸型与模板不一致：客户端预览固定 A5（[print_preview.py:69](his_client/ui/print_preview.py#L69)），而收据/瓶签/取药凭证模板是 `@page size: 58mm auto`（[print/router.py:213](app/modules/print/router.py#L213)），预览/打印尺寸与版式不匹配；并且预览用无鉴权 `urlopen(self.url)`（[print_preview.py:58](his_client/ui/print_preview.py#L58)），一旦给打印加鉴权会直接打断客户端预览。",
+        "打印中心只是 URL 跳板：管理台页面手输单号后 `window.open('/print/...')`（[print_center.html:24](app/modules/admin/templates/print_center.html#L24)），本身不做任何权限/患者归属校验，管理员页面与匿名接口能力叠加。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（74）财务信息管理（票据打印） —— docs/标准逐条对照.md 第 208 行",
+        "NHC-2018-4（205）个人隐私保护 —— docs/标准逐条对照.md 第 339 行",
+        "EMR 评价项目 #32 电子病历文档应用（标准文档、授权浏览、留痕） —— docs/标准逐条对照.md 第 73 行",
+        "EMR 评价项目 #34 电子认证与签名（签名与验签） —— docs/标准逐条对照.md 第 75 行",
+        "智慧服务 #16 安全管理 —— docs/标准逐条对照.md 第 113 行"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.4 病历留痕（第三方痕迹保留/CA 签名）",
+        "reference/comparison.md §3.1 处方头（打印应带 prescriptionNo）",
+        "reference/README.md（打印属患者端交付，先保证授权与留痕）"
+      ],
+      "recommendation": "P0：① 打印路由接入鉴权（require_login 或由客户端换取短期一次性 token），并同步改 PrintPreviewDialog 用带凭据的 requests 取 HTML；② 打印写 patient_access_logs + 打印流水（文档类型、单号、第几次、操作人、时间），病历/处方重打显著标记“补打/复印”；③ 处方笺改用真实 prescription_no，并按审方状态过滤或加水印；④ 已签名病历打印带签名人/时间/验证码；⑤ 预览按文档类型选纸型（A4/A5/58mm）；⑥ 对匿名访问打印接口做网关层拒绝。验收：未登录访问 /print/medical-record/1 返回 401；每次打印可在患者访问审计里查到；同一处方只有一处处方号。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "catalog_proposal",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "目录建议是真实审批闭环而非占位：医生提交新药品/新治疗项目建议，药品走药事→库房两级、治疗项目走院长一级，状态机 pending_pharmacy→pending_warehouse→approved/rejected，审批事件写 ApprovalEvent，最终通过自动建立 Drug 或 ChargeItem 主数据。客户端有医生提交对话框与三个审核工作站（[doctor.py:2442](his_client/ui/doctor.py#L2442)、[catalog_proposal.py](his_client/ui/catalog_proposal.py)、[main_window.py:66](his_client/ui/main_window.py#L66)），tests/test_catalog_proposal.py 3 条覆盖两阶段、驳回与越权，test_catalog_dropdown.py 2 条覆盖下拉。主要风险不在流程，而在审批产物质量：新建 Drug 关键字段全空、新治疗项目默认 0.7 医保比例且未对码。",
+      "findings": [
+        "主数据产物不完整：`review_proposal` 最终通过时新建 Drug 只填 name/spec/unit/base_price，dosage_form、ingredient、barcode、insurance_code、approval_no、manufacturer 全部写空串（[catalog_proposal/service.py:128](app/modules/catalog_proposal/service.py#L128)）→ 后续开方时成分重复校验（[encounter/service.py:677](app/modules/encounter/service.py#L677) 依赖 ingredient）、扫码（barcode）、医保对码（insurance_code）全部失效；新建治疗 ChargeItem 也只填 code/name/category/price/unit（[catalog_proposal/service.py:149](app/modules/catalog_proposal/service.py#L149)）。tests 只断言药品名出现在 /drugs/，不校验字段完整性。",
+        "新治疗项目默认医保 0.7 且未对码：ChargeItem 的 insurance_ratio 默认 0.7（[charges/models.py:19](app/modules/charges/models.py#L19)），`review_proposal` 创建时未传该字段 → 新批治疗项目直接以 70% 报销比例进入结算（billing 按明细 insurance_ratio 计算，[billing/service.py:73](app/modules/billing/service.py#L73)），同时 insurance_category 停在默认未对码。这是审批产物直接进入费用的财务风险。",
+        "提交端不查重：`create_proposal` 不检查同名/同规格是否已有 Drug 或 ChargeItem、也不检查是否已有同名的在途建议（[catalog_proposal/service.py:15](app/modules/catalog_proposal/service.py#L15)）；只在最终审批时按 Drug.name（[catalog_proposal/service.py:131](app/modules/catalog_proposal/service.py#L131)）或 ChargeItem.code（[catalog_proposal/service.py:153](app/modules/catalog_proposal/service.py#L153)）拒绝，导致重复建议可以把整套审批走完再失败；且同名不同规格无法表达（Drug 唯一性只按 name 判定）。",
+        "审批阶段可能与可配置流程分叉：`create_proposal` 用 steps_override 写死药品为 pharmacist→warehouse、治疗为 director，但 `ensure_request` 优先采用管理员配置的 ApprovalFlowStep（[approval/service.py:259](app/modules/approval/service.py#L259) 配置优先）；而 `review_proposal` 的 allowed 判断按写死阶段与状态判定（[catalog_proposal/service.py:92](app/modules/catalog_proposal/service.py#L92)）。若管理员给 catalog_proposal 配了别的角色顺序，会出现审批引擎已进入下一步、业务表状态仍停在上一步，或有权角色被拒。tests 未覆盖“配置流 + 建议表”的组合。",
+        "建议不可撤回/补充材料/查历史：提交后无 withdraw、无编辑、无附件；`list_proposals` 只按角色返回当前阶段（[catalog_proposal/service.py:49](app/modules/catalog_proposal/service.py#L49)），审核端页面只加载待审列表（[catalog_proposal.py:141](his_client/ui/catalog_proposal.py#L141)），审核通过后看不到 created_object_id 对应的建档结果。docs/开方与目录治理评估.md §九自述仍待做“建议附件/证据材料、医务科两级审批”。",
+        "审计与页面覆盖：提交/审核的角色边界正确（医生提交，药事/库房/院长审核，[catalog_proposal/router.py:15](app/modules/catalog_proposal/router.py#L15)），审批事件写 ApprovalEvent；但新建 Drug/ChargeItem 本身不写对象级审计（只有全局 audit middleware 的 POST 路径日志，[app/main.py:178](app/main.py#L178)），且管理台没有目录建议页面，台账只在客户端。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（23）门急诊处方和处置管理（处方/处置录入、审核、分析；药物/治疗知识库） —— docs/标准逐条对照.md 第 157 行",
+        "NHC-2018-4（51）（52）（53）药事信息管理/处方点评/发药管理（药品目录属药事管理） —— docs/标准逐条对照.md 第 185-187 行",
+        "NHC-2018-4（108）（109）主数据注册服务/主数据管理 —— docs/标准逐条对照.md 第 242-243 行",
+        "EMR 评价项目 #10 处方书写（全院共享、药物知识、剂型/可供应提示） —— docs/标准逐条对照.md 第 51 行",
+        "docs/开方与目录治理评估.md §八（医生不得直接改目录，须药事/库房/院长审批）、§九第四阶段与仍待做清单"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 模块边界对照（当前 HIS 一个模块一个包，目录属主数据）",
+        "reference/comparison.md §5 值得借鉴（统一字典/主数据，但不要一次做全院平台）",
+        "reference/README.md 使用边界（只借鉴设计，不复制代码）"
+      ],
+      "recommendation": "P1：① 审批通过建 Drug 时补齐关键字段（至少 ingredient、dosage_form、barcode、insurance_code），缺关键字段应拒绝建档或标记“待补齐”并禁止开方；治疗项目必须显式指定 insurance_ratio 与 insurance_category（默认 0/未对码，不允许继承 0.7）；② 提交时查重（同名+规格 vs Drug/ChargeItem/在途建议），同名不同规格要能表达；③ 统一阶段来源：要么禁止给 catalog_proposal 配自定义流程，要么 review_proposal 按 ApprovalRequest 当前步骤的 role_required 授权，而不是写死阶段；④ 增加撤回、补充附件、历史查询与 created_object_id 展示；⑤ 管理台加只读目录建议台账。验收：新批药品 ingredient/barcode 为空时不能建档；新治疗项目未显式填医保比例时按 0 且标未对码；同名同规格重复提交被拒；配置两步院长流程时审核不越权、不卡死。",
+      "not_optimize_reason": "不适用（结论为优化）"
+    },
+    {
+      "module": "inpatient",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "住院是有真实代码与测试、但未接入任何界面的非主线模块：病区/床位/入院/转床/出院、住院医嘱（standing/stat）、医嘱执行、执行即计费、摆药申请/发药/退药、体征、护理记录共 9 张表，tests/test_inpatient*.py 47 条 + test_concurrency.py 摆药并发 1 条覆盖状态与库存。但缺住院病历/病程/出院小结、缺入科转科、缺出院结算与医保，执行记录无执行人，医嘱只有药品，摆药可重复申请，床位并发不安全，14 个读接口匿名；docs 明确把住院列为不适用/未纳入门诊级评价，因此定位应是“保留、暂不投入”。",
+      "findings": [
+        "关键闭环缺失：只有 Ward/Bed/Admission/InpatientOrder/OrderExecution/InpatientCharge/InpatientDispenseRequest/VitalSign/NursingNote（[inpatient/models.py](app/modules/inpatient/models.py)），没有住院病历、病程记录、出院小结、知情同意，没有入科/转科（只有 transfer-bed，[inpatient/service.py:125](app/modules/inpatient/service.py#L125)），没有出院结算/预交金/医保——`get_bill` 只是已产生费用求和（[inpatient/service.py:280](app/modules/inpatient/service.py#L280)），与 NHC（25）（26）（27）（28）（31）（32）的住院全流程要求不符。",
+        "执行记录不可追溯：`OrderExecution` 只有 order_id/executed_at/note（[inpatient/models.py:77](app/modules/inpatient/models.py#L77)），没有 executed_by/核对人；`execute_order` 也不接收执行人（[inpatient/service.py:224](app/modules/inpatient/service.py#L224)）→ 无法回答谁在何时执行、谁核对，直接不满足 EMR #8“执行记录可追踪、可核对”与 NHC（30）患者身份查对/执行人要求；tests 也只断言 executed_at。",
+        "医嘱只有药品：`InpatientOrder.drug_id` 必填（[inpatient/models.py:60](app/modules/inpatient/models.py#L60)），OrderCreate 只有 doctor_id/drug_id/order_type/quantity（[inpatient/schemas.py:44](app/modules/inpatient/schemas.py#L44)），没有诊疗/护理/文字/成组医嘱，也没有频次/剂量/途径 → 长期医嘱无法按频次排程，只能护士手工重复点执行；每次 execute 都计费，频次与计费口径无约束。",
+        "住院用药绕过门诊全部安全网：`create_order` 只校验医生与药品存在（[inpatient/service.py:170](app/modules/inpatient/service.py#L170)），不做过敏、相互作用、特殊级抗菌药、麻精处方权、医保事前提醒；这些拦截只存在于门诊开方（[encounter/service.py:632](app/modules/encounter/service.py#L632) 起）。",
+        "摆药单可重复：`create_dispense_request` 对同一 open 医嘱无唯一约束/去重（[inpatient/service.py:290](app/modules/inpatient/service.py#L290)），可生成多张 pending 摆药单导致重复扣库存；单张发药/退药用条件 UPDATE 保证只处理一次（[inpatient/service.py:331](app/modules/inpatient/service.py#L331)、[inpatient/service.py:373](app/modules/inpatient/service.py#L373)，tests/test_inpatient_dispense.py 13 条 + test_concurrency.py 覆盖），但摆药单没有批号/发药人/核对人明细。",
+        "床位与入院并发不安全：`create_admission` 先读 bed.status 再赋值（[inpatient/service.py:86](app/modules/inpatient/service.py#L86)），`transfer_bed` 同样读-改-写（[inpatient/service.py:136](app/modules/inpatient/service.py#L136)），没有条件 UPDATE/占用唯一约束；`Admission` 也没有“同一患者仅一条在院”约束，并发可双占床/重复在院。tests/test_inpatient.py 只测顺序重复（:84），没有并发用例。",
+        "权限与隐私：14 个 GET（wards、wards/{id}、beds、admissions、admission、orders、order、charges、bill、dispense-requests、dispense-request、vital-signs、nursing-notes）全部无鉴权（[inpatient/router.py:69](app/modules/inpatient/router.py#L69)、:83、:91、:110、:130、:180、:187、:222、:231、:254、:264、:319、:346），暴露在院患者、医嘱、体征与护理记录；入院登记只允许 cashier（[inpatient/router.py:118](app/modules/inpatient/router.py#L118)），医生不能开住院证；`doctor_id` 取请求体而非当前登录医生（[inpatient/router.py:165](app/modules/inpatient/router.py#L165)），任何 doctor 账号可代他人开医嘱。",
+        "无界面、与门诊两套账：his_client/ui 没有住院工作站（[main_window.py](his_client/ui/main_window.py) 无住院页签），admin 无住院页面，仅 scripts/demo.py 演示；住院费用独立在 InpatientCharge，不进 billing/Payment、不进患者 360（[patient/profile.py](app/modules/patient/profile.py) 只汇总门诊 charges/payments），无法统一对账。",
+        "测试形态：test_inpatient.py 16、test_inpatient_orders.py 11、test_inpatient_dispense.py 13、test_inpatient_billing.py 7、test_concurrency.py 1，均为 API 层状态/计费断言；没有并发入院/转床、没有执行人、没有出院结算用例。"
+      ],
+      "standard_refs": [
+        "NHC-2018-4（25）住院病历书写、（26）住院医嘱管理、（27）临床路径管理、（28）护理记录、（29）非药品医嘱执行、（30）药品医嘱执行、（31）输液管理、（32）护理信息提醒 —— docs/标准逐条对照.md 第 159-166 行",
+        "EMR 评价项目 #1-#9 住院角色项目（当前标注不适用/未纳入），其中 #8 医嘱执行要求执行记录可追踪、可核对，#9 护理记录可共享 —— docs/标准逐条对照.md 第 42-50 行",
+        "NHC-2018-4（205）个人隐私保护 —— docs/标准逐条对照.md 第 339 行",
+        "docs/标准对照与差距.md：住院/手术/麻醉/区域协同有部分包/字段但未形成完整闭环；“当前不做：为了评级堆砌住院、手术、ICU、DRG 模块”"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §2 模块边界对照（当前 HIS 住院有包但非主线）",
+        "reference/comparison.md §5 不直接借鉴（住院/手术/麻醉/ICU 全量模块、116 张平台表）",
+        "reference/README.md 对照结论（门诊主线优先）"
+      ],
+      "recommendation": "暂不投入主线。若未来启用住院，以下为立项前置条件：① 执行记录加 executed_by/核对人，并与护理执行单打通；② 医嘱补频次/剂量/途径与诊疗/护理类医嘱，长期医嘱按频次生成执行任务；③ 摆药单加 (order_id, status=pending) 唯一 + 批号/发药人/核对人明细；④ 床位占用与在院唯一性改条件 UPDATE + 唯一约束；⑤ 出院前校验未停医嘱与未结算费用，补住院结算/预交金/医保；⑥ 全部读接口加鉴权，doctor_id 取当前登录医生；⑦ 住院费用并入患者 360 与财务对账。验收：并发两名患者抢同一床只成功一个；执行记录能查出执行人；同一医嘱不能生成两张 pending 摆药单；未结算不能出院。",
+      "not_optimize_reason": "住院不是当前业务主线且没有任何使用入口：客户端与管理台都没有住院工作站（main_window.py 无住院页签，admin 无页面），只有 scripts/demo.py 和测试调用；docs 明确把住院列为不适用/未纳入门诊级评价，并写明“不因为对照而仓促扩住院”。现在投入不产生运营价值，还会分散门诊 P0（匿名读、收费真实性、处方闭环）的资源。保留现有模型作为将来立项起点即可；一旦启用住院，必须先完成 recommendation 中的执行人留痕、摆药唯一、床位并发、出院结算与鉴权，否则不具备上线条件。"
+    }
+  ]
+}

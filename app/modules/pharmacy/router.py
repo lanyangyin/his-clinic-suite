@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 import uuid
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.drug.models import Drug
 from app.modules.materials.models import MaterialItem, MaterialStock
 from app.modules.pharmacy.models import DrugStock
@@ -19,6 +19,7 @@ from .retail_service import (
 from .schemas import (
     DispenseRequest,
     DispenseResponse,
+    DispenseReturnRequest,
     PharmacyCallRequest,
     PharmacyCallResponse,
     PickupVerifyResponse,
@@ -29,18 +30,20 @@ from .schemas import (
     StockResponse,
 )
 from .service import (
+    build_dispense_slip,
     call_patient,
     dispense,
     get_dispense,
     get_stock,
     list_stocks,
     return_dispense,
+    return_dispense_items,
     stock_in,
     verify_pickup,
     worklist,
 )
 
-router = APIRouter(prefix="/pharmacy", tags=["pharmacy"])
+router = APIRouter(prefix="/pharmacy", tags=["pharmacy"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/dispense", response_model=DispenseResponse, status_code=201)
@@ -66,6 +69,45 @@ def return_medicines(
         return return_dispense(db, dispense_id, operator=user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/dispense/{dispense_id}/return-items", response_model=DispenseResponse)
+def return_medicines_partial(
+    dispense_id: int,
+    data: DispenseReturnRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist")),
+):
+    """按发药明细部分退药。"""
+    try:
+        return return_dispense_items(
+            db, dispense_id, data.items, operator=user.username, reason=data.reason
+        )
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/prescription-reviews")
+def prescription_reviews(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist")),
+):
+    from app.modules.encounter.service import list_pending_prescription_reviews
+
+    return list_pending_prescription_reviews(db)
+
+
+@router.get("/dispense-slips/{encounter_id}")
+def dispense_slip(
+    encounter_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist", "cashier", "doctor")),
+):
+    try:
+        return build_dispense_slip(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/dispense/{dispense_id}", response_model=DispenseResponse)

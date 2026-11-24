@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.tcm import TcmWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "tcm"
@@ -30,7 +30,7 @@ VIDEO = VIDEO_DIR / "08_中医煎药.mp4"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class TcmDemo(QMainWindow):
+class TcmDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("中医 / 煎药")
@@ -164,9 +164,11 @@ class TcmDemo(QMainWindow):
             FRAME_DIR.mkdir(parents=True, exist_ok=True)
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
+            self.timer.start(250)
+            self.caption.show()
+            self.perform_login("doctor", "doctor123")
             for window in self.views.values():
                 window.show()
-            self.timer.start(250)
             self.caption.show()
             self.wait(1.5)
             self.setup()

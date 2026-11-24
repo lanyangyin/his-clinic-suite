@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.treatment_room import TreatmentRoomWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "treatment"
@@ -31,7 +31,7 @@ CONSENT = ROOT / "docs" / "dept_preview" / "consent_demo.png"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class TreatmentDemo(QMainWindow):
+class TreatmentDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("治疗室 · treatment")
@@ -167,6 +167,8 @@ class TreatmentDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("treatment", "treatment123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)

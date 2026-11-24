@@ -13,10 +13,13 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
+    QButtonGroup,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
@@ -27,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.print_preview import open_print_preview
 from his_client.config import load_config
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
@@ -200,7 +204,7 @@ class CashierWidget(QWidget):
         self.q_name = QLineEdit()
         self.q_name.setPlaceholderText("姓名（可空）")
         self.q_id_number = QLineEdit()
-        self.q_id_number.setPlaceholderText("身份证号/证件号（可空）")
+        self.q_id_number.setPlaceholderText("身份证号/证件号（仅检索，不显示）")
         self.q_phone = QLineEdit()
         self.q_phone.setPlaceholderText("手机号（可空）")
         query_btn = QPushButton("查询")
@@ -211,13 +215,9 @@ class CashierWidget(QWidget):
         query_layout.addWidget(query_btn)
         layout.addWidget(query_box)
 
-        self.patient_table = QTableWidget(0, 7)
-        self.patient_table.setHorizontalHeaderLabels(
-            ["ID", "患者编号", "姓名", "性别/年龄", "电话", "医保", "过敏"]
-        )
-        self.patient_table.horizontalHeader().setStretchLastSection(True)
-        if not self.insurance_enabled:
-            self.patient_table.setColumnHidden(5, True)
+        self.patient_table = QTableWidget(0, 3)
+        self.patient_table.setHorizontalHeaderLabels(["患者编号", "姓名", "性别/年龄"])
+        self.patient_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.patient_table.cellClicked.connect(self._select_patient_row)
         self.patient_table.cellDoubleClicked.connect(self._patient_to_registration)
         self.patient_table.setColumnHidden(0, True)
@@ -388,7 +388,9 @@ class CashierWidget(QWidget):
         self.r_card_uid.clear()
 
     def _set_registration_patient_label(self, patient: dict) -> None:
-        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(
+            patient.get("gender"), "性别不详"
+        )
         age = patient.get("age")
         birth = patient.get("birth_date")
         age_display = age_text(date.fromisoformat(birth)) if birth else (
@@ -528,19 +530,17 @@ class CashierWidget(QWidget):
             age_display = age_text(date.fromisoformat(birth)) if birth else (
                 f"{age}岁" if age is not None else "年龄不详"
             )
-            gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+            gender = {"male": "男", "female": "女"}.get(
+                patient.get("gender"), "性别不详"
+            )
             insurance = {
                 "employee": "职工", "resident": "居民", "remote": "异地",
                 "self_pay": "自费", "commercial": "商保", "other": "其他",
             }.get(patient.get("insurance_type"), patient.get("insurance_type") or "")
             values = [
-                str(patient["id"]),
                 patient.get("patient_no") or "—",
                 patient["name"],
                 f"{gender}/{age_display}",
-                patient.get("phone") or "—",
-                insurance,
-                patient.get("allergy_label") or "不详",
             ]
             for col, value in enumerate(values):
                 self.patient_table.setItem(row, col, QTableWidgetItem(str(value)))
@@ -561,12 +561,20 @@ class CashierWidget(QWidget):
         self.qr_phone.setPlaceholderText("手机号*")
         self.qr_id_number = QLineEdit()
         self.qr_id_number.setPlaceholderText("身份证号（可空，后补）")
-        quick_btn = QPushButton("快速建档并挂号")
+        self.qr_mode_only = QRadioButton("仅建档")
+        self.qr_mode_register = QRadioButton("建档后挂号")
+        self.qr_mode_register.setChecked(True)
+        qr_mode_group = QButtonGroup(self)
+        qr_mode_group.addButton(self.qr_mode_only)
+        qr_mode_group.addButton(self.qr_mode_register)
+        quick_btn = QPushButton("快速建档")
         quick_btn.clicked.connect(self._quick_register)
         quick_row.addWidget(self.qr_name)
         quick_row.addWidget(self.qr_gender)
         quick_row.addWidget(self.qr_phone)
         quick_row.addWidget(self.qr_id_number)
+        quick_row.addWidget(self.qr_mode_only)
+        quick_row.addWidget(self.qr_mode_register)
         quick_row.addWidget(quick_btn)
         layout.addWidget(quick)
 
@@ -702,11 +710,14 @@ class CashierWidget(QWidget):
         if not name or not phone:
             self.reg_msg.setText("快速挂号至少填写姓名和手机号")
             return
-        try:
-            doctor_id = int(self.r_doctor_combo.text())
-        except ValueError:
-            self.reg_msg.setText("请先在下方刷新医生列表并选择医生")
-            return
+        register_now = self.qr_mode_register.isChecked()
+        doctor_id = None
+        if register_now:
+            try:
+                doctor_id = int(self.r_doctor_combo.text())
+            except ValueError:
+                self.reg_msg.setText("立即挂号需要先在下方选择医生")
+                return
         payload = {
             "name": name,
             "gender": self.qr_gender.currentData(),
@@ -724,19 +735,28 @@ class CashierWidget(QWidget):
         }
         try:
             patient = self.api.create_patient(payload=payload)
-            registration = self.api.create_registration(
-                patient["id"], doctor_id, self.r_schedule_id.value() or None
+            registration = (
+                self.api.create_registration(
+                    patient["id"], doctor_id, self.r_schedule_id.value() or None
+                )
+                if register_now
+                else None
             )
         except ApiError as e:
-            self.reg_msg.setText(f"快速挂号失败（{e.status_code}）：{e.detail}")
+            self.reg_msg.setText(f"快速建档失败（{e.status_code}）：{e.detail}")
             return
         self.r_patient_id.setValue(patient["id"])
         self.banner.set_patient(patient)
         self._set_registration_patient_label(patient)
-        self.reg_msg.setText(
-            f"快速挂号成功：{patient['name']}，挂号 ID {registration['id']}；"
-            "证件/地址/紧急联系人请后补"
-        )
+        if registration is not None:
+            self.reg_msg.setText(
+                f"快速建档并挂号成功：{patient['name']}，挂号 ID {registration['id']}；"
+                "证件/地址/紧急联系人请后补"
+            )
+        else:
+            self.reg_msg.setText(
+                f"快速建档成功：{patient['name']}；已按“仅建档”处理，未挂号"
+            )
         self.qr_name.clear()
         self.qr_phone.clear()
         self.qr_id_number.clear()
@@ -875,7 +895,9 @@ class CashierWidget(QWidget):
         refund_layout = QVBoxLayout(refund_box)
         refund_top = QHBoxLayout()
         self.refund_payment_id = QSpinBox()
-        self.refund_payment_id.setRange(1, 10_000_000)
+        self.refund_payment_id.setRange(0, 10_000_000)
+        self.refund_payment_id.setSpecialValueText("选择收费单")
+        self.refund_payment_id.setValue(0)
         load_refund = QPushButton("加载收费明细")
         load_refund.clicked.connect(self._load_refund_charges)
         refund_all = QPushButton("全部退")
@@ -965,12 +987,15 @@ class CashierWidget(QWidget):
             detail = e.detail if isinstance(e, ApiError) else str(e)
             label.setText(f"当前患者：读取失败（{detail}）")
             return
-        gender = {"male": "男", "female": "女"}.get(patient.get("gender"), "不详")
+        gender = {"male": "男", "female": "女"}.get(
+            patient.get("gender"), "性别不详"
+        )
         age = patient.get("age")
-        allergy = patient.get("allergy_label") or "不详"
+        allergy = patient.get("allergy_label") or "过敏史不详"
         label.setText(
             f"当前患者：{patient.get('patient_no') or patient['id']} "
-            f"{patient['name']} · {gender}/{age if age is not None else '—'}岁 · "
+            f"{patient['name']} · {gender}/"
+            f"{age if age is not None else '年龄不详'} · "
             f"过敏：{allergy} · 电话：{patient.get('phone') or '—'}"
         )
         if hasattr(self, "charge_info") and label is self.c_patient_label:
@@ -1020,13 +1045,13 @@ class CashierWidget(QWidget):
         except ApiError as e:
             self.charge_msg.setText(f"收费失败（{e.status_code}）：{e.detail}")
             return
+        self.refund_payment_id.setValue(payment["id"])
+        self._load_charges()
         self.charge_msg.setText(
             f"收费成功：单号 {payment['id']}，应收 {payment['amount']:.2f}，"
             f"优惠 {payment.get('discount_amount', 0):.2f}，"
-            f"实收自费 {payment['self_pay_amount']:.2f}"
+            f"实收自费 {payment['self_pay_amount']:.2f}，渠道 {payment.get('channel')}"
         )
-        self.refund_payment_id.setValue(payment["id"])
-        self._load_charges()
 
     def _load_charges(self) -> None:
         encounter_id = self.c_encounter_id.value()
@@ -1076,6 +1101,9 @@ class CashierWidget(QWidget):
 
     def _load_refund_charges(self) -> None:
         payment_id = self.refund_payment_id.value()
+        if payment_id <= 0:
+            self.refund_msg.setText("请先选择收费单")
+            return
         try:
             payment = self.api.get_payment(payment_id)
             charges = self.api.get_charges(payment["encounter_id"])
@@ -1171,13 +1199,11 @@ class CashierWidget(QWidget):
         box1 = QGroupBox("打印处方")
         row1 = QHBoxLayout(box1)
         self.pr_encounter_id = QSpinBox()
-        self.pr_encounter_id.setRange(1, 10_000_000)
-        open_pr = QPushButton("打开处方打印页")
-        open_pr.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl(self.api.prescription_print_url(self.pr_encounter_id.value()))
-            )
-        )
+        self.pr_encounter_id.setRange(0, 10_000_000)
+        self.pr_encounter_id.setSpecialValueText("选择就诊")
+        self.pr_encounter_id.setValue(0)
+        open_pr = QPushButton("处方打印预览")
+        open_pr.clicked.connect(self._preview_prescription)
         row1.addWidget(QLabel("就诊 ID"))
         row1.addWidget(self.pr_encounter_id)
         row1.addWidget(open_pr)
@@ -1186,13 +1212,11 @@ class CashierWidget(QWidget):
         box2 = QGroupBox("打印收费小票")
         row2 = QHBoxLayout(box2)
         self.pr_payment_id = QSpinBox()
-        self.pr_payment_id.setRange(1, 10_000_000)
-        open_rc = QPushButton("打开小票打印页")
-        open_rc.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl(self.api.receipt_print_url(self.pr_payment_id.value()))
-            )
-        )
+        self.pr_payment_id.setRange(0, 10_000_000)
+        self.pr_payment_id.setSpecialValueText("选择收费单")
+        self.pr_payment_id.setValue(0)
+        open_rc = QPushButton("小票打印预览")
+        open_rc.clicked.connect(self._preview_receipt)
         row2.addWidget(QLabel("收费单 ID"))
         row2.addWidget(self.pr_payment_id)
         row2.addWidget(open_rc)
@@ -1339,8 +1363,20 @@ class CashierWidget(QWidget):
         self.invoice_msg.setText(
             f"发票 {row['invoice_no']} 已登记打印，第 {row['print_count']} 次"
         )
-        QDesktopServices.openUrl(
-            QUrl(self.api.receipt_print_url(self.pr_payment_id.value()))
+        self._preview_receipt()
+
+    def _preview_prescription(self) -> None:
+        open_print_preview(
+            self,
+            self.api.prescription_print_url(self.pr_encounter_id.value()),
+            "处方打印预览",
+        )
+
+    def _preview_receipt(self) -> None:
+        open_print_preview(
+            self,
+            self.api.receipt_print_url(self.pr_payment_id.value()),
+            "收费小票打印预览",
         )
 
     def _void_invoice(self) -> None:

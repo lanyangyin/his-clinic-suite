@@ -569,10 +569,22 @@ def transfer(db: Session, data: TransferCreate, operator: str = "") -> dict:
     wh = get_warehouse_stock(db, data.drug_id, data.batch_no)
     if not wh:
         raise ValueError("药库无该批次库存")
-    if wh.quantity < data.quantity:
+    # 条件扣减，防止两个调拨请求同时通过“先读后写”造成负库存
+    affected = (
+        db.query(WarehouseStock)
+        .filter(
+            WarehouseStock.id == wh.id,
+            WarehouseStock.quantity >= data.quantity,
+        )
+        .update(
+            {WarehouseStock.quantity: WarehouseStock.quantity - data.quantity},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        db.rollback()
         raise ValueError("药库库存不足")
-
-    wh.quantity -= data.quantity
+    db.expire(wh)
 
     pharmacy = (
         db.query(DrugStock)
@@ -630,7 +642,21 @@ def check(db: Session, data: CheckCreate, checked_by: str = "") -> WarehouseChec
 
     expected = wh.quantity
     diff = data.actual_quantity - expected
-    wh.quantity = data.actual_quantity
+    affected = (
+        db.query(WarehouseStock)
+        .filter(
+            WarehouseStock.id == wh.id,
+            WarehouseStock.quantity == expected,
+        )
+        .update(
+            {WarehouseStock.quantity: data.actual_quantity},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        db.rollback()
+        raise ValueError("盘点期间库存发生变化，请刷新后重新盘点")
+    db.expire(wh)
 
     record = WarehouseCheck(
         drug_id=data.drug_id,
@@ -828,6 +854,17 @@ def create_purchase_request(
             )
         )
     request.total_amount = round(total, 2)
+    db.flush()
+    from app.modules.approval.service import ensure_request
+
+    ensure_request(
+        db,
+        "purchase_request",
+        request.id,
+        f"采购申请 {request.request_no}",
+        "director",
+        applicant=requester,
+    )
     db.commit()
     db.refresh(request)
     return request
@@ -915,6 +952,17 @@ def create_purchase_request_from_outbound(
         )
     request.total_amount = round(total, 2)
     order.purchase_request_id = request.id
+    db.flush()
+    from app.modules.approval.service import ensure_request
+
+    ensure_request(
+        db,
+        "purchase_request",
+        request.id,
+        f"采购申请 {request.request_no}",
+        "director",
+        applicant=requester,
+    )
     db.commit()
     db.refresh(request)
     return request
@@ -942,9 +990,13 @@ def approve_purchase_request(
         raise ValueError("采购申请不存在")
     if request.status != "submitted":
         raise ValueError("只有待审核采购申请可以批准")
-    request.status = "approved"
-    request.approver = approver
-    request.approved_at = datetime.now()
+    from app.modules.approval.service import advance_request, apply_business_result
+
+    result = advance_request(db, "purchase_request", request.id, "approve", approver)
+    if result in ("approved", "missing"):
+        apply_business_result(db, "purchase_request", request.id, "approved", approver)
+    elif result == "rejected":
+        apply_business_result(db, "purchase_request", request.id, "rejected", approver)
     db.commit()
     db.refresh(request)
     return request
@@ -958,9 +1010,13 @@ def reject_purchase_request(
         raise ValueError("采购申请不存在")
     if request.status != "submitted":
         raise ValueError("只有待审核采购申请可以驳回")
-    request.status = "rejected"
-    request.approver = approver
-    request.rejected_reason = data.reason
+    from app.modules.approval.service import advance_request, apply_business_result
+
+    result = advance_request(db, "purchase_request", request.id, "reject", approver, data.reason)
+    if result in ("rejected", "missing"):
+        apply_business_result(
+            db, "purchase_request", request.id, "rejected", approver, data.reason
+        )
     db.commit()
     db.refresh(request)
     return request

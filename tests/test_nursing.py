@@ -174,3 +174,21 @@ def test_nursing_role_protection(client, auth):
     )
     assert response.status_code == 403
     assert client.get("/nursing/orders", headers=auth["cashier"]).status_code == 403
+
+
+def test_nursing_prepare_requires_paid_and_dispensed_in_production(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "NURSING_REQUIRE_PAID_DISPENSED", True)
+    patient, encounter = _setup(client, auth)
+    orders = client.post(
+        f"/nursing/encounters/{encounter['id']}/sync", headers=auth["nurse"]
+    ).json()
+    infusion = next(row for row in orders if row["order_type"] == "infusion")
+    blocked = client.post(
+        f"/nursing/orders/{infusion['id']}/prepare",
+        json={"solvent": "0.9%氯化钠 250ml", "dose": "1g", "checked_by": "李护士"},
+        headers=auth["nurse"],
+    )
+    assert blocked.status_code == 400
+    assert "尚未收费" in blocked.json()["detail"]

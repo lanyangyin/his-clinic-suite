@@ -48,11 +48,124 @@ SECRET_KEY = (
     os.environ.get("HIS_SECRET_KEY")
     or _ini.get("server", "secret_key", fallback="his-dev-secret-change-me-0123456789")
 )
+STRICT_CONFIG = (
+    os.environ.get("HIS_STRICT_CONFIG", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("server", "strict_config", fallback=False)
+)
+_INSECURE_SECRETS = {
+    "his-dev-secret-change-me-0123456789",
+    "CHANGE_ME_TO_A_RANDOM_LONG_STRING",
+    "",
+}
+
+
+def validate_runtime_settings() -> None:
+    """严格模式禁止占位密钥启动，避免管理台 Cookie 被伪造。"""
+    if STRICT_CONFIG and SECRET_KEY in _INSECURE_SECRETS:
+        raise RuntimeError("严格模式要求配置非占位 SECRET_KEY")
 
 # 医保总开关：默认关闭（未接入医保的门诊）。测试通过 HIS_INSURANCE_ENABLED=1 打开。
+INSURANCE_PRESCRIPTION_UPLOAD_URL = (
+    os.environ.get("HIS_INSURANCE_PRESCRIPTION_UPLOAD_URL")
+    or _ini.get("insurance", "prescription_upload_url", fallback="")
+)
+INSURANCE_PRESCRIPTION_UPLOAD_TOKEN = (
+    os.environ.get("HIS_INSURANCE_PRESCRIPTION_UPLOAD_TOKEN")
+    or _ini.get("insurance", "prescription_upload_token", fallback="")
+)
+
+KIOSK_TOKEN = (
+    os.environ.get("HIS_KIOSK_TOKEN")
+    or _ini.get("features", "kiosk_token", fallback="")
+)
+
+PUBLIC_HEALTH_GATEWAY_URL = os.environ.get(
+    "HIS_PUBLIC_HEALTH_GATEWAY_URL", ""
+) or _ini.get("public_health", "gateway_url", fallback="")
+PUBLIC_HEALTH_GATEWAY_TOKEN = os.environ.get(
+    "HIS_PUBLIC_HEALTH_GATEWAY_TOKEN", ""
+) or _ini.get("public_health", "gateway_token", fallback="")
+
+PUBLIC_HEALTH_ALLOW_MOCK = (
+    os.environ.get("HIS_PUBLIC_HEALTH_ALLOW_MOCK", "").lower()
+    in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "public_health_mock", fallback=False)
+)
+
+NURSING_REQUIRE_PAID_DISPENSED = (
+    os.environ.get("HIS_NURSING_REQUIRE_PAID_DISPENSED", "").lower()
+    in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "nursing_require_paid_dispensed", fallback=False)
+)
+
+LIS_REQUIRE_SAMPLE = (
+    os.environ.get("HIS_LIS_REQUIRE_SAMPLE", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "lis_require_sample", fallback=False)
+)
+
+SMS_GATEWAY_URL = os.environ.get("HIS_SMS_GATEWAY_URL", "") or _ini.get(
+    "sms", "gateway_url", fallback=""
+)
+SMS_GATEWAY_TOKEN = os.environ.get("HIS_SMS_GATEWAY_TOKEN", "") or _ini.get(
+    "sms", "gateway_token", fallback=""
+)
+
+SMS_ALLOW_MOCK = (
+    os.environ.get("HIS_SMS_ALLOW_MOCK", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "sms_mock", fallback=False)
+)
+
+PORTAL_REQUIRE_OTP = (
+    os.environ.get("HIS_PORTAL_REQUIRE_OTP", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "portal_require_otp", fallback=False)
+)
+
+INSURANCE_GATEWAY_URL = os.environ.get("HIS_INSURANCE_GATEWAY_URL", "") or _ini.get(
+    "insurance", "gateway_url", fallback=""
+)
+INSURANCE_GATEWAY_TOKEN = os.environ.get("HIS_INSURANCE_GATEWAY_TOKEN", "") or _ini.get(
+    "insurance", "gateway_token", fallback=""
+)
+
+INSURANCE_ALLOW_MOCK = (
+    os.environ.get("HIS_INSURANCE_ALLOW_MOCK", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "insurance_mock", fallback=False)
+)
+
+REFUND_APPROVAL_THRESHOLD = float(
+    os.environ.get("HIS_REFUND_APPROVAL_THRESHOLD", "")
+    or _ini.get("features", "refund_approval_threshold", fallback="500")
+)
+
+ALLOW_ANONYMOUS_READ = (
+    os.environ.get("HIS_ALLOW_ANONYMOUS_READ", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "anonymous_read", fallback=False)
+)
+
+PAYMENT_ALLOW_MOCK = (
+    os.environ.get("HIS_PAYMENT_ALLOW_MOCK", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "payment_mock", fallback=False)
+)
+
+WECOM_WEBHOOK_URL = (
+    os.environ.get("HIS_WECOM_WEBHOOK_URL")
+    or _ini.get("notify", "wecom_webhook_url", fallback="")
+)
+SMS_WEBHOOK_URL = (
+    os.environ.get("HIS_SMS_WEBHOOK_URL")
+    or _ini.get("notify", "sms_webhook_url", fallback="")
+)
+
 INSURANCE_ENABLED = (
     os.environ.get("HIS_INSURANCE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
     or _ini.getboolean("features", "insurance", fallback=False)
+)
+
+# 处方是否必须经药师审方后才能发药。生产默认开启；自动化测试通过环境变量关闭以保留旧用例，
+# 审方/阻断行为另用显式测试覆盖。
+REQUIRE_PRESCRIPTION_REVIEW = (
+    os.environ.get("HIS_REQUIRE_PRESCRIPTION_REVIEW", "").lower() not in {"0", "false", "no", "off"}
+    and _ini.getboolean("features", "prescription_review", fallback=True)
 )
 
 # 打印抬头（可在 config.ini [clinic] 覆盖）

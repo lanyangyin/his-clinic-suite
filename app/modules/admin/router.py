@@ -26,8 +26,8 @@ from app.modules.auth.service import (
 from app.modules.charges.schemas import ChargeItemCreate
 from app.modules.charges.service import create_item as create_charge_item
 from app.modules.charges.service import list_items as list_charge_items
-from app.modules.drug.schemas import DrugCreate
-from app.modules.drug.service import create_drug, list_drugs
+from app.modules.drug.schemas import DrugCreate, DrugUpdate
+from app.modules.drug.service import create_drug, list_drugs, update_drug
 from app.modules.insurance_catalog.schemas import CatalogSyncRequest
 from app.modules.insurance_catalog.service import (
     import_bytes as catalog_import_bytes,
@@ -135,7 +135,21 @@ from app.modules.warehouse.service import (
     receive_purchase_request,
     reject_purchase_request,
 )
-from app.modules.supplier.service import list_suppliers
+from app.modules.encounter.service import list_record_revisions, review_record_revision
+from app.modules.pacs.schemas import ImagingTemplateCreate
+from app.modules.pacs.service import create_template as create_imaging_template
+from app.modules.pacs.service import list_templates as list_imaging_templates
+from app.modules.publichealth.service import PublicHealthUnavailable
+from app.modules.publichealth.service import list_reports as list_public_health_reports
+from app.modules.publichealth.service import submit_report as submit_public_health_report
+from app.modules.supplier.schemas import SupplierCreate, SupplierUpdate
+from app.modules.supplier.service import (
+    create_supplier,
+    list_expiring_suppliers,
+    list_suppliers,
+    suspend_expired,
+    update_supplier,
+)
 from app.modules.tcm.schemas import HerbCreate
 from app.modules.tcm.service import (
     create_herb,
@@ -400,6 +414,7 @@ def drugs_create(
     is_otc: bool = Form(False),
     ingredient: str = Form(""),
     barcode: str = Form(""),
+    dosage_form: str = Form(""),
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -419,6 +434,7 @@ def drugs_create(
                 is_otc=is_otc,
                 ingredient=ingredient.strip(),
                 barcode=barcode.strip(),
+                dosage_form=dosage_form.strip(),
             ),
         )
     except (ValueError, IntegrityError) as e:
@@ -429,6 +445,291 @@ def drugs_create(
             status_code=400,
         )
     return RedirectResponse("/admin/master/drugs?ok=1", status_code=302)
+
+
+@router.post("/master/drugs/update", response_class=HTMLResponse)
+def drugs_update(
+    request: Request,
+    drug_id: int = Form(...),
+    name: str = Form(...),
+    spec: str = Form(""),
+    unit: str = Form(""),
+    base_price: float = Form(...),
+    insurance_ratio: float = Form(0.7),
+    antibiotic_level: int = Form(0),
+    high_alert: bool = Form(False),
+    is_otc: bool = Form(False),
+    controlled_level: str = Form(""),
+    dosage_form: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        update_drug(
+            db,
+            drug_id,
+            DrugUpdate(
+                name=name.strip(),
+                spec=spec.strip(),
+                unit=unit.strip(),
+                base_price=base_price,
+                insurance_ratio=insurance_ratio,
+                antibiotic_level=antibiotic_level,
+                high_alert=high_alert,
+                is_otc=is_otc,
+                controlled_level=controlled_level,
+                dosage_form=dosage_form.strip(),
+            ),
+        )
+    except ValueError as e:
+        return templates.TemplateResponse(
+            request,
+            "drugs.html",
+            _ctx(request, drugs=list_drugs(db), error=str(e)),
+            status_code=400,
+        )
+    return RedirectResponse("/admin/master/drugs?ok=1", status_code=302)
+
+
+@router.get("/imaging-templates", response_class=HTMLResponse)
+def imaging_templates_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "imaging_templates.html",
+        _ctx(
+            request,
+            templates=list_imaging_templates(db, active_only=False),
+            ok=request.query_params.get("ok"),
+            error=request.query_params.get("error"),
+        ),
+    )
+
+
+@router.post("/imaging-templates", response_class=HTMLResponse)
+def imaging_templates_create(
+    request: Request,
+    name: str = Form(...),
+    body_part: str = Form(""),
+    findings: str = Form(""),
+    impression: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        create_imaging_template(
+            db,
+            ImagingTemplateCreate(
+                name=name.strip(),
+                body_part=body_part.strip(),
+                findings=findings.strip(),
+                impression=impression.strip(),
+            ),
+        )
+    except ValueError as e:
+        return templates.TemplateResponse(
+            request,
+            "imaging_templates.html",
+            _ctx(request, templates=list_imaging_templates(db, active_only=False), error=str(e)),
+            status_code=400,
+        )
+    return RedirectResponse("/admin/imaging-templates?ok=1", status_code=302)
+
+
+@router.get("/record-revisions", response_class=HTMLResponse)
+def record_revisions_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    status = request.query_params.get("status", "pending")
+    return templates.TemplateResponse(
+        request,
+        "record_revisions.html",
+        _ctx(
+            request,
+            revisions=list_record_revisions(db, status or None),
+            status=status,
+            ok=request.query_params.get("ok"),
+            error=request.query_params.get("error"),
+        ),
+    )
+
+
+@router.post("/record-revisions/{revision_id}/review", response_class=HTMLResponse)
+def record_revision_review(
+    request: Request,
+    revision_id: int,
+    approve: bool = Form(False),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    user = getattr(request.state, "user", None)
+    try:
+        review_record_revision(
+            db, revision_id, approve, getattr(user, "username", "admin"), note
+        )
+    except ValueError as e:
+        return RedirectResponse(f"/admin/record-revisions?error={e}", status_code=302)
+    return RedirectResponse("/admin/record-revisions?ok=1", status_code=302)
+
+
+@router.get("/public-health", response_class=HTMLResponse)
+def public_health_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "public_health.html",
+        _ctx(
+            request,
+            reports=list_public_health_reports(db),
+            ok=request.query_params.get("ok"),
+            error=request.query_params.get("error"),
+        ),
+    )
+
+
+@router.post("/public-health/{report_id}/submit", response_class=HTMLResponse)
+def public_health_submit(
+    request: Request,
+    report_id: int,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        submit_public_health_report(db, report_id)
+    except (ValueError, PublicHealthUnavailable) as e:
+        return RedirectResponse(f"/admin/public-health?error={e}", status_code=302)
+    return RedirectResponse("/admin/public-health?ok=1", status_code=302)
+
+
+@router.get("/master/suppliers", response_class=HTMLResponse)
+def suppliers_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request,
+        "suppliers.html",
+        _ctx(
+            request,
+            suppliers=list_suppliers(db),
+            expiring=list_expiring_suppliers(db),
+            ok=request.query_params.get("ok"),
+            error=request.query_params.get("error"),
+        ),
+    )
+
+
+@router.post("/master/suppliers", response_class=HTMLResponse)
+def suppliers_create(
+    request: Request,
+    code: str = Form(...),
+    name: str = Form(...),
+    contact: str = Form(""),
+    phone: str = Form(""),
+    address: str = Form(""),
+    license_no: str = Form(""),
+    license_expiry: str = Form(""),
+    first_business_approved: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from datetime import date
+
+    try:
+        expiry = date.fromisoformat(license_expiry) if license_expiry.strip() else None
+        create_supplier(
+            db,
+            SupplierCreate(
+                code=code.strip(),
+                name=name.strip(),
+                contact=contact.strip(),
+                phone=phone.strip(),
+                address=address.strip(),
+                license_no=license_no.strip(),
+                license_expiry=expiry,
+                first_business_approved=first_business_approved,
+            ),
+        )
+    except (ValueError, TypeError) as e:
+        return templates.TemplateResponse(
+            request,
+            "suppliers.html",
+            _ctx(request, suppliers=list_suppliers(db), error=str(e)),
+            status_code=400,
+        )
+    return RedirectResponse("/admin/master/suppliers?ok=1", status_code=302)
+
+
+@router.post("/master/suppliers/suspend-expired", response_class=HTMLResponse)
+def suppliers_suspend_expired(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    count = suspend_expired(db)
+    return RedirectResponse(f"/admin/master/suppliers?ok=expired-{count}", status_code=302)
+
+
+@router.post("/master/suppliers/update", response_class=HTMLResponse)
+def suppliers_update(
+    request: Request,
+    supplier_id: int = Form(...),
+    name: str = Form(...),
+    contact: str = Form(""),
+    phone: str = Form(""),
+    address: str = Form(""),
+    license_no: str = Form(""),
+    license_expiry: str = Form(""),
+    status: str = Form("active"),
+    first_business_approved: bool = Form(False),
+    blacklist_reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from datetime import date
+
+    try:
+        expiry = date.fromisoformat(license_expiry) if license_expiry.strip() else None
+        update_supplier(
+            db,
+            supplier_id,
+            SupplierUpdate(
+                name=name.strip(),
+                contact=contact.strip(),
+                phone=phone.strip(),
+                address=address.strip(),
+                license_no=license_no.strip(),
+                license_expiry=expiry,
+                status=status,
+                first_business_approved=first_business_approved,
+                blacklist_reason=blacklist_reason.strip(),
+            ),
+        )
+    except (ValueError, TypeError) as e:
+        return templates.TemplateResponse(
+            request,
+            "suppliers.html",
+            _ctx(request, suppliers=list_suppliers(db), error=str(e)),
+            status_code=400,
+        )
+    return RedirectResponse("/admin/master/suppliers?ok=1", status_code=302)
 
 
 @router.get("/master/charge-items", response_class=HTMLResponse)

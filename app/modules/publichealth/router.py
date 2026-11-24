@@ -2,12 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import ReportCreate, ReportResponse
-from .service import create_report, get_report, list_reports, submit_report
+from .service import (
+    PublicHealthUnavailable,
+    create_report,
+    get_report,
+    list_reports,
+    submit_report,
+)
 
-router = APIRouter(prefix="/public-health", tags=["public-health"])
+router = APIRouter(prefix="/public-health", tags=["public-health"], dependencies=[Depends(require_read_login)])
 
 
 @router.post("/reports", response_model=ReportResponse, status_code=201)
@@ -44,6 +50,8 @@ def submit(
 ):
     try:
         return submit_report(db, report_id)
+    except PublicHealthUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except ValueError as e:
         code = 404 if str(e) == "报告卡不存在" else 400
         raise HTTPException(status_code=code, detail=str(e))

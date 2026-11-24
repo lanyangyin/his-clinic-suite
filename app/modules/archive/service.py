@@ -238,6 +238,16 @@ def destroy_record(
         raise ValueError("该病案当前不可销毁")
     if not data.approved_by.strip():
         raise ValueError("销毁必须填写审批人")
+    approved = (
+        db.query(ArchiveDestructionRequest)
+        .filter(
+            ArchiveDestructionRequest.record_id == record.id,
+            ArchiveDestructionRequest.status == "approved",
+        )
+        .first()
+    )
+    if not approved:
+        raise ValueError("请先提交病案销毁申请并完成院长审批，不能直接销毁")
     record.status = "destroyed"
     row = ArchiveDestruction(
         record_id=record.id,
@@ -302,6 +312,17 @@ def create_destruction_request(
         requested_by=operator,
     )
     db.add(row)
+    db.flush()
+    from app.modules.approval.service import ensure_request
+
+    ensure_request(
+        db,
+        "archive_destruction",
+        row.id,
+        f"病案销毁申请 {row.id}",
+        "director",
+        applicant=operator,
+    )
     db.commit()
     db.refresh(row)
     return row
@@ -324,10 +345,25 @@ def decide_destruction_request(
         raise ValueError("销毁申请不存在")
     if row.status != "pending":
         raise ValueError("该申请当前不可审批")
-    row.status = "approved" if approved else "rejected"
-    row.approver = approver
-    row.approved_at = datetime.now()
-    row.approval_note = data.note.strip()
+    from app.modules.approval.service import advance_request, apply_business_result
+
+    result = advance_request(
+        db,
+        "archive_destruction",
+        row.id,
+        "approve" if approved else "reject",
+        approver,
+        data.note,
+    )
+    if result in ("approved", "rejected", "missing"):
+        apply_business_result(
+            db,
+            "archive_destruction",
+            row.id,
+            "approved" if approved else "rejected",
+            approver,
+            data.note,
+        )
     db.commit()
     db.refresh(row)
     return row

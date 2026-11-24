@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}影像报告模板 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>影像报告模板</h2>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if ok %}<p class="ok">已保存</p>{% endif %}
+<div class="panel">
+  <form class="inline" method="post" action="/admin/imaging-templates">
+    <label>模板名称 <input type="text" name="name" required maxlength="100"></label>
+    <label>部位 <input type="text" name="body_part" maxlength="50"></label>
+    <label>影像所见 <input type="text" name="findings" maxlength="1000" style="width:360px"></label>
+    <label>诊断意见 <input type="text" name="impression" maxlength="500" style="width:280px"></label>
+    <button type="submit">新增模板</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>部位</th><th>影像所见</th><th>诊断意见</th><th>启用</th></tr>
+    {% for row in templates %}
+    <tr>
+      <td>{{ row.id }}</td><td>{{ row.name }}</td><td>{{ row.body_part or '—' }}</td>
+      <td>{{ row.findings or '—' }}</td><td>{{ row.impression or '—' }}</td>
+      <td>{{ '是' if row.active else '否' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">暂无模板</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

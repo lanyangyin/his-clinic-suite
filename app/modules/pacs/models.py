@@ -16,6 +16,20 @@ class ImagingItem(Base):
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
 
 
+class ImagingReportTemplate(Base):
+    """影像报告模板：按检查部位/项目预置所见与意见。"""
+
+    __tablename__ = "imaging_report_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    body_part: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    findings: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    impression: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
 class ImagingRequest(Base):
     __tablename__ = "imaging_requests"
 
@@ -29,15 +43,25 @@ class ImagingRequest(Base):
         String(30), unique=True, default=lambda: f"ACC{uuid.uuid4().hex[:10].upper()}",
         nullable=False,
     )
-    # pending 已申请 / reported 已出报告
+    # pending 已申请 / reported 已出报告 / reviewed 已审核 / rejected 已退回
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     requested_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     requested_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )
     reported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    report: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    reported_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    report: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    findings: Mapped[str] = mapped_column(String(1000), default="", nullable=False)
+    impression: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    template_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     image_url: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    study_uid: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    series_uid: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    modality: Mapped[str] = mapped_column(String(20), default="", nullable=False)
 
     item = relationship("ImagingItem")
 

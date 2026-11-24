@@ -142,10 +142,20 @@ def charge(
 
     config = get_config(db, channel)
     if not _live(config):
+        from app import settings
+
+        if not getattr(settings, "PAYMENT_ALLOW_MOCK", False):
+            return {
+                "status": "failed",
+                "trade_no": "",
+                "message": f"{CHANNELS[channel]}未配置真实通道，已拒绝收费",
+                "channel": channel,
+                "channel_status": "unconfigured",
+            }
         return {
             "status": "success",
             "trade_no": _mock_trade_no("MOCK"),
-            "message": f"{CHANNELS[channel]}模拟支付成功（未配置真实通道）",
+            "message": f"{CHANNELS[channel]}模拟支付成功（演示模式）",
             "channel": channel,
             "channel_status": "mock",
         }
@@ -237,9 +247,14 @@ def refund(
     """支付退款；未配置/现金走模拟，配置后调用网关。"""
     if channel == "cash" or amount <= 0:
         return {"status": "success", "message": "现金/无需退款"}
+    if channel == "mixed":
+        return {"status": "success", "message": "混合支付模拟退款成功"}
     config = get_config(db, channel)
     if not _live(config):
-        return {"status": "success", "message": f"{CHANNELS[channel]}模拟退款成功"}
+        return {
+            "status": "success",
+            "message": f"{CHANNELS.get(channel, channel)}模拟退款成功",
+        }
     payload = {
         "type": "refund",
         "channel": channel,

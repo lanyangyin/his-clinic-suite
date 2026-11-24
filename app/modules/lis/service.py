@@ -182,6 +182,10 @@ def report_request(
         raise ValueError("该检验申请已出结果")
     if request.status not in REPORTABLE:
         raise ValueError("该检验申请当前状态不可报告")
+    from app import settings
+
+    if settings.LIS_REQUIRE_SAMPLE and request.status not in ("received", "testing"):
+        raise ValueError("标本未采样/签收，不能出报告")
 
     flag = data.abnormal_flag
     low = data.reference_low if data.reference_low is not None else request.item.reference_low

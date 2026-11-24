@@ -1,0 +1,365 @@
+{
+  "domain": "HIS 门诊系统 14 个子系统（insurance / insurance_catalog / insurance_inventory / insurance_materials / payment_gateway / ca / sms / notify / integration / integrations / kiosk / portal / download / idempotency）",
+  "modules": [
+    {
+      "module": "insurance",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "医保适配层是“国密 Mock 通道 + 只读工作台”：没有 models.py，事前提醒/结算都不落库，没有真实报文、回执、结算流水号；处方级上传只改状态。事前提醒不受 INSURANCE_ENABLED 控制，每张开方都调用 Mock 平台，ratio=0 且未对码的自费药会被当“目录外”拒开。工作台只能做目录类别提醒，撑不起 NHC（73）的真实结算与对账。",
+      "findings": [
+        "无 models.py（仅 adapter/crypto/demo_keys/mock_platform/prescription_upload/router/workbench）：事前提醒与结算请求/回执不留痕；billing.models.Payment 只有 insurance_amount，无医保结算流水号/回执号/险种/起付封顶字段（app/modules/billing/models.py:8-95），无法按笔对账。",
+        "生产接入只是“替换 _send”：app/modules/insurance/adapter.py:45-48 的 _send 直接 return handler(payload)，无 HTTP、超时、重试、熔断与报文日志；可复用的只有 _build_request/_unwrap_response 的国密封装（adapter.py:29-57）。",
+        "总开关未覆盖事前提醒：app/modules/encounter/service.py:723-740 无条件调用 check_prescription(...)，不看 settings.INSURANCE_ENABLED；Mock 对 ratio<=0 返回 forbid（mock_platform.py:39-40），catalog_warning 为空即抛 InsuranceForbiddenError，医保关闭时自费药仍不能开方。与 docs/医保前端开关说明.md“如果服务端开关打开”不符。",
+        "演示密钥硬编码且被真实开方流程使用：demo_keys.py:10-22 含 HIS 私钥、平台私钥、SM4 密钥；crypto.py:26-37 的 SM4 用 ECB、无 IV/随机数，同明文同密文可重放；adapter._build_request 无时间戳窗口校验。",
+        "降级不可识别：billing/service.py:72-85 医保不可用时 insurance_amount=0，Payment.channel_status 仍记 success，事后无法筛出“应医保却降级自费”单据。",
+        "处方级上传是状态壳：prescription_upload.py:17-31 报文 patient_id 恒为 None，无就诊号/医师/诊断/明细 ID；encounter/service.py:460-496 只写 local/uploaded，无 failed、回执号、重试，HTTP 失败抛 400 不留痕。",
+        "权限：insurance/router.py:24-32 的 /insurance/risks/encounter/{id} 只校验 doctor/admin，不校验医生与就诊归属，也不写 patient_access_logs（对照 app/modules/patient/access.py）。",
+        "覆盖：tests/test_insurance.py 13 例（国密往返/篡改签名/Mock 规则/降级/结算）+ test_insurance_switch.py、test_insurance_workbench.py；管理台 /admin/insurance-workbench 有页面（admin/router.py:2039-2070），his_client 未调用该接口，医生端看不到事前事中提示。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（国卫办规划发〔2018〕4号）第73项 业务结算与收费（docs 判 ⚠️：医保为 Mock，患者参保类型未进结算）",
+        "NHC 2018-4 第52项 处方点评（❌）、第51项 药事信息管理（⚠️）、第53项 发药管理（⚠️）",
+        "电子病历分级 2018-1079 第10项 门诊医师/处方书写（3级：处方供药剂科、收费使用；⚠️）",
+        "电子病历分级 2018-1079 第29项 门诊药品调剂（处方-调配-发药关联；⚠️）",
+        "医院智慧服务 2019-236 第12项 费用支付（3级：窗口移动支付；⚠️）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.3 审方、§3.6 字段级对照（处方状态/发药明细）、§4 状态机对照",
+        "reference/README.md 对照结论：处方头→审方→调配→发药→执行",
+        "docs/标准逐条对照.md §4.1（23）（24）（51）（52）（53）（73）",
+        "docs/医保前端开关说明.md（关闭后不再计算医保、医生药品目录隐藏医保列）"
+      ],
+      "recommendation": "1) 事前提醒按 settings.INSURANCE_ENABLED 前置判空；2) 新增 insurance_transactions（req_no/业务类型/请求摘要/响应摘要/医保回执号/金额/状态/失败原因/重试次数），payments 增 insurance_settle_no 供日结对账；3) 密钥改环境变量/加密机注入，SM4 改 CBC/GCM 带随机 IV 并加时间戳+nonce 防重放；4) 上传报文补 patient_id/encounter_id/diagnosis/physician/items.prescription_item_id，补 failed 与重试；5) 风险接口补就诊归属校验并写 patient_access_logs。",
+      "not_optimize_reason": "不适用：判定为本轮整改。医保默认关闭只降低暴露面，未消除“关闭态仍走 Mock 平台”“无结算流水无法对账”“演示私钥进真实流程”三项结构性缺陷。"
+    },
+    {
+      "module": "insurance_catalog",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "本批实现最完整的模块：贯标码唯一目录、导入版本+SHA256、甲乙丙分类、对码（码优先/名称+剂型+规格）、处方与收费共用 resolve。缺口在健壮性与边界：导入非事务安全（文件内重复码 500 且整批丢失）、版本号无唯一约束、目录有效期与限定支付不参与校验、多个读接口未鉴权、ensure-drug 让仓库角色绕过 admin 与目录审批直接建药品主数据（价格 0）。",
+      "findings": [
+        "导入无事务保护、重复码 500：service.import_bytes（app/modules/insurance_catalog/service.py:140-234）循环内 db.query 查重，但 SessionLocal 是 autoflush=False（app/database.py:34），同文件重复 national_code 时两次 db.add，commit 触发 IntegrityError；路由只捕 ValueError（router.py:40-49）→ 500，版本记录也不生成。",
+        "版本号可重复：version=f\"V{latest.id+1:04d}\"（service.py:177），models.py:54-56 对 version 无唯一约束，并发导入会重复。",
+        "目录有效期/限定支付未生效：resolve_prescription_insurance（service.py:401-436）只按 category 给 甲=1.0/丙=0/乙=药品比例，忽略 valid_from、valid_to、reimbursement_note（限定支付范围）；_norm_category（service.py:64-70）把空值/未知值一律归“乙”，目录外可能被误当乙类报销。",
+        "读接口未鉴权：router.py:52-60 /search、63-65 /versions、101-119 /resolve/{drug_id}、135-139 /{national_code} 均无 Depends，与 /matches、/match 的 admin 限制不一致；/resolve 暴露医保类别与报销比例。",
+        "越权建药品主数据：router.py:122-132 ensure-drug 允许 admin|warehouse，而 POST /drugs/ 仅 admin（app/modules/drug/router.py:14-20），并绕过 catalog_proposal“审批通过后才写入主数据”（app/modules/catalog_proposal/models.py 类注释）；落地 base_price=0.0（service.py:457-467），可直接开 0 元处方。",
+        "SSRF：sync_from_url（service.py:279-296）对管理台传入 URL 直接 requests.get，无协议/主机白名单、无大小上限。",
+        "覆盖：tests/test_insurance_catalog.py 5 例 + tests/test_insurance_match.py 6 例（甲乙丙/歧义/未匹配/页面）；管理台 /admin/insurance-catalog 有页面（admin/router.py:667-749）与 E2E 截图脚本（scripts/e2e_insurance_admin.py），但 base.html 无该导航。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第108项 主数据注册服务（⚠️）、第109项 主数据管理（⚠️）",
+        "NHC 2018-4 第55项 基本药物监管（⚠️：有药品字典，无监管指标）",
+        "NHC 2018-4 第24项 门诊合理用药（⚠️：无完整知识库，目录校验仅是比例快照）",
+        "电子病历分级 2018-1079 第10项 处方书写（4级要求剂型/可供应/知识提示）"
+      ],
+      "reference_refs": [
+        "docs/入库与医保目录设计.md §二 医保药品目录、§十二 医保目录对码与处方/收费校验",
+        "docs/医保属性对齐说明.md（类别取值与“没有自动校验编码是否真的存在”的边界）",
+        "reference/comparison.md §3.6 字段级对照（药品主数据字段来源）；该文档无目录导入/版本章节"
+      ],
+      "recommendation": "导入改单事务逐行 flush，IntegrityError 回滚返回 400（或文件内按 national_code 去重）；version 加唯一约束；resolve 返回并校验 valid_from/valid_to 与 reimbursement_note；/search、/versions、/resolve 至少 require_login；ensure-drug/ensure-item 收敛为 admin 或接入 catalog_proposal，价格必须显式传参。",
+      "not_optimize_reason": "目录导入、对码、处方/收费比例快照主流程可用且有 11 个用例覆盖；上述是健壮性与越权边界，不影响当前医保关闭下的门诊主线，故排在 P0（integration/kiosk/portal）与 P1（insurance/payment_gateway）之后。"
+    },
+    {
+      "module": "insurance_inventory",
+      "verdict": "optimize_now",
+      "priority": "P2",
+      "summary": "少数具备真实闭环的模块：库存流水→期间预览→upload_no→Mock/HTTPS(HMAC-SHA256/SM2)→回执落库→submitted/success/failed→历史详情，管理台有页。但上报口径有实质错误：取全部 drug 流水且业务类型表缺 transfer/stocktake/住院/零售等，总库→药房内部调拨会以“入库+出库”两条上报；同一期间可重复上报，失败单无重传入口。",
+      "findings": [
+        "内部调拨双计+业务类型兜底：service.build_records（app/modules/insurance_inventory/service.py:34-78）取期间全部 kind==\"drug\" 流水；_BUSINESS_TYPE（service.py:14-25）缺 transfer/stocktake/inpatient_dispense/inpatient_return/retail_sale/retail_refund/narcotic_inventory，_business_type（service.py:28-31）按方向回落成“入库/出库”。总库→药房调拨写 out+in 两条流水（app/modules/warehouse/service.py:598-610），导致重复计数、采购/销售/结存失真。",
+        "同一期间可重复上报：create_upload（service.py:105-146）无“期间已上传”校验、无幂等键；upload_no 由 last_id+1 生成（service.py:114-118），并发撞 models.py:14 的 unique 并 500；status=failed 无重传接口。",
+        "报文缺进销存要素：记录只有医保码/名称/规格/剂型/单位/批号/效期/库房/业务类型/方向/数量/单价/金额/时间/单据/结存（service.py:55-77），缺供应商、发票号/随货单号（docs/入库与医保目录设计.md §三 要求）；耗材完全不进（kind==\"drug\" 过滤）。",
+        "密钥明文入库：interface_service.save_config（interface_service.py:22-63）把 app_secret/private_key/public_key 明文写 insurance_interface_config（interface_models.py:36-47），仅展示时 masked()（interface_service.py:66-69）。",
+        "回执不验签：adapter.submit_inventory（adapter.py:118-126）只按 code 白名单判成功，未校验平台响应签名；接口调用在 create_upload 的数据库事务内（service.py:137-144），慢接口持锁。",
+        "覆盖：tests/test_insurance_inventory.py 4 例、tests/test_insurance_interface.py 7 例（Mock 回退/HMAC 签名/平台拒绝/连接失败/密钥掩码/非 admin 拒绝）；管理台 /admin/insurance-inventory 有页面与详情（admin/router.py:836-908），base.html 无导航。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第56项 药物物流管理（⚠️：有药库/库存流水，缺完整药物物流）",
+        "NHC 2018-4 第82项 临床试剂（⚠️）、第83项 高值耗材管理（⚠️）、第84项 低值耗材及办公用品（⚠️）",
+        "NHC 2018-4 第73项 业务结算与收费（⚠️）"
+      ],
+      "reference_refs": [
+        "docs/入库与医保目录设计.md §九 库存流水台账、§十四 医保进销存上传、§十五 医保接口配置",
+        "docs/标准逐条对照.md §4.1（51）（52）（53）药事与发药（发药/退药流水是进销存来源）；reference/comparison.md 只对照到发药/审方，无进销存章节"
+      ],
+      "recommendation": "1) business_type 表补齐 transfer/stocktake/住院/零售/麻精，或加“是否计入进销存”白名单，调拨单记“调拨”；2) 对 (start_date,end_date) 做唯一/占用校验，失败单按 upload_no 重传；3) 报文补 supplier/invoice_no/随货单号并纳入耗材；4) 密钥加密存储或仅从环境变量读；5) 回执验签，HTTP 调用移出数据库事务。",
+      "not_optimize_reason": "不适用：判定为本轮整改。上报口径错误会直接形成医保监管数据问题，修复集中在一个映射表、一个期间校验与报文补字段。"
+    },
+    {
+      "module": "insurance_materials",
+      "verdict": "merge",
+      "priority": "P2",
+      "summary": "耗材目录是“第二套目录实现”：独立 models/import/search/ensure-item，能导入 CSV/XLSX 并落地 MaterialItem，但相比 insurance_catalog 缺版本、校验和、导入人留痕，重复编码同样 500；ensure-item 让仓库角色绕过 admin 建物资主数据（价格 0）。解析、upsert、落地逻辑与药品目录高度重复，继续单独演进会形成两套目录策略。",
+      "findings": [
+        "与 insurance_catalog 重复实现：CSV/XLSX 解析+upsert 分别在 app/modules/insurance_materials/service.py:62-157 与 app/modules/insurance_catalog/service.py:104-234；耗材侧无 InsuranceCatalogVersion 对应表（对照 insurance_catalog/models.py:49-73），口径已漂移。",
+        "无导入人/版本留痕：import_bytes(db, data, file_name, imported_by)（service.py:108-157）接收 imported_by 后完全未使用；无 checksum、source、版本号，无法回答“这批目录谁何时导入、内容是否变化”。",
+        "重复编码同样 500：autoflush=False 下同文件重复 code 在 commit 触发 models.py:14-16 的 unique，路由只捕 ValueError（router.py:33-38）→ 500。",
+        "越权+0 元落地：router.py:65-74 ensure-item 允许 admin|warehouse，而 POST /materials/items/ 仅 admin（app/modules/materials/router.py:28-33）；落地 MaterialItem 的 price=0.0（service.py:237-247），材料费为 0。",
+        "器械追溯字段不足：models.py 无有效期/UDI/灭菌批号，_map_row（service.py:53-59）丢弃未知列，导入不校验 registration_no（NHC 83 要求高值耗材可追溯）。",
+        "GET /{code} 未鉴权（router.py:77-81）；覆盖：tests/test_material_catalog.py、tests/test_client_api.py:296-298（客户端 URL），管理台 /admin/insurance-materials 有页面（admin/router.py:912-958）但无导航。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第83项 高值耗材管理（⚠️：有高值耗材/UDI 相关模块，未与计费全闭环）",
+        "NHC 2018-4 第84项 低值耗材及办公用品（⚠️）",
+        "NHC 2018-4 第80项 资产信息管理（⚠️）",
+        "NHC 2018-4 第108项 主数据注册服务（⚠️）"
+      ],
+      "reference_refs": [
+        "docs/入库与医保目录设计.md §十七 医用耗材目录与物资下拉",
+        "docs/医保属性对齐说明.md（耗材字段 insurance_code/insurance_name/insurance_category/insurance_match_status）",
+        "reference/comparison.md 无耗材目录章节；reference/README.md 只说明参考项目不复制代码"
+      ],
+      "recommendation": "合并进 insurance_catalog，做统一“医保目录”模块（药品/耗材/服务共用导入器、版本表、校验和、检索与 ensure 接口），保留耗材专属字段（注册证号/型号/UDI）；合并后统一 admin 或走 catalog_proposal 审批。",
+      "not_optimize_reason": "取 merge 而非优化：药品目录已承担版本/校验和/对码，耗材目录再单独补一套版本与导入只会维护两份解析器和两套权限，合并成本低于分别优化成本；且耗材目录没有独立业务消费方（客户端只用于入库下拉）。"
+    },
+    {
+      "module": "payment_gateway",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "支付通道是“未配置即模拟成功”：现金直接成功，微信/支付宝/POS/医保卡未启用或未填网关时返回 success/mock，但收费层仍写 Payment(status=paid)、关闭就诊、占用发票号，日结与报表按真实收入统计。配置后走 HTTPS+HMAC，但只校验回执 code、不验签；退款请求连签名头都不带，混合支付退款还传空交易号。属资金链路高风险实现。",
+      "findings": [
+        "默认模拟成功且污染收入数据：service.charge（app/modules/payment_gateway/service.py:144-151）未配置时返回 success/mock；billing.service.create_payment 照常写 Payment(status=paid)、charge.status=paid、close_encounter、allocate 发票号、生成取药码（app/modules/billing/service.py:142-181）。",
+        "回执不验签：charge 只判断 body.code/success（service.py:222-231），未校验网关响应签名；refund（service.py:234-271）只发 Content-Type、不带 X-Sign、不校验回执，内网网关或中间人可伪造“支付成功/退款成功”。",
+        "混合支付退款断链：billing.service.refund_payment（app/modules/billing/service.py:274-293）按分渠道调用 refund(db, allocation.channel, \"\", part)，trade_no 传空；payment_gateway.refund 对 channel==\"mixed\" 直接返回模拟成功（service.py:240-241）。",
+        "密钥/证书明文：models.PaymentChannelConfig.api_secret 明文入库（models.py:31-33），仅页面掩码（service.py:96-99）；gateway_url 允许 http，无 TLS 强制。",
+        "医保卡只有卡号字段：charge 对 insurance_card 仅校验 card_no 非空（service.py:160-166），无读卡器/PSAM/医保授权（docs/入库与医保目录设计.md §二十 已声明模拟）。",
+        "无独立 REST 路由：配置只在管理台会话内（app/modules/admin/router.py:1029-1081，_guard 校验 admin session），第三方终端无法安全读写；覆盖：tests/test_payment_gateway.py 9 例 + test_mixed_payment.py + test_partial_refund.py，客户端收费面板走 /payments（his_client/ui/payment.py、cashier.py）。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第10项 支付方式（✅：现金/微信/支付宝/POS/医保卡）",
+        "NHC 2018-4 第73项 业务结算与收费（⚠️：医保是 Mock，不能宣称合规）",
+        "NHC 2018-4 第9项 便民结算（⚠️：有窗口/诊间收费，无床旁/移动结算）",
+        "医院智慧服务 2019-236 第12项 费用支付（3级：窗口移动支付；⚠️）"
+      ],
+      "reference_refs": [
+        "docs/入库与医保目录设计.md §二十 收费支付通道、§二十二 按明细/按数量退费（含“医保只能整单退”）",
+        "docs/标准逐条对照.md §4.1（10）（73）；reference/comparison.md、reference/README.md 未覆盖支付通道"
+      ],
+      "recommendation": "1) 增加“生产模式”开关，生产禁止静默 Mock 成功，未配置直接拒绝并在收据标注；2) charge/refund 双向签名与验签，退款必须带原 channel_trade_no；3) 收款时把每笔分渠道 trade_no 写入 payment_allocations（表已有字段但 create_payment 未写），退款按 allocation.trade_no 调用；4) 密钥加密存储或托管，强制 https。",
+      "not_optimize_reason": "不适用：判定为本轮整改。资金类回调不验签、退款不签名、模拟成功计入真实收入，都是上线前必须消除的风险。"
+    },
+    {
+      "module": "ca",
+      "verdict": "merge",
+      "priority": "P2",
+      "summary": "CA 能签能验（SM3 摘要+SM2 签名、篡改可检出、重复签章可拒），但与病历签名完全脱节的旁路：encounter.sign_medical_record 只写 signed_by/signed_at，不调用 CA；证书服务端本地生成、私钥明文存库，无有效期、无吊销入口；签章只覆盖病历 5 个字段，不校验签名人与是否已签名；读接口未鉴权、无任何 UI。满足不了 EMR #34 的“可靠电子签名与验签绑定”。",
+      "findings": [
+        "与病历签名脱节：app/modules/encounter/service.py:1144-1160 sign_medical_record 只写 signed_by/signed_at 并记版本，不调用 ca.seal_record；CA 只有独立 POST /ca/seals（app/modules/ca/router.py:49-59）。docs/标准逐条对照.md §二 #34 已注明“病历签名仍是字符串，未与 CA 强制绑定”。",
+        "不是真 CA：ca/service.issue_certificate（service.py:13-31）用 gmssl.sm2.CryptSM2._kg（私有 API）本地生成密钥，并把 private_key 明文写入 ca_certificates（ca/models.py:14-16）；无证书有效期、无吊销接口（revoked_at 无写入口，status 从不置 revoked）。",
+        "签名人与证书主体不绑定：seal_record（service.py:55-98）只校验 status 与 encounter/record 存在，不校验 certificate.subject 与当前登录医生一致，也不校验 record.signed_at；任何 doctor 可用任意有效证书给任意病历签章。",
+        "签章范围过窄：_record_content（service.py:42-52）只拼主诉/现病史/既往史/查体/处理意见，不含诊断、处方、签名人、修改时间；verify_seal（service.py:114-137）只校验这 5 个字段。",
+        "读接口未鉴权：router.py:36-46 /ca/certificates、62-72 /ca/seals 与 /ca/seals/{id}/verify 无 Depends；tests/test_ca.py:63-67、110-136 也是匿名调用。",
+        "无 UI 覆盖：his_client 无任何 /ca 调用，管理台无 CA 模板（app/modules/admin/templates/ 无 ca.html）；覆盖仅 tests/test_ca.py 9 例。"
+      ],
+      "standard_refs": [
+        "电子病历分级 2018-1079 第34项 电子认证与签名（⚠️：有 CA/签章模块与签名时间，但病历签名仍是字符串，未与 CA 强制绑定）",
+        "NHC 2018-4 第203项 电子认证服务（docs 将数据中心安全类整体标为—，本软件只能提供接口形态，不能替代证书/加密机验收）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.4 病历留痕（上海哲策：痕迹保留 + CA 数字证书签名）、§5 值得借鉴第4条“病历修改痕迹 + 电子签名”",
+        "reference/README.md 对照结论：病历修改留痕",
+        "docs/标准逐条对照.md §二 #34、§4.3（十五、数据中心安全）"
+      ],
+      "recommendation": "合并进病历签名链路：sign_medical_record 内按“医生证书”强制签章（证书主体=当前用户、覆盖病历全文+诊断+处方摘要），签名与 sealed_at 一起落库；补证书有效期/吊销接口与 UKey/外部 CA 接入点；/ca 读接口改登录+病案权限并写 patient_access_logs；管理台/客户端提供签章与验章入口。",
+      "not_optimize_reason": "取 merge 而非优化：该模块没有消费方（无客户端/管理台入口，医嘱与病历签名都不调用），单独优化只是维护一个“看起来有签章”的旁路；只有并入病历/病案签名，才能满足 EMR #34 对签名与内容强绑定的要求。"
+    },
+    {
+      "module": "sms",
+      "verdict": "merge",
+      "priority": "P2",
+      "summary": "短信只有落库：send_sms 固定 status=sent，不调用任何短信服务，记录里没有 provider id/错误/重试/操作人。它在三个业务点被同步调用（检验报告、影像报告、预约成功），而 notify 另有一套 channel=sms 的 outbox（配置 sms_webhook_url 后真实 HTTP 发送、带失败重试）。同一能力两套实现，口径与记录会分裂。",
+      "findings": [
+        "只落库不外发：app/modules/sms/service.py:6-17 send_sms 直接写 SmsMessage 并固定 status=\"sent\"；models.SmsMessage 无 provider_msg_id/error/attempts/operator（models.py:8-21），无法判断是否送达。",
+        "与 notify 重复：app/modules/notify/service.py:65-74 在配置 sms_webhook_url 时另建 channel=\"sms\" 的 NotificationOutbox，由 dispatch_pending（notify/service.py:105-111）真正 POST；send_sms 记录不进 outbox、无重试，两入口产生两套记录。",
+        "同步阻塞业务接口：lis.service._notify_result_ready（app/modules/lis/service.py:352-371）、pacs.service._notify_result_ready（app/modules/pacs/service.py:111-129）、appointment.service.create_appointment（app/modules/appointment/service.py:64-73）在请求线程直接 send_sms；接真实网关后报告/预约 RT 被运营商绑定。",
+        "send_sms 内部 db.commit()（service.py:15）：当前三个调用点都在业务 commit 之后，暂未破坏原子性，但这是隐式约定，后续在事务中调用会提前提交半成品。",
+        "无模板/频控/退订：template 为自由字符串（schemas.py:7），content 直接截断 200 字（service.py:11），phone 仅校验长度（schemas.py:5），无黑名单与频控。",
+        "覆盖：tests/test_sms.py 3 例、tests/test_appointment.py 断言预约短信；无客户端/管理台页面，管理台无短信记录页。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第20项 信息推送（⚠️：有 SMS 模块，未覆盖全部就诊节点）",
+        "医院智慧服务 2019-236 第4项 信息推送（3级：取药/报告/危急值告知；⚠️）",
+        "NHC 2018-4 第5项 预约签到（⚠️）与第4项 预约内容（✅，预约通知依赖短信）"
+      ],
+      "reference_refs": [
+        "docs/标准逐条对照.md §三 第4项、§四 第20项",
+        "docs/入库与医保目录设计.md §十八 界面汉化（短信模板/状态标签）；reference/comparison.md 未覆盖短信"
+      ],
+      "recommendation": "合并进 notify：短信作为 NotificationOutbox 的一个 channel，复用 attempts/last_error/retry/回执字段；send_sms 改为 enqueue（不 commit），由派发器统一发送；补模板注册表、频控、退订与 provider 回执号；报告/预约接口改异步入队。",
+      "not_optimize_reason": "取 merge 而非优化：notify 的 outbox 已具备失败重试、渠道状态与重发入口，短信模块缺的正是这些；先在 sms 再补一套网关/重试会形成第二种可靠投递实现，合并到一个 outbox 成本更低。"
+    },
+    {
+      "module": "notify",
+      "verdict": "optimize_now",
+      "priority": "P2",
+      "summary": "通知采用 outbox（pending/sent/failed + attempts/last_error + 手工重试）方向正确；但没有任何自动派发器：审批、审方、超时升级产生的通知只能由 admin 点 POST /notifications/dispatch 或脚本触发，生产会长期滞留 pending；internal 渠道不投递也置 sent；已读状态按角色行共享；retry 无上限。审批闭环的“提醒”环节实际未闭合。",
+      "findings": [
+        "没有派发器：dispatch_pending（app/modules/notify/service.py:84-123）只能由 admin 的 POST /notifications/dispatch（router.py:54-58）触发，全仓仅 scripts/e2e_full.py:227 调用；approval.service 的 notify_role/enqueue（app/modules/approval/service.py:289-298、395-402、414-423、448-457、463-472）只入队，无定时任务消费。",
+        "internal 渠道假送达：dispatch_pending 对 channel==\"internal\" 只 pass 后置 sent（service.py:96-97、114-115），没有投递凭据，状态与真实送达脱节。",
+        "已读状态按角色共享：inbox（service.py:126-133）按 recipient==\"role:<role>\" 取件，一行通知被同角色所有账号共享；mark_read（service.py:136-146）写单一 read_at → 一人已读全角色变已读。",
+        "状态字段语义混用：NotificationOutbox.status 同时承载 pending/sent/failed/read（models.py:21-22），mark_read 会覆盖 sent，无法统计“未送达/未读”。",
+        "重试无上限：retry_failed（service.py:149-158）把所有 failed 重置为 pending，不限次数、无退避，坏地址会无限重试。",
+        "覆盖：tests/test_clinical_refactor.py::test_approval_notifications（入队/派发/已读）、scripts/e2e_full.py；客户端有 his_client/ui/notifications.py（管理员可派发/重试），管理台无通知页面（templates 无 notifications.html）。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第20项 信息推送（⚠️）",
+        "NHC 2018-4 第49项 危急值管理（✅：危急值标记/通知/医生确认/超时基础闭环；通知渠道依赖本模块）",
+        "医院智慧服务 2019-236 第4项 信息推送（⚠️）"
+      ],
+      "reference_refs": [
+        "docs/标准逐条对照.md §4.1（49）危急值管理、§二 #35 基础设施与安全管控",
+        "docs/部门工作站与审批.md（审批待办与通知入口）；reference/comparison.md 未覆盖通知"
+      ],
+      "recommendation": "加定时派发（服务启动后台任务或外部 cron 调 dispatch），或把 dispatch 挂在审批动作后的事务外触发；internal 与 sent 状态解耦，拆 sent_at/read_at 两个语义；收件人改 user 维度（或 role 行+每用户 read 表）；retry 加次数上限与退避；管理台补通知列表页。",
+      "not_optimize_reason": "不适用：判定为本轮整改。审批/审方“待办提醒”是闭环的一部分，缺自动派发会让通知永远停在 pending，修复成本主要是定时任务与收件人维度。"
+    },
+    {
+      "module": "integration",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "集成模块提供 FHIR Patient 查询与 HL7 ADT 建档，逻辑能跑（按身份证号幂等），但两个接口都完全没有鉴权：任何人可按自增 ID 读取姓名/身份证号/电话，也能匿名写患者主索引。日志表只有 summary，无报文/错误码/ACK；FHIR 资源不符合 R4 最小实现，HL7 无 ACK/MSA。是本次审计中隐私与越权风险最高的一项。",
+      "findings": [
+        "FHIR 查询未鉴权：app/modules/integration/router.py:14-20 无 Depends，返回姓名、身份证号、电话（service.to_fhir_patient，service.py:43-57）；患者 ID 是自增整数，可遍历拉取全量 PHI；读请求不写 patient_access_logs，审计中间件只记录写方法（app/main.py:178-191）。",
+        "HL7 建档未鉴权：router.py:23-29 POST /integration/hl7/adt 无鉴权、无限流，任何可访问端口的人都能写患者主索引（handle_hl7_adt → patient.service.create_patient，service.py:83-98），只靠身份证号幂等，接受任意姓名字符串。",
+        "不是完整 HL7 接口：无 MSH 校验、无 ACK/MSA 回执（返回 JSON patient_id/created，service.py:96-98）、无消息控制 ID 关联；IntegrationLog 只有 summary（models.py:8-20），不存报文/错误码/重试状态，direction=\"out\" 从未使用（无对外推送）。",
+        "FHIR 资源不符合 R4 最小实现：to_fhir_patient 无 gender/birthDate/address/meta.profile，无 Bundle/OperationOutcome；姓名全名塞 family（service.py:52）。",
+        "无 UI 覆盖：管理台无集成日志页，his_client 只有 integration_config.py（配置 integrations，与本模块无关）；覆盖仅 tests/test_integration.py 7 例（含 logs 权限），无客户端页面。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第112项 数据交换（⚠️：有 REST API/集成模块，缺标准交换规范）",
+        "NHC 2018-4 第110项 患者主索引（⚠️：有主索引字段，缺 EMPI 合并/交叉索引）",
+        "电子病历分级 2018-1079 第37项 信息利用/临床数据整合（⚠️）",
+        "医院智慧服务 2019-236 第16项 安全管理（要求身份认证覆盖全部系统；⚠️）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.5 LIS/PACS“接口层应显式区分已接入/未接入/Mock”、§5 值得借鉴第5条“LIS/PACS 接口状态和失败重试”",
+        "docs/标准对照与差距.md §1.5 数据共享与接口（P1：明确接口边界、失败重试、审计）",
+        "docs/标准逐条对照.md §二 #35、#37"
+      ],
+      "recommendation": "立即给 FHIR/HL7 加鉴权（客户端证书/Token/白名单）并写 patient_access_logs；HL7 增加 ACK/MSA 与 MSH 校验，日志落报文摘要+错误码；FHIR 补 R4 必填字段与 meta.profile/OperationOutcome；出站推送（direction=out）补重试与审计；管理台提供集成日志页。",
+      "not_optimize_reason": "不适用：判定为本轮整改。未鉴权读取/写入患者 PHI 是可直接利用的越权与隐私泄露，优先级高于所有功能性优化。"
+    },
+    {
+      "module": "integrations",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "集成配置是 4 个 key 的明文键值表（insurance_upload_url/token、wecom_webhook_url、sms_webhook_url），admin 可读写，客户端 integration_config.py 直接回显。它能用，但把 Token/Webhook 明文下发与入库、没有掩码、不校验 URL，且这些值会被 notify/处方上传直接 POST，构成 SSRF 与外发数据通道。",
+      "findings": [
+        "明文回显与入库：list_values（app/modules/integrations/service.py:23-38）原样返回 insurance_upload_token、webhook URL；GET /integrations（router.py:17-22，admin）明文下发；IntegrationConfig.value 无加密（models.py:9-15），只有 updated_by，无变更历史，与 payment_channels/insurance_interface 的掩码策略不一致。",
+        "SSRF/外发通道可配置：set_values（service.py:41-54）不校验协议/主机，写入的 wecom_webhook_url/sms_webhook_url 会被 notify.dispatch_pending 直接 urllib POST（app/modules/notify/service.py:99-111），insurance_upload_url 会被 prescription_upload POST（app/modules/insurance/prescription_upload.py:33-47）。",
+        "静默丢键：set_values 对不在 KEYS 的字段直接 continue（service.py:43-44），拼错 key 仍返回 200 但没保存。",
+        "能力过窄：KEYS 只有 4 项（service.py:7-12），无分组/环境/凭据轮换/连通性测试。",
+        "覆盖：tests/test_clinical_refactor.py::test_integration_config（读/写）；客户端 his_client/ui/integration_config.py 为 admin 页签（main_window.py:51-53），无管理台页面。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第118项 平台配置（❌：无平台可视化配置）",
+        "NHC 2018-4 第119项 服务监控（❌：无服务监控/故障分析）、第115项 业务规则流程管理（⚠️）",
+        "医院智慧服务 2019-236 第16项 安全管理（⚠️：无 SSO/多因素/会话治理）"
+      ],
+      "reference_refs": [
+        "docs/医保前端开关说明.md（医保默认关闭，配置入口保留但未接真实接口）",
+        "docs/标准逐条对照.md §4.3（十一、平台服务集成 → P2）；reference/comparison.md、reference/README.md 未覆盖集成配置"
+      ],
+      "recommendation": "值分级：Token/密钥加密存储或只从环境变量读取，列表接口只回 masked+configured；set_values 校验 URL scheme/host 白名单并拒绝未知 key（400）；补变更审计（谁改了什么，before/after 掩码）与连通性测试按钮；后续按环境（测试/生产）分组。",
+      "not_optimize_reason": "该模块仅 admin 可写，且医保/短信/企业微信当前都未真实启用（config.ini [features] insurance=false，docs/医保前端开关说明.md）；掩码与 URL 白名单属于接入真实平台前的前置工作，故排 P2 而非立即整改。"
+    },
+    {
+      "module": "kiosk",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "自助机接口实现上是“匿名 API”：挂号、查挂号、缴费三个接口都没有鉴权/限流（注释自认“生产环境应加终端鉴权与限流”）。缴费直接复用 create_payment 且不传渠道，默认现金 → payment_gateway 对现金直接成功，于是任何知道自增 encounter_id 的人都能把他人就诊标记为已收费、关闭就诊、占用发票号、生成取药码；这些收入还不带 created_by，收费员日结交班看不到。",
+      "findings": [
+        "全开放：app/modules/kiosk/router.py:18-49 三个接口均无 Depends（无 Basic/终端证书/签名/限流），注释写明“生产环境应加终端鉴权与限流”。",
+        "匿名可改资金状态：kiosk_service.kiosk_payment（service.py:28-30）调用 create_payment 未传 channel → 默认 cash（billing/service.py:64）→ payment_gateway.charge 对现金直接成功（payment_gateway/service.py:128-134）→ 费用 paid、close_encounter、allocate 发票号、生成取药码（billing/service.py:165-181）。",
+        "收费员日结不可见：kiosk 未传 created_by（create_payment 默认 \"\"），cashier_service.daily 按 Payment.created_by==cashier 过滤（app/modules/cashier/service.py:125-127），自助现金收入不会进入任何收费员交班/日结，只有 admin 的 all 口径可见，形成现金对账差异。",
+        "挂号可重复占用号源：kiosk_registration（service.py:12-25）直接复用 create_registration，同一患者可匿名反复取号；并发防超卖有覆盖（scripts/check_concurrency.py:81-107、tests/test_concurrency.py:85）。",
+        "信息暴露：KioskPaymentResponse 含 amount/insurance_amount/self_pay_amount（schemas.py:23-29），配合自增 ID 可探测他人账单金额；GET /kiosk/registrations/{id} 也返回任意挂号。",
+        "覆盖：tests/test_kiosk.py 6 例（含号源满、重复缴费、缺就诊），但全部以匿名方式调用，等于把“无鉴权”固化为契约；无客户端/管理台页面。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第8项 自助服务（⚠️：有自助机模块，全流程自助未闭环）",
+        "NHC 2018-4 第5项 预约签到（⚠️）、第9项 便民结算（⚠️：无床旁/移动结算）",
+        "NHC 2018-4 第10项 支付方式（✅）",
+        "医院智慧服务 2019-236 第6项 患者便利保障服务（❌）、第12项 费用支付（⚠️）、第16项 安全管理（⚠️）"
+      ],
+      "reference_refs": [
+        "docs/标准逐条对照.md §三 第6/12/16项、§四 第5/8/9/10项",
+        "docs/标准对照与差距.md §智慧服务（患者端在线支付不完整，P2）；reference/comparison.md、reference/README.md 未覆盖自助机"
+      ],
+      "recommendation": "1) 加终端鉴权（设备证书/Token+IP 白名单）与限流；2) 自助缴费必须带终端号并写 created_by=终端/操作员，或改预下单+患者扫码，禁止匿名现金成功；3) 挂号加同一患者/同医生当日去重与幂等键；4) 查询接口按取号凭证/就诊卡校验，不向匿名调用返回金额明细。",
+      "not_optimize_reason": "不适用：判定为本轮整改。匿名写资金状态可造成收费流失与账单状态污染，且可通过自增 ID 批量探测。"
+    },
+    {
+      "module": "portal",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "患者门户用“身份证号即凭据”：两个查询接口完全没有鉴权，返回姓名、身份证号、手机号、近 10 次就诊诊断、检验结果、影像报告和 image_url。身份证号可构造/枚举，接口又无频控、无二次核验、无访问审计，等于把 PHI 暴露给任何能访问端口的人；报告只按 status=reported 过滤，未审核报告也会外发。",
+      "findings": [
+        "未鉴权+身份证号即凭据：app/modules/portal/router.py:12-27 无 Depends；get_portal_patient（service.py:20-54）按 id_number 查患者并返回姓名/身份证号/手机号/挂号与就诊诊断；get_portal_reports（service.py:57-107）返回检验结果、影像报告与 image_url。docstring 自认“演示：身份证号作为身份凭据”。",
+        "可枚举/撞库：身份证号可依据公开规则构造，接口无频控、无失败计数、无手机号/就诊号二次核验，构成批量拖取 PHI 的入口。",
+        "无访问审计：读请求不写 patient_access_logs（仅 app/modules/patient/router.py 写），审计中间件只记录写方法（app/main.py:178-191）；docs/标准逐条对照.md §二 #35 的“已有患者访问审计”只在患者模块成立。",
+        "报告口径：只过滤 status==\"reported\"（service.py:68-84），未审核（reviewed）报告也外发；image_url 直接下发内网 PACS 地址。",
+        "无患者账号体系：没有登录/令牌/授权关系（docs/标准对照与差距.md §智慧服务 已列“没有统一患者门户账号体系”）；覆盖：tests/test_portal.py 5 例，均匿名调用，无客户端/管理台页面。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第3项 信息查询（⚠️：门户/报告查询有基础，未覆盖医嘱全量）",
+        "NHC 2018-4 第21项 信息公开（⚠️）、第14项 实名认证（⚠️：有身份证字段，无实名认证/人脸核验）",
+        "医院智慧服务 2019-236 第4项 信息推送（⚠️）、第16项 安全管理（⚠️）",
+        "电子病历分级 2018-1079 第35项 基础设施与安全管控（⚠️：已有患者访问审计，仍缺会话超时/多因素）"
+      ],
+      "reference_refs": [
+        "docs/标准逐条对照.md §三 第4/16项、§二 #35",
+        "docs/标准对照与差距.md §智慧服务（患者端在线支付/报告/排队不完整，P2）；reference/comparison.md、reference/README.md 未覆盖患者门户"
+      ],
+      "recommendation": "改为“账号+令牌”或至少“就诊号+手机后四位/短信验证码”双因子查询，并加频控；报告只出 reviewed 状态，image_url 改受控代理地址；所有读请求写 patient_access_logs；对外暴露前强制 HTTPS；在文档与页面标注“演示凭据不可用于生产”。",
+      "not_optimize_reason": "不适用：判定为本轮整改。未鉴权 PHI 读取且以身份证号为唯一凭据，属于上线前必须消除的隐私风险。"
+    },
+    {
+      "module": "download",
+      "verdict": "keep",
+      "priority": "P3",
+      "summary": "客户端分发只有两个无鉴权接口：/version 返回版本与 client_min_version，/download/client 用 FileResponse 直发 dist/his-client.zip。功能可用（有 404/200 测试），但没有 SHA256/签名/manifest；client_min_version 没有任何消费者——his_client/api.py:62-63 的 version() 从未被调用，启动/登录也不做版本检查，升级闭环实际不存在。",
+      "findings": [
+        "无鉴权、无完整性校验：app/modules/download/router.py:13-36 两个接口都无 Depends；FileResponse 直发 settings.CLIENT_ZIP_PATH（app/settings.py:97），没有 SHA256、签名或 manifest，无法防篡改。",
+        "升级闭环未落地：/version 返回 client_min_version（router.py:19），但 his_client/api.py:62-63 的 version() 从未被调用（__main__.py 启动与登录均无版本检查），该字段无消费者。",
+        "管理台入口存在：app/modules/admin/templates/base.html:81 直接链接 /download/client；无下载审计与次数限制。",
+        "覆盖：tests/test_distribution.py 4 例（/version、/auth/me、包缺失 404、包存在 200），无客户端/管理台专属页面。"
+      ],
+      "standard_refs": [
+        "无直接对应条款：NHC 2018-4 262 项中没有“客户端分发”指标；第218项 客户端终端认证在 docs/标准逐条对照.md 中标为“—”（终端/安全管理非本软件交付范围）",
+        "本模块仅作为交付配套，不作为评级达标证据"
+      ],
+      "reference_refs": [
+        "docs/客户端部署指南.md、docs/部署手册.md（客户端绿色包分发方式）",
+        "reference/README.md 使用边界（本资料包不参与产品打包）；reference/comparison.md 无分发章节"
+      ],
+      "recommendation": "保持现状即可；若启用自动升级，再补 zip 的 SHA256+签名、/version 强制校验（低于 client_min_version 拒绝登录）与下载审计。",
+      "not_optimize_reason": "该模块只做内网客户端包分发，不含患者数据，也没有自动升级链路（client_min_version 无客户端消费，his_client/api.py:62 的 version() 未被调用）；现在加签名/鉴权只增加部署与运维动作，不改善临床或合规结果，等真正启用自动升级时再一并做。"
+    },
+    {
+      "module": "idempotency",
+      "verdict": "optimize_later",
+      "priority": "P2",
+      "summary": "幂等中间件方向正确（唯一约束原子占位→执行→缓存响应→并发 409→5xx 释放），测试覆盖原子性、重放、endpoint 隔离、业务错误缓存。但缓存键只有 (key, endpoint)、没有用户维度：两个用户用同一 Idempotency-Key 命中同一端点时，后者会拿到前者缓存的响应体（可能含患者数据）；另外无 TTL 清理、processing 残留永久 409、4xx 也被永久缓存，中间件还全量缓冲响应。当前没有任何客户端发送该头，缺陷尚未被真实流量触发。",
+      "findings": [
+        "幂等键不区分用户：IdempotencyKey 唯一约束只有 (key, endpoint)（app/modules/idempotency/models.py:22-24），reserve/get_cached（service.py:18-50）也只按这两维；中间件用 method+path 作 endpoint（app/main.py:100）。两人用相同 key 命中同一端点时，后到者直接拿到前者缓存的响应体（如建档返回的患者数据），构成越权读取。",
+        "无过期/清理：created_at 无 TTL 或清理任务（全仓无清理逻辑）；processing 行在进程崩溃/客户端断开后永久残留（只有 5xx 与异常才 release，main.py:131-132），该 key 后续永远 409。",
+        "缓存 4xx：除 5xx 外都 store_response（main.py:131-140），400/404 用同 key 重试会永久返回旧错误（tests/test_idempotency.py:75-86 明确断言此行为）。",
+        "全量缓冲响应：中间件 async for chunk in response.body_iterator 后重建 Response（main.py:126-152），大响应/文件流整块进内存并丢失原始流式语义。",
+        "没有真实使用者：his_client 未发送 Idempotency-Key（全仓仅 tests/test_idempotency.py 使用），写接口重复提交防护实际未生效；服务端也无法知道哪些客户端支持。",
+        "会话借用模式脆弱：_session() 用 next(get_db()) 取会话并手工 close（service.py:14-15），生成器未被消费/关闭；覆盖：tests/test_idempotency.py 7 例（重放、无 key、endpoint 隔离、业务错误缓存、并发原子占位、409、GET 忽略）。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4 第112项 数据交换（⚠️：有 REST API/集成模块，缺标准交换规范与失败重试边界）",
+        "NHC 2018-4 第115项 业务规则流程管理（⚠️：有业务规则代码，缺可视化流程配置）",
+        "电子病历分级 2018-1079 第35项 基础设施与安全管控（⚠️：身份、权限、审计、备份仍需完善）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §5 值得借鉴第5条“LIS/PACS 接口状态和失败重试”（本模块是同一诉求的通用化）",
+        "docs/标准对照与差距.md §1.5 数据共享与接口（明确接口边界、失败重试、审计）；reference/README.md 未覆盖幂等"
+      ],
+      "recommendation": "缓存键加 username/租户维度（uq(key,endpoint,username)）；加 TTL（如 24h）与 processing 超时清理；只缓存 2xx 或按配置缓存 4xx；客户端接入时由 api.py 统一注入 Idempotency-Key；中间件改流式透传或限制缓存响应体大小。",
+      "not_optimize_reason": "当前没有客户端发送 Idempotency-Key（仅测试使用），跨用户缓存泄露尚未被真实流量触发；但一旦客户端接入就会直接暴露写入响应，故列为 P2，在客户端接入前修复，而不是现在改动全局中间件影响全部写请求。"
+    }
+  ]
+}

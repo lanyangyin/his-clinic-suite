@@ -1,4 +1,5 @@
 """收费面板：门诊工作站/药房工作站共用（现金/微信/支付宝/POS/医保卡）。"""
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
@@ -16,12 +17,16 @@ from PySide6.QtWidgets import (
 from his_client.api import ApiClient, ApiError
 from his_client.config import load_config
 from his_client.labels import zh
+from his_client.ui.patient_picker import PatientPicker
 
 
 class PaymentPanel(QWidget):
-    def __init__(self, api: ApiClient, parent=None):
+    payment_completed = Signal()
+
+    def __init__(self, api: ApiClient, parent=None, compact: bool = False):
         super().__init__(parent)
         self.api = api
+        self.compact = compact
         self.insurance_enabled = load_config().insurance_enabled
         layout = QVBoxLayout(self)
 
@@ -40,15 +45,30 @@ class PaymentPanel(QWidget):
         scan_row.addWidget(self.scan_status)
         box_layout.addLayout(scan_row)
 
+        picker_row = QHBoxLayout()
+        self.patient_picker = PatientPicker(self.api)
+        self.patient_picker.patient_selected.connect(self._load_patient_encounters)
+        picker_row.addWidget(self.patient_picker, 1)
+        self.patient_picker.setVisible(not compact)
+        box_layout.addLayout(picker_row)
+
         row = QHBoxLayout()
         self.encounter_id = QSpinBox()
-        self.encounter_id.setRange(1, 10_000_000)
+        self.encounter_id.setRange(0, 10_000_000)
+        self.encounter_id.setSpecialValueText("扫码/选择就诊")
+        self.encounter_id.setValue(0)
         query = QPushButton("查询费用")
         query.clicked.connect(self._load_charges)
         pay = QPushButton("收费")
         pay.clicked.connect(self._pay)
-        row.addWidget(QLabel("就诊 ID"))
+        self.encounter_id.setMaximumWidth(150)
+        self.encounter_choice = QComboBox()
+        self.encounter_choice.setMinimumWidth(260)
+        self.encounter_choice.currentIndexChanged.connect(self._choose_encounter)
+        row.addWidget(QLabel("就诊"))
         row.addWidget(self.encounter_id)
+        self.encounter_choice.setVisible(not compact)
+        row.addWidget(self.encounter_choice, 1)
         row.addWidget(query)
         row.addWidget(pay)
         box_layout.addLayout(row)
@@ -121,8 +141,39 @@ class PaymentPanel(QWidget):
                 f"未收费：{row['patient_name']}，待收 {row['pending_amount']:.2f} 元"
             )
 
+    def _load_patient_encounters(self, patient: dict) -> None:
+        self.encounter_choice.blockSignals(True)
+        self.encounter_choice.clear()
+        try:
+            rows = self.api.list_encounters(patient_id=int(patient["id"]))
+        except ApiError as e:
+            self.encounter_choice.addItem(f"就诊加载失败：{e.detail}", None)
+            self.encounter_choice.blockSignals(False)
+            return
+        for row in rows:
+            status = zh("encounter_status", row.get("status")) or row.get("status") or ""
+            diagnosis = row.get("diagnosis") or "未诊断"
+            self.encounter_choice.addItem(
+                f"就诊 {row['id']} · {diagnosis} · {status}", row["id"]
+            )
+        if not rows:
+            self.encounter_choice.addItem("该患者暂无就诊", None)
+        self.encounter_choice.blockSignals(False)
+        if rows:
+            self.encounter_choice.setCurrentIndex(0)
+            self._choose_encounter(0)
+
+    def _choose_encounter(self, index: int) -> None:
+        encounter_id = self.encounter_choice.itemData(index) if index >= 0 else None
+        if encounter_id:
+            self.encounter_id.setValue(int(encounter_id))
+            self._load_charges()
+
     def _load_charges(self) -> None:
         encounter_id = self.encounter_id.value()
+        if encounter_id <= 0:
+            self.message.setText("请先扫码或填写就诊 ID")
+            return
         try:
             charges = self.api.get_charges(encounter_id)
             summary = self.api.get_charge_summary(encounter_id)
@@ -146,6 +197,9 @@ class PaymentPanel(QWidget):
         )
 
     def _pay(self) -> None:
+        if self.encounter_id.value() <= 0:
+            self.message.setText("请先扫码或填写就诊 ID")
+            return
         try:
             payment = self.api.create_payment(
                 self.encounter_id.value(),
@@ -171,3 +225,4 @@ class PaymentPanel(QWidget):
             )
         )
         self._load_charges()
+        self.payment_completed.emit()

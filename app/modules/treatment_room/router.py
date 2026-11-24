@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 from app.modules.procedure_materials.schemas import (
     ProcedureMaterialCreate,
     ProcedureMaterialResponse,
@@ -50,7 +50,7 @@ from .service import (
     workbench,
 )
 
-router = APIRouter(prefix="/treatment-room", tags=["treatment-room"])
+router = APIRouter(prefix="/treatment-room", tags=["treatment-room"], dependencies=[Depends(require_read_login)])
 CONSENT_DIR = Path("data/treatment_consents")
 
 

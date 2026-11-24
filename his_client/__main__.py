@@ -24,7 +24,35 @@ def _auto_login():
         return None
 
 
+def _open_main_window(app, api, user):
+    """显示加载提示后再构造主窗口，避免认证成功后出现空白/像闪退。"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QMessageBox, QProgressDialog
+
+    from his_client.ui.main_window import MainWindow
+
+    progress = QProgressDialog("登录成功，正在加载工作站…", "", 0, 0)
+    progress.setWindowTitle("HIS 客户端")
+    progress.setCancelButton(None)
+    progress.setWindowModality(Qt.ApplicationModal)
+    progress.setMinimumDuration(0)
+    progress.show()
+    app.processEvents()
+    try:
+        return MainWindow(api, user)
+    except Exception as exc:
+        progress.close()
+        QMessageBox.critical(None, "启动失败", f"加载工作站失败：{exc}")
+        return None
+    finally:
+        progress.close()
+
+
 def main() -> int:
+    from his_client.crashlog import install_crash_logging
+
+    log_path = install_crash_logging()
+    print(f"客户端日志: {log_path}")
     if "--self-test" in sys.argv:
         return _self_test()
 
@@ -37,15 +65,17 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setFont(QFont("Microsoft YaHei", 10))
-    from his_client.ui.theme import install_theme_watcher
-    install_theme_watcher(app)
     from his_client.ui.window_theme import install_light_titlebars
+    from his_client.ui.table_policy import install_readonly_table_policy
+    install_readonly_table_policy(app)
     install_light_titlebars(app)
 
     if "--auto-login" in sys.argv:
         pair = _auto_login()
         if pair:
-            window = MainWindow(pair[0], pair[1])
+            window = _open_main_window(app, pair[0], pair[1])
+            if window is None:
+                return 1
             window.show()
             return app.exec()
 
@@ -53,7 +83,9 @@ def main() -> int:
     if dialog.exec() != QDialog.Accepted or not dialog.api or not dialog.user:
         return 0
 
-    window = MainWindow(dialog.api, dialog.user)
+    window = _open_main_window(app, dialog.api, dialog.user)
+    if window is None:
+        return 1
     window.show()
     return app.exec()
 
@@ -90,7 +122,7 @@ def _self_test() -> int:
         "SELF-TEST OK",
         f"version={CLIENT_VERSION}",
         f"login={dialog.windowTitle()}",
-        f"tabs={window.centralWidget().count()}",
+        f"tabs={window.tabs.count()}",
         f"widgets={len(widgets)}",
     )
     return 0

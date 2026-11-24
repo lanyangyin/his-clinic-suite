@@ -9,9 +9,9 @@ class Dispense(Base):
     __tablename__ = "dispensations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    # MVP：一次就诊只发一次药
+    # 一次就诊可因退药/退费后重新发药，保留历史记录
     encounter_id: Mapped[int] = mapped_column(
-        ForeignKey("encounters.id"), unique=True, nullable=False, index=True
+        ForeignKey("encounters.id"), nullable=False, index=True
     )
     # dispensed 已发药 / returned 已退药
     status: Mapped[str] = mapped_column(
@@ -25,6 +25,34 @@ class Dispense(Base):
     receiver_relation: Mapped[str] = mapped_column(String(20), default="本人", server_default="本人", nullable=False)
     signature_path: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
     signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    items: Mapped[list["DispenseItem"]] = relationship(
+        back_populates="dispense", cascade="all, delete-orphan"
+    )
+
+
+class DispenseItem(Base):
+    """实际发药明细：一张发药单可拆多个批次/多个处方明细。"""
+
+    __tablename__ = "dispense_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    dispense_id: Mapped[int] = mapped_column(
+        ForeignKey("dispensations.id"), nullable=False, index=True
+    )
+    prescription_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prescription_items.id"), nullable=True, index=True
+    )
+    drug_id: Mapped[int | None] = mapped_column(ForeignKey("drugs.id"), nullable=True)
+    drug_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    spec: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    batch_no: Mapped[str] = mapped_column(String(30), default="", nullable=False)
+    expiry: Mapped[date | None] = mapped_column(Date, nullable=True)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    returned_quantity: Mapped[int] = mapped_column(default=0, nullable=False)
+    unit_price: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    amount: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    dispense: Mapped["Dispense"] = relationship(back_populates="items")
 
 
 class DrugStock(Base):

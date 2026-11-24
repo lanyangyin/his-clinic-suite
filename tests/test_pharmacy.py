@@ -307,3 +307,99 @@ def test_get_dispense(client, auth):
 
 def test_get_dispense_missing(client):
     assert client.get("/pharmacy/dispense/999").status_code == 404
+
+
+def test_partial_dispense_return_restores_each_line(client, auth):
+    reg = make_registration(client, auth)
+    encounter = client.post(
+        "/encounters/", json={"registration_id": reg["id"]}, headers=auth["doctor"]
+    ).json()
+    drug_a = make_drug(client, auth, "部分退药A", 10.0)
+    drug_b = make_drug(client, auth, "部分退药B", 5.0)
+    for drug in (drug_a, drug_b):
+        client.post(
+            f"/encounters/{encounter['id']}/prescriptions",
+            json={"drug_id": drug["id"], "quantity": 2},
+            headers=auth["doctor"],
+        )
+        stock_in(client, auth, drug["id"], f"P{drug['id']}", "2027-06-30", quantity=10)
+    client.post("/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"])
+    dispensed = client.post(
+        "/pharmacy/dispense",
+        json={"encounter_id": encounter["id"]},
+        headers=auth["pharmacist"],
+    )
+    assert dispensed.status_code == 201, dispensed.text
+    record = dispensed.json()
+    assert len(record["items"]) == 2
+    first = record["items"][0]
+    partial = client.post(
+        f"/pharmacy/dispense/{record['id']}/return-items",
+        json={"items": [{"line_id": first["id"], "quantity": 1}], "reason": "患者少取"},
+        headers=auth["pharmacist"],
+    )
+    assert partial.status_code == 200, partial.text
+    assert partial.json()["status"] == "partially_returned"
+    assert partial.json()["items"][0]["returned_quantity"] == 1
+    rest = client.post(
+        f"/pharmacy/dispense/{record['id']}/return-items",
+        json={"items": [{"line_id": first["id"], "quantity": 1}, {"line_id": record["items"][1]["id"], "quantity": 2}]},
+        headers=auth["pharmacist"],
+    )
+    assert rest.status_code == 200, rest.text
+    assert rest.json()["status"] == "returned"
+
+
+def test_return_refund_then_redispense_same_encounter(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", False)
+    reg = make_registration(client, auth)
+    encounter = client.post(
+        "/encounters/", json={"registration_id": reg["id"]}, headers=auth["doctor"]
+    ).json()
+    drug = make_drug(client, auth, "重发药", 10.0)
+    drug_b = make_drug(client, auth, "重发药B", 10.0)
+    stock_in(client, auth, drug["id"], "RE-DISP", "2027-06-30", quantity=10)
+    stock_in(client, auth, drug_b["id"], "RE-DISP-B", "2027-06-30", quantity=10)
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert payment.status_code == 201, payment.text
+    first = client.post(
+        "/pharmacy/dispense",
+        json={"encounter_id": encounter["id"]},
+        headers=auth["pharmacist"],
+    )
+    assert first.status_code == 201, first.text
+    returned = client.post(
+        f"/pharmacy/dispense/{first.json()['id']}/return",
+        headers=auth["pharmacist"],
+    )
+    assert returned.status_code == 200, returned.text
+    refunded = client.post(
+        f"/payments/{payment.json()['id']}/refund", headers=auth["cashier"]
+    )
+    assert refunded.status_code == 200, refunded.text
+    added = client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug_b["id"], "quantity": 1},
+        headers=auth["doctor"],
+    )
+    assert added.status_code == 201, added.text
+    second_payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert second_payment.status_code == 201, second_payment.text
+    second = client.post(
+        "/pharmacy/dispense",
+        json={"encounter_id": encounter["id"]},
+        headers=auth["pharmacist"],
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] != first.json()["id"]

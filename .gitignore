@@ -47,3 +47,14 @@ login_history.json
 
 # 客户端界面状态（分隔条高度等）
 ui_state.ini
+# 验收媒体（视频/截图体积大，随 Release 资产发布）
+docs/acceptance_20261124/videos/
+docs/acceptance_20261124/screenshots/
+client_run*.err
+client_run*.out
+# 参考源码副本（含超长路径，不纳入本仓库）
+reference/open-source/openhis-itai/
+preview_probe.py
+preview_run.err
+reference/open-source/shanghai-his/
+reference/open-source/*/repo/

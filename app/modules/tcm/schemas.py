@@ -37,6 +37,12 @@ class PrescriptionCreate(BaseModel):
     items: list[PrescriptionItemCreate] = Field(min_length=1)
 
 
+class PrescriptionItemUpdate(BaseModel):
+    dose_g: float = Field(gt=0, le=1000)
+    special: str = Field(default="none", pattern="^(none|first|last|wrap|separate|melt|infuse)$")
+    note: str = Field(default="", max_length=100)
+
+
 class PrescriptionItemResponse(BaseModel):
     id: int
     herb_id: int
@@ -50,6 +56,7 @@ class PrescriptionItemResponse(BaseModel):
 class PrescriptionResponse(BaseModel):
     id: int
     prescription_no: str
+    prescription_id: int | None = None
     encounter_id: int
     doctor: str
     formula_name: str

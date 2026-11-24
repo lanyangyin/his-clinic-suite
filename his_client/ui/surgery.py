@@ -27,6 +27,7 @@ from his_client.ui.theme import apply_theme
 from his_client.labels import zh
 from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
+from his_client.ui.patient_picker import PatientPicker
 
 
 class SurgeryWidget(QWidget):
@@ -87,7 +88,13 @@ class SurgeryWidget(QWidget):
         case_box = QGroupBox("手术排班")
         form = QFormLayout(case_box)
         self.sc_patient = QSpinBox()
-        self.sc_patient.setRange(1, 10_000_000)
+        self.sc_patient.setRange(0, 10_000_000)
+        self.sc_patient.setSpecialValueText("选择患者")
+        self.sc_patient.setValue(0)
+        self.sc_patient_picker = PatientPicker(self.api)
+        self.sc_patient_picker.patient_selected.connect(
+            lambda patient: self.sc_patient.setValue(int(patient["id"]))
+        )
         self.sc_room = QComboBox()
         self.sc_procedure = QLineEdit()
         self.sc_diagnosis = QLineEdit()
@@ -103,6 +110,7 @@ class SurgeryWidget(QWidget):
         self.sc_price.setPlaceholderText("空=收费项目价")
         create = QPushButton("创建手术")
         create.clicked.connect(self._create_case)
+        form.addRow("查患者", self.sc_patient_picker)
         form.addRow("患者 ID", self.sc_patient)
         form.addRow("手术间", self.sc_room)
         form.addRow("手术名称", self.sc_procedure)
@@ -128,7 +136,9 @@ class SurgeryWidget(QWidget):
         layout = QVBoxLayout(page)
         top = QHBoxLayout()
         self.case_id = QSpinBox()
-        self.case_id.setRange(1, 10_000_000)
+        self.case_id.setRange(0, 10_000_000)
+        self.case_id.setSpecialValueText("选择手术")
+        self.case_id.setValue(0)
         load = QPushButton("载入手术")
         load.clicked.connect(self._load_case)
         top.addWidget(QLabel("手术 ID"))
@@ -290,7 +300,9 @@ class SurgeryWidget(QWidget):
         layout = QVBoxLayout(page)
         form = QFormLayout()
         self.recovery_case = QSpinBox()
-        self.recovery_case.setRange(1, 10_000_000)
+        self.recovery_case.setRange(0, 10_000_000)
+        self.recovery_case.setSpecialValueText("选择手术")
+        self.recovery_case.setValue(0)
         self.vitals = QLineEdit()
         self.score = QSpinBox()
         self.score.setRange(0, 10)
@@ -484,8 +496,8 @@ class SurgeryWidget(QWidget):
         except ApiError as e:
             self.intra_msg.setText(f"核查失败（{e.status_code}）：{e.detail}")
             return
-        self.intra_msg.setText(f"安全核查完成：{phase}")
         self._load_case()
+        self.intra_msg.setText(f"安全核查完成：{phase}")
 
     def _start(self) -> None:
         try:
@@ -493,8 +505,8 @@ class SurgeryWidget(QWidget):
         except ApiError as e:
             self.intra_msg.setText(f"开始失败（{e.status_code}）：{e.detail}")
             return
-        self.intra_msg.setText("手术已开始")
         self._load_case()
+        self.intra_msg.setText("手术已开始")
 
     def _save_record(self) -> None:
         try:
@@ -511,8 +523,8 @@ class SurgeryWidget(QWidget):
         except ApiError as e:
             self.intra_msg.setText(f"记录失败（{e.status_code}）：{e.detail}")
             return
-        self.intra_msg.setText("术中记录已保存")
         self._load_case()
+        self.intra_msg.setText("术中记录已保存")
 
     def _add_count(self) -> None:
         try:
@@ -528,8 +540,8 @@ class SurgeryWidget(QWidget):
         except ApiError as e:
             self.intra_msg.setText(f"清点失败（{e.status_code}）：{e.detail}")
             return
-        self.intra_msg.setText("清点相符" if row["matched"] else "清点不符")
         self._load_case()
+        self.intra_msg.setText("清点相符" if row["matched"] else "清点不符")
 
     def _complete(self) -> None:
         try:
@@ -537,8 +549,8 @@ class SurgeryWidget(QWidget):
         except ApiError as e:
             self.intra_msg.setText(f"结束失败（{e.status_code}）：{e.detail}")
             return
-        self.intra_msg.setText("手术已结束")
         self._load_case()
+        self.intra_msg.setText("手术已结束")
 
     def _attach_package(self) -> None:
         try:

@@ -23,7 +23,7 @@ class InboundOrder(Base):
     source: Mapped[str] = mapped_column(
         String(20), default="purchase", server_default="purchase", nullable=False
     )
-    # received 已收货 / checked 已验收 / stocked 已入库 / cancelled 已取消
+    # received 已收货 / checking 验收中 / checked 已验收 / stocking 入库中 / stocked 已入库 / cancelled 已取消
     status: Mapped[str] = mapped_column(
         String(20), default="received", server_default="received", nullable=False
     )

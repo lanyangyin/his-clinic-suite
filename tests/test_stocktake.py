@@ -48,10 +48,19 @@ def test_drug_stocktake_adjusts_stock(client, auth):
     )
     assert done.status_code == 200, done.text
     assert done.json()["status"] == "completed"
+    again = client.post(
+        f"/stocktakes/{body['id']}/complete", headers=auth["warehouse"]
+    )
+    assert again.status_code == 400
+    assert "已结束" in again.json()["detail"]
     stocks = client.get(
         f"/warehouse/stocks?drug_id={drug['id']}", headers=auth["admin"]
     ).json()
     assert stocks[0]["quantity"] == 7
+    ledger = client.get(
+        "/stock/ledger?ref_type=stocktake&warehouse=总库", headers=auth["admin"]
+    ).json()
+    assert ledger and ledger[0]["balance_after"] == 7
 
 
 def test_material_stocktake_and_page(client, auth):

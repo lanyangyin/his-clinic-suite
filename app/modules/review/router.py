@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.modules.auth.security import require_role
+from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import ReviewDetail, ReviewIssue, ReviewSummary
 from .service import detail, issues, summary
 
-router = APIRouter(prefix="/review", tags=["review"])
+router = APIRouter(prefix="/review", tags=["review"], dependencies=[Depends(require_read_login)])
 
 
 @router.get("/summary", response_model=ReviewSummary)

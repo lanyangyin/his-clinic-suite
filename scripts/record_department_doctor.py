@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.doctor import DoctorWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "doctor"
@@ -30,7 +30,7 @@ VIDEO = VIDEO_DIR / "02_医生站.mp4"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class DoctorDemo(QMainWindow):
+class DoctorDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("医生站 · doctor")
@@ -166,23 +166,49 @@ class DoctorDemo(QMainWindow):
             json={"patient_id": self.patient["id"], "doctor_id": self.doc["id"]},
         )
         self.registration = reg
+    def add_drug_row(self, name: str, quantity: int = 2) -> None:
+        from his_client.ui.prescription_dialog import PrescriptionQuickDialog
+
+        table = self.widget.drug_table
+        target = -1
+        for row in range(table.rowCount()):
+            if table.item(row, 1) and table.item(row, 1).text() == name:
+                target = row
+                break
+        if target < 0:
+            raise RuntimeError(f"药品目录没有 {name}")
+
+        def fill_dialog():
+            for widget in QApplication.topLevelWidgets():
+                if isinstance(widget, PrescriptionQuickDialog) and widget.isVisible():
+                    widget.quantity.setValue(quantity)
+                    widget.days.setValue(3)
+                    widget.accept()
+                    return
+            QTimer.singleShot(200, fill_dialog)
+
+        QTimer.singleShot(200, fill_dialog)
+        self.double_click_cell(table, target, 1)
+        self.wait(1.0)
+
     def run(self):
         try:
             FRAME_DIR.mkdir(parents=True, exist_ok=True)
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("doctor", "doctor123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)
             self.setup()
             self.widget.auto_timer.stop()
-            work = self.tab("门诊工作台")
+            work = self.tab("门诊队列")
             self.widget._load_workbench()
             self.scene("医生站演示：未选患者直接点开始接诊", work)
-            self.click(work, "开始接诊")
-            assert "请先选择患者" in self.widget.wb_summary.text(), self.widget.wb_summary.text()
-            self.scene("异常路径被拦截；现在选中本次患者")
+            assert not self.widget.wb_start.isEnabled(), "未选患者时开始接诊应禁用"
+            self.scene("未选患者时开始接诊按钮禁用；现在选中本次患者")
             target = -1
             for row in range(self.widget.wb_table.rowCount()):
                 if self.patient["name"] in self.widget.wb_table.item(row, 1).text():
@@ -192,10 +218,6 @@ class DoctorDemo(QMainWindow):
             self.widget.wb_table.selectRow(target)
             self.widget._select_workbench(target, 0)
             self.scene("填写诊断并开始接诊")
-            code_index = self.widget.wb_diagnosis_code.findData("J06.9")
-            if code_index >= 0:
-                self.widget.wb_diagnosis_code.setCurrentIndex(code_index)
-            self.widget.wb_diagnosis.setText("急性上呼吸道感染")
             self.click(work, "开始接诊")
             encounters = self.doctor_api.call(
                 "GET", "/encounters/", params={"patient_id": self.patient["id"]}
@@ -203,26 +225,7 @@ class DoctorDemo(QMainWindow):
             self.encounter = encounters[0]
             assert self.encounter["id"]
 
-            self.scene("接诊时修改患者史，保存留痕", work)
-
-            def fill_clinical_dialog():
-                for widget in QApplication.topLevelWidgets():
-                    if widget.__class__.__name__ == "PatientClinicalDialog" and widget.isVisible():
-                        widget.allergy_status.setCurrentIndex(
-                            widget.allergy_status.findData("present")
-                        )
-                        widget.allergy_detail.setText("青霉素、头孢")
-                        widget.special_history.setPlainText(
-                            "2型糖尿病 8 年；高血压 5 年；冠心病 2 年"
-                        )
-                        widget.reason.setText("接诊核对患者史")
-                        widget.accept()
-                        return
-
-            QTimer.singleShot(700, fill_clinical_dialog)
-            self.click(self.widget.patient_info, "修改过敏史 / 现存疾病")
-            self.wait(1.2)
-            assert "患者史已更新" in self.widget.wb_summary.text(), self.widget.wb_summary.text()
+            self.scene("接诊成功，医生站自动进入病历页；继续演示检验危急值联动", self.tab("病历"))
 
             lab_request = self.doctor_api.call(
                 "POST", f"/lab/encounters/{self.encounter['id']}/lab-requests",
@@ -248,7 +251,7 @@ class DoctorDemo(QMainWindow):
                     self.widget._select_workbench(row, 0)
                     break
             self.widget._load_critical_alerts()
-            self.scene("检验科报告危急值，医生工作台红色提醒")
+            self.scene("检验科报告危急值，医生工作台红色提醒", work)
             self.widget.critical_table.selectRow(0)
             self.widget._select_critical(0, 0)
             self.widget.critical_note.setText("已电话回读并确认")
@@ -271,16 +274,7 @@ class DoctorDemo(QMainWindow):
             rx_tab = self.tab("开方")
             self.widget.rx_encounter_id.setValue(self.encounter["id"])
             self.click(rx_tab, "刷新药品目录")
-            for row in range(self.widget.drug_table.rowCount()):
-                if self.widget.drug_table.item(row, 1).text() == self.drug["name"]:
-                    self.widget.drug_table.selectRow(row)
-                    self.widget.rx_drug_id.setText(self.widget.drug_table.item(row, 0).text())
-                    break
-            self.widget.rx_quantity.setValue(2)
-            self.widget.rx_dosage.setText("1 片")
-            self.widget.rx_frequency.setText("tid")
-            self.widget.rx_route.setText("口服")
-            self.click(rx_tab, "开方")
+            self.add_drug_row(self.drug["name"], 2)
             self.scene("西药处方已开；切换到注射剂", rx_tab)
             self.widget.rx_type_tabs.setCurrentIndex(0)
             self.widget._load_drugs()
@@ -288,16 +282,7 @@ class DoctorDemo(QMainWindow):
                 self.widget.rx_form_filter.findData("注射")
             )
             self.wait(0.8)
-            for row in range(self.widget.drug_table.rowCount()):
-                if self.widget.drug_table.item(row, 1).text() == self.injection["name"]:
-                    self.widget.drug_table.selectRow(row)
-                    self.widget.rx_drug_id.setText(self.widget.drug_table.item(row, 0).text())
-                    self.widget.rx_quantity.setValue(1)
-                    self.widget.rx_dosage.setText("0.5g")
-                    self.widget.rx_frequency.setText("qd")
-                    self.widget.rx_route.setText("静滴")
-                    break
-            self.click(rx_tab, "开方")
+            self.add_drug_row(self.injection["name"], 1)
             self.scene("注射剂已开；切换到中药饮片", rx_tab)
             self.widget.rx_type_tabs.setCurrentIndex(1)
             self.widget._load_tcm_herbs()

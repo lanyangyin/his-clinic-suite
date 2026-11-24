@@ -33,6 +33,10 @@ class TcmPrescription(Base):
     encounter_id: Mapped[int] = mapped_column(
         ForeignKey("encounters.id"), nullable=False, index=True
     )
+    # 统一处方头：中药饮片也挂到 prescriptions(type=tcm_herb)
+    prescription_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prescriptions.id"), nullable=True, index=True
+    )
     doctor: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     formula_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     usage: Mapped[str] = mapped_column(String(20), default="internal", nullable=False)

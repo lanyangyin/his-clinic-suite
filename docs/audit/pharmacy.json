@@ -1,0 +1,372 @@
+{
+  "domain": "pharmacy-supply（药事与物资供应域：drug / pharmacy / warehouse / receiving / stock_ledger / stocktake / supplier / materials / gsp / traceability / narcotic / cssd / linen / procedure_materials，14 个模块）",
+  "modules": [
+    {
+      "module": "drug",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "药品主数据字段是药品域里最全的（医保贯标 insurance_code/category/match_status、抗菌药分级、高危、OTC、条码、管制等级、剂型/批准文号/厂家），但只有创建没有维护：同名创建静默复用旧记录并丢弃新价格，全仓库无药品更新接口；相互作用规则无数据库唯一约束与停用入口；读接口全部匿名。",
+      "findings": [
+        "app/modules/drug/service.py create_drug：同名直接返回既有记录，请求里的 base_price/spec/高危/OTC 全部被忽略；tests/test_drug.py::test_duplicate_drug_returns_existing 断言第二次 base_price=99 仍返回 201 且 id 不变，等于把静默丢价固化为契约。",
+        "全仓库无 PUT/PATCH /drugs 或 update_drug（检索 base_price= 只出现在 admin 创建、catalog_proposal、insurance_catalog），药价/规格/管制等级创建后不可改；insurance_catalog.service.ensure_drug_from_catalog 以 base_price=0.0 落本地药（insurance_catalog/service.py:457-461），inbound 未填单价时取 drug.base_price=0 → 处方 unit_price 快照 0 → 收费 0，金额链失真。",
+        "DrugInteraction 无 UniqueConstraint（drug/models.py 仅两个 ForeignKey + 字段），重复靠 router 手工查重，并发/重放可产生重复规则；active 字段无翻转接口，规则只能建不能停。",
+        "缺基本药物标识（NHC 55）与药理/药品分类编码，dosage_form/manufacturer 为自由文本，无法支撑按类统计与目录治理。",
+        "GET /drugs/、/drugs/{id}、/drugs/by-barcode、/drugs/interactions 均无 require_role（drug/router.py:23-75），匿名可枚举价格、条码、医保码与管制等级。",
+        "管理台药品表单没有 controlled_level 字段（admin/templates/drugs.html 与 admin/router.py drugs_create 只收 antibiotic_level/high_alert/is_otc），麻精标记只能走 API POST /drugs/。",
+        "tests/test_drug.py 仅 5 例（CRUD+负价），tests/test_drug_safety.py 覆盖相互作用/条码，均未覆盖药价修改与 0 价药开方。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（24）门诊合理用药（docs/标准逐条对照.md L158）",
+        "NHC 2018-4（51）药事信息管理（L185）、（54）抗菌药物管理（L188）、（55）基本药物监管（L189）",
+        "电子病历 39 项第 10 项 门诊医师/处方书写 4 级「关联药物知识、剂型/可供应提示」（L51）",
+        "智慧服务 17 项第 9 项 药品调剂与配送（L106）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.1 处方头、§3.3 审方（字段级对照）",
+        "上海哲策 DmSstore.java：drugType/dosageForm/pharmacologicAction/otcType/insurerate/nationalNumber/upLimit/downLimit（reference/open-source/shanghai-his/repo/hospital-information-systemhis-master/HIS-boot-module/his-module-his/src/main/java/org/jeecg/modules/his/entity/drugStore/DmSstore/DmSstore.java）",
+        "OpenHIS InventoryItem.java：lotNumber/expirationDate/validityMon/traceNo/locationId（openhis-domain/.../workflow/domain/InventoryItem.java）"
+      ],
+      "recommendation": "补 PATCH /drugs/{id}（价格/规格/高危/OTC/管制等级/基本药物，变更写审计）；重名创建改为 409 或显式 upsert 语义；DrugInteraction 加 (drug_a_id,drug_b_id) 唯一约束 + 停用接口；所有 GET 补 require_login；admin 药品表单补 controlled_level/基本药物；ensure_drug_from_catalog 落库后禁止 0 价进入可开方状态（标记待定价或开方时拦截）。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "pharmacy",
+      "verdict": "optimize_now",
+      "priority": "P0",
+      "summary": "发药/退药/取药码/叫号/零售/取药凭证已是真实闭环：收费+药师审方双闸门 → 近效期扣批 → dispense_items 记批次效期 → 退药回补 → 已发药拦截退费。但处方头状态机只走到 approved：全仓库没有任何代码把 Prescription.status 写成 dispensing/dispensed，发药不回写处方状态，「调配中→已发药」是死状态。",
+      "findings": [
+        "pharmacy/service.py dispense()：校验 payment.status==paid、REQUIRE_PRESCRIPTION_REVIEW 时拒绝 pending_review/dispensing 处方、取药码归属/一次性校验、FEFO 扣批、写 DispenseItem（batch_no/expiry/amount）、管制药调用 narcotic.record_issue、回写叫号与取药码；deduct_stock 用条件 UPDATE（quantity>=take）防扣负并拦截 GSP 召回批次。",
+        "处方状态断链：encounter/service.py 只在 finalize_prescription_approval 写 approved/rejected，检索 prescription.status = 无 dispensing/dispensed 赋值；pharmacy/service.py:125 对 dispensing 的过滤是死分支；print/router.py:346 的「调配中」标签永远用不到。docs/标准逐条对照.md L6 与 reference/comparison.md §7 宣称「审方状态机/发药明细已完成」，与代码只完成审方段不符。",
+        "Dispense.encounter_id 唯一（pharmacy/models.py:12-15 注释「MVP：一次就诊只发一次药」）→ 同就诊多张处方/多次发药无法表达；return_dispense 只能整单退（遍历全部明细剩余量），没有按 dispense_item 部分退药接口。",
+        "高危药品双人核对没有落到发药：high_alert 只在 nursing.service.prepare 校验第二核对人（nursing/service.py:170-174），门诊发药单药师一人即可完成。",
+        "麻精发药无双人签字：narcotic.record_issue 不写 witness（narcotic/service.py:12-27），witness 只由 /narcotic/ampoule-return 请求体自由文本传入（narcotic/router.py:60-71）。",
+        "零售退货非原子且不拦召回：retail_service.refund_retail_sale 先查 status==completed 再改，无条件 UPDATE（并发可双退）；create_retail_sale 不检查 GspRecall，已召回批次仍可零售（与 deduct_stock 的召回拦截不一致）。",
+        "GET /pharmacy/dispense/{id}、/pharmacy/stocks、/pharmacy/stocks/{id} 无鉴权（router.py:94-124），发药记录含 receiver_name/signature_path/note；/pharmacy/worklist 是 GET 但会建取药码并 commit。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（23）门急诊处方和处置管理（L157）、（24）门诊合理用药（L158）、（29）非药品医嘱执行（L163）、（30）药品医嘱执行（L164）、（51）药事信息管理（L185）、（52）处方点评（L186）、（53）发药管理（L187）、（56）药物物流管理（L190）、（57）静脉药物配置管理（L191）",
+        "电子病历第 29 项 门诊药品调剂 3/4 级「处方-调配-发药关联；合理用药审方」（L70）",
+        "智慧服务第 9 项 药品调剂与配送（L106）"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.2 发药明细、§3.3 审方、§4 状态机对照（目标状态 prescription: draft→submitted→pending_review→approved/rejected→dispensing→dispensed）、§7 结论",
+        "OpenHIS MedicationDispense（medReqId/dispenseQuantity/preparerId/prepareTime/dispenseTime）与 ReviewPrescriptionRecords（passFlag/reasonText/practitionerId），见 comparison.md L111-129、L174-183",
+        "上海哲策 CmDruglist（adviceCode/adviceId、send_status/send_qty/return_qty、batch_no/expiry_date），见 comparison.md L188-193"
+      ],
+      "recommendation": "在 dispense() 内按处方头写 dispensing→dispensed（发药成功回写、整单退药回写 returned/已退），把 /pharmacy/prescription-reviews 扩成「已审待配」队列；退药支持按 dispense_item 部分退；Dispense 唯一键改 (encounter_id,prescription_id) 或增加发药批次；高危药品发药强制第二人（复用 nursing 的 checked_by 规则）；麻精 issue 写 witness 并校验为另一有效账号；零售退货改条件 UPDATE 并加召回/效期拦截；GET 补 require_role。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "warehouse",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "总库→药房/科室的出库单状态机（submitted→approved→partially_issued→issued/cancelled）、按角色分单类型、FEFO 分配、盘点调整、采购申请审批链都是真实实现，是库存侧最完整的模块；主要缺陷在并发/事务边界、结存字段准确性与操作人留痕。",
+      "findings": [
+        "结存可能记旧值：_issue_drug_fefo 先 query 全部批次（进 identity map），再 update(synchronize_session=False)，随后 record_drug→stock_ledger._drug_balance 重新 query 同一批对象不会刷新 → balance_after 记的是扣减前数量。已用 SQLAlchemy 复现：不 expire 读到 10，expire 后为 4；对照 pharmacy.deduct_stock 显式 db.expire(stock)，warehouse 的 _deduct_drug/_issue_drug_fefo 都没有 expire。该 balance_after 被 insurance_inventory.build_records 直接上传医保进销存。",
+        "transfer 未传操作人：router.py:80-89 调 transfer(db,data) 未带 user.username，库存流水 operator 为空；transfer 还是读-改-写（wh.quantity -=），无 条件 UPDATE，并发可超发、新建药房批次可撞 uq_drug_stocks_drug_batch 直接 500。",
+        "purchase 读-改-写 + get-or-create，无 IntegrityError 兜底（对比 pharmacy.dispense 有唯一键兜底）；单号用 max(id)+1（create_outbound / _next_purchase_request_no），并发重号撞唯一键。",
+        "approve_outbound/cancel_outbound 非原子（先查 status 再赋值）；cancel 允许 partially_issued 取消，已出库部分不回滚、不记取消人。",
+        "receive_purchase_request 逐条调用 purchase()，而 purchase 内部 db.commit()（service.py:553）→ 部分到货中途失败会留下已提交行，整单事务被拆碎。",
+        "warehouse.check 单批次盘库直接改库存并生成 StockAdjustment，无第二人复核；与 stocktake 模块并行两套盘点机制。",
+        "采购申请审批虽调用 approval.advance_request，但业务路由 approve_purchase_request 只校验 admin/director，不校验当前步骤 role_required（只有 /approvals/requests/action 校验 step role，approval/router.py:136-141）。",
+        "GET /purchases、/stocks、/checks、/outbound-orders、/outbound-orders/{id} 无鉴权（router.py:66-146），泄露供应商、采购与单据明细。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（56）药物物流管理（docs/标准逐条对照.md L190）",
+        "NHC 2018-4（82）临床试剂（L216）、（83）高值耗材管理（L217）、（84）低值耗材及办公用品（L218）",
+        "医保进销存上传依赖本模块流水（docs/入库与医保目录设计.md L32、L112）",
+        "电子病历第 29 项 门诊药品调剂（L70）"
+      ],
+      "reference_refs": [
+        "上海哲策 DmSstore.java：upLimit/downLimit/realNumber/lostNumber/backNumber/isExpired/batchId/storeId/sellPrice",
+        "上海哲策 McSinDO.java：billCode/provider/auditor/inType/rStoreId/sStoreId/storeNumber（耗材入库单）",
+        "OpenHIS InventoryItem.java：locationStoreId/locationId/lotNumber/expirationDate/traceNo；workflow/domain/SupplyRequest.java + SupplyDelivery.java 的请领-配送工作流"
+      ],
+      "recommendation": "出库/调拨/采购改为条件 UPDATE + 记账后 expire 或 re-select 结存；transfer 传 operator；单号改独立计数表/序列并捕获 IntegrityError 重试；取消加「已出库禁止」与 cancelled_by；receive 用单事务（purchase 提供 commit=False）；把 warehouse.check 并入 stocktake 盘点单；业务审批统一走 /approvals/requests/action 的步骤校验；GET 全部补 require_role。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "receiving",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "入库单收货→验收→入库状态机、药品批号/效期与器械注册证强校验、不合格数量与拒收原因、入总库并记流水都是真实实现；但事务不原子、与 GSP 验收和采购申请脱节、可绕开采购直接入账、列表接口匿名可读。",
+      "findings": [
+        "状态机与校验完整：received→checked→stocked/cancelled 均有状态判断；_build_items 强制药品批号+有效期、器械注册证号（service.py:25-107）；check_order 登记 rejected_qty/reject_reason，stock_order 只入合格数量。",
+        "stock_order 非原子且中途提交：materials.service.stock_in 即使 record=False 仍 db.commit()（materials/service.py:70），药品行先改 WarehouseStock 再遇后续报错会留下已提交库存；order.status 无原子条件更新，并发两次 /inbound/orders/{id}/stock 可重复入库。",
+        "与 GSP 验收重复且未打通：gsp.GspAcceptance 用自由文本 drug name/supplier_name 独立建表（gsp/models.py），receiving 既不创建也不引用 GSP 验收记录；同一到货可只做 receiving 验收，GSP 记录可完全缺失，验收结论双轨。",
+        "与采购申请/采购单无关联：InboundOrder 无 purchase_request_id/采购单号字段（models.py），warehouse 角色可直接建任意数量入库单入总库，supplier_id 可空且不校验供应商资质（schemas.py:33-40），入库缺少前置审批依据。",
+        "cancel_order 无取消人/取消时间字段，审计只靠全局中间件；而 admin 会话写操作在审计中间件里记为 anonymous（admin 只设 request.session，不设 request.state.user_name）。",
+        "GET /inbound/orders、/inbound/orders/{id} 无鉴权（router.py:33-47），暴露供应商、随货单号与发票号；tests/test_receiving.py::test_inbound_list_and_details 以无 header 请求断言 200，把匿名可读固化为预期。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（56）药物物流管理（docs/标准逐条对照.md L190）",
+        "NHC 2018-4（82）临床试剂（L216）、（83）高值耗材管理（L217）、（84）低值耗材及办公用品（L218）",
+        "docs/入库与医保目录设计.md L12-L32：入库单作为统一收货验收入口、批号/效期/供应商/发票留痕"
+      ],
+      "reference_refs": [
+        "上海哲策 McSinDO.java：billCode/invoiceCode/provider/auditor/inType/rStoreId/storeNumber",
+        "OpenHIS workflow/domain/SupplyDelivery.java 与 SupplyRequest.java（请领→配送→到货）",
+        "reference/comparison.md L587「药品/库房较完整…可参考批次/资质/冷链设计」"
+      ],
+      "recommendation": "stock_order 改单事务（materials.stock_in 提供 commit=False）+ 条件 UPDATE 占状态；入库单增加 purchase_request_id/采购单号并与 GSP 验收单互链（或把 GSP 验收合并进入库单验收页）；供应商必填且校验证照有效；加 cancelled_by/at；GET 补 require_role。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "stock_ledger",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "单一库存流水表承载药品/耗材的入库、出库、发药、退药、零售、盘点、报损、调拨与结存，是全库存域的统一账本并被医保进销存上传直接复用（insurance_inventory.service 读 StockMovement.balance_after）；但结存口径有两个确定性错误，且耗材无批次。",
+      "findings": [
+        "库房映射错误：_drug_balance 只有 warehouse==「总库」才查 WarehouseStock，其他一律查 DrugStock（stock_ledger/service.py:13-29）；stocktake.complete_stocktake 以 warehouse=「药库」记账（stocktake/service.py:139）但实际盘的是 WarehouseStock（同文件 32-38）→ 盘点流水的 balance_after 取的是药房批次结存，且 /stock/ledger?warehouse=总库 查不到这些行。",
+        "FEFO 出库结存取旧值（warehouse 模块已列，_drug_balance 复用 identity map，无 expire）→ 上传医保的结存字段可能不等于真实库存。",
+        "无唯一键/幂等键（stock_ledger/models.py 无 UniqueConstraint），内部调用不带 Idempotency-Key，重放/重试会重复记账。",
+        "record_material 结存只按 (item_id, warehouse)，MaterialStock 本身无 batch_no/expiry（materials/models.py:49-64）→ 耗材无法批次追溯与效期管理，与高值耗材批次/UDI 要求冲突。",
+        "只有 in/out 两种方向，无冲销/红冲动作类型；期末结存完全依赖逐行 balance_after，一旦某行错则后续口径不可信。",
+        "GET /stock/ledger 要求 warehouse/pharmacist（router.py:28），是全组里鉴权最严的接口之一；测试 tests/test_stock_ledger.py 5 例覆盖入库/出库/发药退药/采购调整，未覆盖盘点与并发。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（56）药物物流管理（docs/标准逐条对照.md L190）",
+        "医保进销存上传字段口径（docs/入库与医保目录设计.md L32、L112；insurance_inventory/service.py:34-79 用 StockMovement.balance_after）",
+        "NHC 2018-4（83）高值耗材管理（L217）——耗材批次缺口"
+      ],
+      "reference_refs": [
+        "OpenHIS yb/domain/InventoryCheckRecord.java：invdate/invCnt/manuLotnum/fixmedinsBchno/manuDate/expyEnd（医保进销存报文字段）",
+        "OpenHIS workflow/domain/InventoryItem.java：lotNumber/expirationDate/validityMon/traceNo/locationId",
+        "上海哲策 DmSstore.java：batchId/storeId/number/realNumber"
+      ],
+      "recommendation": "统一库房标识（去「药库」或映射「总库」）；balance_after 改为记账后 re-select/expire 或由库存行回写；material_stocks 增 batch_no/expiry 或并入统一 inventory 表；加 (ref_type,ref_id,kind,warehouse,direction) 幂等唯一键；补冲销类型与日结存快照。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "stocktake",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "有盘点单/明细、账面-实盘-差异、未录完禁止完成，能真实调整总库与耗材库存；但只覆盖总库药品，无复核与原子状态机，且完成时直接用实盘数覆盖当前库存，会吞掉盘点期间发生的发药/出库。",
+      "findings": [
+        "create_stocktake 对 kind=drug 固定查 WarehouseStock（stocktake/service.py:32-38），忽略 data.warehouse，明细 warehouse 写死「药库」（第48行）→ 无法盘点药房 DrugStock，且与总库台账命名不一致。",
+        "complete_stocktake 直接 stock.quantity = actual（第133、164行）；盘点期间若有发药/出库，完成即覆盖 → 库存静默丢失，没有锁库或截止时点+期间流水对账。",
+        "无复核/审批：warehouse/pharmacist 单人可完成；对照 narcotic 盘点必须 admin/director 审核（narcotic/router.py:120-133），药品盘点反而没有复核。",
+        "非原子状态机：先查 status 再赋值（第114-118、179行），并发 complete 会双次应用差异、双倍流水。",
+        "不生成 StockAdjustment，与 warehouse.check 的调整单并行两套（warehouse/service.py:645-676）→ 盘点差异无法统一审计；差异无损益金额汇总、无复盘轮次。",
+        "tests/test_stocktake.py 仅 2 例，无并发/覆盖/审批/药房库房用例。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（56）药物物流管理（docs/标准逐条对照.md L190）",
+        "NHC 2018-4（83）高值耗材管理（L217）、（84）低值耗材及办公用品（L218）"
+      ],
+      "reference_refs": [
+        "上海哲策 McSscount.java：number/realNumber/storeNumber/profitLossType/profitLoss/cause/auditor/status/batchId/timeLimit（耗材盘点含审核人与损益类型）",
+        "上海哲策 DmSstore.java：realNumber/lostNumber/backNumber/cause",
+        "OpenHIS yb/domain/InventoryCheckRecord.java（盘点报文口径）"
+      ],
+      "recommendation": "与 warehouse.check 合并为唯一盘点单（明细含库房/批次），完成前锁库或记录截止时点并对期间流水对账；差异生成 StockAdjustment 并要求 admin/director 复核后生效；状态切换改条件 UPDATE；补药房库房与耗材批次；补并发/复核测试。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "supplier",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "供应商只有 code/name/contact/phone/address 五个业务字段，没有证照、首营准入、停用/黑名单；没有管理台页面也没有客户端页面，只能通过 admin Basic API 创建；读接口匿名可读联系方式。",
+      "findings": [
+        "supplier/models.py 仅 5 字段，无 license_no/证照效期/经营范围/授权书/状态，也无供应商-药品或耗材授权、价格协议、评价。",
+        "无准入审批：创建只有 require_role(admin)（router.py:13-22），不走 approval，无供应商准入事件；与 warehouse.PurchaseRequest 有完整审批链形成反差。",
+        "无 UI：admin/templates/base.html 导航无供应商项，仅 purchase_request_detail.html:22 与入库相关页面作为下拉引用；客户端 api.list_suppliers 只用于入库下拉（ui/pharmacy.py:279），无法维护主数据。",
+        "GET /suppliers/、/suppliers/{id} 无鉴权（router.py:25-34），泄露联系人/电话/地址。",
+        "tests/test_supplier.py 9 例全部是 CRUD + 采购关联，无证照、停用、越权用例。",
+        "docs/入库与医保目录设计.md L74 已把「供应商证照效期」列为后续项，说明是已知缺口而非设计取舍。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（56）药物物流管理（docs/标准逐条对照.md L190）",
+        "NHC 2018-4（82）（83）（84）耗材/器械/试剂到货来源（L216-218）",
+        "docs/入库与医保目录设计.md L74：供应商证照效期列为待办"
+      ],
+      "reference_refs": [
+        "OpenHIS administration/domain/Supplier.java：busNo/name/typeEnum/address/phone/email/activeFlag/pyStr/wbStr（主数据 + 启用标志）",
+        "上海哲策 McSinDO.java 以 provider 自由字符串记录供应商（示范工程也未做供应商资质模型，可说明不能直接照搬）"
+      ],
+      "recommendation": "补证照（许可证/营业执照/授权书/效期）与状态（active/suspended/blacklisted）+ 效期预警（复用 gsp.alerts 的 expiring 逻辑）；准入走 approval（新增 biz_type=supplier_admission）；补 admin 供应商管理页；进出货时校验证照有效；GET 补 require_role(warehouse/pharmacist/director)。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "materials",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "物资主数据（分类/高值/注册证/医保编码）+ 库房库存 + 高值序列号使用追溯有模型和单测，但高值使用接口没有任何界面入口、使用不产生费用、扣减非原子、耗材库存无批次效期。",
+      "findings": [
+        "POST /materials/usages（nurse）扣库存并写 MaterialUsage（service.py:82-129），但 his_client/api.py 无对应方法、his_client/ui 无页面、admin 无页面 → 该能力实际不可达，仅有 tests/test_materials.py 覆盖。",
+        "use_material 不产生收费：全程无 add_charge 调用，对比 procedure_materials/service.py:63-74 会写 EncounterCharge → 高值耗材用了不计费，收入漏计。",
+        "扣减非原子：先 stock.quantity<1 判断再 -=1（service.py:102-105），无条件 UPDATE，并发可超扣。",
+        "MaterialStock 无 batch_no/expiry（models.py:49-64），耗材无法批次追溯/效期预警；warehouse.service.expiry_alerts 只覆盖 WarehouseStock/DrugStock，物资近效期无提醒。",
+        "GET /materials/items/、/materials/stocks、/materials/usages 无鉴权（router.py:40-85），/usages 暴露 encounter_id+serial_no+used_by（患者就诊关联）。",
+        "物资主数据无界面：POST /materials/items/ 仅 admin API；界面只能通过医保目录 ensure_material_from_catalog（ui/pharmacy.py:448）间接落地。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（83）高值耗材管理（docs/标准逐条对照.md L217，明确「有高值耗材/UDI 相关模块，未与计费全闭环」）",
+        "NHC 2018-4（84）低值耗材及办公用品（L218）",
+        "NHC 2018-4（82）临床试剂（L216）",
+        "NHC 2018-4（73）业务结算与收费（L207）"
+      ],
+      "reference_refs": [
+        "上海哲策 McSinDO.java：batchId/timeLimit/medicalInsuranceType/inType/auditor/storeNumber",
+        "上海哲策 McSscount.java：profitLossType/batchId/timeLimit/auditor",
+        "OpenHIS InventoryItem.java：itemTable/itemId 多态物资 + lotNumber/expirationDate/traceNo/locationId"
+      ],
+      "recommendation": "use_material 增加收费（source_type=material_usage，与库房联动）；扣减改条件 UPDATE；MaterialStock 增 batch/expiry（或并入统一 inventory 表）并接入效期预警；护士工作站/管理台补耗材使用与主数据入口；GET 补鉴权。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "gsp",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "GSP 六类记录（验收/温湿度养护/ADR/召回/人员资质/告警）已建模，召回能在门诊发药环节拦截；但验收与入库脱节，召回只拦发药，冷链阈值写死，ADR 状态无流转。",
+      "findings": [
+        "验收独立：create_acceptance 用 supplier_name/item name 自由文本（schemas.py），不引用 drugs/material_items、不生成库存、不门禁入库；与 receiving.check_order 双轨验收。",
+        "召回拦截不完整：只有 pharmacy.deduct_stock 按 drug_name+batch 拦截（pharmacy/service.py:552-566）；warehouse._issue_drug_fefo/_deduct_drug 与 retail_service.create_retail_sale 均不检查 GspRecall → 召回批次仍可出库/零售；complete_recall 只改状态，不核对回收数量/批次库存。",
+        "冷链不支持：create_storage_log 对 temperature 统一用 10–30℃、湿度 35–75% 判正常（gsp/service.py:77-83），无冷藏 2–8℃ 区间与品种温区，验收的 transport_temp 也不参与判定。",
+        "ADR 无状态流转：GspAdverseReaction.status 有 reported/investigating/closed（models.py:81-82），但 router.py 无任何修改状态接口；patient_name 为自由文本，不关联 patient_id。",
+        "人员资质 status 只在创建时算一次（service.py:150-156），过期不刷新；alerts 端点只返回各类数量（router.py:137-143），管理台也只显示计数，无明细下钻。",
+        "召回以 drug_name 字符串匹配（models.py:90），药品改名/多规格会漏；tests/test_gsp_recall.py 只有 1 例（拦截发药），未覆盖出库/零售/退货。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（51）药事信息管理（docs/标准逐条对照.md L185）、（53）发药管理（L187）、（56）药物物流管理（L190）",
+        "NHC 2018-4（61）医疗安全（不良）事件（L195，「有药物不良反应记录，缺全院不良事件」）",
+        "NHC 2018-4（58）院感管理（L192，养护/储存环节）"
+      ],
+      "reference_refs": [
+        "上海哲策 McSinDO.java：provider/invoiceCode/auditor（到货核对与审核字段）",
+        "OpenHIS InventoryItem.java：supplierId/expirationDate/validityMon",
+        "reference/comparison.md L587「可参考批次/资质/冷链设计」；两示范工程均无 GSP 验收表，无直接模块可抄"
+      ],
+      "recommendation": "验收记录挂 drug_id/material_id+inbound_order_id，并作为入库前置（未验收不得 stock）；召回改 drug_id+batch 并统一在 deduct_stock、warehouse 出库、零售入口拦截；温区按 storage_condition 配置阈值；ADR 加 investigate/close 接口并关联 patient_id；人员资格查询时动态判定；alerts 返回明细。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "traceability",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "药品追溯码有唯一码表、入库/出库/发药/退药四种扫码流转、入库数量与总库库存挂钩、管理台查询页；但「码状态」是单行原地改写，退药会把患者/就诊关联清空，且与发药流程没有强制绑定。",
+      "findings": [
+        "DrugTraceCode 单行原地改（models.py），scan_return 把 used→in_stock 并把 patient_id/encounter_id 置 None（service.py:174-197）→ 同一盒药的历史使用人消失；注释声明的 returned/void 状态从未使用。",
+        "与发药脱钩：pharmacy.dispense 不读也不写 drug_trace_codes（pharmacy/service.py:99-216），追溯码只能由药师另开「追溯码」页手工扫（ui/pharmacy.py:1704）→ 无法证明实际发放的盒码；tests/test_traceability.py 只覆盖独立扫码接口。",
+        "扫码不校验药/批次一致性：scan_dispense/scan_outbound 只校验状态与所在库房，不校验 drug_id/batch_no/数量与发药单或出库单一致，可扫错药。",
+        "入库扫码的数量约束只与总库 batch 库存比较（service.py:72-86），与入库单应收数、追溯码应收数无关。",
+        "无失效期/召回联动；高值耗材 UDI 走 materials.serial_no 另一张表，没有统一追溯模型。",
+        "GET /trace/codes 等接口需 warehouse/pharmacist（router.py:69-103），鉴权 ok；admin/templates/trace_codes.html 只读查询、无扫码入口。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（83）高值耗材管理（UDI）（docs/标准逐条对照.md L217）",
+        "NHC 2018-4（56）药物物流管理（L190）",
+        "docs/入库与医保目录设计.md L147-153（追溯码表与状态 in_stock/used/returned/void 的设计）",
+        "docs/标签与看板.md L69「条码是药品自编码，不是国家药品追溯码」——当前追溯码能力边界需在验收口径中说明"
+      ],
+      "reference_refs": [
+        "OpenHIS workflow/domain/InventoryItem.java：traceNo（一物一码）",
+        "上海哲策 DmSstore/CmDruglist 仅 batch_no/expiry_date，无码级追溯（reference/comparison.md L269）"
+      ],
+      "recommendation": "改成追加式事件表（trace_code_events：code/action/ref_type/ref_id/dispense_item_id/patient_id/operator/at），DrugTraceCode 只存当前态；dispense 强制按 dispense_item 关联码或记录免扫豁免理由；退药保留历史并新增事件；出库/发药校验码的 drug/batch/数量；接入 UDI 统一模型。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "narcotic",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "麻精链路已从「完全缺失」推进到有处方权、处方类型、专用账册、空安瓿回收、盘点差异审批；缺口在发药双人、处方限量、逐日盘点与账册-库存对账。",
+      "findings": [
+        "处方权已落地：auth User.narcotic_right（auth/models.py:19-20）在开方时校验（encounter/service.py:632-639，admin 恒放行），授权接口 /users/{id}/narcotic-right（auth/router.py:52-61）；但 admin 药品表单无 controlled_level（admin/templates/drugs.html），麻精药只能 API 建。",
+        "账册写入：发药 record_issue（pharmacy/service.py:176-188）、退药 record_return（同文件 723-733）；record_return 不写 patient_id/prescription_id（narcotic/service.py:30-41）→ 退药无法追溯到人/处方。",
+        "发药无双人核对：record_issue 不填 witness；witness 只在 /narcotic/ampoule-return 由请求体传入（router.py:60-71），且不校验 witness 是另一个真实账号（schema 仅要求非空字符串）。",
+        "无处方限量/疗程校验：全仓库没有麻精天数/单次数量上限规则（检索麻精/限量/3日 无实现）。",
+        "无逐日盘点/班次交接：NarcoticInventoryCheck 是事件式盘点，没有按日强制或交接班记录。",
+        "盘点审批非原子且可能造过期批次：review_inventory_check 先查 status 再赋值；库存行不存在时新建 DrugStock(expiry=date.today())（service.py:124-129）→ 立即过期批次。",
+        "空安瓿回收不与发药量对账（无 issue vs ampoule_return 差异查询）；无 admin 麻精页面，仅客户端 ui/narcotic.py（pharmacist/director/admin）。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（51）药事信息管理（docs/标准逐条对照.md L185）、（53）发药管理（L187）、（56）药物物流管理（L190）",
+        "电子病历第 29 项 门诊药品调剂（L70）",
+        "docs/标准对照与差距.md L80「麻醉/第一类精神药品没有专用处方和处方权」（已部分补齐）、L164「麻精仍缺」",
+        "docs/处方单据架构.md L177「麻精账册/空安瓿已做，盘点差异未做」——与代码不符（narcotic_inventory_checks 已实现并有审核），文档需更新"
+      ],
+      "reference_refs": [
+        "reference/comparison.md §3.1/§3.2 与 §7：麻精药品处方权/专用处方被列为剩余差距",
+        "两示范工程检索无独立麻精账册表（无对应模型），无字段级参照"
+      ],
+      "recommendation": "发药写 witness 并校验为不同有效用户（复用 nursing 高危核对规则）；record_return 补齐 patient_id/prescription_id；加处方限量规则（days 上限、单次数量）与超限拦截；盘点审批改条件 UPDATE、缺行时用真实效期而非 today；加每日/每班麻精盘点任务与空安瓿对账视图；admin 增麻精专页或把麻精标记加入药品表单。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "cssd",
+      "verdict": "optimize_now",
+      "priority": "P1",
+      "summary": "器械包主数据、灭菌批次、化学/生物监测放行校验、包码发放/使用/召回/效期提醒已实现并有 4 例测试；但缺清洗/回收/打包前环节，放行人可由请求体伪造，手术关联绕过放行与效期校验。",
+      "findings": [
+        "放行校验存在：release_batch 要求 chemical/biological 均 pass（cssd/service.py:51-65），未放行不能发放、过期不能发放（issue_package）。",
+        "放行人可伪造：POST /cssd/batches/{id}/release 使用请求体 released_by（router.py:86-96，service 直接用该值），任意 nurse/warehouse 可声称他人放行；admin 页面用 session 用户（admin/router.py:1412）→ API 与页面身份口径不一致。",
+        "监测结果无法后补：chemical/biological 只在 create_batch 时由 BatchCreate 传入（schemas.py:28-29），无更新接口；现实流程（先灭菌、后出生物监测）无法表达，只能重建批次。",
+        "手术关联绕过门禁：surgery.service.attach_package 只校验 status in (sterilized, issued)，不校验 batch.release_status、不校验 expiry、不校验召回（surgery/service.py:283-299），且不写 PackageUsage（只有 cssd.use_package 写）→ 未放行/过期包可用于手术且留不下使用记录。",
+        "无回收-清洗-检查-打包-灭菌前核对环节；InstrumentPackage 无包内器械明细，无器械清点；无成本/收费联动（CSSD 包不计入 EncounterCharge）。",
+        "reject_batch 可对已 released 批次再次执行并把已 used 的包改成 recalled（覆盖使用状态证据），无状态约束与审批。",
+        "tests/test_cssd.py 4 例未覆盖伪造放行人、过期包 attach、未放行 attach、重复 reject。"
+      ],
+      "standard_refs": [
+        "标准逐条对照.md 的 262 项清单中没有「消毒供应/CSSD」条目；最接近的是（58）院感管理（L192）与电子病历第 24 项 手术预约与登记（L65）",
+        "docs/标准逐条对照.md L543 把后勤/被服类整体列为「不适用」，CSSD 属超出 NHC 软件条款的院内感控辅助能力，不能宣称评级达标"
+      ],
+      "reference_refs": [
+        "两个示范工程均无 CSSD/消毒供应模块（对 reference/open-source 全量 java/vue/md 检索 CSSD|消毒供应|灭菌|被服 无命中）",
+        "上海仅有耗材目录字段 MiCatalogueMedicalConsumable.java「灭菌标志」，无批次放行/包码追溯可参照"
+      ],
+      "recommendation": "release 改用登录身份（拒绝请求体 released_by）；增加监测结果登记接口并把放行绑定监测记录；attach_package 复用 issue_package/use_package 门禁（放行+效期+召回）并写 PackageUsage；补清洗/回收/打包前核对节点与包内明细；reject 加状态约束与审批；补伪造/过期/未放行用例。",
+      "not_optimize_reason": ""
+    },
+    {
+      "module": "linen",
+      "verdict": "optimize_later",
+      "priority": "P3",
+      "summary": "被服洗涤批次、发放/剩余、召回、窗帘拆洗生命周期与到期提醒、期间汇总都已实现，并与 CSSD 器械灭菌在模型注释上明确隔离；属非无菌后勤辅助，行政台单页（/admin/linen），无客户端入口。",
+      "findings": [
+        "LinenBatch 有 category/soil_level/wash_method/temperature/duration_min/detergent，LinenDistribution 记录科室/数量，CurtainRecord 记录 remove/wash/reinstall 与 next_due（linen/models.py），summary 按类别统计（service.py:133-146）。",
+        "发放非原子：distribute 先算 remaining_quantity 再插行（service.py:64-84），并发可超发；remaining 是派生属性无 DB 约束。",
+        "召回只改批次状态并追加备注（service.py:87-95），不记录回收数量/回收科室，已发到科室的织物无回收任务。",
+        "身份不可靠：窗帘记录的 operator 来自请求体（schemas.py:66-76，router.py:96-102），不取登录用户；批次/发放取登录用户（ok）。",
+        "无洗涤标准规则：soil_level=infectious 与 wash_method/temperature 之间无强制关系，可记录「感染性织物+低温」且不拦截。",
+        "无客户端页面，仅 admin/templates/linen.html（新建/发放/召回/窗帘登记）；tests/test_linen.py 3 例 + tests/test_linen_cssd_admin.py 覆盖页面，均未覆盖并发与规则校验。"
+      ],
+      "standard_refs": [
+        "标准逐条对照.md 262 项无被服/织物洗涤条目；L543 明确「被服等不在软件 P0」、第六类后勤管理整类标「—/不适用」",
+        "（91）医疗废弃物、（92）医疗废弃物管理补充项（L225-226）与织物处置相邻，但非同一能力；不把被服洗涤算作 NHC 达标项"
+      ],
+      "reference_refs": [
+        "两个示范工程均无被服/织物洗涤模块（对 reference/open-source 全量检索 被服|洗涤 无命中）",
+        "无字段级参照，只能参照通用批次/发放/召回结构"
+      ],
+      "recommendation": "保持现状优先级即可；若洗衣房/外包洗涤真实上线，再做三件小事：distribute 改条件更新或剩余量落库、召回登记回收数量与科室、窗帘 operator 取登录用户；同时把感染性织物的洗涤参数做成规则校验。",
+      "not_optimize_reason": "被服洗涤不在 NHC 2018-4 262 项软件条款内（docs/标准逐条对照.md L543 明确「被服等不在软件 P0」），且当前只有管理台单页、无客户端入口与真实运营证据；现存缺陷（发放非原子、窗帘操作人取自请求体）不影响药品/收费/院感主链，排在 P0/P1 之后再修，现在投入不产生评级或收入收益。"
+    },
+    {
+      "module": "procedure_materials",
+      "verdict": "merge",
+      "priority": "P2",
+      "summary": "它不是独立模块，而是手术室/治疗室的「耗材扣库+计费」适配层：没有 router、没有独立测试文件、没有页面，只有 models+schemas+service，由 surgery/treatment_room 直接 import；职责与 materials、charges 重叠。",
+      "findings": [
+        "无 router：全仓库仅 main.py:68 以 import models 方式注册建表；子系统指标底表记为 136 行/0 路由/0 测试文件；仅被 tests/test_procedure_charges.py 2 例间接覆盖（surgery/treatment_room 各 1 例）。",
+        "consume_material 扣库存写流水并写 EncounterCharge（service.py:12-80），但 insurance_ratio=0.0 硬编码（第73行）→ 材料费一律自费，忽略 materials 模型已有的 insurance_category/insurance_code/insurance_name。",
+        "扣库非原子：stock.quantity<quantity 判断后 -=（service.py:35-37），无条件 UPDATE，并发可超扣。",
+        "退耗材只有治疗室路径：treatment_room.service.cancel_case 回补库存+作废费用+置 returned_at（treatment_room/service.py:772-803）；surgery 无取消/退货函数（surgery/service.py 无 cancel_case），手术耗材只能单向消耗。",
+        "无独立 API/UI：耗材登记寄生在 /surgery/cases/{id}/materials 与 /treatment-room/cases/{id}/materials，his_client 侧通过 surgery.py/treatment_room.py 调用；admin 无对应页面。"
+      ],
+      "standard_refs": [
+        "NHC 2018-4（83）高值耗材管理（docs/标准逐条对照.md L217）",
+        "NHC 2018-4（84）低值耗材及办公用品（L218）",
+        "NHC 2018-4（73）业务结算与收费（L207）",
+        "电子病历第 24 项 手术预约与登记（L65）"
+      ],
+      "reference_refs": [
+        "上海哲策 McSinDO.java（耗材入库/批次/医保类别）与 CmCost.java（费用）——示范工程把耗材与计费放在同一业务域",
+        "OpenHIS InventoryItem.java（itemTable/itemId 多态物资，统一库存引用）",
+        "reference/comparison.md 未覆盖耗材计费章节，说明该域第三方字段级参照有限"
+      ],
+      "recommendation": "合并为 materials 的「耗材消耗/计费」服务（保留 consume_material 作为唯一入口，schema 移入 materials），insurance_ratio 由 material.insurance_category 解析而不是硬编码 0；扣库改条件 UPDATE；补 surgery 取消/退耗材路径；挪到 materials 下统一测试与页面入口。",
+      "not_optimize_reason": ""
+    }
+  ]
+}

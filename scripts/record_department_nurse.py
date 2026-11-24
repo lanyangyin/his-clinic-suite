@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.nurse import NurseWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "nurse"
@@ -30,7 +30,7 @@ VIDEO = VIDEO_DIR / "03_护士站.mp4"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class NurseDemo(QMainWindow):
+class NurseDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("护士站 · nurse")
@@ -55,6 +55,7 @@ class NurseDemo(QMainWindow):
         self.cashier = Api("cashier", "cashier123")
         self.doctor_api = Api("doctor", "doctor123")
         self.nurse_api = Api("nurse", "nurse123")
+        self.pharmacist_api = Api("pharmacist", "pharm123")
         self.suffix = datetime.now().strftime("%H%M%S")
 
     def wait(self, seconds=1.2):
@@ -141,12 +142,17 @@ class NurseDemo(QMainWindow):
             "POST", f"/treatments/encounters/{self.encounter['id']}",
             json={"item_id": self.treat_item["id"], "quantity": 1},
         )
-        self.doctor_api.call(
+        prescription = self.doctor_api.call(
             "POST", f"/encounters/{self.encounter['id']}/prescriptions",
             json={
                 "drug_id": self.drug["id"], "quantity": 1,
                 "dosage": "1g", "frequency": "qd", "route": "静滴", "days": 1,
             },
+        )
+        self.pharmacist_api.call(
+            "POST",
+            f"/encounters/{self.encounter['id']}/prescriptions/{prescription['prescription_id']}/review",
+            json={"approve": True},
         )
         self.payment = self.cashier.call(
             "POST", "/payments/", json={"encounter_id": self.encounter["id"], "channel": "cash"}
@@ -158,6 +164,8 @@ class NurseDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("nurse", "nurse123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)

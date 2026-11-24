@@ -1,0 +1,3885 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+<script>
+  // 立即应用主题，避免页面闪烁 (FOUC)
+  (function() {
+    function getCookieTheme() {
+      var match = document.cookie.match(/theme=(light|dark|system)/);
+      return match ? match[1] : null;
+    }
+  
+    function getCurrentTheme() {
+      var cookieTheme = getCookieTheme();
+      var savedTheme = localStorage.getItem('theme');
+  
+      // 优先使用 cookie 中的 theme
+      if (cookieTheme) {
+        // 如果 localStorage 里没有，就补回去
+        if (!savedTheme) {
+          localStorage.setItem('theme', cookieTheme);
+        }
+        return cookieTheme;
+      }
+  
+      // 如果 cookie 中没有 theme，则使用 localStorage 中的 theme
+      savedTheme = savedTheme && ['light', 'dark', 'system'].includes(savedTheme) ? savedTheme : 'system'; // 默认跟随系统
+  
+      return savedTheme;
+    }
+  
+    var savedTheme = getCurrentTheme();
+  
+    // 检测系统是否为暗黑模式
+    function isSystemDarkMode() {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+  
+    if (savedTheme === 'system') {
+      // 系统模式：移除覆盖类，让CSS媒体查询自动处理
+      document.documentElement.classList.remove('dark-mode-override');
+      document.documentElement.classList.remove('dark-mode');
+    } else {
+      // 手动模式：添加覆盖类，禁用媒体查询
+      document.documentElement.classList.add('dark-mode-override');
+  
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-mode');
+      } else {
+        document.documentElement.classList.remove('dark-mode');
+      }
+    }
+  })();
+</script>
+
+<title>openhis-itai: OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。</title>
+<meta content='on' http-equiv='x-dns-prefetch-control'>
+<link href='//e.gitee.com' rel='dns-prefetch'>
+<link href='//files.gitee.com' rel='dns-prefetch'>
+<link href='//toscode.gitee.com' rel='dns-prefetch'>
+<link href='https://cn-assets.gitee.com' rel='dns-prefetch'>
+<link rel="shortcut icon" type="image/vnd.microsoft.icon" href="https://cn-assets.gitee.com/assets/favicon-9007bd527d8a7851c8330e783151df58.ico" />
+<link rel="canonical" href="https://gitee.com/tntlinking-opensource/openhis-itai" />
+<meta content='gitee.com/tntlinking-opensource/openhis-itai git https://gitee.com/tntlinking-opensource/openhis-itai.git' name='go-import'>
+<meta charset='utf-8'>
+<meta content='always' name='referrer'>
+<meta content='Gitee' property='og:site_name'>
+<meta content='Object' property='og:type'>
+<meta content='https://gitee.com/tntlinking-opensource/openhis-itai' property='og:url'>
+<meta content='https://foruda.gitee.com/avatar/1752117932338963630/13762746_newtouch_code_1752117932.png' itemprop='image' property='og:image'>
+<meta content='天天开源/openhis-itai: OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。' itemprop='name' property='og:title'>
+<meta content='天天开源/openhis-itai: OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。' property='og:description'>
+<meta content='openhis-itai' name='Keywords'>
+<meta content='天天开源/openhis-itai: OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。' itemprop='description' name='Description'>
+<meta content='pc,mobile' name='applicable-device'>
+
+<meta content="IE=edge" http-equiv="X-UA-Compatible" />
+<meta name="csrf-param" content="authenticity_token" />
+<meta name="csrf-token" content="L5GAkLwFG3pngF8zbuEOEaqY+kos5jc021DcKYxgeQJUtpeLgR+4EicXlHmWXDzATD7NU+JRO5BstTsxgjsDTA==" />
+
+<link rel="stylesheet" media="all" href="https://cn-assets.gitee.com/assets/application-d4d2dea0d9d5a365c923967f89a4d3e8.css" />
+<script>
+//<![CDATA[
+window.gon = {};gon.locale="zh-CN";gon.sentry_dsn=null;gon.baidu_register_hm_push=null;gon.info={"controller_path":"projects","action_name":"show","current_user":false};gon.tour_env={"current_user":null,"action_name":"show","original_url":"https://gitee.com/tntlinking-opensource/openhis-itai","controller_path":"projects"};gon.http_clone="https://gitee.com/tntlinking-opensource/openhis-itai.git";gon.user_project="tntlinking-opensource/openhis-itai";gon.manage_branch="管理分支";gon.manage_tag="管理标签";gon.enterprise_id=0;gon.create_reaction_path="/tntlinking-opensource/openhis-itai/reactions";gon.ipipe_base_url="https://go-api.gitee.com";gon.artifact_base_url="https://go-repo.gitee.com";gon.gitee_go_remote_url="https://go.gitee.com/assets";gon.gitee_go_active=false;gon.current_project_is_mirror=false;gon.show_repo_comment=false;gon.diagram_viewer_path="https://diagram-viewer.giteeusercontent.com";gon.ent_host="e.gitee.com";gon.encrypt={"enabled":true,"separator":"$gitee$","password_key":"-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDIrn+WB2Yi4ABAL5Tq6E09tumY\nqVTFdpU01kCDUmClczJOCGZriLNMrshmN9NJxazpqizPthwS1OIK3HwRLEP9D3GL\n7gCnvN6lpIpoVwppWd65f/rK2ewv6dstN0fCmtVj4WsLUchWlgNuVTfWljiBK/Dc\nYkfslRZzCq5Fl3ooowIDAQAB\n-----END PUBLIC KEY-----\n"};gon.cp="点击复制";gon.aready_cp="已复制";gon.is_fork=false;gon.is_admin_domain=false;gon.ref="develop";
+//]]>
+</script>
+<script src="https://cn-assets.gitee.com/assets/application-5833ff043f647fb7404ce043a2fe3e22.js"></script>
+<script src="https://cn-assets.gitee.com/assets/lib/jquery.timeago.zh-CN-4a4818e98c1978d2419ab19fabcba740.js"></script>
+
+<link rel="stylesheet" media="all" href="https://cn-assets.gitee.com/assets/projects/application-46b94c31ba11ae8c37eacce2bdb5603e.css" />
+<script src="https://cn-assets.gitee.com/assets/projects/app-beda4d7616a11b1c0e7fba8165ae996e.js"></script>
+
+<script type='text/x-mathjax-config'>
+MathJax.Hub.Config({
+  tex2jax: {
+    inlineMath: [['$','$'], ['\\(','\\)']],
+    displayMath: [["$$","$$"],["\\[","\\]"]],
+    processEscapes: true,
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+    ignoreClass: "container|files",
+    processClass: "markdown-body"
+  }
+});
+</script>
+<script src="https://cn-assets.gitee.com/uploads/resources/MathJax-2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+<script>
+  (function () {
+    var messages = {
+      'zh-CN': {
+        addResult: '增加 <b>{term}</b>',
+        count: '已选择 {count}',
+        maxSelections: '最多 {maxCount} 个选择',
+        noResults: '未找到结果',
+        serverError: '连接服务器时发生错误'
+      },
+      'zh-TW': {
+        addResult: '增加 <b>{term}</b>',
+        count: '已選擇 {count}',
+        maxSelections: '最多 {maxCount} 個選擇',
+        noResults: '未找到結果',
+        serverError: '連接服務器時發生錯誤'
+      }
+    }
+  
+    if (messages[gon.locale]) {
+      $.fn.dropdown.settings.message = messages[gon.locale]
+    }
+  }());
+</script>
+
+<script>
+  var userAgent = navigator.userAgent;
+  var isLessIE11 = userAgent.indexOf('compatible') > -1 && userAgent.indexOf('MSIE') > -1;
+  if(isLessIE11){
+    var can_access = ""
+    if (can_access != "true"){
+      window.location.href = "/incompatible.html";
+    }
+  }
+  document.addEventListener("error", function (ev) {
+    var elem = ev.target;
+    if (elem.tagName.toLowerCase() === 'img') {
+      elem.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAAAAACIM/FCAAACh0lEQVR4Ae3ch5W0OgyG4dt/mQJ2xgQPzJoM1m3AbALrxzrf28FzsoP0HykJEEAAAUQTBBBAAAEEEEAAAQQQQAABBBBAAAEEEEAAAQQQQAABBBBAAAEEkKK0789+GK/I2ezfQB522PnS1qc8pGgXvr4tE4aY0XOUWlGImThWgyCk6DleixzE7qwBkg/MGiDPlVVAyp1VQGrPKiACDhFI6VkF5LmzCki+sg7IwDoglnVAil0IMkeG9CyUiwsxLFUVFzJJOQaKCjFCDN9RXMjIX7W6ztZXZDKKCyn8sWJvH+nca7WHDN9lROlAliPH9iRKCPI4cswFJQWxB46toLQgQ9jhn5QYZA9DOkoMUoQde5YapAxDWkoNYsOQR3KQd9CxUnIQF4S49CB9ENKlBxmDEKsFUgMCCCCAAHIrSF61f6153Ajy8nyiPr8L5MXnmm4CyT2fzN4DUvHZ+ntA2tOQBRBAAAEEEEAAAQQQ7ZBaC6TwSiDUaYHQ2yuB0MN+ft+43whyrs4rgVCjBUKTFshLC6TUAjGA3AxSaYFYLZBOC2RUAsk8h5qTg9QcbEoOsoQhQ2qQhsO5xCD5dgB5JQaZ+KBKGtKecvR81Ic0ZDjByKdDx0rSEDZ/djQbH+bkIdvfJFm98BfV8hD2zprfVdlu9PxVeyYAkciREohRAplJCaRSAplJCcQogTjSAdlyHRBvSAekJR0QRzogA+mADJkOiCPSAPEtqYBshlRAXC43hxix2QiOuEZkVERykGyNo9idIZKE0HO7XrG6OiMShlDWjstVzdPgXtUH9v0CEidAAAEEEEAAAQQQQAABBBBAAAEEEEAAAQQQQAABBBBAAAEEEEAAAQQQQP4HgjZxTpdEii0AAAAASUVORK5CYII=";
+    }
+  }, true);
+</script>
+</head>
+
+<script src="//res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
+<script>
+  var title = document.title.replace(/( - Gitee| - 码云)$/, '')
+      imgUrl = '';
+  
+  document.addEventListener('DOMContentLoaded', function(event) {
+    var imgUrlEl = document.querySelector('.readme-box .markdown-body > img, .readme-box .markdown-body :not(a) > img');
+    imgUrl = imgUrlEl && imgUrlEl.getAttribute('src');
+  
+    if (!imgUrl) {
+      imgUrlEl = document.querySelector('meta[itemprop=image]');
+      imgUrl = imgUrlEl && imgUrlEl.getAttribute('content');
+      imgUrl = imgUrl || "https://gitee.com/static/images/logo_themecolor_circle.png";
+    }
+  
+    wx.config({
+      debug: false,
+      appId: "wx74f3fbb24061d30a",
+      timestamp: "1795325899",
+      nonceStr: "7f224794f594f4789467e23fbab6b274",
+      signature: "d5a579ee64ab63fe910e4ed88820e1129b624899",
+      jsApiList: [
+        'onMenuShareTimeline',
+        'onMenuShareAppMessage'
+      ]
+    });
+  
+    wx.ready(function () {
+      wx.onMenuShareTimeline({
+        title: title, // 分享标题
+        link: "https://gitee.com/tntlinking-opensource/openhis-itai", // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+        imgUrl: imgUrl // 分享图标
+      });
+      wx.onMenuShareAppMessage({
+        title: title, // 分享标题
+        link: "https://gitee.com/tntlinking-opensource/openhis-itai", // 分享链接，该链接域名或路径必须与当前页面对应的公众号JS安全域名一致
+        desc: document.querySelector('meta[name=Description]').getAttribute('content'),
+        imgUrl: imgUrl // 分享图标
+      });
+    });
+    wx.error(function(res){
+      console.error('err', res)
+    });
+  })
+</script>
+
+<body class='git-project lang-zh-CN projects-site-content projects_show'>
+<header class='common-header fixed noborder' id='git-header-nav'>
+<div class='ui container'>
+<div class='ui menu header-menu header-container'>
+<div class='git-nav-expand-bar'>
+<i class='iconfont icon-mode-table'></i>
+</div>
+<div class='gitee-nav__sidebar'>
+<div class='gitee-nav__sidebar-container'>
+<div class='gitee-nav__sidebar-top'>
+<div class='gitee-nav__avatar-box'></div>
+<div class='gitee-nav__buttons-box'>
+<a class="ui button small fluid orange" href="/login">登录</a>
+<a class="ui button small fluid basic is-register" href="/signup">注册</a>
+</div>
+</div>
+<div class='gitee-nav__sidebar-middle'>
+<div class='gitee-nav__sidebar-list'>
+<ul>
+<li class='gitee-nav__sidebar-item'>
+<a href="/explore"><i class='iconfont icon-ic-discover'></i>
+<span class='gitee-nav__sidebar-name'>开源</span>
+</a></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/enterprises"><i class='iconfont icon-ic-enterprise'></i>
+<span class='gitee-nav__sidebar-name'>企业版</span>
+</a></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/education"><i class='iconfont icon-ic-education'></i>
+<span class='gitee-nav__sidebar-name'>高校版</span>
+</a></li>
+<li class='gitee-nav__sidebar-item split-line'></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/search"><i class='iconfont icon-ic-search'></i>
+<span class='gitee-nav__sidebar-name'>搜索</span>
+</a></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/help"><i class='iconfont icon-help-circle'></i>
+<span class='gitee-nav__sidebar-name'>帮助中心</span>
+</a></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/terms"><i class='iconfont icon-file'></i>
+<span class='gitee-nav__sidebar-name'>使用条款</span>
+</a></li>
+<li class='gitee-nav__sidebar-item'>
+<a href="/about_us"><i class='iconfont icon-issuepx'></i>
+<span class='gitee-nav__sidebar-name'>关于我们</span>
+</a></li>
+</ul>
+</div>
+</div>
+<div class='gitee-nav__sidebar-bottom'>
+<div class='gitee-nav__sidebar-close-button'>
+<i class='fa fa-angle-double-left'></i>
+</div>
+</div>
+</div>
+</div>
+
+<!-- /todo 10周年活动结束后 恢复 -->
+<div class='item gitosc-logo'>
+<a href="https://gitee.com"><img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='ui inline image light-mode-img' height='28' src='/static/images/logo-black.svg?t=158106664' title='Gitee - 基于 Git 的代码托管和研发协作平台' width='95'>
+<img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='ui inline image dark-mode-img' height='28' src='/static/images/logo.svg?t=158106664' title='Gitee - 基于 Git 的代码托管和研发协作平台' width='95'>
+</a></div>
+<a title="开源" class="item " href="/explore">开源
+</a><a title="企业版" class="item " href="/enterprises">企业版
+</a><a title="高校版" class="item " href="/education">高校版
+</a><a title="私有云" class="item" target="_blank" href="https://gitee.cn?utm_source=giteecom">私有云
+</a><a title="模力方舟" class="item" id="gitee-blog" target="_blank" href="https://moark.com/serverless-api/?utm_sources=site_nav"><span>
+模力方舟
+</span>
+<img alt='模力方舟' class='ui inline image' src='/static/images/notification-star.svg' style='transform: translate(-4.6px, -8.8px)' title='模力方舟'>
+</a><a title="AI 队友" class="item" id="gitee-ai-bot" target="_blank" href="https://gitee.com/ai-teammates"><span>AI 队友</span>
+</a><div class='center responsive-logo'>
+<a href="https://gitee.com"><img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='ui inline image' height='24' src='/static/images/logo.svg?t=158106664' title='Gitee - 基于 Git 的代码托管和研发协作平台' width='85'>
+<img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='ui inline black image' height='24' src='/static/images/logo-black.svg?t=158106664' title='Gitee - 基于 Git 的代码托管和研发协作平台' width='85'>
+</a></div>
+<div class='right menu userbar right-header' id='git-nav-user-bar'>
+<form class="ui item" id="navbar-search-form" data-text-require="搜索关键字不能少于1个" data-text-filter="搜索格式不正确" data-text-search-site-projects="在全站搜索 %{query} 相关项目" action="/search" accept-charset="UTF-8" method="get"><input name="utf8" type="hidden" value="&#x2713;" />
+<input type="hidden" name="type" id="navbar-search-type" />
+<input type="hidden" name="fork_filter" id="fork_filter" value="on" />
+<div class='ui search header-search' style='position: relative;'>
+<input type="text" name="q" id="navbar-search-input" value="" class="prompt" placeholder="搜开源" style="width: 100%; padding-right: 32px; box-sizing: border-box;" />
+<span class='iconify' data-icon='gitee:search' style='position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; color:rgba(0, 0, 0, 0.88); pointer-events: none;'></span>
+</div>
+</form>
+
+<script>
+  var can_search_in_repo = 1,
+      repo = "VGtSQmVrNTZWWGhOYWtKb1RucFplbHBuUFQxaE56WXpaZz09YTc2M2Y=",
+      reponame = "tntlinking-opensource/openhis-itai";
+  
+  $(function() {
+    var $search = $('#navbar-search-form .ui.search');
+    var $form = $('#navbar-search-form');
+    var searchSiteProjectsText = $form.data('text-search-site-projects');
+  
+    $form.on('submit', function(e) {
+      e.preventDefault(); // 防止默认提交
+      var query = $('#navbar-search-input').val();
+      if (query) {
+        window.location = '/search?fork_filter=on&q=' + encodeURIComponent(query);
+      }
+    });
+  
+    // 原有的搜索逻辑保持不变
+    $search.search({
+      apiSettings: {
+        url: '/search/relative_project?q=' + encodeURIComponent('{query}'),
+        onResponse: function (res) {
+          if (res && res.status === 200 && res.data) {
+            var query = htmlSafe($search.search('get value'));
+  
+            res.data.map(function (item) {
+              item.path_ns = '/' + item.path_ns;
+              item.icon = 'iconfont icon-project-public';
+            });
+            res.data.unshift({
+              name_ns: searchSiteProjectsText.replace('%{query}', "<b class='hl'>" + query + "</b>"),
+              path_ns: '/search?fork_filter=on&q=' + encodeURIComponent(query),
+              icon: 'iconfont icon-search'
+            });
+            return res;
+          } else {
+            return { data: [] };
+          }
+        }
+      },
+      fields: {
+        results: 'data',
+        description: 'name_ns',
+        url: 'path_ns',
+      },
+      minCharacters: 1,
+      maxResults: 10,
+      searchDelay: 250,
+      showNoResults: false,
+      transition: 'fade'
+    });
+  });
+</script>
+
+<script src="https://cn-assets.gitee.com/webpacks/gitee_icons-db24f196ed7cfb3a6136.bundle.js"></script>
+<script src="https://cn-assets.gitee.com/assets/theme_toggle-0c8215e3e0cd891c42ea4226ae882bfb.js"></script>
+<link rel="stylesheet" media="screen" href="https://cn-assets.gitee.com/assets/fonts/font-awesome-febf886370cf750ab95af17cede1d51f.css" />
+<a class="item git-nav-user__login-item" href="/login">登录
+</a><a class="item git-nav-user__register-item" href="/signup">注册
+</a><script>
+  $('.destroy-user-session').on('click', function() {
+    localStorage.setItem('theme', 'system');
+    $.cookie('access_token', null, { path: '/' });
+  })
+</script>
+
+</div>
+</div>
+</div>
+</header>
+<script>
+  Gitee.initNavbar()
+  Gitee.initRepoRemoteWay()
+  $.cookie('user_locale',null)
+</script>
+
+<script>
+  var userAgent = navigator.userAgent;
+  var isLessIE11 = userAgent.indexOf('compatible') > -1 && userAgent.indexOf('MSIE') > -1;
+  if(isLessIE11){
+    var can_access = ""
+    if (can_access != "true"){
+      window.location.href = "/incompatible.html";
+    }
+  }
+</script>
+
+<div class='fixed-notice-infos'>
+<div class='all-messages'>
+</div>
+<div class='ui container'>
+<div class='flash-messages' id='messages-container'></div>
+</div>
+<script>
+  (function() {
+    $(function() {
+      var $error_box, alertTip, notify_content, notify_options, template;
+      template = '<div data-notify="container" class="ui {0} message" role="alert">' + '<i data-notify="dismiss" class="close icon"></i>' + '<span data-notify="message">{2}</span>' + '</div>';
+      notify_content = null;
+      notify_options = {};
+      alertTip = '';
+      $error_box = $(".flash_error.flash_error_box");
+      if (notify_options.type === 'error' && $error_box.length > 0 && !$.isEmptyObject(notify_content.message)) {
+        if (notify_content.message === 'captcha_fail') {
+          alertTip = "验证码不正确";
+        } else if (notify_content.message === 'captcha_expired') {
+          alertTip = "验证码已过期，请点击刷新";
+        } else if (notify_content.message === 'not_found_in_database') {
+          alertTip = "帐号或者密码错误";
+        } else if (notify_content.message === 'not_found_and_show_captcha') {
+          alertTip = "帐号或者密码错误";
+        } else if (notify_content.message === 'phone_captcha_fail') {
+          alertTip = "手机验证码不通过";
+        } else {
+          alertTip = notify_content.message;
+        }
+        return $error_box.html(alertTip).show();
+      } else if (notify_content) {
+        if ("show" === 'third_party_binding') {
+          return $('#third_party_binding-message').html(notify_content.message).addClass('ui message red');
+        }
+        notify_options.delay = 3000;
+        notify_options.template = template;
+        notify_options.offset = {
+          x: 10,
+          y: 30
+        };
+        notify_options.element = '#messages-container';
+        return $.notify(notify_content, notify_options);
+      }
+    });
+  
+  }).call(this);
+</script>
+
+</div>
+<script>
+  (function() {
+    $(function() {
+      var setCookie;
+      setCookie = function(name, value) {
+        $.cookie(name, value, {
+          path: '/',
+          expires: 365
+        });
+      };
+      $('#remove-bulletin, #remove-bulletin-dashboard').on('click', function() {
+        setCookie('remove_bulletin', "gitee-maintain-1793944268");
+        $('#git-bulletin').hide();
+      });
+      $('#remove-member-bulletin').on('click', function() {
+        setCookie('remove_member_bulletin', "gitee_member_bulletin");
+        $(this).parent().hide();
+      });
+      return $('#remove-gift-bulletin').on('click', function() {
+        setCookie('remove_gift_bulletin', "gitee-gift-bulletin");
+        $(this).parent().hide();
+      });
+    });
+  
+  }).call(this);
+</script>
+<script>
+  function closeMessageBanner(pthis, type, val) {
+    var json = {}
+  
+    val = typeof val === 'undefined' ? null : val
+    $(pthis).parent().remove()
+    if (type === 'out_of_enterprise_member') {
+      json = {type: type, data: val}
+    } else if (type === 'enterprise_overdue') {
+      json = {type: type, data: val}
+    }
+    $.post('/profile/close_flash_tip', json)
+  }
+</script>
+
+<div class='site-content'>
+<div class='git-project-header'>
+<div class='fixed-notice-infos'>
+<div class='ui info icon floating message green' id='fetch-ok' style='display: none'>
+<div class='content'>
+<div class='header status-title'>
+<i class='info icon status-icon'></i>
+代码拉取完成，页面将自动刷新
+</div>
+</div>
+</div>
+<div class='ui info icon floating message error' id='fetch-error' style='display: none'>
+<div class='content'>
+<div class='header status-title'>
+<i class='info icon status-icon'></i>
+<span class='error_msg'></span>
+</div>
+</div>
+</div>
+</div>
+<div class='ui container'>
+
+<div class='git-project-header-details'>
+<div class='git-project-header-container'>
+<div class='git-project-header-actions'>
+<div class='tootip no-arrow' data-position='bottom center' data-tooltip='试试让马建仓 AI 助手来解读仓库吧～'>
+<div class='chat-button'>
+<a target="_blank" class="d-align-center" href="https://chat.gitee.com?repo_owner=tntlinking-opensource&amp;repo_path=openhis-itai"><img alt="richgiteeai" style="width:14px; height:14px;" src="https://cn-assets.gitee.com/assets/rich_giteeai-78477b2d4703c69031f90ac6a524c3e3.svg" />
+</a></div>
+</div>
+<span class='ui buttons basic watch-container'>
+<div class='ui dropdown button js-project-watch' data-watch-type='unwatch'>
+<input type='hidden' value=''>
+<i class='iconfont icon-watch'></i>
+<div class='text'>
+Watch
+</div>
+<i class='dropdown icon'></i>
+<div class='menu'>
+<a data-value="unwatch" class="item" rel="nofollow" data-method="post" href="/tntlinking-opensource/openhis-itai/unwatch"><i class='iconfont icon-msg-read'></i>
+不关注
+</a><a data-value="watching" class="item" rel="nofollow" data-method="post" href="/tntlinking-opensource/openhis-itai/watch"><i class='iconfont icon-msg-read'></i>
+关注所有动态
+</a><a data-value="releases_only" class="disabled item" rel="nofollow" data-method="post" href="/tntlinking-opensource/openhis-itai/release_only_watch"><i class='iconfont icon-msg-read'></i>
+仅关注版本发行动态
+</a><a data-value="ignoring" class="item" rel="nofollow" data-method="post" href="/tntlinking-opensource/openhis-itai/ignoring_watch"><i class='iconfont icon-msg-read'></i>
+关注但不提醒动态
+</a></div>
+</div>
+<style>
+  .js-project-watch .text .iconfont {
+    display: none; }
+  .js-project-watch a, .js-project-watch a:hover {
+    color: #000; }
+  .js-project-watch .item > .iconfont {
+    visibility: hidden;
+    margin-left: -10px; }
+  .js-project-watch .selected .iconfont {
+    visibility: visible; }
+  .js-project-watch .menu {
+    margin-top: 4px !important; }
+</style>
+<script>
+  $('.js-project-watch').dropdown({
+    action: 'select',
+    onChange: function(value, text, $selectedItem) {
+      var type = value === 'unwatch' ? 'Watch' : 'Watching';
+      $(this).children('.text').text(type);
+      $(this).dropdown('set selected', value)
+    }
+  });
+</script>
+
+<a class="ui button action-social-count" title="25" href="/tntlinking-opensource/openhis-itai/watchers">25
+</a></span>
+<span class='basic buttons star-container ui'>
+<a class="ui button star" href="/login"><i class='iconfont icon-star'></i>
+Star
+</a><a class="ui button action-social-count " title="45" href="/tntlinking-opensource/openhis-itai/stargazers">45
+</a></span>
+<span class='ui basic buttons fork-container' title='无权 Fork 此仓库'>
+<a class="ui button fork" title="你必须登录后才可以fork一个仓库" href="/login"><i class='iconfont icon-fork'></i>
+Fork
+</a><a class="ui button action-social-count disabled-style" title="57" href="/tntlinking-opensource/openhis-itai/members">57
+</a></span>
+</div>
+<h2 class='git-project-title mt-0 mb-0'>
+<span class="project-title"><i class="project-icon iconfont icon-project-public" style='margin-right: 4px' title="这是一个公开仓库"></i> <a title="天天开源" class="author" href="/tntlinking-opensource">天天开源</a> / <a title="openhis-itai" class="repository" target="" style="padding-bottom: 0px; margin-right: 4px" href="/tntlinking-opensource/openhis-itai">openhis-itai</a></span><span class="project-badges"><style>
+  .gitee-modal {
+    width: 500px !important; }
+</style>
+</span>
+<input type="hidden" name="project_title" id="project_title" value="天天开源/openhis-itai" />
+</h2>
+</div>
+</div>
+</div>
+<script>
+  var title_import_url = "false";
+  var title_post_url = "/tntlinking-opensource/openhis-itai/update_import";
+  var title_fork_url = "/tntlinking-opensource/openhis-itai/sync_fork";
+  var title_project_path = "openhis-itai";
+  var title_p_name = "openhis-itai";
+  var title_p_id= "40375120";
+  var title_description = "OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。";
+  var title_form_authenticity_token = "WzLC6KYD4xu+VQ5P3E+kCL28Xm90R3tdrIqmFXq6QOkgFdXzmxlAc/7CxQUk8pbZWxppdrrwd/kbb0ENdOE6pw==";
+  var watch_type = "unwatch";
+  var checkFirst = false;
+  
+  $('.js-project-watch').dropdown('set selected', watch_type);
+  $('.checkbox.sync-wiki').checkbox();
+  $('.checkbox.sync-prune').checkbox();
+  $('.checkbox.team-member-checkbox').checkbox();
+  $('.project-closed-label').popup({ 
+    popup: '.project-closed-popup', 
+    position: 'top center', 
+    hoverable: true,
+  });
+</script>
+<style>
+  i.loading, .icon-sync.loading {
+    -webkit-animation: icon-loading 1.2s linear infinite;
+    animation: icon-loading 1.2s linear infinite;
+  }
+  .qrcode_cs {
+    float: left;
+  }
+  .check-sync-wiki {
+    float: left;
+    height: 28px;
+    line-height: 28px;
+  }
+  .sync-wiki-warn {
+    color: #e28560;
+  }
+</style>
+
+<div class='git-project-nav'>
+<div class='ui container'>
+<div class='ui secondary pointing menu'>
+<a class="item active " href="/tntlinking-opensource/openhis-itai"><i class='iconfont icon-code'></i>
+代码
+</a><a class="item " href="/tntlinking-opensource/openhis-itai/issues"><i class='iconfont icon-task'></i>
+Issues
+<span class='ui mini circular label'>
+83
+</span>
+</a><a class="item " href="/tntlinking-opensource/openhis-itai/pulls"><i class='iconfont icon-pull-request'></i>
+Pull Requests
+<span class='ui mini circular label'>
+2
+</span>
+</a><a class="item " href="/tntlinking-opensource/openhis-itai/wikis"><i class='iconfont icon-wiki'></i>
+Wiki
+</a><a class="item  " href="/tntlinking-opensource/openhis-itai/graph/develop"><i class='iconfont icon-statistics'></i>
+统计
+</a><a class="item " href="/tntlinking-opensource/openhis-itai/gitee_go"><i class='iconfont icon-workflow'></i>
+流水线
+</a><div class='item'>
+<div class='ui pointing top right dropdown git-project-service'>
+<div>
+<i class='iconfont icon-service'></i>
+服务
+<i class='dropdown icon'></i>
+</div>
+<div class='menu' style='display:none'>
+<a class="item" href="/tntlinking-opensource/openhis-itai/javadoc"><img src="https://cn-assets.gitee.com/assets/maven-bd58aee84f266d64d4b8ce5b006a9fcf.png" alt="Maven" />
+<div class='item-title'>
+JavaDoc
+</div>
+</a><a class="item" href="/tntlinking-opensource/openhis-itai/phpdoc"><img src="https://cn-assets.gitee.com/assets/phpdoc-a99f87c2feaa2fd99e5065377a39487e.png" alt="Phpdoc" />
+<div class='item-title'>
+PHPDoc
+</div>
+</a><a class="item" href="/tntlinking-opensource/openhis-itai/quality_analyses?platform=sonar_qube"><img src="https://cn-assets.gitee.com/assets/sonar_mini-5e1b54bb9f6c951d97fb778ef623afea.png" alt="Sonar mini" />
+<div class='item-title'>
+质量分析
+</div>
+</a><a class="item" target="_blank" href="https://gitee.com/help/articles/4193"><img src="https://cn-assets.gitee.com/assets/jenkins_for_gitee-554ec65c490d0f1f18de632c48acc4e7.png" alt="Jenkins for gitee" />
+<div class='item-title'>
+Jenkins for Gitee
+</div>
+</a><a class="item" target="_blank" href="https://gitee.com/help/articles/4318"><img src="https://cn-assets.gitee.com/assets/cloudbase-1197b95ea3398aff1df7fe17c65a6d42.png?20200925" alt="Cloudbase" />
+<div class='item-title'>
+腾讯云托管
+</div>
+</a><a class="item" target="_blank" href="https://gitee.com/help/articles/4330"><img src="https://cn-assets.gitee.com/assets/cloud_serverless-686cf926ced5d6d2f1d6e606d270b81e.png" alt="Cloud serverless" />
+<div class='item-title'>
+腾讯云 Serverless
+</div>
+</a><a class="item" href="/tntlinking-opensource/openhis-itai/open_sca"><img src="https://cn-assets.gitee.com/assets/open_sca/logo-9049ced662b2f9936b8001e6f9cc4952.png" alt="Logo" />
+<div class='item-title'>
+悬镜安全
+</div>
+</a><a class="item" target="_blank" href="https://help.gitee.com/devops/connect/Aliyun-SAE"><img src="https://cn-assets.gitee.com/assets/SAE-f3aa9366a1e2b7fff4747402eb8f10c3.png" alt="Sae" />
+<div class='item-title'>
+阿里云 SAE
+</div>
+</a><a class="item" id="update-codeblitz-link" target="_blank" href="https://gitee.com/link?target=https%3A%2F%2Fcodeblitz.cloud.alipay.com%2Fgitee%2Ftntlinking-opensource%2Fopenhis-itai%2Ftree%2Fdevelop%2F"><img style="width:100px;margin-top:4px" src="https://cn-assets.gitee.com/assets/Codeblitz-8824e38875a106e16e29ff57ec977b08.png" alt="Codeblitz" />
+<div class='item-title'>
+Codeblitz
+</div>
+</a><a class="item" id="update-codeblitz-link" target="_blank" href="/tntlinking-opensource/openhis-itai/sbom"><img style="width:30px;margin-top:4px" src="https://cn-assets.gitee.com/assets/SBOM-36dbd3141411c5c1e9095e8d1d21baf0.png" alt="Sbom" />
+<div class='item-title'>
+SBOM
+</div>
+</a><a class="item" href="/tntlinking-opensource/openhis-itai/qilin_profile"><img class="qilin-profile-nav-logo" src="https://cn-assets.gitee.com/assets/qilin_profile-a1a9c6fee979fdf21e79f25c1f1c18b2.png" alt="Qilin profile" />
+<div class='item-title'>
+开发画像分析
+</div>
+</a><button class='ui orange basic button quit-button' id='quiting-button'>
+我知道了，不再自动展开
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  $('.git-project-nav .ui.dropdown').dropdown({ action: 'nothing' });
+  $('.git-project-service').dropdown({
+    on: 'click',
+    action: 'nothing',
+    onShow: function () {
+      const branch = 'develop'
+      let newUrl = `https://codeblitz.cloud.alipay.com/gitee/tntlinking-opensource/openhis-itai/tree/`
+      const url = decodeURIComponent(window.location.pathname);
+      const startIndex = url.indexOf('develop');
+      if (startIndex !== -1) {
+        newUrl = newUrl + url.substring(startIndex); // 从分支名开始截取
+      }else{
+        newUrl = newUrl + branch
+      }
+      const linkElement = document.getElementById("update-codeblitz-link");
+      linkElement.setAttribute("href", window.location.origin + "/link?target=" + encodeURIComponent(newUrl));
+    },
+  })
+</script>
+<style>
+  .git-project-nav i.checkmark.icon {
+    color: green;
+  }
+  #quiting-button {
+    display: none;
+  }
+  
+  .git-project-nav .dropdown .menu.hidden:after {
+    visibility: hidden !important;
+  }
+</style>
+<script>
+  isSignIn = false
+  isClickGuide = false
+  $('#git-versions.dropdown').dropdown();
+  $.ajax({
+    url:"/tntlinking-opensource/openhis-itai/access/add_access_log",
+    type:"GET"
+  });
+  $('#quiting-button').on('click',function() {
+    $('.git-project-service').click();
+    if (isSignIn) {
+      $.post("/projects/set_service_guide")
+    }
+    $.cookie("Serve_State", true, { expires: 3650, path: '/'})
+    $('#quiting-button').hide();
+  });
+  if (!(isClickGuide || $.cookie("Serve_State") == 'true')) {
+    $('.git-project-service').click()
+    $('#quiting-button').show()
+  }
+</script>
+
+</div>
+<div class='ui container'>
+<div class='register-guide'>
+<div class='register-container'>
+<div class='regist'>
+加入 Gitee
+</div>
+<div class='description'>
+与超过 1400万 开发者一起发现、参与优秀开源项目，私有仓库也完全免费 ：）
+</div>
+<a class="ui orange button free-registion" href="/signup?from=project-guide">免费加入</a>
+<div class='login'>
+已有帐号？
+<a href="/login?from=project-guide">立即登录</a>
+</div>
+</div>
+</div>
+
+<div class='git-project-content-wrapper'>
+
+<div class='ui grid tree-bbb' id='project-wrapper'>
+<div class='project-left-side-contaner wide column' id='project-left-side-contaner' style='display: none;'>
+<script src="https://cn-assets.gitee.com/webpacks/vendors_lib-7ff466a6da368d391eda.js" defer="defer"></script>
+</div>
+<div class='twelve wide column right-wrapper'>
+<div id='git-project-search-panel' style='display: none;'>
+<a href='javascript: void(0);' id='back-to-list'>
+<i class='angle left icon'></i>
+返回
+</a>
+<div class='ui icon input search-input'>
+<i class='iconfont icon-search icon'></i>
+<input id='search-name' maxlength='40' placeholder='搜索文件' type='text'>
+</div>
+</div>
+<div class='git-project-content' id='git-project-content'>
+<div class='git-project-desc-wrapper'>
+<script>
+  $('.git-project-desc-wrapper .ui.dropdown').dropdown();
+  if (false) {
+    gon.project_new_blob_path = "/tntlinking-opensource/openhis-itai/new/develop"
+    bindShowModal({
+      el: $('.no-license .project-license__create'),
+      complete: function(data, modal) {
+        if (!data.haveNoChoice && !data.data) {
+          Flash.show('请选择一项开源许可证')
+        } else {
+          location.href = gon.project_new_blob_path + '?license=' + data.data
+        }
+      },
+      skip: function () {
+        location.href = gon.project_new_blob_path + '?license'
+      }
+    });
+  }
+  
+  $(".project-admin-action-box .reject").click(function() {
+    var reason = $('[name=review-reject-reason]').val();
+    if (!reason) {
+      Flash.error('请选择不通过理由')
+      return
+    }
+    $.ajax({
+      type: 'POST',
+      url: "/admin/shumei_content/shumei_check/reject_project_public",
+      data: {
+        reason: reason,
+        status: 'rejected',
+        project_id: 40375120
+      },
+      success: function(result){
+        if(result.status == 'success'){
+          window.location.reload();
+        }else{
+          Flash.error(result.message)
+        }
+      }
+    })
+  })
+  
+  $(".project-admin-action-box .approve").click(function(){
+  
+    $.ajax({
+      type: 'POST',
+      url: "/admin/shumei_content/shumei_check/reject_project_public",
+      data: {
+        status: 'approved',
+        project_id: 40375120
+      },
+      success: function(result){
+        if(result.status == 'success'){
+          window.location.reload();
+        }else{
+          Flash.error(result.message)
+        }
+      }
+    })
+  })
+  
+  $(".project-admin-action-box .waiting").click(function(){
+  
+    $.ajax({
+      type: 'POST',
+      url: "/admin/shumei_content/shumei_check/reject_project_public",
+      data: {
+        status: 'waiting',
+        project_id: 40375120
+      },
+      success: function(result){
+        if(result.status == 'success'){
+          window.location.reload();
+        }else{
+          Flash.error(result.message)
+        }
+      }
+    })
+  })
+  
+  $('i.help.circle.icon').popup({
+    popup: '.no-license .ui.popup',
+    position: 'right center'
+  });
+  
+  $('#remove-no-license-message').on('click', function() {
+    $.cookie("skip_repo_no_license_message_40375120", 'hide', { expires: 365 });
+    $('#user-no-license-message').hide();
+    return;
+  });
+</script>
+</div>
+
+<div class='git-project-bread' id='git-project-bread'>
+<div class='ui horizontal list mr-1' id='git-branch-dropdown' style=''>
+<div class='item git-project-branch-item'>
+<input type="hidden" name="path" id="path" value="" />
+<div class='ui top left pointing dropdown gradient button dropdown-has-tabs' id='git-project-branch'>
+<input type="hidden" name="ref" id="ref" value="develop" />
+<div class='default text'>
+develop
+</div>
+<i class='dropdown icon'></i>
+<div class='menu'>
+<div class='ui left icon input'>
+<span class='dropdown-search-icon iconify' data-icon='gitee:search' style='font-size: 14px;'></span>
+<input class='search-branch' placeholder='搜索分支' type='text'>
+</div>
+<div class='tab-menu project-branch-tab-menu d-flex'>
+<div class='tab-menu-item' data-placeholder='搜索分支' data-tab='branches'>
+分支 (6)
+</div>
+<div class='tab-menu-item' data-placeholder='搜索标签' data-tab='tags'>
+标签 (3)
+</div>
+<div class='d-align-center' style='flex:1;justify-content:end;'>
+<div class='tab-menu-action' data-tab='branches'>
+<a class="ui link button" href="/tntlinking-opensource/openhis-itai/branches">管理</a>
+</div>
+<div class='tab-menu-action' data-tab='tags'>
+<a class="ui link button" href="/tntlinking-opensource/openhis-itai/tags">管理</a>
+</div>
+</div>
+</div>
+<div class='tab scrolling menu' data-tab='branches' id='branches_panel'>
+<div data-value="develop" class="item" title="develop"><span class="iconify" data-icon="gitee:branch" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>develop</span></div>
+<div data-value="v1.3" class="item" title="v1.3"><span class="iconify" data-icon="gitee:branch" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>v1.3</span></div>
+<div data-value="master" class="item" title="master"><span class="iconify" data-icon="gitee:branch" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>master</span></div>
+<div data-value="v1.1" class="item" title="v1.1"><span class="iconify" data-icon="gitee:branch" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>v1.1</span></div>
+<div data-value="v0.2" class="item" title="v0.2"><span class="iconify" data-icon="gitee:branch" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>v0.2</span></div>
+<div data-value="v1.0" class="item" title="v1.0"><span class="iconify" data-icon="gitee:pen-lock" style="font-size: 13px;margin-right:4px; color:#8C92A4"></span> <span>v1.0</span> <i class="iconfont icon-shieldlock protected-branch-popup" data-title="受保护分支" data-content="保护规则： v1.0"></i></div>
+</div>
+<div class='tab scrolling menu' data-tab='tags' id='tags_panel'>
+<div class='item' data-value='V1.3'>V1.3</div>
+<div class='item' data-value='V1.2'>V1.2</div>
+<div class='item' data-value='v1.1'>v1.1</div>
+</div>
+</div>
+</div>
+<style>
+  .iconfont.icon-shieldlock {
+    color: #8c92a4;
+  }
+  .dropdown-search-icon {
+    position: absolute;
+    top: 8px;
+    left: 11px;
+  }
+</style>
+<style>
+  #git-project-branch .project-branch-tab-menu, .project-branch-item .project-branch-tab-menu {
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+    margin: 0 11px !important;
+    border-bottom: 1px solid #dfe3e9 !important; }
+  #git-project-branch .ui.dropdown .menu, .project-branch-item .ui.dropdown .menu {
+    width: 360px !important; }
+    #git-project-branch .ui.dropdown .menu .item, .project-branch-item .ui.dropdown .menu .item {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap; }
+  #git-project-branch .tab-menu-actions, .project-branch-item .tab-menu-actions {
+    position: absolute;
+    right: 0px !important;
+    bottom: 0.357em; }
+  #git-project-branch .tab-menu-action, .project-branch-item .tab-menu-action {
+    position: relative !important;
+    right: 0px !important;
+    bottom: 0px !important; }
+  #git-project-branch .menu::after, .project-branch-item .menu::after {
+    display: none !important; }
+</style>
+<script>
+  var $branchesDropdown = $('#branches_panel');
+  var $tagsDropdown = $('#tags_panel');
+  var $searchNameInput = $('.search-branch');
+  var concurrentRequestLock = false;
+  var filterXSS = window.filterXSS;
+  var search_text = "";
+  var branch_page_number = 1;
+  var branch_total_pager = Math.ceil(6 / 20) || 1
+  
+  var flag_is_loading = false;
+  var flag_page_number = 1;
+  var flag_total_pager = Math.ceil(3 / 20) || 1
+  
+  $branchesDropdown.scroll(function() {
+    var branchesPanel = document.getElementById('branches_panel');
+    var numOfBranches = $branchesDropdown.children().length;
+    if (branchesPanel.clientHeight + branchesPanel.scrollTop + 37 > branchesPanel.scrollHeight && numOfBranches < 6) {
+      debounceLoadMoreBranches.call();
+    }
+  });
+  function resetFlagVal() {
+    flag_is_loading = false;
+    flag_page_number = 1;
+    flag_total_pager = 1;
+  
+    concurrentRequestLock = false
+    search_text = "";
+    branch_page_number = 1;
+    branch_total_pager = 1
+  }
+  $searchNameInput.on('input', window.globalUtils.debouce(function (e) {
+    resetFlagVal()
+    var $currentTab = $('.tab-menu-action.active');
+    var numOfBranches = $branchesDropdown.children().length;
+    var searchWord = $searchNameInput.val().trim();
+    search_text = searchWord
+    if($currentTab.data('tab') === 'branches') {
+      if (searchWord !== "") {
+        loadData(searchWord,1);
+      } else {
+        loadData();
+      }
+    }
+    var numOfTags = $tagsDropdown.children().length;
+    if($currentTab.data('tab') === 'tags') {
+      if (searchWord !== "") {
+        fetchTags(searchWord,1);
+      } else {
+        fetchTags();
+      }
+    }
+  }, 500));
+  
+  function toggleNoResultView($popPanel) {
+    let no_data_html= `<div class='mt-1 mb-1 d-flex-center'> <span>暂无数据</span> </div>`
+    $popPanel.append(no_data_html)
+  }
+  var debounceLoadMoreBranches = window.globalUtils.debouce(function () {
+    if (concurrentRequestLock) return;
+    branch_page_number += 1;
+    if (branch_page_number > branch_total_pager) return;
+    loadData(search_text, branch_page_number);
+  }, 350);
+  
+  function loadData(search, page) {
+    if (concurrentRequestLock) { return; }
+    concurrentRequestLock = true;
+  
+    var searchParams = search || "";
+    var pageParams = page || 1;
+    $.ajax({
+      url: "/" + gon.user_project + "/branches/names.json",
+      type: 'GET',
+      data: {
+        search: searchParams,
+        page: pageParams,
+      },
+      dataType: 'json',
+      success: function (data) {
+        branch_total_pager = data.total_pages;
+        var html = '';
+  
+        if (pageParams === 1) {
+          $branchesDropdown.empty();
+        }
+        data.branches.forEach(function (branch) {
+          var protectRule = '';
+          var branchName = filterXSS(branch.name);
+          var icon = 'gitee:branch'
+          if(branch.branch_type.value === 1) {
+            var rule = filterXSS(branch.protection_rule.wildcard);
+            protectRule = `<i
+                class="iconfont icon-shieldlock protected-branch-popup"
+                data-title="受保护分支"
+                data-content='保护规则： ${rule}'
+              >
+              </i>`
+            icon ='gitee:pen-lock'
+          }else if(branch.branch_type.value === 2) {
+            icon ='gitee:pen-ban'
+          }
+          var branchIcon = `<span class="iconify" data-icon=${icon} style="font-size: 13px; margin-right:4px; color:#8C92A4"></span>`
+          html += `<div data-value='${branchName}' class="item">
+                    ${branchIcon} 
+                    <span>${branchName}</span> ${protectRule}
+                    </div>`
+        });
+        $branchesDropdown.append(html);
+        $('.protected-branch-popup').popup()
+        if (pageParams === 1 && data.count === 0) {
+          toggleNoResultView($branchesDropdown);
+        }
+      },
+      complete: function () {
+        concurrentRequestLock = false;
+      }
+    });
+  }
+  
+  
+  
+  $tagsDropdown.scroll(function() {
+    var tagsPanel = document.getElementById('tags_panel');
+    var numOfTags = $tagsDropdown.children().length;
+    if (tagsPanel.clientHeight + tagsPanel.scrollTop + 37 > tagsPanel.scrollHeight && numOfTags < 3) {
+      debounceLoadMore.call();
+    }
+  });
+  var debounceLoadMore = window.globalUtils.debouce(function () {
+    if (flag_is_loading) return;
+    flag_page_number += 1;
+    if (flag_page_number > flag_total_pager) return;
+    fetchTags(search_text, flag_page_number);
+  }, 350);
+  
+  function fetchTags(search, page) {
+    var searchParams = search || "";
+    var pageParams = page || 1;
+  
+    if (flag_is_loading) return;
+    flag_is_loading = true;
+  
+    $.ajax({
+      url: "/" + gon.user_project + "/tags/names.json",
+      data: {
+        search: searchParams,
+        page: pageParams,
+      },
+      type: "GET",
+      xhrFields: {
+        withCredentials: true,
+      },
+      success: function (data) {
+        flag_total_pager = data.total_pages;
+        if (pageParams === 1) {
+          $tagsDropdown.html('');
+        }
+        data.tags.forEach((tag) => {
+          const itemDiv = document.createElement('div');
+          itemDiv.classList.add('item');
+          itemDiv.setAttribute('data-value', tag.name);
+          itemDiv.innerText = window.filterXSS(tag.name);
+          $tagsDropdown.append(itemDiv)
+        });
+        if (pageParams === 1 && data.count === 0) {
+          toggleNoResultView($tagsDropdown);
+        }
+      },
+      error: function () {
+      },
+      complete: function () {
+        flag_is_loading = false;
+      },
+    });
+  }
+  $('.project-branch-tab-menu').on('click','.tab-menu-item', function (e) {
+    var $currentTab = $(this).data('tab')
+    if($currentTab === 'branches') {
+      $searchNameInput.val('')
+      search_text = '';
+      loadData()
+    }
+    if($currentTab === 'tags') {
+      $searchNameInput.val('')
+      search_text = '';
+      fetchTags();
+    }
+  })
+</script>
+
+<script>
+  $(function () {
+    var curNode = $('.git-project-branch-item')
+    if (false ){
+      curNode = $('.left-project-branch-item')
+    }else {
+      curNode = $('.git-project-branch-item')
+    }
+    Gitee.initTabsInDropdown(curNode.find('#git-project-branch').dropdown({
+      fullTextSearch: true,
+      selectOnKeydown: false,
+      direction: 'downward',
+      action: function (text,value,el) {
+        var oItemOrInitObject = el[0] || el
+        var isNotSelect = oItemOrInitObject.dataset.tab && oItemOrInitObject.dataset.tab === 'branches'
+        if(isNotSelect){
+          console.warn("You didn't choose a branch")
+          return
+        }
+        var path = $('#path').val();
+        var href = ['/tntlinking-opensource/openhis-itai/tree', encodeURIComponent(value), path].join('/');
+        window.location.href = href;
+        return true
+      },
+      onNoResults: function (searchTerm) {
+        //未找到结果
+        return true
+      },
+    }));
+    $('.protected-branch-popup').popup()
+  })
+</script>
+
+</div>
+</div>
+<div class='git-project-right-actions pull-right'>
+<div class='ui basic orange button' id='btn-dl-or-clone'>
+克隆/下载
+<i class='dropdown icon'></i>
+</div>
+<div class='ui small modal' id='git-project-download-panel'>
+<i class='iconfont icon-close close'></i>
+<div class='header'>
+克隆/下载
+</div>
+<div class='content'>
+<div class='ui secondary pointing menu mb-2 menu-container'>
+<a class='item active' data-text='' data-type='http' data-url='https://gitee.com/tntlinking-opensource/openhis-itai.git'>HTTPS</a>
+<a class='item' data-text='' data-type='ssh' data-url='git@gitee.com:tntlinking-opensource/openhis-itai.git'>SSH</a>
+<a class='item' data-text="该仓库未启用SVN访问，请仓库管理员前往【&lt;a target='_blank' href=/tntlinking-opensource/openhis-itai/settings#function&gt;仓库设置&lt;/a&gt;】开启。" data-type='svn' data-url=''>SVN</a>
+<a class='item' data-text="该仓库未启用SVN访问，请仓库管理员前往【&lt;a target='_blank' href=/tntlinking-opensource/openhis-itai/settings#function&gt;仓库设置&lt;/a&gt;】开启。" data-type='svn_ssh' data-url=''>SVN+SSH</a>
+<a class="button-box ui basic orange button" href="/tntlinking-opensource/openhis-itai/repository/archive/develop.zip"><i class='icon download'></i>
+下载ZIP
+</a></div>
+<div class='ui fluid right labeled small input download-url-panel mb-2'>
+<input type="text" name="project_url_clone" id="project_url_clone" value="https://gitee.com/tntlinking-opensource/openhis-itai.git" onclick="focus();select()" readonly="readonly" />
+<div class='ui basic label copy-icon-box'>
+<i class='icon iconfont icon-clone mr-0 btn-copy-clone' data-clipboard-target='#project_url_clone' id='btn-copy-project_clone_url1'></i>
+</div>
+</div>
+<div class='tip-box mb-2'>
+提示
+</div>
+<div class='mb-1 clone-url-title'>
+下载代码请复制以下命令到终端执行
+</div>
+<div class='ui fluid right labeled small input download-url-panel mb-2'>
+<input type="text" name="project_clone_url" id="project_clone_url" value="https://gitee.com/tntlinking-opensource/openhis-itai.git" onclick="focus();select()" readonly="readonly" />
+<div class='ui basic label copy-icon-box'>
+<i class='icon iconfont icon-clone mr-0 btn-copy-clone' data-clipboard-target='#project_clone_url' id='btn-copy-project_clone_url'></i>
+</div>
+</div>
+<div class='ui fluid right labeled warning-text forbid-warning-text'>
+
+</div>
+<div class='http-ssh-item mb-2'>
+<div>
+为确保你提交的代码身份被 Gitee 正确识别，请执行以下命令完成配置
+</div>
+<div class='textarea-box mt-2'>
+<textarea class='textarea-content-box' id='global-config-clone' readonly>git config --global user.name userName &#10git config --global user.email userEmail</textarea>
+<i class='icon iconfont icon-clone mr-2 btn-copy-clone text-dark' data-clipboard-target='#global-config-clone' id='btn-copy-global-config'></i>
+</div>
+</div>
+<div class='ssh-item item-panel-box'>
+<div class='mb-2'>
+初次使用 SSH 协议进行代码克隆、推送等操作时，需按下述提示完成 SSH 配置
+</div>
+<div class='mb-1'>
+<span>1</span>
+生成 RSA 密钥
+</div>
+<div class='ui fluid right labeled small input mb-2'>
+<input type="text" name="ssh_keygen_clone" id="ssh_keygen_clone" value="ssh-keygen -t rsa" onclick="focus();select()" readonly="readonly" />
+<div class='ui basic label copy-icon-box'>
+<i class='icon iconfont icon-clone mr-0 btn-copy-clone' data-clipboard-target='#ssh_keygen_clone' id='btn-copy-ssh_keygen'></i>
+</div>
+</div>
+<div class='mb-1'>
+<span>2</span>
+获取 RSA 公钥内容，并配置到<a href='/profile/sshkeys' target="_blank"> SSH公钥 </a> 中
+</div>
+<div class='ui fluid right labeled small input mb-2'>
+<input type="text" name="id_rsa_clone" id="id_rsa_clone" value="cat ~/.ssh/id_rsa.pub" onclick="focus();select()" readonly="readonly" />
+<div class='ui basic label copy-icon-box'>
+<i class='icon iconfont icon-clone mr-0 btn-copy-clone' data-clipboard-target='#id_rsa_clone' id='btn-copy-d_rsa'></i>
+</div>
+</div>
+</div>
+<div class='svn-item item-panel-box'>
+<div class='mb-1 mt-2'>
+在 Gitee 上使用 SVN，请访问<a href='https://help.gitee.com/enterprise/code-manage/%E4%BB%A3%E7%A0%81%E6%89%98%E7%AE%A1/%E4%BB%A3%E7%A0%81%E4%BB%93%E5%BA%93/Gitee%20SVN%E6%94%AF%E6%8C%81' target="_blank"> 使用指南 </a>
+</div>
+</div>
+<div class='http-item item-panel-box'>
+<div class='mb-2 mt-2'>
+使用 HTTPS 协议时，命令行会出现如下账号密码验证步骤。基于安全考虑，Gitee 建议<a href='/profile/personal_access_tokens' target="_blank"> 配置并使用私人令牌 </a>替代登录密码进行克隆、推送等操作
+</div>
+<div>Username for 'https://gitee.com': userName</div>
+<div class='mb-1'>
+<span>Password for 'https://userName@gitee.com':</span>
+<span>#</span>
+<span>
+私人令牌
+</span>
+</div>
+</div>
+</div>
+</div>
+<style>
+  #git-project-download-panel {
+    top: 90px !important; }
+    #git-project-download-panel input {
+      color: #40485b !important; }
+    #git-project-download-panel .textarea-box {
+      width: 100%;
+      height: 60px;
+      color: #9d9d9d;
+      border-radius: 2px;
+      background-color: #F5F5F5 !important;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-align: center;
+          -ms-flex-align: center;
+              align-items: center; }
+    #git-project-download-panel .menu-container {
+      font-weight: bold;
+      border-color: rgba(0, 0, 0, 0.1) !important;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important; }
+      #git-project-download-panel .menu-container .item {
+        padding: 7px 12px !important; }
+    #git-project-download-panel .hr-item {
+      color: rgba(39, 41, 43, 0.15) !important; }
+    #git-project-download-panel .textarea-content-box {
+      width: 100%;
+      height: 60px;
+      resize: none;
+      border: 0px !important;
+      background-color: #F5F5F5 !important;
+      color: #40485b !important; }
+    #git-project-download-panel .btn-copy-clone {
+      cursor: pointer;
+      color: rgba(0, 0, 0, 0.87) !important; }
+    #git-project-download-panel .copy-icon-box {
+      background-color: #F5F5F5 !important;
+      border-left: 0px !important; }
+    #git-project-download-panel .button-box {
+      border: 0px !important;
+      float: right !important;
+      padding-right: 0 !important; }
+    #git-project-download-panel .tip-box {
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+      padding-bottom: 4px;
+      font-weight: 700; }
+    #git-project-download-panel .popup-container {
+      padding: 8px 12px 4px 12px;
+      text-align: center;
+      font-size: 14px; }
+      #git-project-download-panel .popup-container .ok {
+        margin: 12px auto;
+        width: 25%;
+        min-width: 125px;
+        display: block; }
+      #git-project-download-panel .popup-container .cancel {
+        margin-left: 0; }
+</style>
+<script>
+  $(function () {
+    var $btnClone = $('#btn-dl-or-clone')
+    var $modalDownload = $('#git-project-download-panel');
+    var $input = $('#project_clone_url')
+    var $inputUrl = $('#project_url_clone')
+    var cloneUrlTitle= $('.clone-url-title')
+  
+    $('#btn-dl-or-clone').on('click', function (e) {
+      e.preventDefault();
+      $modalDownload.modal('show');
+    })
+  
+    $modalDownload.find('.menu > .item').on('click', function(e) {
+      var $item = $(this).addClass('active');
+      $item.siblings().removeClass('active');
+      var dataUrl = $item.attr('data-url');
+      var cloneUrl = $item.attr('data-url');
+      var dataType = $item.attr('data-type')
+      var cloneToLocal = '下载代码请复制以下命令到终端执行'
+      if(dataType=='http'){
+        $modalDownload.find('.http-item').show();
+        $('.content > .item-panel-box:not(.http-item)').hide();
+        $modalDownload.find('.http-ssh-item').show();
+        cloneUrl = 'git clone '+dataUrl
+      }else if(dataType=='ssh'){
+        $modalDownload.find('.ssh-item').show();
+        $('.content > .item-panel-box:not(.ssh-item)').hide();
+        $modalDownload.find('.http-ssh-item').show();
+        cloneUrl = 'git clone '+dataUrl
+      }else if(dataType=='svn') {
+        $('.content > .item-panel-box:not(.svn-item)').hide();
+        $modalDownload.find('.svn-item').show();
+        $modalDownload.find('.http-ssh-item').hide();
+        cloneUrl = 'svn checkout '+dataUrl
+      }else {
+        $('.content > .item-panel-box:not(.svn-item)').hide();
+        $modalDownload.find('.svn-item').show();
+        $modalDownload.find('.http-ssh-item').hide();
+        cloneUrl = 'svn checkout '+dataUrl
+      }
+      if (dataUrl) {
+        $modalDownload.find('.download-url-panel').show();
+        $input.val(cloneUrl);
+        $inputUrl.val(dataUrl)
+        cloneUrlTitle.show();
+        $modalDownload.find('.forbid-warning-text').html('');
+      } else {
+        $modalDownload.find('.download-url-panel').hide();
+        //$modalDownload.find('.svn-item').hide();
+        cloneUrlTitle.hide();
+        $modalDownload.find('.forbid-warning-text').html($item.attr('data-text') || '');
+      }
+      $.cookie('remote_way', $item.attr('data-type'), { expires: 365, path: '/' });
+    }).filter('[data-type="' + ($.cookie('remote_way') || 'http') + '"]').trigger('click');
+  
+    $('.btn-copy-clone').popup({
+      content: '点击复制',
+    }).on('click', function(e) {
+      e.stopPropagation();
+      return false;
+    }).each(function(_, btnCopy) {
+      var $btnCopy = $(btnCopy);
+      new Clipboard(btnCopy).on('success', function() {
+        $btnCopy.popup('destroy').popup({
+          content: '已复制',
+          on: 'manual'
+        }).popup('show');
+        setTimeout(function() {
+          $btnCopy.popup('destroy').popup({
+            content: '点击复制'
+          });
+        }, 2000);
+      });
+    });
+    var $downloadBtn= $('.unlogin-download-btn')
+    var $popupContainer = $('.popup-container')
+    $downloadBtn.popup({
+      popup : $('.custom.popup'),
+      position   : 'bottom right',
+    }).on('click', function(e) {
+      $downloadBtn.popup('destroy').popup({
+        popup : $('.custom.popup'),
+        on: 'manual',
+        position   : 'bottom right',
+      }).popup('show');
+      setTimeout(function() {
+        $downloadBtn.popup('hide');
+      }, 2000);
+  
+    })
+  })
+</script>
+
+</div>
+<div class='d-inline pull-right' id='git-project-root-actions'>
+<div class='ui horizontal list repo-action-list d-flex d-align-center repo-action-list-right'>
+<div class='item search-box-container'>
+<div class='ui icon input search-input' id='search-box'>
+<input class='search-file-name' maxlength='40' placeholder='搜索文件' type='text'>
+</div>
+<a class='d-flex d-align-center head-search-file-btn' id='search-file-btn'>
+<span class='iconify' data-icon='gitee:search' style='font-size: 16px;color:#979CAC;margin-right:10px'></span>
+</a>
+<div class='filter-file-container' style='display: none;'></div>
+</div>
+<div class='item plus-box'>
+<div class='ui pointing right top dropdown git-project-file' id='git-project-file'>
+<span class='iconify' data-icon='gitee:plus' style='font-size: 16px;color:#979CAC'></span>
+<div class='menu repo-dropdown-box pt-1 pb-1'>
+<a title="新建文件" id="new_file_bread" class="item repo-action d-flex d-align-center" href="/tntlinking-opensource/openhis-itai/new/develop"><span class='iconify' data-icon='gitee:file' style='font-size: 16px;color:#979CAC;margin-right:12px'></span>
+<span>
+新建文件
+</span>
+</a><a title="新建 Diagram 文件" class="item repo-action d-flex d-align-center" href="/tntlinking-opensource/openhis-itai/new/develop?ext=drawio"><span class='iconify' data-icon='gitee:lan' style='font-size: 16px;color:#979CAC;margin-right:12px'></span>
+<span>
+新建 Diagram 文件
+</span>
+</a><div class='disabled item d-flex d-align-center'>
+<span class='iconify' data-icon='gitee:folder-sub' style='font-size: 16px;color:#979CAC;margin-right:12px'></span>
+<span>
+新建子模块
+</span>
+</div>
+<div class='disabled item d-flex d-align-center'>
+<span class='iconify' data-icon='gitee:upload' style='font-size: 16px;color:#979CAC;margin-right:12px'></span>
+<span>
+上传文件
+</span>
+</div>
+</div>
+</div>
+</div>
+<div class='item toschina-content__hidden webIDE-box' data-content='Web IDE'>
+<a class="ui d-flex d-align-center webide" target="_blank" href="/-/ide/project/tntlinking-opensource/openhis-itai/edit/develop/-/"><span class='iconify' data-icon='gitee:computer' style='font-size: 16px;color:#979CAC;margin-right:10px'></span>
+</a></div>
+<div class='item compare-box' data-content='对比视图'>
+<a class="ui d-flex d-align-center webide" target="_blank" href="/tntlinking-opensource/openhis-itai/compare/develop...develop"><span class='iconify' data-icon='gitee:diff' style='font-size: 16px;color:#979CAC;margin-right:12px'></span>
+</a></div>
+</div>
+<script>
+  $('.git-project-file').dropdown({
+    action: 'hide',
+    onHide: function () {
+      $('.plus-box').removeClass('click-active')
+    },
+    onShow: function () {
+      $('.plus-box').addClass('click-active')
+    }
+  });
+</script>
+<script>
+  $('.webIDE-box').popup()
+  $('.compare-box').popup()
+</script>
+<script src="https://cn-assets.gitee.com/assets/file_search/app-21e8df8af6aa09b8995390509269205b.js"></script>
+<style>
+  .filter-file-container-hide {
+    display: none !important; }
+</style>
+
+</div>
+<div class='breadcrumb_path path-breadcrumb-contrainer' id='git-project-breadcrumb'>
+
+</div>
+<div class='ui horizontal list repo-action-list branches-tags' style=''>
+<div class='item'>
+<a class="ui blank button" href="/tntlinking-opensource/openhis-itai/branches"><i class='iconfont icon-branches'></i>
+分支 6
+</a></div>
+<div class='item mr-3'>
+<a class="ui blank button" href="/tntlinking-opensource/openhis-itai/tags"><i class='iconfont icon-tag'></i>
+标签 3
+</a></div>
+</div>
+</div>
+<script src="https://cn-assets.gitee.com/webpacks/parse_blob_form_scheme-f8071962be0eddc2e320.bundle.js"></script>
+<script>
+  if(window.gon.locale == 'en')
+    $('.branches-tags').css('margin-top', '12px')
+   // 仓库页面切换路径时: 刷新 yaml 错误检查
+  $(window).on('pjax-complete:file-show', function () {
+    window.parseBlobFormScheme && window.parseBlobFormScheme($('.js-blob-data').data('blob'));
+  });
+</script>
+
+<style>
+  .ui.dropdown .menu > .header {
+    text-transform: none; }
+</style>
+<script>
+  $(function () {
+    var $tip = $('#apk-download-tip');
+    if (!$tip.length) {
+      return;
+    }
+    $tip.find('.btn-close').on('click', function () {
+      $tip.hide();
+    });
+  });
+  (function(){
+    function pathAutoRender() {
+      var $parent = $('#git-project-bread'),
+          $child = $('#git-project-bread').children('.ui.horizontal.list'),
+          mainWidth = 0;
+      $child.each(function (i,item) {
+        mainWidth += $(item).width()
+      });
+      $('.breadcrumb.path.fork-path').remove();
+      if (mainWidth > 995) {
+        $('#path-breadcrumb').hide();
+        $parent.append('<div class="ui breadcrumb path fork-path">' + $('#path-breadcrumb').html() + '<div/>')
+      } else {
+        $('#path-breadcrumb').show();
+      }
+    }
+    window.pathAutoRender = pathAutoRender;
+    pathAutoRender();
+  })();
+</script>
+
+<div class='branch-diff-notice-bar hide'>
+<div class='left-section'></div>
+<div class='right-section'>
+<div class='ui button gradient contribute'>
+贡献代码
+<i class='dropdown icon'></i>
+</div>
+<div class='ui button gradient branch-sync hide'>
+同步代码
+<i class='dropdown icon'></i>
+</div>
+</div>
+</div>
+<div class='ui popup contribute branch-diff-pop-panel contribute-pop'>
+<div class='notice-title'></div>
+<div class='notice-sub-title'></div>
+<div class='notice-content'></div>
+<a class='ui button orange fluid disabled create-pr' href='/' target='_blank'>
+创建 Pull Request
+</a>
+</div>
+<div class='ui popup branch-diff-pop-panel branch-sync-pop'>
+<div class='notice-title'></div>
+<div class='notice-content'></div>
+<div class='known-more'>
+<a href='/help/articles/4395' target='_blank'>
+了解更多
+</a>
+</div>
+<div class='btn-group'>
+<div class='ui button basic red discard-btn hide'></div>
+<a class='ui button orange basic diff-btn hide' href='/' target='_blank'>
+对比差异
+</a>
+<a class='ui button gradient pr-sync-btn hide' href='/' target='_blank'>
+通过 Pull Request 同步
+</a>
+<div class='ui buttons basic dropdown-group-btn hide'>
+<div class='ui button branch-sync-btn'>
+同步更新到分支
+</div>
+<div class='ui button dropdown dropdown-create-pr'>
+<i class='icon dropdown'></i>
+<div class='menu'>
+<div class='disabled item'>
+<div>
+通过 Pull Request 同步
+<div class='text-muted fs-12 mt-1'>
+将会在向当前分支创建一个 Pull <br/>Request，合入后将完成同步
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function () {
+    const i18_compare_current_branch = `当前分支与 <a href="URL">BRANCH</a> 相比`
+    const i18_branch_ahead_commit = `，领先 <a href="URL">NUM 个 Commit</a>`
+    const i18_branch_behind_commit = `，落后 <a href="URL">NUM 个 Commit</a>`
+  
+    const i18_contribute_ahead_title = `当前分支比 BRANCH 领先了 NUM 次提交。`
+    const i18_contribute_pr_create = `创建一个 Pull Request 贡献代码。`
+    const i18_contribute_has_pr = `已创建了 Pull Request`
+    const i18_contribute_no_ahead = `这个分支没有领先于 BRANCH 的代码提交。`
+  
+    const i18_branch_sync_behind  = `这个分支已落后于 BRANCH 分支`
+    const i18_branch_sync_behind_desc = `从 BRANCH 分支同步 NUM 个提交来更新分支以保持当前分支代码是最新的。`
+    const i18_branch_sync_out_of_date = `此分支已过时`
+    const i18_branch_sync_out_of_date_desc = `你可以将 BRANCH 分支中的最新更改合并到此分支中。或丢弃当前分支上的提交以使当前分支与 BRANCH 分支匹配。这将从当前分支中删除 NUM 个提交。`
+    const i18_branch_discard_diff = `丢弃 NUM 个提交`
+  
+    const i18_branch_sync_success = `同步成功`
+    const i18_branch_sync_fail = `同步失败`
+    const i18_branch_discard_success = `丢弃成功`
+    const i18_branch_discard_fail = `丢弃失败`
+  
+    window.locale_temple_branch_diff = {
+      i18_compare_current_branch,
+      i18_branch_ahead_commit,
+      i18_branch_behind_commit,
+  
+      i18_contribute_ahead_title,
+      i18_contribute_pr_create,
+      i18_contribute_has_pr,
+      i18_contribute_no_ahead,
+  
+      i18_branch_sync_behind,
+      i18_branch_sync_behind_desc,
+      i18_branch_sync_out_of_date,
+      i18_branch_sync_out_of_date_desc,
+      i18_branch_discard_diff,
+  
+      i18_branch_sync_success,
+      i18_branch_sync_fail,
+      i18_branch_discard_success,
+      i18_branch_discard_fail
+    }
+  })();
+</script>
+
+<div class='row column tree-holder' id='tree-holder'>
+<div class='tree-content-holder' id='tree-content-holder'>
+<div class='ui flat nopadding segment tree-content'>
+<div class='git-project-recent-commit' id='git-project-info'>
+<div class='recent-commit'>
+<a class="commit-author-link  js-popover-card " data-username="TTopen" href="/TTopen"><img class="avatar circular ui image 20 mini" width="20" alt="" src="https://foruda.gitee.com/avatar/1752028445441702196/14124580_newtouch-open_1752028445.png!avatar30" /> <span class="commit-author-name">天天开源</span></a>
+<span>
+<a class="repo-index-commit-msg" title="update README.md." href="/tntlinking-opensource/openhis-itai/commit/a334114a17599bd52252546034ca6d0a299b1ec5">update README.md.</a>
+</span>
+<span>a334114</span>
+<span class='timeago' datetime='2026-02-05 06:20' title='2026-02-05 06:20:51 +0000'></span>
+<check-runs branch='develop' commit-id='a334114a17599bd52252546034ca6d0a299b1ec5' project-path='tntlinking-opensource/openhis-itai'></check-runs>
+<build-status commit-id='a334114a17599bd52252546034ca6d0a299b1ec5' no-interceptor></build-status>
+</div>
+<div class='all-commits'>
+<a href="/tntlinking-opensource/openhis-itai/commits/develop"><i class='iconfont icon-commit'></i>
+582 次提交
+</a></div>
+</div>
+
+<div class='grid list selection table_da39a3ee5e6b4b0d3255bfef95601890afd80709 tree-table ui' id='tree-slider'>
+<div class='create-folder-form form ui'>
+<form id="folder_form-edit" action="/tntlinking-opensource/openhis-itai/new/develop" accept-charset="UTF-8" method="post"><input name="utf8" type="hidden" value="&#x2713;" /><input type="hidden" name="authenticity_token" value="FgS2c9PpAq4HL8jOeUCEZ/xkZZuXmawFE/6VVwfrP+ltI6Fo7vOhxke4A4SB/ba2GsJSglkuoKGkG3JPCbBFpw==" />
+<div class='fields'>
+<div class='field'>
+<input type="hidden" name="new_file_path" id="new_file_path" />
+<input type="hidden" name="content" id="content" />
+<input id='new_folder_path' name='new_folder_path' placeholder='新建文件夹' type='text'>
+</div>
+<div class='field'>
+<button name="button" type="submit" class="ui primary button orange submit field-init-btn js-submit-btn">提交</button>
+<a class="ui basic white button cancel field-init-btn" href="javascript:void(0)">取消</a>
+</div>
+<div class='ui mid-center small message notice'>
+<strong>提示:</strong>
+由于 Git 不支持空文件夾，创建文件夹后会生成空的 .keep 文件
+</div>
+</div>
+</form>
+
+</div>
+<div class='file_31464ddfda32718b554f1b8d131cbe2d65909fd9 row tree-item' data-branch='develop' data-type='folder' file_hex='file_31464ddfda32718b554f1b8d131cbe2d65909fd9'>
+<div class='five wide column tree-item-file-name tree-folder tree-list-item d-align-center' data-path='openhis-server-new' data-type='folder'>
+<i class='iconfont icon-folders file-icon-item'></i>
+<a class="tree-folder-item" title="openhis-server-new" data-path="openhis-server-new" href="/tntlinking-opensource/openhis-itai/tree/develop/openhis-server-new"><span class='simplified-path'></span>openhis-server-new
+<div class='js-tree-row-lfs'></div>
+</a></div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_31464ddfda32718b554f1b8d131cbe2d65909fd9 row tree-item tree-item-rename' file_hex='file_31464ddfda32718b554f1b8d131cbe2d65909fd9' style='display:none'>
+<div class='ui column form' path='tree/develop/openhis-server-new'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='openhis-server-new'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_1eb7cd06d93b2fffce7586a1931d83f24e803416 row tree-item' data-branch='develop' data-type='folder' file_hex='file_1eb7cd06d93b2fffce7586a1931d83f24e803416'>
+<div class='five wide column tree-item-file-name tree-folder tree-list-item d-align-center' data-path='openhis-ui-vue3' data-type='folder'>
+<i class='iconfont icon-folders file-icon-item'></i>
+<a class="tree-folder-item" title="openhis-ui-vue3" data-path="openhis-ui-vue3" href="/tntlinking-opensource/openhis-itai/tree/develop/openhis-ui-vue3"><span class='simplified-path'></span>openhis-ui-vue3
+<div class='js-tree-row-lfs'></div>
+</a></div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_1eb7cd06d93b2fffce7586a1931d83f24e803416 row tree-item tree-item-rename' file_hex='file_1eb7cd06d93b2fffce7586a1931d83f24e803416' style='display:none'>
+<div class='ui column form' path='tree/develop/openhis-ui-vue3'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='openhis-ui-vue3'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_fa2c99c42a2af5d2a41d6fa195c4b0d111d45e09 row tree-item' data-branch='develop' data-type='folder' file_hex='file_fa2c99c42a2af5d2a41d6fa195c4b0d111d45e09'>
+<div class='five wide column tree-item-file-name tree-folder tree-list-item d-align-center' data-path='发版记录' data-type='folder'>
+<i class='iconfont icon-folders file-icon-item'></i>
+<a class="tree-folder-item" title="发版记录" data-path="发版记录" href="/tntlinking-opensource/openhis-itai/tree/develop/%E5%8F%91%E7%89%88%E8%AE%B0%E5%BD%95"><span class='simplified-path'></span>发版记录
+<div class='js-tree-row-lfs'></div>
+</a></div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_fa2c99c42a2af5d2a41d6fa195c4b0d111d45e09 row tree-item tree-item-rename' file_hex='file_fa2c99c42a2af5d2a41d6fa195c4b0d111d45e09' style='display:none'>
+<div class='ui column form' path='tree/develop/%E5%8F%91%E7%89%88%E8%AE%B0%E5%BD%95'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='发版记录'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_3138a4bb1e0c92a30724256f8b88e0dc07b033c7 row tree-item' data-branch='develop' data-type='folder' file_hex='file_3138a4bb1e0c92a30724256f8b88e0dc07b033c7'>
+<div class='five wide column tree-item-file-name tree-folder tree-list-item d-align-center' data-path='迁移记录-DB变更记录' data-type='folder'>
+<i class='iconfont icon-folders file-icon-item'></i>
+<a class="tree-folder-item" title="迁移记录-DB变更记录" data-path="迁移记录-DB变更记录" href="/tntlinking-opensource/openhis-itai/tree/develop/%E8%BF%81%E7%A7%BB%E8%AE%B0%E5%BD%95-DB%E5%8F%98%E6%9B%B4%E8%AE%B0%E5%BD%95"><span class='simplified-path'></span>迁移记录-DB变更记录
+<div class='js-tree-row-lfs'></div>
+</a></div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_3138a4bb1e0c92a30724256f8b88e0dc07b033c7 row tree-item tree-item-rename' file_hex='file_3138a4bb1e0c92a30724256f8b88e0dc07b033c7' style='display:none'>
+<div class='ui column form' path='tree/develop/%E8%BF%81%E7%A7%BB%E8%AE%B0%E5%BD%95-DB%E5%8F%98%E6%9B%B4%E8%AE%B0%E5%BD%95'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='迁移记录-DB变更记录'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_24139dae656713ba861751fb2c2ac38839349a7a row tree-item' data-branch='develop' data-type='file' file_hex='file_24139dae656713ba861751fb2c2ac38839349a7a'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='.gitattributes' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title=".gitattributes" data-path=".gitattributes" href="/tntlinking-opensource/openhis-itai/blob/develop/.gitattributes">.gitattributes</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_24139dae656713ba861751fb2c2ac38839349a7a row tree-item tree-item-rename' file_hex='file_24139dae656713ba861751fb2c2ac38839349a7a' style='display:none'>
+<div class='ui column form' path='blob/develop/.gitattributes'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='.gitattributes'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_a5cc2925ca8258af241be7e5b0381edf30266302 row tree-item' data-branch='develop' data-type='file' file_hex='file_a5cc2925ca8258af241be7e5b0381edf30266302'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='.gitignore' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title=".gitignore" data-path=".gitignore" href="/tntlinking-opensource/openhis-itai/blob/develop/.gitignore">.gitignore</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_a5cc2925ca8258af241be7e5b0381edf30266302 row tree-item tree-item-rename' file_hex='file_a5cc2925ca8258af241be7e5b0381edf30266302' style='display:none'>
+<div class='ui column form' path='blob/develop/.gitignore'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='.gitignore'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_0398ccd0f49298b10a3d76a47800d2ebecd49859 row tree-item' data-branch='develop' data-type='file' file_hex='file_0398ccd0f49298b10a3d76a47800d2ebecd49859'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='LICENSE' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title="LICENSE" data-path="LICENSE" href="/tntlinking-opensource/openhis-itai/blob/develop/LICENSE">LICENSE</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_0398ccd0f49298b10a3d76a47800d2ebecd49859 row tree-item tree-item-rename' file_hex='file_0398ccd0f49298b10a3d76a47800d2ebecd49859' style='display:none'>
+<div class='ui column form' path='blob/develop/LICENSE'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='LICENSE'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d row tree-item' data-branch='develop' data-type='file' file_hex='file_8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='README.md' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title="README.md" data-path="README.md" href="/tntlinking-opensource/openhis-itai/blob/develop/README.md">README.md</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d row tree-item tree-item-rename' file_hex='file_8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d' style='display:none'>
+<div class='ui column form' path='blob/develop/README.md'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='README.md'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_016a5af5cea89eb58ea21ee80c712847394313cf row tree-item' data-branch='develop' data-type='file' file_hex='file_016a5af5cea89eb58ea21ee80c712847394313cf'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='天天开源软件（社区版）许可协议.pdf' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title="天天开源软件（社区版）许可协议.pdf" data-path="天天开源软件（社区版）许可协议.pdf" href="/tntlinking-opensource/openhis-itai/blob/develop/%E5%A4%A9%E5%A4%A9%E5%BC%80%E6%BA%90%E8%BD%AF%E4%BB%B6%EF%BC%88%E7%A4%BE%E5%8C%BA%E7%89%88%EF%BC%89%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf">天天开源软件（社区版）许可协议.pdf</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_016a5af5cea89eb58ea21ee80c712847394313cf row tree-item tree-item-rename' file_hex='file_016a5af5cea89eb58ea21ee80c712847394313cf' style='display:none'>
+<div class='ui column form' path='blob/develop/%E5%A4%A9%E5%A4%A9%E5%BC%80%E6%BA%90%E8%BD%AF%E4%BB%B6%EF%BC%88%E7%A4%BE%E5%8C%BA%E7%89%88%EF%BC%89%E8%AE%B8%E5%8F%AF%E5%8D%8F%E8%AE%AE.pdf'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='天天开源软件（社区版）许可协议.pdf'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+<div class='file_634f347df647c3199470540bfdb305b808239652 row tree-item' data-branch='develop' data-type='file' file_hex='file_634f347df647c3199470540bfdb305b808239652'>
+<div class='five wide column tree-item-file-name tree-list-item d-align-center' data-path='说明.txt' data-type='file'>
+<i class="iconfont icon-file"></i>
+<a class="tree-folder-item" title="说明.txt" data-path="说明.txt" href="/tntlinking-opensource/openhis-itai/blob/develop/%E8%AF%B4%E6%98%8E.txt">说明.txt</a>
+<div class='js-tree-row-lfs'></div>
+</div>
+<div class='js-tree-row-commit'></div>
+</div>
+<div class='rename-file_634f347df647c3199470540bfdb305b808239652 row tree-item tree-item-rename' file_hex='file_634f347df647c3199470540bfdb305b808239652' style='display:none'>
+<div class='ui column form' path='blob/develop/%E8%AF%B4%E6%98%8E.txt'>
+<div class='two fields'>
+<div class='five wide field'>
+<input class='ui input' name='new_filename' type='text' value='说明.txt'>
+</div>
+<div class='five wide field'>
+<button class='ui blue button popup-save' type='submit'>保存</button>
+<button class='ui basic button popup-close'>取消</button>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+</div>
+<div class='ui tree_progress' data-logs-path='/tntlinking-opensource/openhis-itai/refs/develop/logs_tree/'>
+<div class='ui active inverted dimmer'>
+<div class='ui small text loader'>Loading...</div>
+</div>
+</div>
+<div class='readme-box' id='git-readme'>
+<div class='ui flat nopadding segment file_holder'>
+<div class='file_title d-flex-between file_readme_title'>
+<div class='left-box'>
+<div class='file_title_readme mr-1 pb-1 active-title pr-1 pl-1'>
+<i class='iconfont icon-readme mr-05'></i>
+<span class='file_name'>README</span>
+</div>
+<div class='file_title_license mr-1 pb-1 pl-1 pr-1' data-license-index='0' id='license-title-0'>
+<i class='iconfont icon-licence mr-05'></i>
+<span class='file_name'>
+GPL-3.0
+</span>
+</div>
+</div>
+<div class='box-border d-align-center pb-1 flex-shrink-0 ml-2'>
+<div class='readme-edit d-align-center gap-2'>
+</div>
+<div class='hide lisence-edit' id='license-edit-0'>
+<a class='text-muted edit_path edit-blob' href='/tntlinking-opensource/openhis-itai/edit/develop/LICENSE' title='只有登陆后才可以编辑'>
+<i class='iconfont icon-edit mr-05'></i>
+</a>
+</div>
+</div>
+</div>
+<div class='readme-content'>
+<div class='file-markdown-layout'>
+<div class='file_catalog'>
+<div class='toggle'>
+<i class='icon angle left'></i>
+</div>
+<div class='file_catalog_resizer'></div>
+<div class='scroll-container'>
+<div class='container'>
+<div class='skeleton'>
+<div class='line line1'></div>
+<div class='line line2'></div>
+<div class='line line3'></div>
+<div class='line line1'></div>
+<div class='line line2'></div>
+<div class='line line3'></div>
+</div>
+</div>
+</div>
+</div>
+<div class='file_content markdown-body'>
+<blob-markdown-renderer data-dir='' data-path-with-namespace='/tntlinking-opensource/openhis-itai'>&#x000A;<textarea class='content' style='display:none;'># 平台介绍&#x000A;&#x000A;## 🏠【关于我们】&#x000A;&#x000A;![天天开源](https://open.tntlinking.com/assets/logo-b-BzFUYaRU.png) &#x000A;&#x000A;天天开源致力于构建开放共赢的平台，推动安全高效的开源应用普及。我们始终秉持“开源、众包、共享”的理念，致力于为医疗、教育、中小企业等行业提供优质的开源解决方案。&#x000A;&#x000A;天天开源聚焦医疗、企业、教育三大行业信息化市场，现已发布OpenHIS、OpenCOM、OpenEDU系列开源软件产品。我们通过建立开源生态，联合生态伙伴共同打造创新行业协作模式，让数字化普惠、可信、安全。&#x000A;&#x000A;天天开源的前身是新致开源，最早于2022年6月发布OpenHIS开源医疗，于2023年6月发布OpenCOM开源企业。2025年7月，新致开源品牌升级为天天开源。我们将持续践行开源精神，期待成为全球开源生态的引领者。&#x000A;&#x000A;了解我们：https://open.tntlinking.com/about?site=gitee&#x000A;&#x000A;## 💾【部署包下载】&#x000A;&#x000A;请访问官网产品中心下载部署包：https://open.tntlinking.com/resource/productCenter?site=gitee&#x000A;&#x000A;## 📚【支持文档】&#x000A;&#x000A;技术文档：https://open.tntlinking.com/resource/openProductDoc?site=gitee （含演示环境、操作手册、部署手册、开发手册、常见问题等）&#x000A;&#x000A;产品介绍：https://open.tntlinking.com/resource/productPresentation?site=gitee&#x000A;&#x000A;操作教程：https://open.tntlinking.com/resource/operationTutorial?site=gitee&#x000A;&#x000A;沙龙回顾：https://open.tntlinking.com/resource/openSourceSalon#23?site=gitee&#x000A;&#x000A;## 🤝【合作方式】&#x000A;&#x000A;产品服务价格：https://open.tntlinking.com/cost?site=gitee&#x000A;&#x000A;加入生态伙伴：https://open.tntlinking.com/ecology/becomePartner?site=gitee&#x000A;&#x000A;## 🤗【技术社区】&#x000A;&#x000A;请访问官网扫码加入技术社区交流：https://open.tntlinking.com/ecology/joinCommunity?site=gitee&#x000A;&#x000A;请关注公众号【天天开源软件】以便获得最新产品更新信息。&#x000A;&#x000A;&#x000A;&#x000A;# 项目介绍&#x000A;&#x000A;OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。&#x000A;&#x000A;系统深度适配民营及公立一二级医院业务场景，支持单体医院、集团化运营及区域医疗协同等多种部署模式，并通过国家信创认证体系，确保全栈技术自主可控。如有项目需求，可联系官方平台合作。&#x000A;&#x000A;&#x000A;&#x000A;## 运行环境&#x000A;&#x000A;    jdk17 (必须)&#x000A;    node.js-v16.15 (推荐)&#x000A;    PostgreSQL-v16.2 (必须)&#x000A;    redis (常用稳定版本即可)&#x000A;&#x000A;## 开发提示&#x000A;&#x000A;    需要修改数据库和redis的连接信息,详见:&#x000A;        application.yml&#x000A;        application-druid.yml&#x000A;&#x000A;## 目录解释&#x000A;	&#x000A;    前端: openhis-ui-vue3&#x000A;    后端: openhis-server&#x000A;        启动类: OpenHisApplication</textarea>&#x000A;<div class='loader-wrapper'>&#x000A;<div class='ui inline mini active loader'></div>&#x000A;</div></blob-markdown-renderer>&#x000A;</div>
+</div>
+</div>
+<div class='hide lisence-content' data-license-index='0' id='license-content-0'>
+<div class='file_content code'>
+<div class='d-block lines mb-1 ml-3 mr-3 mt-1 white'>
+<div class='preformatted'>&#x000A;                    GNU GENERAL PUBLIC LICENSE&#x000A;                       Version 3, 29 June 2007&#x000A;&#x000A; Copyright (C) 2007 Free Software Foundation, Inc. &lt;https://fsf.org/&gt;&#x000A; Everyone is permitted to copy and distribute verbatim copies&#x000A; of this license document, but changing it is not allowed.&#x000A;&#x000A;                            Preamble&#x000A;&#x000A;  The GNU General Public License is a free, copyleft license for&#x000A;software and other kinds of works.&#x000A;&#x000A;  The licenses for most software and other practical works are designed&#x000A;to take away your freedom to share and change the works.  By contrast,&#x000A;the GNU General Public License is intended to guarantee your freedom to&#x000A;share and change all versions of a program--to make sure it remains free&#x000A;software for all its users.  We, the Free Software Foundation, use the&#x000A;GNU General Public License for most of our software; it applies also to&#x000A;any other work released this way by its authors.  You can apply it to&#x000A;your programs, too.&#x000A;&#x000A;  When we speak of free software, we are referring to freedom, not&#x000A;price.  Our General Public Licenses are designed to make sure that you&#x000A;have the freedom to distribute copies of free software (and charge for&#x000A;them if you wish), that you receive source code or can get it if you&#x000A;want it, that you can change the software or use pieces of it in new&#x000A;free programs, and that you know you can do these things.&#x000A;&#x000A;  To protect your rights, we need to prevent others from denying you&#x000A;these rights or asking you to surrender the rights.  Therefore, you have&#x000A;certain responsibilities if you distribute copies of the software, or if&#x000A;you modify it: responsibilities to respect the freedom of others.&#x000A;&#x000A;  For example, if you distribute copies of such a program, whether&#x000A;gratis or for a fee, you must pass on to the recipients the same&#x000A;freedoms that you received.  You must make sure that they, too, receive&#x000A;or can get the source code.  And you must show them these terms so they&#x000A;know their rights.&#x000A;&#x000A;  Developers that use the GNU GPL protect your rights with two steps:&#x000A;(1) assert copyright on the software, and (2) offer you this License&#x000A;giving you legal permission to copy, distribute and/or modify it.&#x000A;&#x000A;  For the developers' and authors' protection, the GPL clearly explains&#x000A;that there is no warranty for this free software.  For both users' and&#x000A;authors' sake, the GPL requires that modified versions be marked as&#x000A;changed, so that their problems will not be attributed erroneously to&#x000A;authors of previous versions.&#x000A;&#x000A;  Some devices are designed to deny users access to install or run&#x000A;modified versions of the software inside them, although the manufacturer&#x000A;can do so.  This is fundamentally incompatible with the aim of&#x000A;protecting users' freedom to change the software.  The systematic&#x000A;pattern of such abuse occurs in the area of products for individuals to&#x000A;use, which is precisely where it is most unacceptable.  Therefore, we&#x000A;have designed this version of the GPL to prohibit the practice for those&#x000A;products.  If such problems arise substantially in other domains, we&#x000A;stand ready to extend this provision to those domains in future versions&#x000A;of the GPL, as needed to protect the freedom of users.&#x000A;&#x000A;  Finally, every program is threatened constantly by software patents.&#x000A;States should not allow patents to restrict development and use of&#x000A;software on general-purpose computers, but in those that do, we wish to&#x000A;avoid the special danger that patents applied to a free program could&#x000A;make it effectively proprietary.  To prevent this, the GPL assures that&#x000A;patents cannot be used to render the program non-free.&#x000A;&#x000A;  The precise terms and conditions for copying, distribution and&#x000A;modification follow.&#x000A;&#x000A;                       TERMS AND CONDITIONS&#x000A;&#x000A;  0. Definitions.&#x000A;&#x000A;  &quot;This License&quot; refers to version 3 of the GNU General Public License.&#x000A;&#x000A;  &quot;Copyright&quot; also means copyright-like laws that apply to other kinds of&#x000A;works, such as semiconductor masks.&#x000A;&#x000A;  &quot;The Program&quot; refers to any copyrightable work licensed under this&#x000A;License.  Each licensee is addressed as &quot;you&quot;.  &quot;Licensees&quot; and&#x000A;&quot;recipients&quot; may be individuals or organizations.&#x000A;&#x000A;  To &quot;modify&quot; a work means to copy from or adapt all or part of the work&#x000A;in a fashion requiring copyright permission, other than the making of an&#x000A;exact copy.  The resulting work is called a &quot;modified version&quot; of the&#x000A;earlier work or a work &quot;based on&quot; the earlier work.&#x000A;&#x000A;  A &quot;covered work&quot; means either the unmodified Program or a work based&#x000A;on the Program.&#x000A;&#x000A;  To &quot;propagate&quot; a work means to do anything with it that, without&#x000A;permission, would make you directly or secondarily liable for&#x000A;infringement under applicable copyright law, except executing it on a&#x000A;computer or modifying a private copy.  Propagation includes copying,&#x000A;distribution (with or without modification), making available to the&#x000A;public, and in some countries other activities as well.&#x000A;&#x000A;  To &quot;convey&quot; a work means any kind of propagation that enables other&#x000A;parties to make or receive copies.  Mere interaction with a user through&#x000A;a computer network, with no transfer of a copy, is not conveying.&#x000A;&#x000A;  An interactive user interface displays &quot;Appropriate Legal Notices&quot;&#x000A;to the extent that it includes a convenient and prominently visible&#x000A;feature that (1) displays an appropriate copyright notice, and (2)&#x000A;tells the user that there is no warranty for the work (except to the&#x000A;extent that warranties are provided), that licensees may convey the&#x000A;work under this License, and how to view a copy of this License.  If&#x000A;the interface presents a list of user commands or options, such as a&#x000A;menu, a prominent item in the list meets this criterion.&#x000A;&#x000A;  1. Source Code.&#x000A;&#x000A;  The &quot;source code&quot; for a work means the preferred form of the work&#x000A;for making modifications to it.  &quot;Object code&quot; means any non-source&#x000A;form of a work.&#x000A;&#x000A;  A &quot;Standard Interface&quot; means an interface that either is an official&#x000A;standard defined by a recognized standards body, or, in the case of&#x000A;interfaces specified for a particular programming language, one that&#x000A;is widely used among developers working in that language.&#x000A;&#x000A;  The &quot;System Libraries&quot; of an executable work include anything, other&#x000A;than the work as a whole, that (a) is included in the normal form of&#x000A;packaging a Major Component, but which is not part of that Major&#x000A;Component, and (b) serves only to enable use of the work with that&#x000A;Major Component, or to implement a Standard Interface for which an&#x000A;implementation is available to the public in source code form.  A&#x000A;&quot;Major Component&quot;, in this context, means a major essential component&#x000A;(kernel, window system, and so on) of the specific operating system&#x000A;(if any) on which the executable work runs, or a compiler used to&#x000A;produce the work, or an object code interpreter used to run it.&#x000A;&#x000A;  The &quot;Corresponding Source&quot; for a work in object code form means all&#x000A;the source code needed to generate, install, and (for an executable&#x000A;work) run the object code and to modify the work, including scripts to&#x000A;control those activities.  However, it does not include the work's&#x000A;System Libraries, or general-purpose tools or generally available free&#x000A;programs which are used unmodified in performing those activities but&#x000A;which are not part of the work.  For example, Corresponding Source&#x000A;includes interface definition files associated with source files for&#x000A;the work, and the source code for shared libraries and dynamically&#x000A;linked subprograms that the work is specifically designed to require,&#x000A;such as by intimate data communication or control flow between those&#x000A;subprograms and other parts of the work.&#x000A;&#x000A;  The Corresponding Source need not include anything that users&#x000A;can regenerate automatically from other parts of the Corresponding&#x000A;Source.&#x000A;&#x000A;  The Corresponding Source for a work in source code form is that&#x000A;same work.&#x000A;&#x000A;  2. Basic Permissions.&#x000A;&#x000A;  All rights granted under this License are granted for the term of&#x000A;copyright on the Program, and are irrevocable provided the stated&#x000A;conditions are met.  This License explicitly affirms your unlimited&#x000A;permission to run the unmodified Program.  The output from running a&#x000A;covered work is covered by this License only if the output, given its&#x000A;content, constitutes a covered work.  This License acknowledges your&#x000A;rights of fair use or other equivalent, as provided by copyright law.&#x000A;&#x000A;  You may make, run and propagate covered works that you do not&#x000A;convey, without conditions so long as your license otherwise remains&#x000A;in force.  You may convey covered works to others for the sole purpose&#x000A;of having them make modifications exclusively for you, or provide you&#x000A;with facilities for running those works, provided that you comply with&#x000A;the terms of this License in conveying all material for which you do&#x000A;not control copyright.  Those thus making or running the covered works&#x000A;for you must do so exclusively on your behalf, under your direction&#x000A;and control, on terms that prohibit them from making any copies of&#x000A;your copyrighted material outside their relationship with you.&#x000A;&#x000A;  Conveying under any other circumstances is permitted solely under&#x000A;the conditions stated below.  Sublicensing is not allowed; section 10&#x000A;makes it unnecessary.&#x000A;&#x000A;  3. Protecting Users' Legal Rights From Anti-Circumvention Law.&#x000A;&#x000A;  No covered work shall be deemed part of an effective technological&#x000A;measure under any applicable law fulfilling obligations under article&#x000A;11 of the WIPO copyright treaty adopted on 20 December 1996, or&#x000A;similar laws prohibiting or restricting circumvention of such&#x000A;measures.&#x000A;&#x000A;  When you convey a covered work, you waive any legal power to forbid&#x000A;circumvention of technological measures to the extent such circumvention&#x000A;is effected by exercising rights under this License with respect to&#x000A;the covered work, and you disclaim any intention to limit operation or&#x000A;modification of the work as a means of enforcing, against the work's&#x000A;users, your or third parties' legal rights to forbid circumvention of&#x000A;technological measures.&#x000A;&#x000A;  4. Conveying Verbatim Copies.&#x000A;&#x000A;  You may convey verbatim copies of the Program's source code as you&#x000A;receive it, in any medium, provided that you conspicuously and&#x000A;appropriately publish on each copy an appropriate copyright notice;&#x000A;keep intact all notices stating that this License and any&#x000A;non-permissive terms added in accord with section 7 apply to the code;&#x000A;keep intact all notices of the absence of any warranty; and give all&#x000A;recipients a copy of this License along with the Program.&#x000A;&#x000A;  You may charge any price or no price for each copy that you convey,&#x000A;and you may offer support or warranty protection for a fee.&#x000A;&#x000A;  5. Conveying Modified Source Versions.&#x000A;&#x000A;  You may convey a work based on the Program, or the modifications to&#x000A;produce it from the Program, in the form of source code under the&#x000A;terms of section 4, provided that you also meet all of these conditions:&#x000A;&#x000A;    a) The work must carry prominent notices stating that you modified&#x000A;    it, and giving a relevant date.&#x000A;&#x000A;    b) The work must carry prominent notices stating that it is&#x000A;    released under this License and any conditions added under section&#x000A;    7.  This requirement modifies the requirement in section 4 to&#x000A;    &quot;keep intact all notices&quot;.&#x000A;&#x000A;    c) You must license the entire work, as a whole, under this&#x000A;    License to anyone who comes into possession of a copy.  This&#x000A;    License will therefore apply, along with any applicable section 7&#x000A;    additional terms, to the whole of the work, and all its parts,&#x000A;    regardless of how they are packaged.  This License gives no&#x000A;    permission to license the work in any other way, but it does not&#x000A;    invalidate such permission if you have separately received it.&#x000A;&#x000A;    d) If the work has interactive user interfaces, each must display&#x000A;    Appropriate Legal Notices; however, if the Program has interactive&#x000A;    interfaces that do not display Appropriate Legal Notices, your&#x000A;    work need not make them do so.&#x000A;&#x000A;  A compilation of a covered work with other separate and independent&#x000A;works, which are not by their nature extensions of the covered work,&#x000A;and which are not combined with it such as to form a larger program,&#x000A;in or on a volume of a storage or distribution medium, is called an&#x000A;&quot;aggregate&quot; if the compilation and its resulting copyright are not&#x000A;used to limit the access or legal rights of the compilation's users&#x000A;beyond what the individual works permit.  Inclusion of a covered work&#x000A;in an aggregate does not cause this License to apply to the other&#x000A;parts of the aggregate.&#x000A;&#x000A;  6. Conveying Non-Source Forms.&#x000A;&#x000A;  You may convey a covered work in object code form under the terms&#x000A;of sections 4 and 5, provided that you also convey the&#x000A;machine-readable Corresponding Source under the terms of this License,&#x000A;in one of these ways:&#x000A;&#x000A;    a) Convey the object code in, or embodied in, a physical product&#x000A;    (including a physical distribution medium), accompanied by the&#x000A;    Corresponding Source fixed on a durable physical medium&#x000A;    customarily used for software interchange.&#x000A;&#x000A;    b) Convey the object code in, or embodied in, a physical product&#x000A;    (including a physical distribution medium), accompanied by a&#x000A;    written offer, valid for at least three years and valid for as&#x000A;    long as you offer spare parts or customer support for that product&#x000A;    model, to give anyone who possesses the object code either (1) a&#x000A;    copy of the Corresponding Source for all the software in the&#x000A;    product that is covered by this License, on a durable physical&#x000A;    medium customarily used for software interchange, for a price no&#x000A;    more than your reasonable cost of physically performing this&#x000A;    conveying of source, or (2) access to copy the&#x000A;    Corresponding Source from a network server at no charge.&#x000A;&#x000A;    c) Convey individual copies of the object code with a copy of the&#x000A;    written offer to provide the Corresponding Source.  This&#x000A;    alternative is allowed only occasionally and noncommercially, and&#x000A;    only if you received the object code with such an offer, in accord&#x000A;    with subsection 6b.&#x000A;&#x000A;    d) Convey the object code by offering access from a designated&#x000A;    place (gratis or for a charge), and offer equivalent access to the&#x000A;    Corresponding Source in the same way through the same place at no&#x000A;    further charge.  You need not require recipients to copy the&#x000A;    Corresponding Source along with the object code.  If the place to&#x000A;    copy the object code is a network server, the Corresponding Source&#x000A;    may be on a different server (operated by you or a third party)&#x000A;    that supports equivalent copying facilities, provided you maintain&#x000A;    clear directions next to the object code saying where to find the&#x000A;    Corresponding Source.  Regardless of what server hosts the&#x000A;    Corresponding Source, you remain obligated to ensure that it is&#x000A;    available for as long as needed to satisfy these requirements.&#x000A;&#x000A;    e) Convey the object code using peer-to-peer transmission, provided&#x000A;    you inform other peers where the object code and Corresponding&#x000A;    Source of the work are being offered to the general public at no&#x000A;    charge under subsection 6d.&#x000A;&#x000A;  A separable portion of the object code, whose source code is excluded&#x000A;from the Corresponding Source as a System Library, need not be&#x000A;included in conveying the object code work.&#x000A;&#x000A;  A &quot;User Product&quot; is either (1) a &quot;consumer product&quot;, which means any&#x000A;tangible personal property which is normally used for personal, family,&#x000A;or household purposes, or (2) anything designed or sold for incorporation&#x000A;into a dwelling.  In determining whether a product is a consumer product,&#x000A;doubtful cases shall be resolved in favor of coverage.  For a particular&#x000A;product received by a particular user, &quot;normally used&quot; refers to a&#x000A;typical or common use of that class of product, regardless of the status&#x000A;of the particular user or of the way in which the particular user&#x000A;actually uses, or expects or is expected to use, the product.  A product&#x000A;is a consumer product regardless of whether the product has substantial&#x000A;commercial, industrial or non-consumer uses, unless such uses represent&#x000A;the only significant mode of use of the product.&#x000A;&#x000A;  &quot;Installation Information&quot; for a User Product means any methods,&#x000A;procedures, authorization keys, or other information required to install&#x000A;and execute modified versions of a covered work in that User Product from&#x000A;a modified version of its Corresponding Source.  The information must&#x000A;suffice to ensure that the continued functioning of the modified object&#x000A;code is in no case prevented or interfered with solely because&#x000A;modification has been made.&#x000A;&#x000A;  If you convey an object code work under this section in, or with, or&#x000A;specifically for use in, a User Product, and the conveying occurs as&#x000A;part of a transaction in which the right of possession and use of the&#x000A;User Product is transferred to the recipient in perpetuity or for a&#x000A;fixed term (regardless of how the transaction is characterized), the&#x000A;Corresponding Source conveyed under this section must be accompanied&#x000A;by the Installation Information.  But this requirement does not apply&#x000A;if neither you nor any third party retains the ability to install&#x000A;modified object code on the User Product (for example, the work has&#x000A;been installed in ROM).&#x000A;&#x000A;  The requirement to provide Installation Information does not include a&#x000A;requirement to continue to provide support service, warranty, or updates&#x000A;for a work that has been modified or installed by the recipient, or for&#x000A;the User Product in which it has been modified or installed.  Access to a&#x000A;network may be denied when the modification itself materially and&#x000A;adversely affects the operation of the network or violates the rules and&#x000A;protocols for communication across the network.&#x000A;&#x000A;  Corresponding Source conveyed, and Installation Information provided,&#x000A;in accord with this section must be in a format that is publicly&#x000A;documented (and with an implementation available to the public in&#x000A;source code form), and must require no special password or key for&#x000A;unpacking, reading or copying.&#x000A;&#x000A;  7. Additional Terms.&#x000A;&#x000A;  &quot;Additional permissions&quot; are terms that supplement the terms of this&#x000A;License by making exceptions from one or more of its conditions.&#x000A;Additional permissions that are applicable to the entire Program shall&#x000A;be treated as though they were included in this License, to the extent&#x000A;that they are valid under applicable law.  If additional permissions&#x000A;apply only to part of the Program, that part may be used separately&#x000A;under those permissions, but the entire Program remains governed by&#x000A;this License without regard to the additional permissions.&#x000A;&#x000A;  When you convey a copy of a covered work, you may at your option&#x000A;remove any additional permissions from that copy, or from any part of&#x000A;it.  (Additional permissions may be written to require their own&#x000A;removal in certain cases when you modify the work.)  You may place&#x000A;additional permissions on material, added by you to a covered work,&#x000A;for which you have or can give appropriate copyright permission.&#x000A;&#x000A;  Notwithstanding any other provision of this License, for material you&#x000A;add to a covered work, you may (if authorized by the copyright holders of&#x000A;that material) supplement the terms of this License with terms:&#x000A;&#x000A;    a) Disclaiming warranty or limiting liability differently from the&#x000A;    terms of sections 15 and 16 of this License; or&#x000A;&#x000A;    b) Requiring preservation of specified reasonable legal notices or&#x000A;    author attributions in that material or in the Appropriate Legal&#x000A;    Notices displayed by works containing it; or&#x000A;&#x000A;    c) Prohibiting misrepresentation of the origin of that material, or&#x000A;    requiring that modified versions of such material be marked in&#x000A;    reasonable ways as different from the original version; or&#x000A;&#x000A;    d) Limiting the use for publicity purposes of names of licensors or&#x000A;    authors of the material; or&#x000A;&#x000A;    e) Declining to grant rights under trademark law for use of some&#x000A;    trade names, trademarks, or service marks; or&#x000A;&#x000A;    f) Requiring indemnification of licensors and authors of that&#x000A;    material by anyone who conveys the material (or modified versions of&#x000A;    it) with contractual assumptions of liability to the recipient, for&#x000A;    any liability that these contractual assumptions directly impose on&#x000A;    those licensors and authors.&#x000A;&#x000A;  All other non-permissive additional terms are considered &quot;further&#x000A;restrictions&quot; within the meaning of section 10.  If the Program as you&#x000A;received it, or any part of it, contains a notice stating that it is&#x000A;governed by this License along with a term that is a further&#x000A;restriction, you may remove that term.  If a license document contains&#x000A;a further restriction but permits relicensing or conveying under this&#x000A;License, you may add to a covered work material governed by the terms&#x000A;of that license document, provided that the further restriction does&#x000A;not survive such relicensing or conveying.&#x000A;&#x000A;  If you add terms to a covered work in accord with this section, you&#x000A;must place, in the relevant source files, a statement of the&#x000A;additional terms that apply to those files, or a notice indicating&#x000A;where to find the applicable terms.&#x000A;&#x000A;  Additional terms, permissive or non-permissive, may be stated in the&#x000A;form of a separately written license, or stated as exceptions;&#x000A;the above requirements apply either way.&#x000A;&#x000A;  8. Termination.&#x000A;&#x000A;  You may not propagate or modify a covered work except as expressly&#x000A;provided under this License.  Any attempt otherwise to propagate or&#x000A;modify it is void, and will automatically terminate your rights under&#x000A;this License (including any patent licenses granted under the third&#x000A;paragraph of section 11).&#x000A;&#x000A;  However, if you cease all violation of this License, then your&#x000A;license from a particular copyright holder is reinstated (a)&#x000A;provisionally, unless and until the copyright holder explicitly and&#x000A;finally terminates your license, and (b) permanently, if the copyright&#x000A;holder fails to notify you of the violation by some reasonable means&#x000A;prior to 60 days after the cessation.&#x000A;&#x000A;  Moreover, your license from a particular copyright holder is&#x000A;reinstated permanently if the copyright holder notifies you of the&#x000A;violation by some reasonable means, this is the first time you have&#x000A;received notice of violation of this License (for any work) from that&#x000A;copyright holder, and you cure the violation prior to 30 days after&#x000A;your receipt of the notice.&#x000A;&#x000A;  Termination of your rights under this section does not terminate the&#x000A;licenses of parties who have received copies or rights from you under&#x000A;this License.  If your rights have been terminated and not permanently&#x000A;reinstated, you do not qualify to receive new licenses for the same&#x000A;material under section 10.&#x000A;&#x000A;  9. Acceptance Not Required for Having Copies.&#x000A;&#x000A;  You are not required to accept this License in order to receive or&#x000A;run a copy of the Program.  Ancillary propagation of a covered work&#x000A;occurring solely as a consequence of using peer-to-peer transmission&#x000A;to receive a copy likewise does not require acceptance.  However,&#x000A;nothing other than this License grants you permission to propagate or&#x000A;modify any covered work.  These actions infringe copyright if you do&#x000A;not accept this License.  Therefore, by modifying or propagating a&#x000A;covered work, you indicate your acceptance of this License to do so.&#x000A;&#x000A;  10. Automatic Licensing of Downstream Recipients.&#x000A;&#x000A;  Each time you convey a covered work, the recipient automatically&#x000A;receives a license from the original licensors, to run, modify and&#x000A;propagate that work, subject to this License.  You are not responsible&#x000A;for enforcing compliance by third parties with this License.&#x000A;&#x000A;  An &quot;entity transaction&quot; is a transaction transferring control of an&#x000A;organization, or substantially all assets of one, or subdividing an&#x000A;organization, or merging organizations.  If propagation of a covered&#x000A;work results from an entity transaction, each party to that&#x000A;transaction who receives a copy of the work also receives whatever&#x000A;licenses to the work the party's predecessor in interest had or could&#x000A;give under the previous paragraph, plus a right to possession of the&#x000A;Corresponding Source of the work from the predecessor in interest, if&#x000A;the predecessor has it or can get it with reasonable efforts.&#x000A;&#x000A;  You may not impose any further restrictions on the exercise of the&#x000A;rights granted or affirmed under this License.  For example, you may&#x000A;not impose a license fee, royalty, or other charge for exercise of&#x000A;rights granted under this License, and you may not initiate litigation&#x000A;(including a cross-claim or counterclaim in a lawsuit) alleging that&#x000A;any patent claim is infringed by making, using, selling, offering for&#x000A;sale, or importing the Program or any portion of it.&#x000A;&#x000A;  11. Patents.&#x000A;&#x000A;  A &quot;contributor&quot; is a copyright holder who authorizes use under this&#x000A;License of the Program or a work on which the Program is based.  The&#x000A;work thus licensed is called the contributor's &quot;contributor version&quot;.&#x000A;&#x000A;  A contributor's &quot;essential patent claims&quot; are all patent claims&#x000A;owned or controlled by the contributor, whether already acquired or&#x000A;hereafter acquired, that would be infringed by some manner, permitted&#x000A;by this License, of making, using, or selling its contributor version,&#x000A;but do not include claims that would be infringed only as a&#x000A;consequence of further modification of the contributor version.  For&#x000A;purposes of this definition, &quot;control&quot; includes the right to grant&#x000A;patent sublicenses in a manner consistent with the requirements of&#x000A;this License.&#x000A;&#x000A;  Each contributor grants you a non-exclusive, worldwide, royalty-free&#x000A;patent license under the contributor's essential patent claims, to&#x000A;make, use, sell, offer for sale, import and otherwise run, modify and&#x000A;propagate the contents of its contributor version.&#x000A;&#x000A;  In the following three paragraphs, a &quot;patent license&quot; is any express&#x000A;agreement or commitment, however denominated, not to enforce a patent&#x000A;(such as an express permission to practice a patent or covenant not to&#x000A;sue for patent infringement).  To &quot;grant&quot; such a patent license to a&#x000A;party means to make such an agreement or commitment not to enforce a&#x000A;patent against the party.&#x000A;&#x000A;  If you convey a covered work, knowingly relying on a patent license,&#x000A;and the Corresponding Source of the work is not available for anyone&#x000A;to copy, free of charge and under the terms of this License, through a&#x000A;publicly available network server or other readily accessible means,&#x000A;then you must either (1) cause the Corresponding Source to be so&#x000A;available, or (2) arrange to deprive yourself of the benefit of the&#x000A;patent license for this particular work, or (3) arrange, in a manner&#x000A;consistent with the requirements of this License, to extend the patent&#x000A;license to downstream recipients.  &quot;Knowingly relying&quot; means you have&#x000A;actual knowledge that, but for the patent license, your conveying the&#x000A;covered work in a country, or your recipient's use of the covered work&#x000A;in a country, would infringe one or more identifiable patents in that&#x000A;country that you have reason to believe are valid.&#x000A;&#x000A;  If, pursuant to or in connection with a single transaction or&#x000A;arrangement, you convey, or propagate by procuring conveyance of, a&#x000A;covered work, and grant a patent license to some of the parties&#x000A;receiving the covered work authorizing them to use, propagate, modify&#x000A;or convey a specific copy of the covered work, then the patent license&#x000A;you grant is automatically extended to all recipients of the covered&#x000A;work and works based on it.&#x000A;&#x000A;  A patent license is &quot;discriminatory&quot; if it does not include within&#x000A;the scope of its coverage, prohibits the exercise of, or is&#x000A;conditioned on the non-exercise of one or more of the rights that are&#x000A;specifically granted under this License.  You may not convey a covered&#x000A;work if you are a party to an arrangement with a third party that is&#x000A;in the business of distributing software, under which you make payment&#x000A;to the third party based on the extent of your activity of conveying&#x000A;the work, and under which the third party grants, to any of the&#x000A;parties who would receive the covered work from you, a discriminatory&#x000A;patent license (a) in connection with copies of the covered work&#x000A;conveyed by you (or copies made from those copies), or (b) primarily&#x000A;for and in connection with specific products or compilations that&#x000A;contain the covered work, unless you entered into that arrangement,&#x000A;or that patent license was granted, prior to 28 March 2007.&#x000A;&#x000A;  Nothing in this License shall be construed as excluding or limiting&#x000A;any implied license or other defenses to infringement that may&#x000A;otherwise be available to you under applicable patent law.&#x000A;&#x000A;  12. No Surrender of Others' Freedom.&#x000A;&#x000A;  If conditions are imposed on you (whether by court order, agreement or&#x000A;otherwise) that contradict the conditions of this License, they do not&#x000A;excuse you from the conditions of this License.  If you cannot convey a&#x000A;covered work so as to satisfy simultaneously your obligations under this&#x000A;License and any other pertinent obligations, then as a consequence you may&#x000A;not convey it at all.  For example, if you agree to terms that obligate you&#x000A;to collect a royalty for further conveying from those to whom you convey&#x000A;the Program, the only way you could satisfy both those terms and this&#x000A;License would be to refrain entirely from conveying the Program.&#x000A;&#x000A;  13. Use with the GNU Affero General Public License.&#x000A;&#x000A;  Notwithstanding any other provision of this License, you have&#x000A;permission to link or combine any covered work with a work licensed&#x000A;under version 3 of the GNU Affero General Public License into a single&#x000A;combined work, and to convey the resulting work.  The terms of this&#x000A;License will continue to apply to the part which is the covered work,&#x000A;but the special requirements of the GNU Affero General Public License,&#x000A;section 13, concerning interaction through a network will apply to the&#x000A;combination as such.&#x000A;&#x000A;  14. Revised Versions of this License.&#x000A;&#x000A;  The Free Software Foundation may publish revised and/or new versions of&#x000A;the GNU General Public License from time to time.  Such new versions will&#x000A;be similar in spirit to the present version, but may differ in detail to&#x000A;address new problems or concerns.&#x000A;&#x000A;  Each version is given a distinguishing version number.  If the&#x000A;Program specifies that a certain numbered version of the GNU General&#x000A;Public License &quot;or any later version&quot; applies to it, you have the&#x000A;option of following the terms and conditions either of that numbered&#x000A;version or of any later version published by the Free Software&#x000A;Foundation.  If the Program does not specify a version number of the&#x000A;GNU General Public License, you may choose any version ever published&#x000A;by the Free Software Foundation.&#x000A;&#x000A;  If the Program specifies that a proxy can decide which future&#x000A;versions of the GNU General Public License can be used, that proxy's&#x000A;public statement of acceptance of a version permanently authorizes you&#x000A;to choose that version for the Program.&#x000A;&#x000A;  Later license versions may give you additional or different&#x000A;permissions.  However, no additional obligations are imposed on any&#x000A;author or copyright holder as a result of your choosing to follow a&#x000A;later version.&#x000A;&#x000A;  15. Disclaimer of Warranty.&#x000A;&#x000A;  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY&#x000A;APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT&#x000A;HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM &quot;AS IS&quot; WITHOUT WARRANTY&#x000A;OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,&#x000A;THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR&#x000A;PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM&#x000A;IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF&#x000A;ALL NECESSARY SERVICING, REPAIR OR CORRECTION.&#x000A;&#x000A;  16. Limitation of Liability.&#x000A;&#x000A;  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING&#x000A;WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS&#x000A;THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY&#x000A;GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE&#x000A;USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF&#x000A;DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD&#x000A;PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),&#x000A;EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF&#x000A;SUCH DAMAGES.&#x000A;&#x000A;  17. Interpretation of Sections 15 and 16.&#x000A;&#x000A;  If the disclaimer of warranty and limitation of liability provided&#x000A;above cannot be given local legal effect according to their terms,&#x000A;reviewing courts shall apply local law that most closely approximates&#x000A;an absolute waiver of all civil liability in connection with the&#x000A;Program, unless a warranty or assumption of liability accompanies a&#x000A;copy of the Program in return for a fee.&#x000A;&#x000A;                     END OF TERMS AND CONDITIONS&#x000A;&#x000A;            How to Apply These Terms to Your New Programs&#x000A;&#x000A;  If you develop a new program, and you want it to be of the greatest&#x000A;possible use to the public, the best way to achieve this is to make it&#x000A;free software which everyone can redistribute and change under these terms.&#x000A;&#x000A;  To do so, attach the following notices to the program.  It is safest&#x000A;to attach them to the start of each source file to most effectively&#x000A;state the exclusion of warranty; and each file should have at least&#x000A;the &quot;copyright&quot; line and a pointer to where the full notice is found.&#x000A;&#x000A;    &lt;one line to give the program's name and a brief idea of what it does.&gt;&#x000A;    Copyright 2022-2025 湖北天天数链技术有限公司&#x000A;&#x000A;    This program is free software: you can redistribute it and/or modify&#x000A;    it under the terms of the GNU General Public License as published by&#x000A;    the Free Software Foundation, either version 3 of the License, or&#x000A;    (at your option) any later version.&#x000A;&#x000A;    This program is distributed in the hope that it will be useful,&#x000A;    but WITHOUT ANY WARRANTY; without even the implied warranty of&#x000A;    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the&#x000A;    GNU General Public License for more details.&#x000A;&#x000A;    You should have received a copy of the GNU General Public License&#x000A;    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.&#x000A;&#x000A;Also add information on how to contact you by electronic and paper mail.&#x000A;&#x000A;  If the program does terminal interaction, make it output a short&#x000A;notice like this when it starts in an interactive mode:&#x000A;&#x000A;    OpenHis  Copyright (C) 2022-2025 湖北天天数链技术有限公司&#x000A;    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.&#x000A;    This is free software, and you are welcome to redistribute it&#x000A;    under certain conditions; type `show c' for details.&#x000A;&#x000A;The hypothetical commands `show w' and `show c' should show the appropriate&#x000A;parts of the General Public License.  Of course, your program's commands&#x000A;might be different; for a GUI interface, you would use an &quot;about box&quot;.&#x000A;&#x000A;  You should also get your employer (if you work as a programmer) or school,&#x000A;if any, to sign a &quot;copyright disclaimer&quot; for the program, if necessary.&#x000A;For more information on this, and how to apply and follow the GNU GPL, see&#x000A;&lt;https://www.gnu.org/licenses/&gt;.&#x000A;&#x000A;  The GNU General Public License does not permit incorporating your program&#x000A;into proprietary programs.  If your program is a subroutine library, you&#x000A;may consider it more useful to permit linking proprietary applications with&#x000A;the library.  If this is what you want to do, use the GNU Lesser General&#x000A;Public License instead of this License.  But first, please read&#x000A;&lt;https://www.gnu.org/licenses/why-not-lgpl.html&gt;.&#x000A;&#x000A;</div></div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  "use strict";
+  
+  if ($('.markdown-body').children("style").length != 0) {
+    var i, array = $('.markdown-body').children("style");
+    array.first().attr('scoped','');
+    $.scoped();
+  }
+  
+  $('.appeal_message').removeClass('text-center')
+  
+  $(".file_title_readme").click(function(event) {
+    $('.lisence-content').hide()
+    $('.readme-content').show()
+    $('.lisence-edit').hide()
+    $('.readme-edit').show()
+    $('.file_title_readme').addClass('active-title')
+    $('.file_title_license').removeClass('active-title')
+  });
+  
+  $(".file_title_license").click(function(event) {
+    var licenseIndex = $(this).data('license-index');
+    $('.readme-content').hide()
+    $('.lisence-edit').hide()
+    $('.readme-edit').hide()
+    
+    // 移除所有license标题的active-title类，然后为当前点击的标题添加active-title类
+    $('.file_title_license').removeClass('active-title');
+    $(this).addClass('active-title');
+    $('.file_title_readme').removeClass('active-title');
+    // 隐藏所有license内容，然后只显示选中的license内容
+    $('.lisence-content').hide();
+    $('#license-content-' + licenseIndex).show();
+    $('#license-edit-' + licenseIndex).show();
+  });
+  try {
+    if((gon.wait_fork!=undefined && gon.wait_fork==true) || (gon.wait_fetch!=undefined && gon.wait_fetch==true)){
+      $('.edit-blob').popup({content:"当前仓库正在后台处理中,暂时无法编辑", on: 'hover', delay: { show: 200, hide: 200 }});
+      $('.edit-blob').click(function(e){
+        e.preventDefault();
+      })
+    }
+  }catch (error) {}
+  $('.disabled-edit-readonly').popup({
+    content: "只读文件不可编辑",
+    className: {
+      popup: 'ui popup',
+    },
+    position: 'bottom center',
+  })
+  $('.disabled-edit-readonly, .disabled-edit-status').click(function() {
+    return false
+  })
+  $('.has_tooltip').popup({
+    position: 'top center'
+  });
+  
+  $('.ai-readme-dropdown-btn').dropdown({
+    on: 'hover',
+    action: 'hide',
+  })
+</script>
+<style>
+  @charset "UTF-8";
+  .txt-style {
+    background: #FFF !important;
+    padding: 0 !important; }
+  
+  .file_readme_title {
+    padding-bottom: 0 !important;
+    cursor: pointer;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex; }
+    .file_readme_title .left-box {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      min-width: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      white-space: nowrap;
+      /* 自定义滚动条样式 */
+      /* 确保license标题不会被压缩 */
+      /* README标题也不被压缩 */ }
+      .file_readme_title .left-box::-webkit-scrollbar {
+        height: 4px; }
+      .file_readme_title .left-box::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 2px; }
+      .file_readme_title .left-box::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 2px; }
+      .file_readme_title .left-box::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8; }
+      .file_readme_title .left-box .file_title_license {
+        -ms-flex-negative: 0;
+            flex-shrink: 0;
+        min-width: -webkit-fit-content;
+        min-width: -moz-fit-content;
+        min-width: fit-content; }
+      .file_readme_title .left-box .file_title_readme {
+        -ms-flex-negative: 0;
+            flex-shrink: 0;
+        min-width: -webkit-fit-content;
+        min-width: -moz-fit-content;
+        min-width: fit-content; }
+  
+  .active-title {
+    border-bottom: 2px solid #fe7300; }
+  
+  .preformatted {
+    font-family: monospace;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    word-break: keep-all; }
+  
+  .disabled-edit-readonly,
+  .has_tooltip {
+    color: #40485b !important;
+    cursor: default !important;
+    opacity: 0.3 !important; }
+  
+  .ai-btn {
+    -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+    position: relative;
+    display: -webkit-inline-box !important;
+    display: -ms-inline-flexbox !important;
+    display: inline-flex !important;
+    -webkit-box-align: center;
+        -ms-flex-align: center;
+            align-items: center;
+    gap: 4px;
+    border-radius: 4px !important;
+    background: -webkit-gradient(linear, right top, left top, from(rgba(44, 126, 248, 0.15)), to(rgba(195, 73, 232, 0.15))) !important;
+    background: linear-gradient(270deg, rgba(44, 126, 248, 0.15) 0%, rgba(195, 73, 232, 0.15) 100%) !important; }
+    .ai-btn:before {
+      content: '';
+      pointer-events: none;
+      -webkit-user-select: none;
+         -moz-user-select: none;
+          -ms-user-select: none;
+              user-select: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: -webkit-gradient(linear, right top, left top, from(#2c7ef8), to(#b752eb));
+      background: linear-gradient(270deg, #2c7ef8 0%, #b752eb 100%);
+      -webkit-mask: -webkit-gradient(linear, left top, left bottom, from(black), to(black)) content-box content-box, -webkit-gradient(linear, left top, left bottom, from(black), to(black));
+      -webkit-mask: linear-gradient(black, black) content-box content-box, linear-gradient(black, black);
+      -webkit-mask-composite: xor;
+      mask: -webkit-gradient(linear, left top, left bottom, from(black), to(black)) content-box content-box, -webkit-gradient(linear, left top, left bottom, from(black), to(black));
+      mask: linear-gradient(black, black) content-box content-box, linear-gradient(black, black);
+      -webkit-mask-composite: subtract;
+              mask-composite: subtract; }
+    .ai-btn.optimize-readme {
+      height: 26px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px; }
+    .ai-btn .ai-img {
+      width: 18px;
+      height: 12px; }
+  
+  .p-rel {
+    position: relative; }
+  
+  .gen-free-label {
+    background: -webkit-gradient(linear, right top, left top, color-stop(-2.78%, #367bf7), to(#c064fb));
+    background: linear-gradient(270deg, #367bf7 -2.78%, #c064fb 100%);
+    color: #fff;
+    font-size: 10px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    -webkit-transform: translateY(-50%);
+            transform: translateY(-50%);
+    padding: 0px 2px 0px 6px;
+    border-radius: 16px 12px 0px 16px; }
+  
+  .gen-dropdown-free-label {
+    background: -webkit-gradient(linear, right top, left top, color-stop(-2.78%, #367bf7), to(#c064fb));
+    background: linear-gradient(270deg, #367bf7 -2.78%, #c064fb 100%);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 16px; }
+  
+  .gen-readme-tip {
+    -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+    padding: 8px 12px;
+    background: -webkit-gradient(linear, right top, left top, from(rgba(148, 112, 255, 0.0507)), to(rgba(255, 167, 118, 0.07481)));
+    background: linear-gradient(270deg, rgba(148, 112, 255, 0.0507) 0%, rgba(255, 167, 118, 0.07481) 100%);
+    border-bottom: 1px solid #E3E9ED; }
+  
+  .text-wrap-auto {
+    text-wrap: auto; }
+  
+  .ai-readme-dropdown-box .item {
+    max-width: 264px; }
+  
+  .translate-hover-text:hover {
+    color: #8c919c !important; }
+  
+  .text-hover-underline:hover {
+    text-decoration: underline; }
+</style>
+
+</div>
+<script id='tree-item-context-menu-template' type='text/plain'>
+<div class='ui menu compact vertical tree-context'>
+<a class='btn-open-new-tab item tree-operation'>
+<i class='file outline icon'></i>
+新标签打开
+</a>
+<a class='btn-copy item tree-operation'>
+<i class='copy icon'></i>
+复制
+</a>
+<a class='btn-rename item tree-operation'>
+<i class='edit icon'></i>
+重命名
+</a>
+<a class='btn-delete item tree-operation'>
+<i class='trash icon'></i>
+删除
+</a>
+</div>
+</script>
+<script id='tree-item-submodule-context-menu-template' type='text/plain'>
+<div class='ui menu compact vertical tree-context'>
+<a class='btn-copy item tree-operation'>
+<i class='copy icon'></i>
+复制
+</a>
+<a class='btn-compact-edit item tree-operation submodule_item'>
+<i class='edit icon'></i>
+编辑
+</a>
+<a class='btn-submodule-delete item tree-operation submodule_item'>
+<i class='trash icon'></i>
+删除
+</a>
+</div>
+</script>
+<script src="/static/javascripts/file-icons.js"></script>
+<script>
+  $(function() {
+    /*$(".tree-list-item").each(function(){
+      $this = $(this)
+      var path = $this.attr('data-path')
+      var type = $this.attr('data-type')
+      $icon = $this.find('i')
+      if(type==='file'){
+        let iconClass='';
+        try {
+          iconClass =
+            FileIcons.getClassWithColor(path) || 'file-generic';
+        } catch (err) {}
+        if(iconClass)
+          $icon.attr('class', "file-icon-item iconfont icon-file ".concat(iconClass));
+      }
+    })*/
+    var $createFolderForm = $('.create-folder-form'),
+        $createFolderSubmitBtn = $('.create-folder-form .js-submit-btn')
+        $folderPath = $('#new_folder_path'),
+        $message = $('.create-folder-form .notice'),
+        folders = ["openhis-server-new","openhis-ui-vue3","发版记录","迁移记录-DB变更记录"],
+        folderReg = new RegExp(/\/+/);
+  
+    var INDEX_BEGIN_WITH_READONLY_DIR = 0
+    var gitGCModal = new GiteeModalHelper({
+        approveText: "确认",
+        cancelText: "取消",
+        okText: "确认",
+    })
+    function checkFolder(folder) {
+      var i, itemArr;
+      if (folder == '') {
+        return false;
+      }
+      for (i = 0; i< folders.length; i++) {
+        itemArr = folders[i].split('/');
+        if (itemArr[0] == folder){
+          return true
+        }
+      }
+      return false;
+    }
+    function createFolderShow () {
+      $createFolderForm.show();
+      $folderPath.focus();
+    }
+  
+    $('.create-folder-form .cancel').click(function () {
+      $createFolderForm.hide();
+    })
+  
+    $folderPath.on('input', function (e) {
+      if($(this).parent().hasClass('error')) {
+        $message.removeClass('warn').html("<strong>提示:</strong> 由于 Git 不支持空文件夾，创建文件夹后会生成空的 .keep 文件");
+        $(this).parent().removeClass('error');
+      }
+      $createFolderSubmitBtn.removeClass('disabled');
+    })
+  
+    $createFolderForm.submit(function (e) {
+      var value = $folderPath.val();
+      if (!folderReg.test(value) && !checkFolder(value) && value) {
+        $('#new_file_path').val(value + '/.keep');
+      } else {
+        $message.addClass('warn').html("文件夹名不为空，不含有字符（／）且不能与当前目录文件夹同名");
+        $folderPath.parent().addClass('error');
+        e.preventDefault();
+      }
+      $createFolderSubmitBtn.addClass('disabled');
+    })
+  
+    $('.create-folder').click(createFolderShow)
+    $('#create-folder').click(createFolderShow);
+    window.createFolderShow = createFolderShow;
+  
+    window.hasTreeContextMenu = false;
+    var contextMenuTemplate = $('#tree-item-context-menu-template').html();
+    var submoduleContextMenuTemplate = $("#tree-item-submodule-context-menu-template").html();
+    if ("true" == "false" || "true" == "false" || "false" == "false") {
+      return;
+    }
+  
+    function createContextMenu($item, x, y) {
+      if (hasTreeContextMenu) {
+        $('.tree-context').remove();
+        hasTreeContextMenu = false;
+        return;
+      }
+      hasTreeContextMenu = true;
+      var isSubmodule = $item.hasClass('tree-item-submodule-name')
+      var path = $item.parent().find('a').attr('href');
+      var $menu = isSubmodule ? $(submoduleContextMenuTemplate).appendTo('body') : $(contextMenuTemplate).appendTo('body');
+      var readonly = $item.attr('data-readonly') !== undefined
+      var submoduleEditUrl = $item.closest('.tree-item').attr('edit_url')
+      var submoduleDeleteUrl = $item.closest('.tree-item').attr('delete_url')
+      var hasNormal = $item.closest('.tree-item')[0].hasAttribute('normal')
+      if ($('.btn-readonly')[0]) {
+        if (readonly) {
+          $('.btn-readonly')[0].children[0].className = 'icon unlock'
+          $('.btn-readonly')[0].lastChild.data = "取消只读"
+        } else {
+          $('.btn-readonly')[0].lastChild.data = "标记为只读"
+        }
+      }
+      $menu.css({ left: x, top: y , 'min-width': '90px'});
+      $menu.find('.btn-open-new-tab').attr({
+        href: path,
+        target: '_blank'
+      });
+      window.Clipboard && new Clipboard('.btn-copy', {
+        text: function () {
+          return $item.text().trim();
+        }
+      });
+      // submodule 菜单事件
+      // 编辑子模块
+      if (!hasNormal) {
+        $menu.find('.btn-compact-edit').addClass('disabled')
+      }
+      $menu.find('.btn-compact-edit').on('click', function(event) {
+        if (!hasNormal) {
+          return
+        }
+        window.location.href = submoduleEditUrl
+      });
+      // 删除子模块
+      $menu.find('.btn-submodule-delete').on('click', function(event) {
+        removeSubmodule(submoduleDeleteUrl, $item)
+      });
+      // 普通文件 菜单事件
+      $menu.find('.btn-rename').on('click', function(event) {
+        rename($item.parent().attr('file_hex'));
+      });
+      $menu.find('.btn-delete').on('click', function(event) {
+        removeFile($item.parent().next().find('.ui.form').attr('path').replace(/\+/g, '%20'), $item.find('a').text());
+      })
+      $menu.find('.btn-readonly').on('click', function(event) {
+        var obj = $item.parent().next().find('.ui.form').attr('path').replace(/\+/g, '%20')
+        var readonly = $item.attr('data-readonly') !== undefined
+        if (readonly) {
+          removeReadonlyMark(obj, $item)
+        } else {
+          addReadonlyMark(obj, $item)
+        }
+      })
+      $menu.find('.btn-readonly-is-uncharged-enterprise').popup({
+        content: "仅付费企业版可使用文件只读功能",
+        className: {
+          popup: 'ui popup',
+        },
+        position: 'bottom center'
+      })
+      $menu.find('.btn-readonly-is-open-svn').popup({
+        content: "仓库已开启 SVN 支持，无法标记只读文件/目录",
+        className: {
+          popup: 'ui popup',
+        },
+        position: 'bottom center'
+      })
+    }
+    // submodule 右键菜单事件
+  
+    var editing = false
+  
+    $(document).on('click',function(event){
+      if (hasTreeContextMenu && event.button !== 2) {
+        setTimeout(function () {
+          $('.tree-context').remove();
+          hasTreeContextMenu = false;
+        }, 200);
+      }
+    })
+  
+    $('.tree-item').on('click',function(event){
+      if (hasTreeContextMenu) {
+        event.preventDefault();
+      }
+    })
+  
+    function isReadonly(path) {
+      if (!gon.readonlyItems) {
+        return false
+      } else {
+        var item_path = getItemPath(path, 'folder')
+        return isTreeItemReadonly(item_path, gon.readonlyItems)
+      }
+    }
+  
+    function isParentsReadonly(path) {
+      var self_path = path.replace(/\/$/, '')
+      var parentPathArray = self_path.split('/')
+      if (parentPathArray.length < 2) {
+        return false
+      }
+      parentPathArray.pop()
+      var parentPath = parentPathArray.join('/') + '/'
+      return isReadonly(parentPath)
+    }
+  
+    // 删除只读标记
+    function removeReadonlyMark(path, $item) {
+      var $icon = $($item.context.children[0])
+      var $parent = $item.parent('.tree-item')
+      var type = $parent.data('type')
+      var branch = $parent.data('branch')
+      var readonly_item = $item.data('path')
+      if (type !== 'file') {
+        readonly_item += "/"
+      }
+  
+      var confirmString = "\n      <p>所属分支: <code class=\"readonly-branch\">".concat(htmlSafe(branch), "</code></p>      <p>文件路径: <code class=\"readonly-path\">").concat(htmlSafe(readonly_item), "</code></p>      <strong>确认取消分支上这个路径的只读标记？</strong>\n      ");
+  
+      gitGCModal.confirm("取消只读", confirmString, function() {
+        var parentsReadonly = isParentsReadonly(readonly_item)
+        if (parentsReadonly) {
+          return gitGCModal.alert('提示', '只读记录不存在，或父级目录为只读',function () {
+            location.reload()
+          })
+        }
+        $.ajax({
+          url: "/tntlinking-opensource/openhis-itai/readonly",
+          type: 'DELETE',
+          data: {
+            branch: branch,
+            path: readonly_item
+          },
+          success: function(res) {
+            if (res.code !== 0) {
+              gitGCModal.alert("提示", res.msg, function() {
+                location.reload();
+              })
+            }else {
+              $parent.removeClass('readonly-item')
+              if (gon.readonlyItems) {
+                gon.readonlyItems.splice(gon.readonlyItems.indexOf(readonly_item), 1)
+              }
+              if (type === 'file') {
+                $icon.removeClass('icon-file-readonly readonly-icon')
+                $icon.addClass('icon-file')
+              } else {
+                $icon.removeClass('icon-folder-readonly readonly-icon')
+                $icon.addClass('icon-folders')
+              }
+              $icon.popup('destroy')
+              $item.removeAttr('data-readonly')
+              location.reload();
+            }
+          }
+        })
+      })
+    }
+  
+    // 只读过滤
+    function isTreeItemReadonly(path, readonlyItems) {
+      var item = readonlyItems.find(function(item) {
+        if (item.slice(-1) === '/') {
+          return path.indexOf(item) === INDEX_BEGIN_WITH_READONLY_DIR
+        } else {
+          return path === item
+        }
+      })
+      return item !== undefined
+    }
+  
+    function getItemPath(path) {
+      var path_type = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'file';
+      return path_type === 'file' ? path : "".concat(path, "/");
+    }
+  
+    // 启用异步只读差异化的次数
+    var is_can_readonly = false
+    // 异步对文件树进行只读差异化显示
+    function markTree() {
+      $.ajax({
+        url: "/tntlinking-opensource/openhis-itai/readonly",
+        method: 'get',
+        data: {
+          "branch": "develop"
+        },
+        success:function(result) {
+          var readonlyItems = result.readonly_items
+          gon.readonlyItems = readonlyItems
+          $(".tree-list-item").each(function(){
+            $this = $(this)
+            var path = $this.attr('data-path')
+            var type = $this.attr('data-type')
+            var item_path = getItemPath(path, type)
+            var readonly = isTreeItemReadonly(item_path, readonlyItems)
+            $icon = $this.find('i')
+            $parent = $this.parent('.tree-item')
+            if (readonly) {
+              $parent.addClass('readonly-item')
+              $this.attr('data-readonly', '')
+              $icon.attr('class', "iconfont icon-".concat(type, "-readonly readonly-icon"));
+              $icon.attr('data-readonly', '')
+              $icon.popup({
+                content: "只读",
+                className   : {
+                  popup: 'ui popup dark',
+                },
+                position: 'top center'
+              })
+            } else {
+              var className =  type === 'file' ? 'file' : 'folders'
+              $this.removeAttr('data-readonly')
+              $icon.attr('class', "iconfont icon-".concat(className));
+              $icon.removeAttr('data-readonly')
+            }
+          })
+        }
+      })
+    }
+  
+    // 若已开启只读功能，对目录进行只读差异化标记
+    if (is_can_readonly) {
+      markTree()
+    }
+  
+    // 添加只读标记
+    function addReadonlyMark(path, $item) {
+      var $icon = $($item.context.children[0])
+      var $parent = $item.parent('.tree-item')
+      var type = $parent.data('type')
+      var branch = $parent.data('branch')
+      var readonly_item = $item.data('path')
+      if (type !== 'file') {
+        readonly_item += "/"
+      }
+  
+      var confirmString = "\n      <p>所属分支: <code class=\"readonly-branch\">".concat(htmlSafe(branch), "</code></p>      <p>文件路径: <code class=\"readonly-path\">").concat(htmlSafe(readonly_item), "</code></p>      <strong>确认将分支上的这个路径标记为只读？</strong>\n      ");
+      gitGCModal.confirm("标记只读", confirmString,function (){
+        $.ajax({
+          url: "/tntlinking-opensource/openhis-itai/readonly",
+          type: 'POST',
+          data: {
+            branch: branch,
+            path: readonly_item,
+          },
+          success: function(res) {
+            if (res.code !== 0) {
+              gitGCModal.alert("提示", res.msg,function (){
+                location.reload();
+              })
+            } else {
+              // 之前未开启只读功能
+              if (!is_can_readonly) {
+                is_can_readonly = true
+                return markTree()
+              }
+              $parent.addClass('readonly-item')
+              var existReadonlyItems = gon.readonlyItems || []
+              existReadonlyItems.push(readonly_item)
+              gon.readonlyItems = existReadonlyItems
+              $icon.popup({
+                content: "只读",
+                className   : {
+                  popup: 'ui popup dark',
+                },
+                position: 'top center'
+              })
+              if (type === 'file') {
+                $icon.removeClass('icon-file')
+                $icon.addClass('icon-file-readonly readonly-icon')
+              } else {
+                $icon.removeClass('icon-folders')
+                $icon.addClass('icon-folder-readonly readonly-icon')
+              }
+              $item.attr('data-readonly', '')
+              location.reload();
+            }
+          }
+        })
+      })
+    }
+  
+    function removeFile(path, file_name) {
+      var file_name = file_name || path
+      var content = "确定要删除 %{name} 吗？".replace('%{name}', htmlSafe(file_name));
+      gitGCModal.confirm("删除", content, function() {
+        $.ajax({
+          type: "DELETE",
+          dataType: "JSON",
+          url: "/tntlinking-opensource/openhis-itai/delete/" + path,
+          success: function(res) {
+            if (res.status != 1) {
+              var alert_message = res.message || "删除失败"
+              return gitGCModal.alert("提示", alert_message)
+            }
+            if ($('.tree-item-file-name').length == 2) {
+              window.location.href = '/' + gon.user_project;
+              if(file_name.toUpperCase()==='LICENSE'){
+                window.location.reload();
+              }
+            } else {
+              window.location.href = window.location.pathname;
+              if(file_name.toUpperCase()==='LICENSE'){
+                window.location.reload();
+              }
+            }
+          }
+        });
+      })
+    }
+    // 删除子模块
+    function removeSubmodule(deleteUrl, $item) {
+      if (!deleteUrl) return
+      var file_name = $item.text().trim()
+      var content = "此操作无法恢复，确定要删除子模块%{name}？".replace('%{name}', htmlSafe(file_name));
+      new GiteeModalHelper({
+        approveText: "删除并提交推送",
+        cancelText: "取消",
+        okText: "删除并提交推送",
+      }).confirm("删除", content, function() {
+        $.ajax({
+          type: "DELETE",
+          dataType: "JSON",
+          url: deleteUrl,
+          success: function(res) {
+            if (res.status == 200) {
+              $item.closest('.row.tree-item').remove();
+              window.location.reload();
+            } else {
+              Flash.error(res.message, 5000)
+            }
+          },
+          error: function (err) {
+            err.responseJSON && Flash.error(err.responseJSON.message);
+          },
+        });
+      })
+    }
+  
+    function rename(file_hex) {
+      $(".row.tree-item").show();
+      $(".tree-item-rename").hide();
+  
+      if($("."+file_hex).is(':hidden') == true) return;
+  
+      $("."+file_hex).hide();
+      var _t = $(".rename-"+file_hex);
+      src = _t.attr('src_text')
+      if(src==undefined){
+         newName = _t.find("[name='new_filename']").val()
+        _t.attr('src_text',newName)
+      }else{
+        _t.find("[name='new_filename']").val(_t.attr('src_text'))
+      }
+      $(".rename-"+file_hex).css("display","");
+    }
+  
+    setTimeout(function(){
+      $(".popup-save").click(function(){
+        form = $(this).parents(".ui.form")
+        file_hex = $(this).parents(".row.tree-item").attr("file_hex");
+        new_filename = $.trim(form.find("[name='new_filename']").val())
+        overwrite = false
+        $('.tree-item-file-name').find('a').each(function(a){
+          title = $(this).attr('title');
+          if(title != undefined){
+            if (title.split('/')[0] == new_filename) {
+              overwrite = true;
+            }
+          }
+        });
+        if(overwrite){
+          form.find("[name='new_filename']").focus();
+          gitGCModal.alert("提示", "存在相同的文件名,请修改后重试")
+          return;
+        }
+        $.ajax({
+          type: 'POST',
+          url: "/tntlinking-opensource/openhis-itai/rename/"+ form.attr('path').replace(/\+/g, '%20'),
+          data:
+          {
+            new_filename: new_filename
+          },
+          success: function(o){
+            if(o.status == 1){
+              href = window.location.href.split('?')[0]
+              window.location.href = href;
+            }else {
+              var alert_message = o.message || "重命名失败"
+              gitGCModal.alert("提示", alert_message)
+            }
+          },
+          dataType: "json"
+        });
+      })
+  
+      $(".popup-close").click(function(){
+        $(".row.tree-item").show();
+        $(".tree-item-rename").hide();
+      })
+      $('.tree-item-file-name, .tree-item-submodule-name').each(function() {
+        var $this = $(this);
+        if (typeof $this.parent().attr('file_hex') === 'undefined') {
+          return;
+        }
+        $this.on('contextmenu', function(event) {
+          event.preventDefault();
+          createContextMenu($this, event.pageX, event.pageY);
+        })
+      })
+    },1000)
+  })
+</script>
+<style>
+  .readonly-item {
+    background-color: #FBFBFB !important;
+  }
+  .readonly-path,.readonly-branch {
+    display: block;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.8;
+    margin-top: 1em;
+  }
+  .btn-readonly-is-uncharged-enterprise, .btn-readonly-is-open-svn {
+    background-color: #f5f5f5 !important;
+    color: #757575 !important;
+  }
+</style>
+
+<div class='complaint'>
+<div class='ui modal small form' id='landing-comments-complaint-modal'>
+<i class='iconfont icon-close close'></i>
+<div class='header'>
+举报
+</div>
+<div class='content'>
+<div class='appeal-success-tip hide'>
+<i class='iconfont icon-ic_msg_success'></i>
+<div class='appeal-success-text'>
+举报成功
+</div>
+<span>
+我们将于2个工作日内通过站内信反馈结果给你！
+</span>
+</div>
+<div class='appeal-tip'>
+请认真填写举报原因，尽可能描述详细。
+</div>
+<div class='ui form appeal-form'>
+<div class='inline field'>
+<label class='left-part appeal-type-wrap'>
+举报类型
+</label>
+<div class='ui dropdown selection' id='appeal-comments-types'>
+<div class='text default'>
+请选择举报类型
+</div>
+<i class='dropdown icon'></i>
+<div class='menu'></div>
+</div>
+</div>
+<div class='inline field'>
+<label class='left-part'>
+举报原因
+</label>
+<textarea class='appeal-reason' id='appeal-comment-reason' name='msg' placeholder='请说明举报原因' rows='3'></textarea>
+</div>
+<div class='ui message callback-msg hide'></div>
+<div class='ui small error text message exceeded-size-tip'></div>
+</div>
+</div>
+<div class='actions'>
+<div class='ui button blank cancel'>
+取消
+</div>
+<div class='ui orange icon button disabled ok' id='complaint-comment-confirm'>
+发送
+</div>
+</div>
+</div>
+<script>
+  var $complaintCommentsModal = $('#landing-comments-complaint-modal'),
+      $complainCommentType = $complaintCommentsModal.find('#appeal-comments-types'),
+      $complaintModalTip = $complaintCommentsModal.find('.callback-msg'),
+      $complaintCommentsContent = $complaintCommentsModal.find('.appeal-reason'),
+      $complaintCommentBtn = $complaintCommentsModal.find('#complaint-comment-confirm'),
+      complaintSending = false,
+      initedCommentsType = false;
+  
+  function initCommentsTypeList() {
+    if (!initedCommentsType) {
+      $.ajax({
+        url: "/appeals/fetch_types",
+        method: 'get',
+        data: {'type': 'comment'},
+        success: function (data) {
+          var result = '';
+          for (var i = 0; i < data.length; i++) {
+            result = result + "<div class='item' data-value='" + data[i].id + "'>" + data[i].name + "</div>";
+          }
+          $complainCommentType.find('.menu').html(result);
+        }
+      });
+      $complainCommentType.dropdown({showOnFocus: false});
+      initedCommentsType = true;
+    }
+  }
+  $complainCommentType.on('click', function() {
+    $complaintCommentsModal.modal({
+      autofocus: false,
+      onApprove: function() {
+        return false;
+      },
+      onHidden: function() {
+        restoreCommonentDefault();
+      }
+    }).modal('show');
+  });
+  
+  $complaintCommentsContent.on('change keyup', function(e) {
+    var content = $(this).val();
+    if ($.trim(content).length > 0 && $complainCommentType.dropdown('get value').length > 0 ) {
+      $complaintCommentBtn.removeClass('disabled');
+      return;
+    }
+    $complaintCommentBtn.addClass('disabled');
+  });
+  
+  
+  $complainCommentType.dropdown({
+    showOnFocus: false,
+    onChange: function(value, text, $selectedItem) {
+      if (value.length > 0 && $.trim($complaintCommentsContent.val()).length > 0) {
+        $complaintCommentBtn.removeClass('disabled');
+        return
+      }
+      $complaintCommentBtn.addClass('disabled');
+    }
+  });
+  
+  function restoreCommonentDefault() {
+    $complainCommentType.dropdown('restore defaults');
+    $complaintCommentsContent.val('');
+    $('.exceeded-size-tip').text('').hide();
+    $complaintModalTip.text('').hide();
+    setTimeout(function() {
+      setCommentSendTip(false);
+    }, 1500);
+  }
+  
+  $complaintCommentBtn.on('click',function(e){
+    var reason = $complaintCommentsContent.val();
+    var appealableId = $('#landing-comments-complaint-modal').attr('data-id');
+    if (complaintSending) {
+      return;
+    }
+    var appealType = $complainCommentType.dropdown('get value');
+    var formData = new FormData();
+    formData.append('appeal_type_id', appealType);
+    formData.append('reason', reason);
+    formData.append('appeal_type','Note');
+    formData.append('target_id',appealableId);
+    $.ajax({
+      type: 'POST',
+      url: "/appeals",
+      cache: false,
+      contentType: false,
+      processData: false,
+      data: formData,
+      beforeSend: function() {
+        setCommentSendStatus(true);
+      },
+      success: function(res) {
+        if (res.status == 200) {
+          setCommentSendTip(true);
+          setTimeout(function() {
+            $complaintCommentsModal.modal('hide');
+            restoreCommonentDefault();
+          }, 3000);
+        }
+        setCommentSendStatus(false);
+      },
+      error: function(err) {
+        showCommonTips(err.responseJSON.message, 'error');
+        setCommentSendStatus(false);
+      }
+    })
+  });
+  
+  function showCommonTips(text, type) {
+    $complaintModalTip.text(text).show();
+    if (type == 'error') {
+      $complaintModalTip.removeClass('success').addClass('error');
+    } else {
+      $complaintModalTip.removeClass('error').addClass('success');
+    }
+  }
+  
+  function setCommentSendStatus(value) {
+    complaintSending = value;
+    if (complaintSending) {
+      $complaintCommentBtn.addClass('loading');
+      $complaintCommentsContent.attr('readonly', true);
+      $complainCommentType.attr('readonly', true);
+    } else {
+      $complaintCommentBtn.removeClass('loading');
+      $complaintCommentsContent.attr('readonly', false);
+      $complainCommentType.attr('readonly', false);
+    }
+  }
+  
+  function setCommentSendTip(value) {
+    if (value) {
+      $('.appeal-success-tip').removeClass('hide');
+      $('.appeal-tip').addClass('hide');
+      $('.appeal-form').addClass('hide');
+      $('#landing-comments-complaint-modal .actions').addClass('hide');
+    } else {
+      $('.appeal-success-tip').addClass('hide');
+      $('.appeal-tip').removeClass('hide');
+      $('.appeal-form').removeClass('hide');
+      $('#landing-comments-complaint-modal .actions').removeClass('hide');
+    }
+  }
+</script>
+
+<div class='ui small modal' id='misjudgment_appeal_modal'>
+<i class='close icon'></i>
+<div class='header dividing ui'>
+误判申诉
+</div>
+<div class='content'>
+<p>此处可能存在不合适展示的内容，页面不予展示。您可通过相关编辑功能自查并修改。</p>
+<p>如您确认内容无涉及 不当用语 / 纯广告导流 / 暴力 / 低俗色情 / 侵权 / 盗版 / 虚假 / 无价值内容或违法国家有关法律法规的内容，可点击提交进行申诉，我们将尽快为您处理。</p>
+<div class='buttons'>
+<div class='ui button blank cancel'>取消</div>
+<div class='ui button orange submit'>提交</div>
+</div>
+</div>
+</div>
+<style>
+  #misjudgment_appeal_modal .buttons {
+    float: right;
+    margin-top: 30px;
+    margin-bottom: 20px; }
+    #misjudgment_appeal_modal .buttons .cancel {
+      margin-right: 20px; }
+</style>
+<script>
+  var $misjudgmentAppealModal = $('#misjudgment_appeal_modal');
+  $('.cancel').on('click',function(){
+    $misjudgmentAppealModal.modal('hide');
+  });
+  var $jsSubmitAppeal = $misjudgmentAppealModal.find('.submit')
+  $jsSubmitAppeal.on('click', function(e) {
+    e.preventDefault();
+    $(this).addClass('loading').addClass('disabled');
+    var type = $(this).attr('data-type');
+    var id = $(this).attr('data-id');
+    var projectId = $(this).attr('data-project-id');
+    var appealType = $(this).attr('data-appeal-type');
+    $.ajax({
+      type: "PUT",
+      url: "/misjudgment_appeal",
+      data: {
+        type: type,
+        id: id,
+        project_id: projectId,
+        appeal_type: appealType
+      },
+      success: function(data) {
+        Flash.info('提交成功');
+        $jsSubmitAppeal.removeClass('loading');
+        $misjudgmentAppealModal.modal('hide');
+        location.reload()
+      },
+      error: function(e) {
+        Flash.error('提交失败:'+e.responseText);
+        $jsSubmitAppeal.removeClass('loading').removeClass('disabled');
+        location.reload()
+      }
+    });
+  })
+</script>
+
+</div>
+<script>
+  "use strict";
+  $('.js-check-star').checkbox('set unchecked')
+</script>
+
+</div>
+<script>
+  (function() {
+    $(function() {
+      Tree.init();
+      return TreeCommentActions.init();
+    });
+  
+  }).call(this);
+</script>
+</div>
+</div>
+<div class='four wide column' style=''>
+<div class='project__right-side'>
+<div class='side-item intro'>
+<div class='header'>
+<h4>简介</h4>
+</div>
+<div class='content'>
+<span class='git-project-desc-text'>OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。</span>
+<a class='hide spread' href='javascript:void(0);'>
+展开
+<i class='caret down icon'></i>
+</a>
+<a class='retract hide' href='javascript:void(0);'>
+收起
+<i class='caret up icon'></i>
+</a>
+<div class='intro-list'>
+<div class='blank d-flex d-flex-between dropdown item js-project-label_show label-list-line-feed project-label-list ui' data-labels='[]' data-url='/tntlinking-opensource/openhis-itai/update_description'>
+<div class='mixed-label'>
+</div>
+
+<div class='default'>暂无标签</div>
+</div>
+<div class='hide item'>
+<i class='iconfont icon-link'></i>
+<span class='git-project-homepage'>
+<a rel="nofollow" id="homepage" target="_blank" href=""></a>
+</span>
+</div>
+<div class='item box-readme'>
+<i class='iconfont icon-readme'></i>
+<span class='file_name' id='readme-name'>README</span>
+</div>
+<div class='item box-licence'>
+<i class='iconfont icon-licence'></i>
+<span class='license-popup license-clickable' data-license-filename='LICENSE' data-license-index='0' data-license-name='GPL-3.0' id='license-popup-0'>
+GPL-3.0
+</span>
+<div class='ui popup dark'>使用 GPL-3.0 开源许可协议</div>
+</div>
+<!-- - page = @project.page -->
+<!-- - if page&.status? -->
+<!-- .item -->
+<!-- %i.iconfont.icon-giteepage -->
+<!-- Pages： -->
+<!-- = link_to page.domain_url, page.domain_url, target: '_blank' -->
+<div class='item star-item'>
+<i class='iconfont icon-star'></i>
+<a class="action-social-count " title="45" href="/tntlinking-opensource/openhis-itai/stargazers"><span class='text-bold'>
+45
+</span>
+Stars
+</a></div>
+<div class='item watch-item'>
+<i class='iconfont icon-watch'></i>
+<a class="action-social-count" title="25" href="/tntlinking-opensource/openhis-itai/watchers"><span class='text-bold'>
+25
+</span>
+Watching
+</a></div>
+<div class='item'>
+<i class='iconfont icon-fork'></i>
+<a class="action-social-count disabled-style" title="57" href="/tntlinking-opensource/openhis-itai/members"><span class='text-bold'>
+57
+</span>
+Forks
+</a></div>
+</div>
+</div>
+<div class='content intro-form'>
+<div class='ui small input'>
+<textarea name='project[description]' placeholder='描述' rows='5'></textarea>
+</div>
+<div class='ui small input'>
+<input data-regex-value='(^$)|(^(http|https):\/\/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]).*)|(^(http|https):\/\/[a-zA-Z0-9]+([_\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,10}(:[0-9]{1,10})?(\?.*)?(\/.*)?$)' name='project[homepage]' placeholder='主页(eg: https://gitee.com)' type='text'>
+</div>
+<button class='ui orange button mt-1 btn-save'>
+保存更改
+</button>
+<div class='ui blank button btn-cancel-edit'>
+取消
+</div>
+</div>
+</div>
+<div class='side-item release'>
+<div class='header'>
+<h4>
+发行版
+<span class='text-muted'>
+(2)
+</span>
+</h4>
+<a class="ui link button pull-right" href="/tntlinking-opensource/openhis-itai/releases">全部</a>
+</div>
+<div class='content ml-3'>
+<i class='iconfont icon-release'></i>
+<div class='desc'>
+<a href="/tntlinking-opensource/openhis-itai/releases/tag/V1.3">OpenHIS医院系统-信创版V1.3部署包</a>
+</div>
+<span class='timeago' datetime='2025-12-25 10:49' title='2025-12-25 10:49:12 +0800'></span>
+</div>
+</div>
+<div class='side-item contrib' data-url='/tntlinking-opensource/openhis-itai/contributors_count?ref=develop' id='contributor'>
+<div class='header'>
+<h4>
+贡献者
+<span class='text-muted' id='contributor-count'></span>
+</h4>
+<a class="ui link button pull-right" href="/tntlinking-opensource/openhis-itai/contributors?ref=develop">全部</a>
+</div>
+<div class='content' id='contributor-list'></div>
+<div class='ui active centered inline loader' id='contributor-loader'></div>
+</div>
+<div class='side-item' id='languages'>
+<div class='header'>
+<h4>
+语言
+</h4>
+</div>
+<div class='content'>
+<div class='lang-bar-container mb-2'>
+<div class='lang-bar'>
+<div class='bar' style='width: 54.0%;background:#b07219'></div>
+<div class='bar' style='width: 40.5%;background:#41b883'></div>
+<div class='bar' style='width: 4.8%;background:#f1e05a'></div>
+<div class='bar' style='width: 0.6%;background:#e34c26'></div>
+<div class='bar' style='width: 0.1%;background:#c6538c'></div>
+<div class='bar' style='width: 0.0%;background:#EDEDED'></div>
+</div>
+</div>
+<div class='lang-legend'>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#b07219'></span>
+<a class="lang-text" href="/explore/all?lang=Java">Java</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=Java">54.0%</a>
+</span>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#41b883'></span>
+<a class="lang-text" href="/explore/all?lang=Vue">Vue</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=Vue">40.5%</a>
+</span>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#f1e05a'></span>
+<a class="lang-text" href="/explore/all?lang=JavaScript">JavaScript</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=JavaScript">4.8%</a>
+</span>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#e34c26'></span>
+<a class="lang-text" href="/explore/all?lang=HTML">HTML</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=HTML">0.6%</a>
+</span>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#c6538c'></span>
+<a class="lang-text" href="/explore/all?lang=SCSS">SCSS</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=SCSS">0.1%</a>
+</span>
+<span class='d-align-center'>
+<span class='lang-dot' style='background:#EDEDED'></span>
+<a class="lang-text" href="/explore/all?lang=Other">Other</a>
+<a class="percentage ml-1 text-muted" href="/explore/all?lang=Other">0.0%</a>
+</span>
+</div>
+</div>
+</div>
+
+<div class='side-item events' data-url='/tntlinking-opensource/openhis-itai/events.json' id='proj-events'>
+<div class='header'>
+<h4>近期动态</h4>
+</div>
+<div class='content'>
+<div class='ui comments' id='event-list'></div>
+<a class="loadmore hide" href="javascript:void(0);">加载更多
+<i class='icon dropdown'></i>
+</a><center>
+<div class='text-muted nomore hide'>不能加载更多了</div>
+<div class='ui inline loader active'></div>
+</center>
+</div>
+</div>
+</div>
+<div class='ui modal tiny' id='edit-project-description'>
+<i class='iconfont icon-close close'></i>
+<div class='header'>编辑仓库简介</div>
+<div class='content'>
+<div class='item mb-2'>
+<div class='title label'>简介内容</div>
+<div class='ui small input'>
+<textarea maxlength='200' name='project[description]' placeholder='描述' rows='5'>OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。</textarea>
+</div>
+</div>
+<div class='item mb-2'>
+<div class='title label'>主页</div>
+<div class='ui small input'>
+<input data-regex-value='(^$)|(^(http|https):\/\/(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]).*)|(^(http|https):\/\/[a-zA-Z0-9]+([_\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,10}(:[0-9]{1,10})?(\?.*)?(\/.*)?$)' name='project[homepage]' placeholder='主页(eg: https://gitee.com)' type='text' value=''>
+</div>
+</div>
+</div>
+<div class='actions'>
+<button class='ui button blank cancel'>取消</button>
+<button class='ui button orange btn-save'>保存更改</button>
+</div>
+</div>
+
+<style>
+  #readme-name,
+  .license-popup {
+    color: #005980;
+    cursor: pointer; }
+  
+  .license-clickable {
+    color: #005980;
+    cursor: pointer;
+    -webkit-transition: color 0.2s ease;
+    transition: color 0.2s ease; }
+</style>
+<script>
+  // 公共函数：平滑滚动到指定的license标题
+  function scrollToLicenseTitle(licenseIndex) {
+    var container = $('.file_readme_title')[0];
+    
+    if (!container) return;
+    
+    if (licenseIndex === undefined || licenseIndex === null) {
+      // 如果没有licenseIndex，滚动到最左侧
+      container.scrollTo({
+        left: 0,
+        behavior: 'smooth'
+      });
+      return;
+    }
+    
+    var selectedElement = $('#license-title-' + licenseIndex)[0];
+    
+    if (selectedElement) {
+      // 计算目标位置（元素相对于容器的位置）
+      var containerRect = container.getBoundingClientRect();
+      var elementRect = selectedElement.getBoundingClientRect();
+      var scrollLeft = container.scrollLeft;
+      var targetScrollLeft = scrollLeft + (elementRect.left - containerRect.left) - 20; // 留20px边距
+      
+      // 平滑滚动到目标位置
+      container.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
+      });
+    }
+  }
+  
+  function scrollToReadmeBox() {
+    var readmeBox = document.getElementById('git-readme');
+    if (readmeBox) {
+      const topPos = readmeBox.offsetTop;
+      window.scrollTo({ top: topPos, behavior: "smooth" });
+    }
+  }
+  
+  window.gon.projectRightSide = {
+    homepage: "",
+    description: "OpenHIS医院系统（信创版）集十大核心模块于一体，涵盖目录管理、基础数据配置、个性化设置、门诊/住院全流程管理、药房药库智能管控、精细化耗材管理、财务核算体系、医保合规对接及多维报表分析等功能模块，共计372项标准化功能。",
+    url: '/tntlinking-opensource/openhis-itai/update_description',
+    i18n: {
+      invalidHomepage: '不是有效的 http 地址',
+      descriptionLimitExceeded: '简介长度不得超过%{limit}个字符',
+      noDescription: '暂无描述',
+      noPermission: '无权限操作！',
+      requestError: '修改发生错误，请稍后重试！'
+    }
+  }
+  window.gon.cloneArrSelectedLabel = [] || []
+  $(function () {
+    var $editModal = $('#edit-project-description')
+    $editModal.modal({
+      onShow: function () {
+        window.globalUtils.getFocus($editModal.find('textarea'))
+      }
+    })
+    $('.project__right-side').on('click', '.header .btn-edit', function () {
+      $editModal.modal('show')
+    })
+    $('.license-popup').popup({ position: 'bottom center', lastResort: 'bottom center' })
+  
+    // 处理每个license的点击事件
+    $('.license-clickable').click(function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      var licenseName = $(this).data('license-name');
+      var licenseIndex = $(this).data('license-index');
+      var licenseFilename = $(this).data('license-filename');
+      
+      // 如果license文件名是README.md，则跳转到readme tab
+      if (licenseFilename === 'README.md') {
+        // 显示readme内容区域
+        $('.readme-content').show()
+        $('.readme-edit').show()
+        $('.lisence-content').hide()
+        $('.lisence-edit').hide()
+        
+        // 移除所有license标题的active-title类，然后为readme标题添加active-title类
+        $('.file_title_license').removeClass('active-title');
+        $('.file_title_readme').addClass('active-title');
+        
+        // 滚动到最左侧
+        scrollToLicenseTitle();
+      } else {
+        // 显示license内容区域
+        $('.lisence-edit').hide()
+        $('.readme-content').hide()
+        $('.readme-edit').hide()
+        
+        // 移除所有license标题的active-title类，然后为对应的标题添加active-title类
+        $('.file_title_license').removeClass('active-title');
+        $('#license-title-' + licenseIndex).addClass('active-title');
+        $('.file_title_readme').removeClass('active-title');
+        
+        // 隐藏所有license内容，然后只显示选中的license内容
+        $('.lisence-content').hide()
+        $('#license-content-' + licenseIndex).show();
+        $('#license-edit-' + licenseIndex).show();
+        
+        // 平滑滚动到对应的license标题
+        scrollToLicenseTitle(licenseIndex);
+      }
+      
+      scrollToReadmeBox()
+    });
+    
+    $(".box-readme").click(function(event) {
+      $('.lisence-content').hide()
+      $('.lisence-edit').hide()
+      $('.readme-content').show()
+      $('.readme-edit').show()
+      $('.file_title_license').removeClass('active-title')
+      $('.file_title_readme').addClass('active-title')
+      scrollToLicenseTitle()
+      scrollToReadmeBox()
+    });
+  
+    $('.js-project-label_show').projectLabel({
+      i18n: {
+        empty: "标签名不能为空",
+        verify: "标签名只允许包含中文、字母、数字或者中划线(-)，不能以中划线开头，且长度少于35个字符",
+        max: "最多选择 5 个标签"
+      }
+    })
+  })
+</script>
+
+</div>
+<div class='project-right-side-contaner' id='code-parsing'>
+<div class='d-flex-between mb-2'>
+<div class='title fs-16 d-align-center'>
+<img class='mr-1' height='32' src='/static/images/mjc_icon@2x.png' width='32'>
+<span class='ai-file-name'>马建仓 AI 助手</span>
+</div>
+<div>
+<i class='iconfont icon-close close gitee-icon-close'></i>
+</div>
+</div>
+<div class='code-parsing-content'>
+<div class='sub_title'></div>
+<div class='markdown-body'></div>
+<div class='bottom-content'>
+<div class='js-code-parsing-img'></div>
+<div class='ai_code_btns_simple'>
+<div class='ai_code_btns_simple_container'>
+<div class='mr-1 test-more'>尝试更多</div>
+<div class='btn_box' data-content='帮我解读代码' data-text='代码解读' data-value='code_explain'>
+<div class='btn_box_title'>代码解读</div>
+</div>
+<div class='btn_box' data-content='帮我代码找茬' data-text='代码找茬' data-value='code_review'>
+<div class='btn_box_title'>代码找茬</div>
+</div>
+<div class='btn_box' data-content='帮我优化代码' data-text='代码优化' data-value='code_improve'>
+<div class='btn_box_title'>代码优化</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class='skeleton'>
+<div class='line line1'></div>
+<div class='line line2'></div>
+<div class='line line3'></div>
+<div class='line line4'></div>
+<div class='line line1'></div>
+<div class='line line2'></div>
+<div class='line line3'></div>
+<div class='line line4'></div>
+<div class='line line1'></div>
+<div class='line line2'></div>
+<div class='line line3'></div>
+<div class='line line4'></div>
+</div>
+<div class='resize-handle'>
+<div class='resize-handle-line'></div>
+</div>
+<script src="/static/javascripts/markdown-it.min.js"></script>
+<script src="https://cn-assets.gitee.com/assets/ai_code_parsing/app-f83eb69e2ecd107b1a533333dea1f4eb.js"></script>
+<script>
+  $(function() {
+    var maxWidthPercentage = 0.5;
+    $("#code-parsing").resizable({
+      handles: 'e, w', // 通过左边调整大小
+      minWidth: 350, // 设置 代码解析框 的最小宽度
+      resize: function(event, ui) {
+        var parentWidth = $(this).parent().width();
+        var newWidthDiv2 = ui.size.width;
+        var newWidthDiv1 = parentWidth - newWidthDiv2;
+        // 计算最大宽度
+        var maxWidthDiv2 = parentWidth * maxWidthPercentage;
+        // 确保 代码解析框 不超过最大宽度
+        newWidthDiv2 = Math.min(newWidthDiv2, maxWidthDiv2);
+        // 确保 文件详情 至少有最小宽度
+        newWidthDiv1 = Math.max(parentWidth - newWidthDiv2, 750);
+  
+        var percentageCode = (newWidthDiv2 / parentWidth) * 100;
+        var percentageProject = (newWidthDiv1 / parentWidth) * 100;
+  
+        $('#code-parsing').css('width',percentageCode+"%")
+        $('.git-project-content-wrapper').find('#sixteen').attr('style', 'width: ' + percentageProject + '% !important;');
+        $('.right-wrapper').attr('style', 'width: ' + percentageProject + '% !important;');
+        $('.project-conter-container').attr('style', 'width: ' + percentageProject + '% !important;');
+      }
+    });
+  })
+</script>
+
+</div>
+</div>
+</div>
+<style>
+  .team-member-checkbox .ui.radio.checkbox.checked label:after {
+    top: 7px !important; }
+</style>
+<script>
+  function scrollToReadmeBox() {
+    var readmeBox = document.getElementById('git-readme');
+    if (readmeBox) {
+      const topPos = readmeBox.offsetTop;
+      window.scrollTo({ top: topPos, behavior: "smooth" });
+    }
+  }
+  
+  $(".box-readme").click(function(event) {
+    $('.lisence-content').hide()
+    $('.lisence-edit').hide()
+    $('.readme-content').show()
+    $('.readme-edit').show()
+    $('.file_title_license').removeClass('active-title')
+    $('.file_title_readme').addClass('active-title')
+    scrollToReadmeBox()
+  });
+  
+  // 防止二次挂载
+  if (false) {
+    window.gon.tree_left_side_loaded = true;
+  }
+</script>
+<link rel="stylesheet" media="all" href="https://cn-assets.gitee.com/assets/markdown_preview-001478f1b12f2725f1b1f76f36b9ce4e.css" />
+<script src="https://cn-assets.gitee.com/assets/markdown_preview-efa1eb7480096c6e1a1264d57dbea013.js"></script>
+<script src="https://cn-assets.gitee.com/webpacks/markdown_render-d25026194db8e94dd875.bundle.js" defer="defer"></script>
+
+</div>
+<script>
+  (function() {
+    Gitee.modalHelper = new GiteeModalHelper({
+      alertText: '提示',
+      okText: '确定'
+    });
+  
+  }).call(this);
+</script>
+<script>
+  Tree.initHighlightTheme('white')
+</script>
+
+
+</div>
+<div class='gitee-project-extension'>
+<div class='extension public'>1</div>
+<div class='extension https'>https://gitee.com/tntlinking-opensource/openhis-itai.git</div>
+<div class='extension ssh'>git@gitee.com:tntlinking-opensource/openhis-itai.git</div>
+<div class='extension namespace'>tntlinking-opensource</div>
+<div class='extension repo'>openhis-itai</div>
+<div class='extension name'>openhis-itai</div>
+<div class='extension branch'>develop</div>
+</div>
+
+<script>
+  $(function() {
+    GitLab.GfmAutoComplete.dataSource = "/tntlinking-opensource/openhis-itai/autocomplete_sources"
+    GitLab.GfmAutoComplete.Emoji.assetBase = '/assets/emoji'
+    GitLab.GfmAutoComplete.setup();
+  });
+</script>
+
+<footer id='git-footer-main'>
+<div class='ui container'>
+<div class='logo-row'>
+<a href="https://gitee.com"><img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='logo-img logo-light' src='/static/images/logo-black.svg?t=158106666'>
+<img alt='Gitee - 基于 Git 的代码托管和研发协作平台' class='logo-img logo-dark' src='/static/images/logo-white-next.svg?t=158106666'>
+</a></div>
+<div class='name-important'>
+北京奥思研工智能科技有限公司版权所有
+</div>
+<div class='ui two column grid d-flex-center'>
+<div class='eight wide column git-footer-left'>
+<div class='ui four column grid' id='footer-left'>
+<div class='column'>
+<div class='ui link list'>
+<div class='item'>
+<a class="item" href="/all-about-git">Git 大全</a>
+</div>
+<div class='item'>
+<a class="item" rel="nofollow" href="https://help.gitee.com/learn-Git-Branching/">Git 命令学习</a>
+</div>
+<div class='item'>
+<a class="item" rel="nofollow" href="https://copycat.gitee.com/">CopyCat 代码克隆检测</a>
+</div>
+<div class='item'>
+<a class="item" href="/appclient">APP与插件下载</a>
+</div>
+</div>
+</div>
+<div class='column'>
+<div class='ui link list'>
+<div class='item'>
+<a class="item" href="/gitee-stars">Gitee 封面人物</a>
+</div>
+<div class='item'>
+<a class="item" href="/gvp">GVP 项目</a>
+</div>
+<div class='item'>
+<a class="item" rel="nofollow" href="https://blog.gitee.com/">Gitee 博客</a>
+</div>
+<div class='item'>
+<a class="item" href="/enterprises#nonprofit-plan">Gitee 公益计划</a>
+</div>
+<div class='item'>
+<a class="item" href="https://gitee.com/features/gitee-go">Gitee 持续集成</a>
+</div>
+</div>
+</div>
+<div class='column'>
+<div class='ui link list'>
+<div class='item'>
+<a class="item" href="/api/v5/swagger">OpenAPI</a>
+</div>
+<div class='item'>
+<a class="item" href="https://gitee.com/oschina/mcp-gitee">MCP Server</a>
+</div>
+<div class='item'>
+<a class="item" href="https://help.gitee.com">帮助文档</a>
+</div>
+<div class='item'>
+<a class="item" href="/self_services">在线自助服务</a>
+</div>
+<div class='item'>
+<a class="item" href="/help/articles/4378">更新日志</a>
+</div>
+</div>
+</div>
+<div class='column'>
+<div class='ui link list'>
+<div class='item'>
+<a class="item" href="/about_us">关于我们</a>
+</div>
+<div class='item'>
+<a class="item" rel="nofollow" href=" https://gitee.com/oschina/jobs">加入我们</a>
+</div>
+<div class='item'>
+<a class="item" href="/terms">使用条款</a>
+</div>
+<div class='item'>
+<a class="item" href="/oschina/git-osc/issues">意见建议</a>
+</div>
+<div class='item'>
+<a class="item" href="/links.html">合作伙伴</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class='eight wide column right aligned followus git-footer-right'>
+<div class='qrcode mr-1'>
+<div class='qrcode-box'>
+<img alt="技术交流QQ群" src="https://cn-assets.gitee.com/assets/communication_QR-3b8de44bedfd3cf6c52c96b1a05771c6.png" />
+</div>
+<p class='mt-1 mini_app-text'>技术交流QQ群</p>
+</div>
+<div class='qrcode'>
+<div class='qrcode-box'>
+<img alt="微信服务号" class="weixin-qr" src="https://cn-assets.gitee.com/assets/qrcode-weixin-260803-3cfc55f0e5e92feab6cf176e2d5df4b3.jpg" />
+</div>
+<p class='mt-1 weixin-text'>微信服务号</p>
+</div>
+<div class='phone-and-qq column'>
+<div class='ui list official-support-container'>
+<div class='item'></div>
+<div class='item mail-and-zhihu'>
+<a rel="nofollow" href="mailto:git@oschina.cn"><i class='iconfont icon-msg-mail'></i>
+<span id='git-footer-email'>git#oschina.cn</span>
+</a></div>
+<div class='item tel'>
+<a>
+<i class='iconfont icon-tel'></i>
+<span>企业版在线使用：400-606-0201</span>
+</a>
+</div>
+<div class='item tel'>
+<a class='d-flex'>
+<i class='iconfont icon-tel mt-05 mr-05'></i>
+<span>专业版私有部署：</span>
+<div>
+赖经理 13058176526
+</div>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class='bottombar'>
+<div class='ui container'>
+<div class='ui d-flex d-flex-between'>
+<div class='seven wide column partner d-flex'>
+<div class='open-atom d-flex-center'>
+<img class="logo-openatom mr-1" alt="开放原子开源基金会" src="https://cn-assets.gitee.com/assets/logo-openatom-new-955174a984c899d2e230d052bdc237cf.svg" />
+<a target="_blank" rel="nofollow" href="https://www.openatom.org/">开放原子开源基金会</a>
+<div class='sub-title ml-1'>合作代码托管平台</div>
+</div>
+<div class='report-12377 d-flex-center ml-3'>
+<img class="report-12377__logo mr-1" alt="违法和不良信息举报中心" src="https://cn-assets.gitee.com/assets/12377@2x-1aa42ed2d2256f82a61ecf57be1ec244.png" />
+<a target="_blank" rel="nofollow" href="https://www.12377.cn">违法和不良信息举报中心</a>
+</div>
+<div class='copyright ml-3'>
+<a rel="nofollow" href="http://beian.miit.gov.cn/">京ICP备2025119063号</a>
+</div>
+<div class='beian d-flex-center ml-2'>
+<img class="report-12377__logo ml-1" alt="京公网安备11011502039387号" src="https://cn-assets.gitee.com/assets/beian-30b2e25c5da148efae50f89073b26816.png" />
+<a target="_blank" rel="nofollow" href="https://beian.mps.gov.cn/#/query/webSearch?code=11011502039387">京公网安备11011502039387号</a>
+</div>
+</div>
+<div class='nine wide column right aligned'>
+<i class='icon world'></i>
+<a href="/language/zh-CN">简 体</a>
+/
+<a href="/language/zh-TW">繁 體</a>
+/
+<a href="/language/en">English</a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+<script>
+  var officialEmail = $('#git-footer-email').text()
+  $('#git-footer-main .icon-popup').popup({ position: 'bottom center' })
+  $('#git-footer-email').text(officialEmail.replace('#', '@'))
+  window.gon.popover_card_locale = {
+    follow:"关注",
+    unfollow:"已关注",
+    gvp_title: "GVP - Gitee 最有价值开源项目",
+    project: "项目",
+    org: "开源组织",
+    member: "",
+    author: "作者",
+    user_blocked: "该用户已被屏蔽或已注销",
+    net_error: "网络错误",
+    unknown_exception: "未知异常"
+  }
+  window.gon.select_message = {
+    placeholder: "请输入个人空间地址或完整的邮箱地址"
+  }
+</script>
+<script src="https://cn-assets.gitee.com/webpacks/popover_card-bfd9ff90603e23ef133f.bundle.js"></script>
+<link rel="stylesheet" media="all" href="https://cn-assets.gitee.com/webpacks/css/gitee_nps-ae0dbee40f6ddc72015a.css" />
+<script src="https://cn-assets.gitee.com/webpacks/gitee_nps-3da0deab0b59d5e7f7a4.bundle.js"></script>
+<script src="https://cn-assets.gitee.com/webpacks/gitee_icons-db24f196ed7cfb3a6136.bundle.js"></script>
+
+
+
+<div class='side-toolbar'>
+<div class='button toolbar-help'>
+<i class='iconfont icon-help'></i>
+</div>
+<div class='ui popup left center dark'>点此查找更多帮助</div>
+<div class='toolbar-help-dialog'>
+<div class='toolbar-dialog-header'>
+<h3 class='toolbar-dialog-title'>搜索帮助</h3>
+<form class="toolbar-help-search-form" action="/help/load_keywords_data" accept-charset="UTF-8" method="get"><input name="utf8" type="hidden" value="&#x2713;" />
+<div class='ui icon input fluid toolbar-help-search'>
+<input name='keywords' placeholder='请输入产品名称或问题' type='text'>
+<i class='icon search'></i>
+</div>
+</form>
+
+<i class='iconfont icon-close toolbar-dialog-close-icon'></i>
+</div>
+<div class='toolbar-dialog-content'>
+<div class='toolbar-help-hot-search'>
+<div class='toolbar-roll'>
+<a class="init active" title="Git 命令在线学习" href="https://help.gitee.com/learn-git-branching/?utm_source==gitee-help-widget"><i class='Blue icon icon-command iconfont'></i>
+<span>Git 命令在线学习</span>
+</a><a class="init " title="如何在 Gitee 导入 GitHub 仓库" href="https://gitee.com/help/articles/4261?utm_source==gitee-help-widget"><i class='icon icon-clipboard iconfont orange'></i>
+<span>如何在 Gitee 导入 GitHub 仓库</span>
+</a></div>
+<div class='toolbar-list'>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4114">Git 仓库基础操作</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4166">企业版和社区版功能对比</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4191">SSH 公钥设置</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4194">如何处理代码冲突</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4232">仓库体积过大，如何减小？</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4279">如何找回被删除的仓库数据</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4283">Gitee 产品配额说明</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4284">GitHub仓库快速导入Gitee及同步更新</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4328">什么是 Release（发行版）</a>
+</div>
+<div class='toolbar-list-item'>
+<a href="/help/articles/4354">将 PHP 项目自动发布到 packagist.org</a>
+</div>
+</div>
+</div>
+<div class='toolbar-help-search-reseult'></div>
+</div>
+</div>
+<script>
+  var opt = { position: 'left center'};
+  var $helpSideToolbar = $('.button.toolbar-help');
+  var $toolbarRoll = $('.toolbar-roll');
+  
+  $(function() {
+    if (false) {
+      $helpSideToolbar.popup(opt).popup({lastResort:'left center'})
+    } else {
+      $helpSideToolbar.popup({lastResort:'left center'}).popup('show', opt);
+      setTimeout(function() {
+        $helpSideToolbar.popup('hide', opt);
+      }, 3000);
+    }
+  
+    if ($toolbarRoll.length) {
+      setInterval(function() {
+        var $nextActiveLink = $toolbarRoll.find('a.active').next();
+        if (!$nextActiveLink.length) {
+          $nextActiveLink = $toolbarRoll.find('a:first-child');
+        }
+        $nextActiveLink.attr('class', 'active').siblings().removeClass('active init');
+      }, 5000);
+    }
+  })
+</script>
+
+<div class='toolbar-appeal popup button'>
+<i class='iconfont icon-report'></i>
+</div>
+<div class='ui popup dark'>
+仓库举报
+</div>
+<script>
+  $('.toolbar-appeal').popup({ position: 'left center' });
+</script>
+
+<div class='button gotop popup' id='gotop'>
+<i class='iconfont icon-top'></i>
+</div>
+<div class='ui popup dark'>回到顶部</div>
+</div>
+<div class='form modal normal-modal tiny ui' id='unlanding-complaint-modal'>
+<i class='iconfont icon-close close'></i>
+<div class='header'>
+登录提示
+</div>
+<div class='container actions'>
+<div class='content'>
+该操作需登录 Gitee 帐号，请先登录后再操作。
+</div>
+<div class='ui orange icon large button ok'>
+立即登录
+</div>
+<div class='ui button blank cancel'>
+没有帐号，去注册
+</div>
+</div>
+</div>
+<script>
+  var $elm = $('.toolbar-appeal');
+  
+  $elm.on('click', function() {
+    var modals = $("#unlanding-complaint-modal.normal-modal");
+    if (modals.length > 1) {
+      modals.eq(0).modal('show');
+    } else {
+      modals.modal('show');
+    }
+  })
+  $("#unlanding-complaint-modal.normal-modal").modal({
+    onDeny: function() {
+      window.location.href = "/signup?from=";
+    },
+    onApprove: function() {
+      window.location.href = "/login?from=";
+    }
+  })
+</script>
+
+<style>
+  .side-toolbar .bdsharebuttonbox a {
+    font-size: 24px;
+    color: white !important;
+    opacity: 0.9;
+    margin: 6px 6px 0px 6px;
+    background-image: none;
+    text-indent: 0;
+    height: auto;
+    width: auto;
+  }
+</style>
+<style>
+  #udesk_btn a {
+    margin: 0px 20px 167px 0px !important;
+  }
+</style>
+<script>
+  (function() {
+    $('#project-user-message').popup({
+      position: 'left center'
+    });
+  
+  }).call(this);
+</script>
+<script>
+  Gitee.initSideToolbar()
+</script>
+
+
+
+
+
+<script>
+  (function() {
+    this.__gac = {
+      domain: 'www.oschina.net'
+    };
+  
+  }).call(this);
+</script>
+
+<script src="https://cn-assets.gitee.com/webpacks/build_status-0282307d33ff78a2a8f2.bundle.js"></script>
+<script src="https://cn-assets.gitee.com/webpacks/scan_status-194728acd3e61212dfe7.bundle.js"></script>
+<script src="https://cn-assets.gitee.com/webpacks/mermaid_render-6cc4f65d3aef3eb03851.bundle.js"></script>
+<script src="https://cn-assets.gitee.com/webpacks/check_runs-dac90373fa1dd8492e27.bundle.js"></script>
+</body>
+</html>

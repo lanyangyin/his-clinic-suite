@@ -175,3 +175,57 @@ def test_get_payment(client, auth):
 
 def test_get_payment_missing(client):
     assert client.get("/payments/999").status_code == 404
+
+
+def test_mixed_payment_can_be_partially_refunded(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, 'INSURANCE_ENABLED', False)
+    d1 = client.post('/drugs/', json={'name': '混合退费A', 'base_price': 30.0}, headers=auth['admin']).json()
+    d2 = client.post('/drugs/', json={'name': '混合退费B', 'base_price': 30.0}, headers=auth['admin']).json()
+    encounter = make_encounter_with_items(client, auth, [(d1['id'], 1), (d2['id'], 1)])
+    paid = client.post(
+        '/payments/',
+        json={
+            'encounter_id': encounter['id'],
+            'allocations': [
+                {'channel': 'cash', 'amount': 30.0},
+                {'channel': 'wechat', 'amount': 30.0},
+            ],
+        },
+        headers=auth['cashier'],
+    )
+    assert paid.status_code == 201, paid.text
+    assert paid.json()['channel'] == 'mixed'
+    charges = client.get(f"/charges/encounters/{encounter['id']}", headers=auth['cashier']).json()
+    charge = next(row for row in charges if row['status'] == 'paid')
+    refunded = client.post(
+        f"/payments/{paid.json()['id']}/refund",
+        json={'items': [{'charge_id': charge['id'], 'quantity': 1}]},
+        headers=auth['cashier'],
+    )
+    assert refunded.status_code == 200, refunded.text
+    assert refunded.json()['status'] in ('partially_refunded', 'refunded')
+
+
+def test_large_refund_requires_admin(client, auth, monkeypatch):
+    from app import settings
+
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", False)
+    monkeypatch.setattr(settings, "REFUND_APPROVAL_THRESHOLD", 500.0)
+    drug = make_drug(client, auth, "大额退费药", 600.0)
+    encounter = make_encounter_with_items(client, auth, [(drug["id"], 1)])
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert payment.status_code == 201, payment.text
+    blocked = client.post(
+        f"/payments/{payment.json()['id']}/refund", headers=auth["cashier"]
+    )
+    assert blocked.status_code == 400
+    assert "审批" in blocked.json()["detail"]
+    allowed = client.post(
+        f"/payments/{payment.json()['id']}/refund", headers=auth["admin"]
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["status"] == "refunded"

@@ -176,3 +176,56 @@ def test_tcm_permissions(client, auth):
         json={"items": [{"herb_id": herb_a["id"], "dose_g": 1}]},
         headers=auth["pharmacist"],
     ).status_code == 403
+
+
+def test_tcm_links_to_unified_prescription_header(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    prescription = _prescribe(client, auth, encounter, herb_a, herb_b).json()
+    assert prescription["prescription_id"]
+    reviews = client.get("/pharmacy/prescription-reviews", headers=auth["pharmacist"]).json()
+    assert all(row["id"] != prescription["prescription_id"] for row in reviews)
+    headers = client.get(
+        f"/encounters/{encounter['id']}/prescriptions/headers"
+    ).json()
+    tcm_header = next(row for row in headers if row["type"] == "tcm_herb" and row["id"] == prescription["prescription_id"])
+    assert tcm_header["item_count"] == 2
+    center = client.get(
+        f"/encounters/{encounter['id']}/prescription-center", headers=auth["doctor"]
+    ).json()
+    assert any(row["id"] == prescription["id"] for row in center["tcm"])
+    lines = client.get(
+        f"/encounters/{encounter['id']}/prescription-lines", headers=auth["doctor"]
+    ).json()
+    assert any(row["kind"] == "herb" for row in lines)
+    client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
+    headers = client.get(
+        f"/encounters/{encounter['id']}/prescriptions/headers"
+    ).json()
+    assert next(row for row in headers if row["id"] == prescription["prescription_id"])["status"] == "approved"
+
+
+def test_tcm_pending_item_edit_and_delete(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    prescription = _prescribe(client, auth, encounter, herb_a, herb_b).json()
+    item = prescription["items"][0]
+    edited = client.put(
+        f"/tcm/prescriptions/{prescription['id']}/items/{item['id']}",
+        json={"dose_g": 12, "special": "first", "note": "先煎"},
+        headers=auth["doctor"],
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["items"][0]["dose_g"] == 12
+    lines = client.get(
+        f"/encounters/{encounter['id']}/prescription-lines", headers=auth["doctor"]
+    ).json()
+    assert any(row["kind"] == "herb" and row["quantity"] == 12 for row in lines)
+    deleted = client.delete(
+        f"/tcm/prescriptions/{prescription['id']}/items/{item['id']}",
+        headers=auth["doctor"],
+    )
+    assert deleted.status_code == 204
+    lines_after = client.get(
+        f"/encounters/{encounter['id']}/prescription-lines", headers=auth["doctor"]
+    ).json()
+    herbs = [row for row in lines_after if row["kind"] == "herb"]
+    assert len(herbs) == 1

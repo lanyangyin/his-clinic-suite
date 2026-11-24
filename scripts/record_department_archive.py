@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from his_client.api import ApiClient  # noqa: E402
 from his_client.ui.archive import ArchiveWidget  # noqa: E402
-from scripts.record_ui_windows import Api, CaptionBar  # noqa: E402
+from scripts.record_ui_windows import Api, CaptionBar, LoginMixin  # noqa: E402
 
 BASE = "http://127.0.0.1:8001"
 FRAME_DIR = ROOT / "docs" / "dept_frames" / "archive"
@@ -30,7 +30,7 @@ VIDEO = VIDEO_DIR / "09_病案室.mp4"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 
 
-class ArchiveDemo(QMainWindow):
+class ArchiveDemo(LoginMixin, QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("病案档案工作站 · archive")
@@ -143,6 +143,8 @@ class ArchiveDemo(QMainWindow):
             for old in FRAME_DIR.glob("*.jpg"):
                 old.unlink()
             self.timer.start(250)
+            self.caption.show()
+            self.perform_login("archive", "archive123")
             self.showMaximized()
             self.caption.show()
             self.wait(1.5)
