@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.auth.security import require_login, require_read_login, require_role
 
-from .service import dispatch_pending, inbox, mark_read, retry_failed
+from .service import dispatch_pending, inbox, mark_read, read_at_for, retry_failed
 
 router = APIRouter(prefix="/notifications", tags=["notifications"], dependencies=[Depends(require_read_login)])
 
@@ -25,7 +25,7 @@ def my_notifications(
             "biz_type": row.biz_type,
             "biz_id": row.biz_id,
             "created_at": row.created_at,
-            "read_at": row.read_at,
+            "read_at": read_at_for(db, row.id, user.username) or row.read_at,
         }
         for row in rows
     ]

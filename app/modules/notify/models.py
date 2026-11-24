@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -25,3 +25,19 @@ class NotificationOutbox(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class NotificationRead(Base):
+    """按用户记录已读，避免 role 行一人已读全角色已读。"""
+
+    __tablename__ = "notification_reads"
+    __table_args__ = (
+        __import__("sqlalchemy").UniqueConstraint("notification_id", "username", name="uq_notification_user_read"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    notification_id: Mapped[int] = mapped_column(
+        ForeignKey("notification_outbox.id"), nullable=False, index=True
+    )
+    username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

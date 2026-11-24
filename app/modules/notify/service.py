@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import settings
 
-from .models import NotificationOutbox
+from .models import NotificationOutbox, NotificationRead
 
 
 def enqueue(
@@ -139,11 +139,33 @@ def mark_read(db: Session, notification_id: int, user) -> NotificationOutbox:
         raise ValueError("通知不存在")
     if user.role != "admin" and row.recipient not in (f"role:{user.role}", user.username):
         raise ValueError("无权操作该通知")
-    # 已读是独立时间语义，不覆盖 outbox 的送达状态
-    row.read_at = datetime.now()
-    db.commit()
-    db.refresh(row)
+    read = (
+        db.query(NotificationRead)
+        .filter(
+            NotificationRead.notification_id == notification_id,
+            NotificationRead.username == user.username,
+        )
+        .first()
+    )
+    if read is None:
+        db.add(NotificationRead(notification_id=notification_id, username=user.username))
+        # 兼容单用户通知的旧 read_at 字段；角色行不再写全局已读
+        if row.recipient == user.username:
+            row.read_at = datetime.now()
+        db.commit()
     return row
+
+
+def read_at_for(db: Session, notification_id: int, username: str):
+    row = (
+        db.query(NotificationRead)
+        .filter(
+            NotificationRead.notification_id == notification_id,
+            NotificationRead.username == username,
+        )
+        .first()
+    )
+    return row.read_at if row else None
 
 
 def retry_failed(db: Session) -> int:

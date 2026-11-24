@@ -468,6 +468,20 @@ def test_approval_notifications(client, auth, monkeypatch):
     row = next(item for item in after if item["id"] == note_id)
     assert row["read_at"] is not None
     assert row["status"] != "read"  # 送达状态不与已读混用
+    import base64
+
+    created = client.post(
+        "/users/",
+        json={"username": "pharmacist2", "password": "pharm2pass", "role": "pharmacist"},
+        headers=auth["admin"],
+    )
+    assert created.status_code == 201, created.text
+    token = base64.b64encode(b"pharmacist2:pharm2pass").decode()
+    other = client.get(
+        "/notifications", headers={"Authorization": f"Basic {token}"}
+    ).json()
+    other_row = next(item for item in other if item["id"] == note_id)
+    assert other_row["read_at"] is None
 
 
 def test_narcotic_inventory_difference(client, auth):
