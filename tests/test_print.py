@@ -54,6 +54,7 @@ def test_print_prescription(client, auth):
     assert "25.00" in html  # 2 * 12.5
     assert "王医生" in html
     assert "处方状态" in html
+    assert "watermark" in html
     headers = client.get(
         f"/encounters/{encounter['id']}/prescriptions/headers", headers=auth["doctor"]
     ).json()

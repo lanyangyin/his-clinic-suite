@@ -9,7 +9,9 @@ PAGE_CSS = """
 @page { size: A4; margin: 12mm; }
 * { box-sizing: border-box; }
 body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-size: 13px; line-height: 1.6; }
-.page { page-break-after: always; }
+.page { page-break-after: always; position: relative; }
+.watermark { position: absolute; top: 38%; left: 22%; transform: rotate(-25deg);
+    font-size: 64px; color: rgba(185,28,28,.22); font-weight: 700; z-index: 0; pointer-events: none; }
 .page:last-child { page-break-after: auto; }
 .clinic { text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 2px; margin: 2px 0 0; }
 .doc-title { text-align: center; font-size: 17px; letter-spacing: 5px; margin: 2px 0 8px; }
@@ -178,8 +180,13 @@ def _western_page(data: dict) -> str:
         "dispensed": "已发药",
         "cancelled": "已作废",
     }.get(data.get("prescription_status") or "", data.get("prescription_status") or "")
+    watermark = ""
+    if data.get("prescription_status") == "pending_review":
+        watermark = '<div class="watermark">待审</div>'
+    elif data.get("prescription_status") == "cancelled":
+        watermark = '<div class="watermark">作废</div>'
     return f"""
-<div class="page">
+<div class="page">{watermark}
   {_barcode(rx_no)}
   <div class="barcode-no">{rx_no}</div>
   <div class="clinic">{escape(meta['name'])}</div>
@@ -224,8 +231,13 @@ def _tcm_page(data: dict, rx: dict) -> str:
         "completed": "已完成",
         "cancelled": "已作废",
     }.get(rx.get("status") or "", rx.get("status") or "")
+    watermark = ""
+    if rx.get("status") == "pending":
+        watermark = '<div class="watermark">待审</div>'
+    elif rx.get("status") == "cancelled":
+        watermark = '<div class="watermark">作废</div>'
     return f"""
-<div class="page">
+<div class="page">{watermark}
   {_barcode(rx["prescription_no"])}
   <div class="barcode-no">{escape(rx["prescription_no"])}</div>
   <div class="clinic">{escape(meta['name'])}</div>
