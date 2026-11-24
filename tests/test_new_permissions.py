@@ -20,3 +20,15 @@ def test_discharge_medication_dispense_requires_pharmacist(client, auth):
         "/discharge-medications/1/dispense", headers=auth["nurse"]
     )
     assert denied.status_code == 403
+
+
+def test_new_admin_pages_require_login(client):
+    for path in (
+        "/admin/finance",
+        "/admin/refund-export-templates",
+        "/admin/tcm-adjustments",
+        "/admin/inpatient",
+        "/admin/notification-templates",
+    ):
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code in (302, 303), path
