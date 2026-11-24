@@ -661,3 +661,14 @@ def test_admin_tcm_adjustments_page(client, auth):
     page = client.get("/admin/tcm-adjustments")
     assert page.status_code == 200, page.text
     assert "中药盘点调整审批" in page.text
+
+
+def test_admin_inpatient_page(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/inpatient")
+    assert page.status_code == 200, page.text
+    assert "住院管理" in page.text

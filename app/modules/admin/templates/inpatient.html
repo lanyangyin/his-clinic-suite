@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}住院管理 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>住院管理</h2>
+<div class="panel">
+  <table>
+    <tr><th>住院 ID</th><th>患者</th><th>病区/床</th><th>状态</th><th>入院时间</th><th>出院时间</th><th>操作</th></tr>
+    {% for admission, patient, bed, ward in rows %}
+    <tr>
+      <td>{{ admission.id }}</td>
+      <td>{{ patient.name }} {{ patient.patient_no or '' }}</td>
+      <td>{{ ward.name }} {{ bed.code }}</td>
+      <td>{{ {'in': '在院', 'discharged': '已出院'}.get(admission.status, admission.status) }}</td>
+      <td>{{ admission.admitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td>{{ admission.discharged_at.strftime('%Y-%m-%d %H:%M') if admission.discharged_at else '—' }}</td>
+      <td>
+        {% if admission.status == 'in' %}
+        <form method="post" action="/admin/inpatient/{{ admission.id }}/discharge" style="display:inline">
+          <button type="submit">出院</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">暂无住院记录</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

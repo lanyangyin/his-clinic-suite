@@ -141,10 +141,11 @@ from app.modules.encounter.service import list_record_revisions, review_record_r
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox, NotificationTemplate
+from app.modules.inpatient.models import Admission, Bed, InpatientOrder, Ward
 from app.modules.tcm.models import TcmStockAdjustment
 from app.modules.tcm.service import approve_stock_adjustment
 from app.modules.billing.models import RefundApproval
-from app.modules.patient.models import PatientMergeRequest
+from app.modules.patient.models import Patient, PatientMergeRequest
 from app.modules.patient.service import review_merge_request
 from app.modules.notify.service import dispatch_pending, retry_failed
 from app.modules.pacs.service import list_templates as list_imaging_templates
@@ -371,6 +372,43 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/inpatient", response_class=HTMLResponse)
+def inpatient_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = (
+        db.query(Admission, Patient, Bed, Ward)
+        .join(Patient, Admission.patient_id == Patient.id)
+        .join(Bed, Admission.bed_id == Bed.id)
+        .join(Ward, Bed.ward_id == Ward.id)
+        .order_by(Admission.id.desc())
+        .limit(200)
+        .all()
+    )
+    return templates.TemplateResponse(
+        request, "inpatient.html", _ctx(request, rows=rows)
+    )
+
+
+@router.post("/inpatient/{admission_id}/discharge")
+def inpatient_discharge(
+    admission_id: int,
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from app.modules.inpatient.service import discharge
+
+    try:
+        discharge(db, admission_id)
+    except ValueError:
+        pass
+    return RedirectResponse("/admin/inpatient", status_code=302)
 
 
 @router.get("/tcm-adjustments", response_class=HTMLResponse)
