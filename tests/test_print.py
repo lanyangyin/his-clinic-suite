@@ -291,3 +291,11 @@ def test_western_prescription_reprint_banner(client, auth):
     assert "补打" not in first.text
     second = client.get(f"/print/western-prescription/{encounter['id']}")
     assert "补打 第2次" in second.text
+
+
+
+def test_reprint_banner_helper():
+    from app.modules.print.router import _reprint_banner
+
+    assert "首次打印" in _reprint_banner(1)
+    assert "补打 第2次" in _reprint_banner(2)

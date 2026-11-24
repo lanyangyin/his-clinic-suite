@@ -60,14 +60,17 @@ def _log_print(db: Session, user, document_type: str, ref_id: int | None) -> int
     return count
 
 
-def _with_reprint_banner(html: str, count: int) -> str:
+def _reprint_banner(count: int) -> str:
     label = "首次打印" if count <= 1 else f"补打 第{count}次"
     color = "#0f172a" if count <= 1 else "#b91c1c"
-    banner = (
+    return (
         f'<div style="margin:4px 0;padding:2px 6px;border:1px solid {color};'
         f'color:{color};font-size:11px;display:inline-block">{label}</div>'
     )
-    return html.replace("<body>", f"<body>{banner}", 1)
+
+
+def _with_reprint_banner(html: str, count: int) -> str:
+    return html.replace("<body>", f"<body>{_reprint_banner(count)}", 1)
 
 
 def _clinic_meta() -> dict:
@@ -525,7 +528,7 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(r
 
 @router.get("/retail/{sale_id}", response_class=HTMLResponse)
 def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "retail", sale_id)
+    print_count = _log_print(db, user, "retail", sale_id)
     sale = get_retail_sale(db, sale_id)
     if not sale:
         raise HTTPException(status_code=404, detail="零售单不存在")
@@ -542,7 +545,7 @@ def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(requi
     status = "已退货" if sale.status == "refunded" else "已完成"
     return HTMLResponse(
         f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>零售小票</title><style>{RECEIPT_CSS}</style></head><body>
+<title>零售小票</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
 <p class="center">零售小票</p>
@@ -566,7 +569,7 @@ def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(requi
 
 @router.get("/dispense-slip/{encounter_id}", response_class=HTMLResponse)
 def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "dispense-slip", encounter_id)
+    print_count = _log_print(db, user, "dispense-slip", encounter_id)
     try:
         data = build_dispense_slip(db, encounter_id)
     except ValueError as e:
@@ -595,7 +598,7 @@ def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=D
     return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>取药凭证</title><style>{RECEIPT_CSS}
 .small {{ color:#555; font-size:10px; }}
-</style></head><body>
+</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
 <p class="center big">取药凭证</p>
@@ -636,7 +639,7 @@ def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=D
 
 @router.get("/dispense-label/{dispense_id}", response_class=HTMLResponse)
 def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "dispense-label", dispense_id)
+    print_count = _log_print(db, user, "dispense-label", dispense_id)
     dispense = get_dispense(db, dispense_id)
     if not dispense:
         raise HTTPException(status_code=404, detail="发药记录不存在")
@@ -651,7 +654,7 @@ def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=D
     )
     meta = _clinic_meta()
     return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>发药袋标签</title><style>{RECEIPT_CSS}</style></head><body>
+<title>发药袋标签</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
 <p class="center big">发药袋标签</p>
@@ -671,7 +674,7 @@ def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=D
 
 @router.get("/nursing-label/{order_id}", response_class=HTMLResponse)
 def print_nursing_label(order_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "nursing-label", order_id)
+    print_count = _log_print(db, user, "nursing-label", order_id)
     order = db.get(NursingOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="护理执行单不存在")
@@ -681,7 +684,7 @@ def print_nursing_label(order_id: int, db: Session = Depends(get_db), user=Depen
     preparation = order.preparations[-1] if order.preparations else None
     meta = _clinic_meta()
     return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>输液瓶签</title><style>{RECEIPT_CSS}</style></head><body>
+<title>输液瓶签</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
 <p class="center big">输液 / 注射瓶签</p>
@@ -721,7 +724,7 @@ LAB_CSS = """
 
 @router.get("/lab-report/{request_id}", response_class=HTMLResponse)
 def print_lab_report(request_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "lab-report", request_id)
+    print_count = _log_print(db, user, "lab-report", request_id)
     request = get_request(db, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="检验申请不存在")
@@ -756,7 +759,7 @@ def print_lab_report(request_id: int, db: Session = Depends(get_db), user=Depend
     }.get(request.status, request.status)
     return HTMLResponse(
         f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<title>检验报告单</title><style>{LAB_CSS}</style></head><body>
+<title>检验报告单</title><style>{LAB_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])} · 检验报告单</h2>
 <div class="meta">
