@@ -1,5 +1,6 @@
 """住院工作站：在院列表、医嘱查看、出院。"""
 from PySide6.QtWidgets import (
+    QDoubleSpinBox,
     QFormLayout,
     QLineEdit,
     QGroupBox,
@@ -56,6 +57,19 @@ class InpatientWidget(QWidget):
             admit_form.addRow("床位 ID", self.admit_bed)
             admit_form.addRow("", admit_btn)
             layout.addWidget(admit_box)
+            bill_box = QGroupBox("住院账单")
+            bill_layout = QHBoxLayout(bill_box)
+            self.bill_label = QLabel("未选择住院记录")
+            self.pay_amount = QDoubleSpinBox()
+            self.pay_amount.setRange(0, 10_000_000)
+            self.pay_amount.setDecimals(2)
+            pay_btn = QPushButton("缴费")
+            pay_btn.clicked.connect(self._pay_bill)
+            bill_layout.addWidget(self.bill_label, 1)
+            bill_layout.addWidget(QLabel("金额"))
+            bill_layout.addWidget(self.pay_amount)
+            bill_layout.addWidget(pay_btn)
+            layout.addWidget(bill_box)
         if role in ("doctor", "admin"):
             takehome_box = QGroupBox("出院带药")
             takehome_form = QFormLayout(takehome_box)
@@ -114,8 +128,15 @@ class InpatientWidget(QWidget):
             return
         try:
             orders = self.api.list_inpatient_orders(self.rows[row]["id"])
+            if hasattr(self, "bill_label"):
+                bill = self.api.get_inpatient_bill(self.rows[row]["id"])
+                self.bill_label.setText(
+                    f"总费用 {bill['total_amount']:.2f}　已缴 {bill['paid_amount']:.2f}　"
+                    f"余额 {bill['balance']:.2f}"
+                )
+                self.pay_amount.setValue(max(0.0, bill["balance"]))
         except ApiError as e:
-            self.msg.setText(f"医嘱加载失败：{e.detail}")
+            self.msg.setText(f"加载失败：{e.detail}")
             return
         self.order_table.setRowCount(len(orders))
         for i, order in enumerate(orders):
@@ -125,6 +146,22 @@ class InpatientWidget(QWidget):
             ]
             for j, value in enumerate(values):
                 self.order_table.setItem(i, j, QTableWidgetItem(str(value)))
+
+    def _pay_bill(self) -> None:
+        row = self.admission_table.currentRow()
+        if not 0 <= row < len(self.rows):
+            self.msg.setText("请先选择住院记录")
+            return
+        if self.pay_amount.value() <= 0:
+            self.msg.setText("请输入缴费金额")
+            return
+        try:
+            self.api.pay_inpatient_bill(self.rows[row]["id"], self.pay_amount.value())
+        except ApiError as e:
+            self.msg.setText(f"缴费失败：{e.detail}")
+            return
+        self._select(row, 0)
+        self.msg.setText("缴费完成")
 
     def _add_takehome(self) -> None:
         row = self.admission_table.currentRow()

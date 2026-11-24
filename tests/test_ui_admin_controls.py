@@ -30,6 +30,12 @@ class _NoopApi:
     def list_inpatient_orders(self, admission_id):
         return []
 
+    def get_inpatient_bill(self, admission_id):
+        return {"total_amount": 10.0, "paid_amount": 0.0, "balance": 10.0, "charge_count": 1}
+
+    def pay_inpatient_bill(self, admission_id, amount, method="cash"):
+        return {"id": 1}
+
     def create_inpatient_admission(self, patient_id, doctor_id, bed_id):
         return {"id": 1}
 
@@ -72,3 +78,4 @@ def test_admin_inpatient_has_admit_form(qapp):
     assert hasattr(widget, "admit_patient")
     assert widget.admit_patient.value() == 0
     assert hasattr(widget, "takehome_drug")
+    assert hasattr(widget, "pay_amount")
