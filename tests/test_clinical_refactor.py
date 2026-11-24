@@ -752,3 +752,7 @@ def test_finance_reconciliation(client, auth):
     page = client.get("/admin/finance")
     assert "日对账签收" in page.text
     assert "已签" in page.text
+    reconciliation = client.get("/admin/finance").text
+    verify = client.get("/admin/finance/reconcile/1/verify")
+    assert verify.status_code == 200
+    assert verify.json()["valid"] is True

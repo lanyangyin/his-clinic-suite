@@ -522,6 +522,36 @@ def reconcile_finance(
     return RedirectResponse("/admin/finance", status_code=302)
 
 
+@router.get("/finance/reconcile/{reconciliation_id}/verify")
+def verify_finance_reconciliation(
+    reconciliation_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    row = db.get(FinancialReconciliation, reconciliation_id)
+    if not row:
+        return {"valid": False, "reason": "对账记录不存在"}
+    if not row.signature or not row.certificate_id:
+        return {"valid": False, "reason": "未签章"}
+    from app.modules.ca.models import CACertificate
+    from app.modules.insurance.crypto import sm2_verify, sm3_hex
+
+    certificate = db.get(CACertificate, row.certificate_id)
+    if not certificate or certificate.status != "valid":
+        return {"valid": False, "reason": "证书无效"}
+    content = (
+        f"{row.biz_date}|{row.total_payment:.2f}|{row.total_inpatient:.2f}|"
+        f"{row.total_refund:.2f}|{row.net:.2f}"
+    )
+    if sm3_hex(content.encode()) != row.content_hash:
+        return {"valid": False, "reason": "对账内容已变化"}
+    valid = sm2_verify(row.signature, row.content_hash.encode(), certificate.public_key)
+    return {"valid": bool(valid), "reason": "" if valid else "签名校验失败"}
+
+
 @router.get("/finance/vouchers.csv")
 def financial_vouchers_csv(request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)

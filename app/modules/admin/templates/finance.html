@@ -25,8 +25,9 @@
     <input type="date" name="biz_date" required>
     <button type="submit">签收对账</button>
   </form>
-  <table><tr><th>日期</th><th>门诊</th><th>住院</th><th>退费</th><th>净收入</th><th>操作人</th><th>CA</th></tr>
-  {% for row in reconciliations %}<tr><td>{{ row.biz_date }}</td><td>{{ '%.2f'|format(row.total_payment) }}</td><td>{{ '%.2f'|format(row.total_inpatient) }}</td><td>{{ '%.2f'|format(row.total_refund) }}</td><td>{{ '%.2f'|format(row.net) }}</td><td>{{ row.operator }}</td><td>{{ '已签' if row.signature else '未签' }}</td></tr>{% endfor %}
+  <table><tr><th>日期</th><th>门诊</th><th>住院</th><th>退费</th><th>净收入</th><th>操作人</th><th>CA</th><th>验签</th></tr>
+  {% for row in reconciliations %}<tr><td>{{ row.biz_date }}</td><td>{{ '%.2f'|format(row.total_payment) }}</td><td>{{ '%.2f'|format(row.total_inpatient) }}</td><td>{{ '%.2f'|format(row.total_refund) }}</td><td>{{ '%.2f'|format(row.net) }}</td><td>{{ row.operator }}</td><td>{{ '已签' if row.signature else '未签' }}</td>
+    <td>{% if row.signature %}<a href="/admin/finance/reconcile/{{ row.id }}/verify">验签</a>{% endif %}</td></tr>{% endfor %}
   </table>
   <h3>财务凭证</h3>
   <form method="post" action="/admin/finance/vouchers/generate" style="display:inline">
