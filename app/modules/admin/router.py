@@ -1,8 +1,10 @@
+import csv
+import io
 from datetime import date
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -367,6 +369,28 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/refund-approvals.csv")
+def refund_approvals_csv(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = db.query(RefundApproval).order_by(RefundApproval.id.desc()).all()
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["ID", "支付单", "退费单号", "金额", "原因", "操作人", "角色", "时间"])
+    for row in rows:
+        writer.writerow([
+            row.id, row.payment_id, row.refund_no, f"{row.amount:.2f}",
+            row.reason, row.operator, row.operator_role,
+            row.created_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=refund-approvals.csv"},
+    )
 
 
 @router.get("/refund-approvals", response_class=HTMLResponse)

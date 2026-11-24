@@ -619,3 +619,15 @@ def test_admin_refund_approvals_page(client, auth):
     page = client.get("/admin/refund-approvals")
     assert page.status_code == 200, page.text
     assert "大额退费审批留痕" in page.text
+
+
+def test_refund_approvals_csv_export(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    response = client.get("/admin/refund-approvals.csv")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers["content-type"]
+    assert "退费单号" in response.text
