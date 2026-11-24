@@ -204,6 +204,11 @@ def prepare(
             raise ValueError("高危药品必须填写第二核对人")
         if checked_by.lower() == (operator or "").strip().lower():
             raise ValueError("高危药品核对人不能与配药人相同")
+        from app.modules.auth.models import User
+
+        checker = db.query(User).filter(User.username == checked_by).first()
+        if not checker or checker.role not in ("nurse", "admin"):
+            raise ValueError("高危药品第二核对人必须是有效的护士账号")
     row = NursingPreparation(
         order_id=order.id,
         solvent=data.solvent,

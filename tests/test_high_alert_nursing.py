@@ -70,6 +70,21 @@ def test_high_alert_requires_second_checker(client, auth):
     assert same.status_code == 400
     assert "不能与配药人相同" in same.json()["detail"]
 
+    fake = client.post(
+        f"/nursing/orders/{order['id']}/prepare",
+        json={
+            "solvent": "0.9%氯化钠", "dose": "1g", "batch_no": "B1",
+            "checked_by": "second-nurse",
+        },
+        headers=auth["nurse"],
+    )
+    assert fake.status_code == 400
+    assert "有效" in fake.json()["detail"]
+    client.post(
+        "/users/",
+        json={"username": "second-nurse", "password": "secondpass", "role": "nurse"},
+        headers=auth["admin"],
+    )
     ok = client.post(
         f"/nursing/orders/{order['id']}/prepare",
         json={
