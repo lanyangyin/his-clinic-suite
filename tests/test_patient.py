@@ -82,7 +82,7 @@ def test_patient_merge_moves_registration_and_redirects(client, auth):
     merged = client.post(
         f"/patients/{source['id']}/merge",
         json={"target_id": target["id"], "reason": "同人重复建档"},
-        headers=auth["admin"],
+        headers=auth["director"],
     )
     assert merged.status_code == 200, merged.text
     assert merged.json()["id"] == target["id"]
@@ -92,7 +92,7 @@ def test_patient_merge_moves_registration_and_redirects(client, auth):
     again = client.post(
         f"/patients/{source['id']}/merge",
         json={"target_id": target["id"], "reason": "重复"},
-        headers=auth["admin"],
+        headers=auth["director"],
     )
     assert again.status_code == 400
 
@@ -130,3 +130,10 @@ def test_patient_merge_request_requires_director(client, auth):
         headers=auth["cashier"],
     )
     assert denied.status_code == 403
+    # 管理员不能绕过审批直接合并
+    bypass = client.post(
+        f"/patients/{source['id']}/merge",
+        json={"target_id": target["id"], "reason": "绕过"},
+        headers=auth["admin"],
+    )
+    assert bypass.status_code == 403

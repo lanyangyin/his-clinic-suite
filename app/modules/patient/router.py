@@ -59,8 +59,10 @@ def merge_patient(
     source_id: int,
     data: PatientMergeRequest,
     db: Session = Depends(get_db),
-    user=Depends(require_role("admin")),
+    user=Depends(require_role("director")),
 ):
+    if user.role != "director":
+        raise HTTPException(status_code=403, detail="患者合并需院长直接操作或走审批")
     try:
         return merge_patients(db, source_id, data.target_id, data.reason, user.username)
     except ValueError as e:
