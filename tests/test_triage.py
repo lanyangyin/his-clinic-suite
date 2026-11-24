@@ -124,3 +124,21 @@ def test_role_protection(client, auth):
     ticket = make_ticket(client, auth, reg["id"]).json()
     r = client.post(f"/triage/tickets/{ticket['id']}/call")
     assert r.status_code == 401
+
+
+def test_queue_orders_by_triage_acuity_before_arrival(client, auth):
+    low = make_registration(client, auth)
+    high = make_registration(client, auth)
+    client.post(
+        "/triage/tickets",
+        json={"registration_id": low["id"], "triage_level": 4},
+        headers=auth["nurse"],
+    )
+    client.post(
+        "/triage/tickets",
+        json={"registration_id": high["id"], "triage_level": 1},
+        headers=auth["nurse"],
+    )
+    rows = client.get("/triage/queue").json()
+    assert rows[0]["registration_id"] == high["id"], rows
+    assert rows[0]["triage_level"] == 1

@@ -146,3 +146,17 @@ def test_worklist_permissions(client, auth):
     _, _, _, _ = _encounter(client, auth)
     assert client.get("/lab/worklist", headers=auth["doctor"]).status_code == 403
     assert client.get("/lab/worklist", headers=auth["nurse"]).status_code == 403
+
+
+def test_lab_worklist_urgent_before_routine(client, auth):
+    patient, encounter, item, urgent = _encounter(client, auth)
+    routine = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": item["id"], "priority": "routine"},
+        headers=auth["doctor"],
+    ).json()
+    work = client.get(
+        "/lab/worklist", params={"status": "pending"}, headers=auth["lab"]
+    ).json()
+    ids = [row["id"] for row in work]
+    assert ids.index(urgent["id"]) < ids.index(routine["id"]), ids

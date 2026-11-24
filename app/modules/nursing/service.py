@@ -122,7 +122,11 @@ def list_orders(
             query = query.filter(NursingOrder.status.in_(statuses))
     if encounter_id:
         query = query.filter(NursingOrder.encounter_id == encounter_id)
-    rows = query.order_by(NursingOrder.id.desc()).all()
+    rows = query.order_by(
+        NursingOrder.high_alert.desc(),
+        NursingOrder.status.asc(),
+        NursingOrder.id.asc(),
+    ).all()
     result = []
     for order, patient in rows:
         encounter = get_encounter(db, order.encounter_id)

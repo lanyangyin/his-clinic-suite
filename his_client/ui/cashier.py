@@ -733,8 +733,16 @@ class CashierWidget(QWidget):
             "allergy_detail": "",
             "privacy_consent": True,
         }
+        duplicate = self._confirm_duplicate(payload)
+        if duplicate is not None:
+            patient = duplicate
+        else:
+            try:
+                patient = self.api.create_patient(payload=payload)
+            except ApiError as e:
+                self.reg_msg.setText(f"快速建档失败（{e.status_code}）：{e.detail}")
+                return
         try:
-            patient = self.api.create_patient(payload=payload)
             registration = (
                 self.api.create_registration(
                     patient["id"], doctor_id, self.r_schedule_id.value() or None

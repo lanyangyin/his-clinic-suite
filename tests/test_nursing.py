@@ -192,3 +192,29 @@ def test_nursing_prepare_requires_paid_and_dispensed_in_production(client, auth,
     )
     assert blocked.status_code == 400
     assert "尚未收费" in blocked.json()["detail"]
+
+
+def test_nursing_high_alert_orders_first(client, auth):
+    patient, encounter = _setup(client, auth)
+    high = client.post(
+        "/drugs/",
+        json={"name": "高警示化疗药", "base_price": 100.0, "high_alert": True},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={
+            "drug_id": high["id"], "quantity": 1, "dosage": "1支",
+            "frequency": "qd", "route": "静滴", "days": 1,
+        },
+        headers=auth["doctor"],
+    )
+    synced = client.post(
+        f"/nursing/encounters/{encounter['id']}/sync", headers=auth["nurse"]
+    )
+    assert synced.status_code == 200, synced.text
+    rows = client.get(
+        "/nursing/orders", params={"encounter_id": encounter["id"]}, headers=auth["nurse"]
+    ).json()
+    assert rows[0]["item_name"] == "高警示化疗药", rows
+    assert rows[0]["high_alert"] is True

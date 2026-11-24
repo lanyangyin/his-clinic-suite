@@ -38,6 +38,9 @@ class EncounterDiagnosisItem(BaseModel):
     diagnosis_code: str = Field(default="", max_length=20)
     diagnosis: str = Field(min_length=1, max_length=200)
     note: str = Field(default="", max_length=200)
+    diagnosis_stage: str = Field(default="outpatient", pattern="^(outpatient|admission|discharge)$")
+    diagnosis_phase: str = Field(default="initial", pattern="^(initial|provisional|corrected|final)$")
+    diagnosis_certainty: str = Field(default="confirmed", pattern="^(pending|suspected|confirmed)$")
 
 
 class EncounterDiagnosisResponse(EncounterDiagnosisItem):

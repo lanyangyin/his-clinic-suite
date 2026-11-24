@@ -203,6 +203,9 @@ def replace_encounter_diagnoses(
                 "diagnosis_code": code,
                 "diagnosis": name,
                 "diagnosis_type": "primary" if index == 0 else "secondary",
+                "diagnosis_stage": getattr(item, "diagnosis_stage", "outpatient"),
+                "diagnosis_phase": getattr(item, "diagnosis_phase", "initial"),
+                "diagnosis_certainty": getattr(item, "diagnosis_certainty", "confirmed"),
                 "sort_no": index,
                 "note": (item.note or "").strip(),
             }

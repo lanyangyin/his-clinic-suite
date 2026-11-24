@@ -49,6 +49,18 @@ class EncounterDiagnosis(Base):
     diagnosis_type: Mapped[str] = mapped_column(
         String(20), default="primary", server_default="primary", nullable=False
     )
+    # outpatient 门诊 / admission 入院 / discharge 出院
+    diagnosis_stage: Mapped[str] = mapped_column(
+        String(20), default="outpatient", server_default="outpatient", nullable=False
+    )
+    # initial 初步 / provisional 暂定 / corrected 修正 / final 最终
+    diagnosis_phase: Mapped[str] = mapped_column(
+        String(20), default="initial", server_default="initial", nullable=False
+    )
+    # pending 待查 / suspected 疑似 / confirmed 确诊
+    diagnosis_certainty: Mapped[str] = mapped_column(
+        String(20), default="confirmed", server_default="confirmed", nullable=False
+    )
     sort_no: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     note: Mapped[str] = mapped_column(
         String(200), default="", server_default="", nullable=False

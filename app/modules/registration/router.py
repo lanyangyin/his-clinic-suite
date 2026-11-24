@@ -15,6 +15,7 @@ from .schemas import (
     VisitTypeUpdate,
 )
 from .service import (
+    cancel_registration,
     convert_registration_visit_type,
     create_registration,
     create_schedule,
@@ -57,6 +58,18 @@ def change_visit_type(
             data.visit_type,
             data.original_registration_id,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{registration_id}/cancel", response_model=RegistrationResponse)
+def cancel(
+    registration_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("cashier")),
+):
+    try:
+        return cancel_registration(db, registration_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

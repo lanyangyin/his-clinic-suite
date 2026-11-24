@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.modules.charges.service import add_charge
@@ -306,7 +307,11 @@ def worklist(
             query = query.filter(LabRequest.status.in_(statuses))
     if priority:
         query = query.filter(LabRequest.priority == priority)
-    rows = query.order_by(LabRequest.id.desc()).all()
+    rows = query.order_by(
+        case((LabRequest.priority == "urgent", 0), else_=1),
+        LabRequest.requested_at.asc(),
+        LabRequest.id.asc(),
+    ).all()
     result = []
     for request, patient in rows:
         encounter = get_encounter(db, request.encounter_id)

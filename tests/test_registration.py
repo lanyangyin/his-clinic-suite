@@ -67,3 +67,30 @@ def test_get_registration(client, auth):
 
 def test_get_registration_missing(client):
     assert client.get("/registrations/999").status_code == 404
+
+
+def test_cancel_unvisited_registration_releases_slot(client, auth):
+    patient = client.post(
+        "/patients/", json={"name": "取消挂号患者", "id_number": "110101199001019876"},
+        headers=auth["cashier"],
+    ).json()
+    dept = client.post("/departments/", json={"name": "取消科"}, headers=auth["admin"]).json()
+    doctor = client.post(
+        "/doctors/", json={"name": "取消医生", "department_id": dept["id"]}, headers=auth["admin"]
+    ).json()
+    schedule = client.post(
+        "/schedules/",
+        json={"doctor_id": doctor["id"], "schedule_date": "2026-11-25", "period": "morning", "capacity": 1},
+        headers=auth["admin"],
+    ).json()
+    reg = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "schedule_id": schedule["id"]},
+        headers=auth["cashier"],
+    ).json()
+    cancelled = client.post(f"/registrations/{reg['id']}/cancel", headers=auth["cashier"])
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+    assert client.get(f"/schedules/{schedule['id']}").json()["booked"] == 0
+    again = client.post(f"/registrations/{reg['id']}/cancel", headers=auth["cashier"])
+    assert again.status_code == 400

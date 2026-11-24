@@ -161,6 +161,25 @@ def create_registration(db: Session, data: RegistrationCreate) -> Registration:
     return registration
 
 
+def cancel_registration(db: Session, registration_id: int) -> Registration:
+    """取消未就诊挂号：释放号源，状态置 cancelled。"""
+    registration = get_registration(db, registration_id)
+    if not registration:
+        raise ValueError("挂号记录不存在")
+    if registration.status != "registered":
+        raise ValueError("仅未就诊的挂号可以取消")
+    from app.modules.encounter.models import Encounter
+
+    if db.query(Encounter).filter(Encounter.registration_id == registration_id).first():
+        raise ValueError("该挂号已接诊，不能直接取消")
+    if registration.schedule_id:
+        release_schedule_slot(db, registration.schedule_id)
+    registration.status = "cancelled"
+    db.commit()
+    db.refresh(registration)
+    return registration
+
+
 def convert_registration_visit_type(
     db: Session,
     registration_id: int,

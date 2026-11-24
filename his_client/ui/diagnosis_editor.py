@@ -15,6 +15,11 @@ from PySide6.QtWidgets import (
 )
 
 
+STAGE_LABELS = {"outpatient": "门诊", "admission": "入院", "discharge": "出院"}
+PHASE_LABELS = {"initial": "初步", "provisional": "暂定", "corrected": "修正", "final": "最终"}
+CERTAINTY_LABELS = {"pending": "待查", "suspected": "疑似", "confirmed": "确诊"}
+
+
 class DiagnosisEditor(QWidget):
     changed = Signal()
 
@@ -26,8 +31,10 @@ class DiagnosisEditor(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["顺序", "类型", "编码", "诊断", "备注"])
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(
+            ["顺序", "类型", "阶段", "分期", "确定性", "编码", "诊断", "备注"]
+        )
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -38,9 +45,20 @@ class DiagnosisEditor(QWidget):
         layout.addWidget(self.table, 1)
 
         form = QHBoxLayout()
+        self.stage = QComboBox()
+        for value, label in STAGE_LABELS.items():
+            self.stage.addItem(label, value)
+        self.phase = QComboBox()
+        for value, label in PHASE_LABELS.items():
+            self.phase.addItem(label, value)
+        self.certainty = QComboBox()
+        for value, label in CERTAINTY_LABELS.items():
+            self.certainty.addItem(label, value)
+        for combo in (self.stage, self.phase, self.certainty):
+            combo.setMinimumWidth(70)
         self.code = QComboBox()
         self.code.addItem("编码（可选）", "")
-        self.code.setMinimumWidth(180)
+        self.code.setMinimumWidth(150)
         self.code.currentIndexChanged.connect(self._code_changed)
         self.name = QLineEdit()
         self.name.setPlaceholderText("诊断名称，必填")
@@ -48,6 +66,9 @@ class DiagnosisEditor(QWidget):
         self.note.setPlaceholderText("备注（可选）")
         self.add_btn = QPushButton("添加/更新")
         self.add_btn.clicked.connect(self._commit)
+        form.addWidget(self.stage)
+        form.addWidget(self.phase)
+        form.addWidget(self.certainty)
         form.addWidget(self.code)
         form.addWidget(self.name, 1)
         form.addWidget(self.note, 1)
@@ -70,7 +91,10 @@ class DiagnosisEditor(QWidget):
         layout.addLayout(actions)
 
     def set_read_only(self, read_only: bool) -> None:
-        for widget in (self.code, self.name, self.note, self.add_btn, self.remove_btn, self.up_btn, self.down_btn):
+        for widget in (
+            self.stage, self.phase, self.certainty, self.code, self.name, self.note,
+            self.add_btn, self.remove_btn, self.up_btn, self.down_btn,
+        ):
             widget.setEnabled(not read_only)
 
     def set_options(self, rows: list[dict]) -> None:
@@ -99,6 +123,9 @@ class DiagnosisEditor(QWidget):
                 "diagnosis_code": row.get("diagnosis_code") or "",
                 "diagnosis": row.get("diagnosis") or "",
                 "note": row.get("note") or "",
+                "diagnosis_stage": row.get("diagnosis_stage") or "outpatient",
+                "diagnosis_phase": row.get("diagnosis_phase") or "initial",
+                "diagnosis_certainty": row.get("diagnosis_certainty") or "confirmed",
             }
             for row in rows
             if (row.get("diagnosis") or "").strip()
@@ -116,6 +143,9 @@ class DiagnosisEditor(QWidget):
                 "diagnosis_code": "",
                 "diagnosis": "待查",
                 "note": "待检验/检查结果回报后修正",
+                "diagnosis_stage": "outpatient",
+                "diagnosis_phase": "provisional",
+                "diagnosis_certainty": "pending",
             },
         )
         self.edit_row = -1
@@ -128,13 +158,8 @@ class DiagnosisEditor(QWidget):
 
     def set_editable(self, editable: bool) -> None:
         for widget in (
-            self.code,
-            self.name,
-            self.note,
-            self.add_btn,
-            self.remove_btn,
-            self.up_btn,
-            self.down_btn,
+            self.stage, self.phase, self.certainty, self.code,
+            self.name, self.note, self.add_btn, self.remove_btn, self.up_btn, self.down_btn,
         ):
             widget.setEnabled(editable)
 
@@ -144,6 +169,9 @@ class DiagnosisEditor(QWidget):
             values = [
                 str(index + 1),
                 "主诊断" if index == 0 else "其他诊断",
+                STAGE_LABELS.get(item.get("diagnosis_stage") or "outpatient", "门诊"),
+                PHASE_LABELS.get(item.get("diagnosis_phase") or "initial", "初步"),
+                CERTAINTY_LABELS.get(item.get("diagnosis_certainty") or "confirmed", "确诊"),
                 item.get("diagnosis_code") or "—",
                 item.get("diagnosis") or "",
                 item.get("note") or "",
@@ -167,6 +195,9 @@ class DiagnosisEditor(QWidget):
         item = self.items[row]
         code_index = self.code.findData(item.get("diagnosis_code") or "")
         self.code.setCurrentIndex(max(0, code_index))
+        self.stage.setCurrentIndex(max(0, self.stage.findData(item.get("diagnosis_stage") or "outpatient")))
+        self.phase.setCurrentIndex(max(0, self.phase.findData(item.get("diagnosis_phase") or "initial")))
+        self.certainty.setCurrentIndex(max(0, self.certainty.findData(item.get("diagnosis_certainty") or "confirmed")))
         self.name.setText(item.get("diagnosis") or "")
         self.note.setText(item.get("note") or "")
 
@@ -179,6 +210,9 @@ class DiagnosisEditor(QWidget):
             "diagnosis_code": self.code.currentData() or "",
             "diagnosis": name,
             "note": self.note.text().strip(),
+            "diagnosis_stage": self.stage.currentData() or "outpatient",
+            "diagnosis_phase": self.phase.currentData() or "initial",
+            "diagnosis_certainty": self.certainty.currentData() or "confirmed",
         }
         if self.edit_row >= 0 and self.edit_row < len(self.items):
             self.items[self.edit_row] = item
@@ -221,7 +255,7 @@ class DiagnosisDialog(QDialog):
     def __init__(self, rows: list[dict], options: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("诊断（主诊断 + 其他诊断）")
-        self.resize(720, 380)
+        self.resize(900, 420)
         layout = QVBoxLayout(self)
         hint = QLabel("按重要性从上到下排序，第一行为主诊断。")
         hint.setWordWrap(True)

@@ -57,11 +57,11 @@ def get_ticket(db: Session, ticket_id: int) -> TriageTicket | None:
 
 
 def list_queue(db: Session, status: str = "waiting") -> list[TriageTicket]:
-    """分诊队列（默认候诊，按入队顺序）。"""
+    """分诊队列：按分诊级别优先（1 级最急），同级按入队时间。"""
     return (
         db.query(TriageTicket)
         .filter(TriageTicket.status == status)
-        .order_by(TriageTicket.id)
+        .order_by(TriageTicket.triage_level.asc(), TriageTicket.created_at.asc(), TriageTicket.id.asc())
         .all()
     )
 
@@ -74,8 +74,17 @@ def call_ticket(db: Session, ticket_id: int) -> TriageTicket:
     if ticket.status != "waiting":
         raise ValueError("仅候诊中的叫号单可以叫号")
 
-    ticket.status = "called"
-    ticket.called_at = datetime.now()
+    affected = (
+        db.query(TriageTicket)
+        .filter(TriageTicket.id == ticket_id, TriageTicket.status == "waiting")
+        .update(
+            {TriageTicket.status: "called", TriageTicket.called_at: datetime.now()},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        db.rollback()
+        raise ValueError("仅候诊中的叫号单可以叫号")
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -89,8 +98,17 @@ def pass_ticket(db: Session, ticket_id: int) -> TriageTicket:
     if ticket.status != "called":
         raise ValueError("仅已叫号的叫号单可以过号")
 
-    ticket.status = "passed"
-    ticket.passed_at = datetime.now()
+    affected = (
+        db.query(TriageTicket)
+        .filter(TriageTicket.id == ticket_id, TriageTicket.status == "called")
+        .update(
+            {TriageTicket.status: "passed", TriageTicket.passed_at: datetime.now()},
+            synchronize_session=False,
+        )
+    )
+    if affected != 1:
+        db.rollback()
+        raise ValueError("仅已叫号的叫号单可以过号")
     db.commit()
     db.refresh(ticket)
     return ticket

@@ -22,6 +22,8 @@ def test_pending_diagnosis_is_primary_and_idempotent(qapp):
     editor.add_pending_diagnosis()
     items = editor.get_items()
     assert items[0]["diagnosis"] == "待查"
+    assert items[0]["diagnosis_certainty"] == "pending"
+    assert items[0]["diagnosis_phase"] == "provisional"
     assert "回报" in items[0]["note"]
     editor.add_pending_diagnosis()
     assert len(editor.get_items()) == 1

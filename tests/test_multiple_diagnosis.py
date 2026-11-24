@@ -117,3 +117,30 @@ def test_closed_encounter_diagnosis_rejected(client, auth):
     )
     assert response.status_code == 409
     assert "已收费" in response.json()["detail"]
+
+
+def test_diagnosis_semantics_are_structured(client, auth):
+    _, encounter = _setup(client, auth)
+    response = client.put(
+        f"/encounters/{encounter['id']}/diagnoses",
+        json=[
+            {
+                "diagnosis": "社区获得性肺炎",
+                "diagnosis_stage": "outpatient",
+                "diagnosis_phase": "provisional",
+                "diagnosis_certainty": "suspected",
+            },
+            {
+                "diagnosis": "2型糖尿病",
+                "diagnosis_stage": "outpatient",
+                "diagnosis_phase": "initial",
+                "diagnosis_certainty": "confirmed",
+            },
+        ],
+        headers=auth["doctor"],
+    )
+    assert response.status_code == 200, response.text
+    rows = response.json()
+    assert rows[0]["diagnosis_phase"] == "provisional"
+    assert rows[0]["diagnosis_certainty"] == "suspected"
+    assert rows[1]["diagnosis_type"] == "secondary"
