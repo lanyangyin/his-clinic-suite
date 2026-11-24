@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -33,6 +33,7 @@ class SurgeryCase(Base):
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     # scheduled 已排班 / in_progress 手术中 / completed 已完成 / cancelled 已取消
     status: Mapped[str] = mapped_column(String(20), default="scheduled", nullable=False)
+    signatures_required: Mapped[bool] = mapped_column(default=False, nullable=False)
     notes: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
@@ -172,3 +173,19 @@ class AnesthesiaRecord(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     case: Mapped[SurgeryCase] = relationship(back_populates="anesthesia")
+
+
+class SurgerySignature(Base):
+    """手术三方电子签名（角色+账号+口令确认）。"""
+
+    __tablename__ = "surgery_signatures"
+    __table_args__ = (
+        UniqueConstraint("case_id", "role", name="uq_surgery_signature_case_role"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    case_id: Mapped[int] = mapped_column(ForeignKey("surgery_cases.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    signed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

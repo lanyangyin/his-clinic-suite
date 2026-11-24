@@ -27,6 +27,8 @@ from .schemas import (
     RoomResponse,
     SafetyCreate,
     SafetyResponse,
+    SurgerySignatureRequest,
+    SurgerySignatureResponse,
 )
 from .service import (
     add_count,
@@ -43,6 +45,9 @@ from .service import (
     get_case,
     list_cases,
     list_rooms,
+    list_signatures,
+    require_signatures,
+    sign_case,
     reschedule_case,
     save_anesthesia,
     save_preop,
@@ -230,6 +235,40 @@ def material(
         return add_material(db, case_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/cases/{case_id}/signatures", response_model=SurgerySignatureResponse)
+def sign_surgery_case(
+    case_id: int,
+    data: SurgerySignatureRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("surgery", "anesthesia", "surgery_nurse", "admin")),
+):
+    try:
+        return sign_case(db, case_id, data.role, data.password, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/cases/{case_id}/signatures", response_model=list[SurgerySignatureResponse])
+def signatures(
+    case_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("surgery", "anesthesia", "surgery_nurse", "admin")),
+):
+    return list_signatures(db, case_id)
+
+
+@router.post("/cases/{case_id}/require-signatures", response_model=CaseResponse)
+def require_surgery_signatures(
+    case_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("surgery", "admin")),
+):
+    try:
+        return require_signatures(db, case_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.post("/cases/{case_id}/preop", response_model=PreopResponse, status_code=201)
 def preop(

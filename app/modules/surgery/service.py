@@ -1,4 +1,5 @@
 """手术室：排班、安全核查、术中记录、器械清点、复苏、CSSD 包关联。"""
+import hashlib
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from .models import (
     SurgeryRecord,
     SurgeryRecovery,
     SurgerySafetyCheck,
+    SurgerySignature,
 )
 from .schemas import (
     AnesthesiaCreate,
@@ -257,6 +259,14 @@ def start_case(db: Session, case_id: int, operator: str = "") -> SurgeryCase:
     )
     if not sign_in:
         raise ValueError("请先完成术前安全核查（sign_in）")
+    if case.signatures_required:
+        roles = {
+            row.role
+            for row in db.query(SurgerySignature).filter(SurgerySignature.case_id == case_id).all()
+        }
+        missing = {"surgeon", "anesthesia", "nurse"} - roles
+        if missing:
+            raise ValueError("缺少手术三方电子签名：" + "、".join(sorted(missing)))
     team = {
         (case.surgeon or "").strip(),
         (case.preop.anesthesiologist or "").strip(),
@@ -437,3 +447,59 @@ def save_anesthesia(db: Session, case_id: int, data: AnesthesiaCreate, operator:
     db.commit()
     db.refresh(row)
     return row
+
+
+def require_signatures(db: Session, case_id: int) -> SurgeryCase:
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    case.signatures_required = True
+    db.commit()
+    db.refresh(case)
+    return case
+
+
+def sign_case(
+    db: Session, case_id: int, role: str, password: str, user
+) -> SurgerySignature:
+    from app.modules.auth.service import verify_password
+
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    allowed = {
+        "surgeon": {"surgery"},
+        "anesthesia": {"anesthesia"},
+        "nurse": {"surgery_nurse"},
+    }
+    if role not in allowed:
+        raise ValueError("签名角色无效")
+    user_role = getattr(user, "role", "")
+    if user_role not in allowed[role] and user_role != "admin":
+        raise ValueError("当前账号角色不能签署该角色")
+    if not verify_password(user, password):
+        raise ValueError("签名口令错误")
+    content = f"{case.id}|{role}|{user.username}|{datetime.now().isoformat()}"
+    row = (
+        db.query(SurgerySignature)
+        .filter(SurgerySignature.case_id == case_id, SurgerySignature.role == role)
+        .first()
+    )
+    if row is None:
+        row = SurgerySignature(case_id=case_id, role=role)
+        db.add(row)
+    row.username = user.username
+    row.content_hash = hashlib.sha256(content.encode()).hexdigest()
+    row.signed_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_signatures(db: Session, case_id: int) -> list[SurgerySignature]:
+    return (
+        db.query(SurgerySignature)
+        .filter(SurgerySignature.case_id == case_id)
+        .order_by(SurgerySignature.id)
+        .all()
+    )

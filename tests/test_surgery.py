@@ -329,3 +329,51 @@ def test_surgery_role_separation(client, auth):
     assert denied_nurse.status_code == 403
     started = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
     assert started.status_code == 200, started.text
+
+
+def test_surgery_three_party_signatures(client, auth):
+    import base64
+
+    for username, role in (("anes2", "anesthesia"), ("or-nurse2", "surgery_nurse")):
+        created = client.post(
+            "/users/",
+            json={"username": username, "password": "pass1234", "role": role},
+            headers=auth["admin"],
+        )
+        assert created.status_code == 201, created.text
+
+    def basic(username):
+        token = base64.b64encode(f"{username}:pass1234".encode()).decode()
+        return {"Authorization": f"Basic {token}"}
+
+    patient, room, case = _setup(client, auth)
+    client.post(
+        f"/surgery/cases/{case['id']}/preop",
+        json={"anesthesiologist": "麻醉医生", "consent": True},
+        headers=auth["surgery"],
+    )
+    client.post(
+        f"/surgery/cases/{case['id']}/safety",
+        json={"phase": "sign_in", "checklist": "身份核查"},
+        headers=auth["surgery"],
+    )
+    enabled = client.post(
+        f"/surgery/cases/{case['id']}/require-signatures", headers=auth["surgery"]
+    )
+    assert enabled.status_code == 200, enabled.text
+    blocked = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
+    assert blocked.status_code == 400
+    assert "电子签名" in blocked.json()["detail"]
+    for role, headers, password in (
+        ("surgeon", auth["surgery"], "surgery123"),
+        ("anesthesia", basic("anes2"), "pass1234"),
+        ("nurse", basic("or-nurse2"), "pass1234"),
+    ):
+        signed = client.post(
+            f"/surgery/cases/{case['id']}/signatures",
+            json={"role": role, "password": password},
+            headers=headers,
+        )
+        assert signed.status_code == 200, signed.text
+    started = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
+    assert started.status_code == 200, started.text

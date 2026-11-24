@@ -172,3 +172,17 @@ class AnesthesiaResponse(AnesthesiaCreate):
     recorded_by: str
     recorded_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class SurgerySignatureRequest(BaseModel):
+    role: str
+    password: str = Field(min_length=1, max_length=100)
+
+
+class SurgerySignatureResponse(BaseModel):
+    id: int
+    case_id: int
+    role: str
+    username: str
+    signed_at: datetime
+    model_config = ConfigDict(from_attributes=True)
