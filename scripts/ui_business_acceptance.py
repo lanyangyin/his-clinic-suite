@@ -11,6 +11,9 @@ from PySide6.QtWidgets import QApplication
 
 from his_client.api import ApiClient
 from his_client.ui.patient_merge import PatientMergeDialog
+from his_client.ui.tcm import TcmWidget
+from his_client.ui.inpatient import InpatientWidget
+from PySide6.QtWidgets import QTabWidget
 
 
 def _patient(api, name, phone):
@@ -41,7 +44,60 @@ def main() -> int:
         if row["source_id"] == source["id"] and row["target_id"] == target["id"]
     ]
     print(f"SOURCE={source['id']} TARGET={target['id']} REQUESTS={len(matched)}")
-    return 0 if matched else 1
+
+    herb = api._request("POST", "/tcm/herbs", json={
+        "code": f"UIH{stamp % 100000}", "name": f"验收饮片{stamp}",
+        "price_per_g": 1, "stock_g": 0,
+    })
+    batch = api._request("POST", f"/tcm/herbs/{herb['id']}/stock-batches", json={
+        "batch_no": f"UIB{stamp % 100000}", "quantity_g": 10,
+    })
+    adjustment = api._request("POST", f"/tcm/stock-batches/{batch['id']}/adjust-requests", json={
+        "delta_g": -2, "reason": "UI 业务验收",
+    })
+    tcm = TcmWidget(api, role="admin")
+    tcm_tabs = tcm.findChild(QTabWidget)
+    for i in range(tcm_tabs.count()):
+        if tcm_tabs.tabText(i) == "盘点审批":
+            tcm_tabs.setCurrentIndex(i)
+            break
+    tcm._load_adjustments()
+    for row in range(tcm.adjust_table.rowCount()):
+        if tcm.adjust_table.item(row, 0).text() == str(adjustment["id"]):
+            tcm.adjust_table.setCurrentCell(row, 0)
+            break
+    tcm._review_adjustment(True)
+    pending = api._request("GET", "/tcm/adjustments", params={"status": "pending"})
+    tcm_ok = not any(row["id"] == adjustment["id"] for row in pending)
+    print(f"TCM_ADJUSTMENT={adjustment['id']} APPROVED={tcm_ok}")
+
+    ward = api._request("POST", "/wards/", json={"name": f"验收病区{stamp}"})
+    bed = api._request("POST", "/beds/", json={"ward_id": ward["id"], "code": f"B{stamp % 100}"})
+    dept = api.create_department(f"验收科{stamp}")
+    doctor = api.create_doctor(f"验收医生{stamp}", dept["id"])
+    inpatient = _patient(api, f"住院验收{stamp}", f"137{stamp % 100000000:08d}")
+    admission = api.create_inpatient_admission(inpatient["id"], doctor["id"], bed["id"])
+    widget = InpatientWidget(api, role="admin")
+    widget._load()
+    for row in range(widget.admission_table.rowCount()):
+        if widget.admission_table.item(row, 0).text() == str(admission["id"]):
+            widget.admission_table.setCurrentCell(row, 0)
+            break
+    widget._select(widget.admission_table.currentRow(), 0)
+    widget._discharge()
+    admissions = api.list_inpatient_admissions()
+    discharged = any(
+        row["id"] == admission["id"] and row["status"] == "discharged" for row in admissions
+    )
+    print(f"ADMISSION={admission['id']} DISCHARGED={discharged}")
+    dialog.close()
+    tcm.close()
+    widget.close()
+    dialog.deleteLater()
+    tcm.deleteLater()
+    widget.deleteLater()
+    app.processEvents()
+    return 0 if matched and tcm_ok and discharged else 1
 
 
 if __name__ == "__main__":
