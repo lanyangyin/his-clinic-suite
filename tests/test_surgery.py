@@ -377,3 +377,33 @@ def test_surgery_three_party_signatures(client, auth):
         assert signed.status_code == 200, signed.text
     started = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
     assert started.status_code == 200, started.text
+
+
+def test_surgery_signature_role_and_password_enforced(client, auth):
+    import base64
+
+    for username, role in (("anes3", "anesthesia"), ("or-nurse3", "surgery_nurse")):
+        created = client.post(
+            "/users/",
+            json={"username": username, "password": "pass1234", "role": role},
+            headers=auth["admin"],
+        )
+        assert created.status_code == 201, created.text
+
+    def basic(username):
+        token = base64.b64encode(f"{username}:pass1234".encode()).decode()
+        return {"Authorization": f"Basic {token}"}
+
+    patient, room, case = _setup(client, auth)
+    wrong_role = client.post(
+        f"/surgery/cases/{case['id']}/signatures",
+        json={"role": "surgeon", "password": "pass1234"},
+        headers=basic("anes3"),
+    )
+    assert wrong_role.status_code == 400
+    wrong_password = client.post(
+        f"/surgery/cases/{case['id']}/signatures",
+        json={"role": "nurse", "password": "bad"},
+        headers=basic("or-nurse3"),
+    )
+    assert wrong_password.status_code == 400
