@@ -631,3 +631,22 @@ def test_refund_approvals_csv_export(client, auth):
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
     assert "退费单号" in response.text
+
+
+def test_admin_notification_templates_page(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/notification-templates")
+    assert page.status_code == 200, page.text
+    assert "通知模板" in page.text
+    created = client.post(
+        "/admin/notification-templates",
+        data={"code": "report_ready", "title": "报告已出", "body": "请取报告", "channel": "internal", "active": "1"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+    page = client.get("/admin/notification-templates")
+    assert "report_ready" in page.text

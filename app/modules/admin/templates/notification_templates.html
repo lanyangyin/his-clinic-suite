@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}通知模板 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>通知模板</h2>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/notification-templates">
+    <label>编码 <input name="code" required maxlength="40"></label>
+    <label>标题 <input name="title" maxlength="120"></label>
+    <label>渠道
+      <select name="channel">
+        <option value="internal">internal</option>
+        <option value="sms">sms</option>
+        <option value="wecom">wecom</option>
+      </select>
+    </label>
+    <label>正文 <input name="body" maxlength="500"></label>
+    <label>启用 <input type="checkbox" name="active" value="1" checked></label>
+    <button type="submit">保存</button>
+  </form>
+  <table>
+    <tr><th>编码</th><th>标题</th><th>渠道</th><th>正文</th><th>启用</th><th>更新时间</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.code }}</td>
+      <td>{{ row.title }}</td>
+      <td>{{ row.channel }}</td>
+      <td>{{ row.body }}</td>
+      <td>{{ '是' if row.active else '否' }}</td>
+      <td>{{ row.updated_at.strftime('%Y-%m-%d %H:%M') if row.updated_at else '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">暂无模板</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

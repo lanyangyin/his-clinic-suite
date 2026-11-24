@@ -140,7 +140,7 @@ from app.modules.warehouse.service import (
 from app.modules.encounter.service import list_record_revisions, review_record_revision
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
-from app.modules.notify.models import NotificationOutbox
+from app.modules.notify.models import NotificationOutbox, NotificationTemplate
 from app.modules.billing.models import RefundApproval
 from app.modules.patient.models import PatientMergeRequest
 from app.modules.patient.service import review_merge_request
@@ -369,6 +369,46 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/notification-templates", response_class=HTMLResponse)
+def notification_templates_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = db.query(NotificationTemplate).order_by(NotificationTemplate.id).all()
+    return templates.TemplateResponse(
+        request, "notification_templates.html", _ctx(request, rows=rows)
+    )
+
+
+@router.post("/notification-templates")
+def notification_template_save(
+    request: Request,
+    code: str = Form(...),
+    title: str = Form(""),
+    body: str = Form(""),
+    channel: str = Form("internal"),
+    active: int = Form(1),
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    code = code.strip()
+    row = db.query(NotificationTemplate).filter(NotificationTemplate.code == code).first()
+    if row is None:
+        row = NotificationTemplate(code=code)
+        db.add(row)
+    row.title = title.strip()
+    row.body = body.strip()
+    row.channel = channel.strip() or "internal"
+    row.active = bool(active)
+    from datetime import datetime as _dt
+
+    row.updated_at = _dt.now()
+    db.commit()
+    return RedirectResponse("/admin/notification-templates", status_code=302)
 
 
 @router.get("/refund-approvals.csv")

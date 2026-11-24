@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -26,6 +26,21 @@ class NotificationOutbox(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class NotificationTemplate(Base):
+    """通知模板：管理台维护标题/正文/渠道。"""
+
+    __tablename__ = "notification_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    channel: Mapped[str] = mapped_column(String(20), default="internal", nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class NotificationRead(Base):
