@@ -352,6 +352,13 @@ def dispense_prescription(
         raise ValueError("中药处方不存在")
     if prescription.status != "reviewed":
         raise ValueError("处方未审核，不能发药")
+    # 饮片库存校验：未启用库存（None）的饮片不拦截
+    for item in prescription.items:
+        herb = get_herb(db, item.herb_id)
+        if herb and herb.stock_g is not None:
+            needed = round(item.dose_g * prescription.packs, 2)
+            if herb.stock_g < needed:
+                raise ValueError(f"饮片库存不足：{herb.name} 需要 {needed:g}g，现有 {herb.stock_g:g}g")
     prescription.status = "dispensed"
     prescription.dispense_by = operator
     prescription.dispensed_at = datetime.now()
@@ -360,6 +367,10 @@ def dispense_prescription(
         if header:
             header.status = "dispensing" if prescription.decoct_service == "decoct" else "dispensed"
             header.updated_at = datetime.now()
+    for item in prescription.items:
+        herb = get_herb(db, item.herb_id)
+        if herb and herb.stock_g is not None:
+            herb.stock_g = round(max(0.0, herb.stock_g - item.dose_g * prescription.packs), 2)
     if prescription.decoct_service == "decoct":
         encounter = get_encounter(db, prescription.encounter_id)
         registration = db.get(Registration, encounter.registration_id) if encounter else None

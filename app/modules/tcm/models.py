@@ -22,6 +22,8 @@ class TcmHerb(Base):
     toxicity: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     # 毒性饮片单味剂量上限（g）；0 表示未配置上限
     max_dose_g: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    # 饮片库存（g）；None 表示未启用库存管理
+    stock_g: Mapped[float | None] = mapped_column(nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

@@ -281,3 +281,47 @@ def test_tcm_toxic_herb_dose_limit(client, auth):
     )
     assert response.status_code == 400
     assert "超过上限" in response.json()["detail"]
+
+
+def test_tcm_stock_deduct_and_insufficient_rejected(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    stocked = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-STOCK", "name": "库存饮片", "price_per_g": 0.1, "stock_g": 10},
+        headers=auth["admin"],
+    ).json()
+    response = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={"packs": 2, "items": [{"herb_id": stocked["id"], "dose_g": 8}]},
+        headers=auth["doctor"],
+    )
+    prescription = response.json()
+    # 2 剂 × 8g = 16g，库存只有 10g
+    client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
+    blocked = client.post(
+        f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
+    )
+    assert blocked.status_code == 400
+    assert "库存不足" in blocked.json()["detail"]
+
+
+def test_tcm_stock_is_deducted_on_dispense(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    stocked = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-STOCK2", "name": "库存饮片二", "price_per_g": 0.1, "stock_g": 100},
+        headers=auth["admin"],
+    ).json()
+    prescription = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={"packs": 2, "items": [{"herb_id": stocked["id"], "dose_g": 8}]},
+        headers=auth["doctor"],
+    ).json()
+    client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
+    dispensed = client.post(
+        f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
+    )
+    assert dispensed.status_code == 200, dispensed.text
+    herbs = client.get("/tcm/herbs", headers=auth["pharmacist"]).json()
+    row = next(item for item in herbs if item["id"] == stocked["id"])
+    assert row["stock_g"] == 84
