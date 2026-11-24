@@ -52,6 +52,8 @@ class NursingOrderResponse(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     executed_by: str
+    started_by: str = ""
+    completed_by: str = ""
     adverse_reaction: str | None
     note: str
     created_at: datetime

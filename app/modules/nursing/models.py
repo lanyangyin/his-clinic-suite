@@ -40,6 +40,8 @@ class NursingOrder(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     executed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    started_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    completed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     adverse_reaction: Mapped[str | None] = mapped_column(String(200), nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

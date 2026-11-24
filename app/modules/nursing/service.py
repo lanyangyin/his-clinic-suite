@@ -242,6 +242,7 @@ def start(db: Session, order_id: int, data: StartRequest, operator: str = "") ->
     order.rate_ml_h = data.rate_ml_h
     order.started_at = datetime.now()
     order.executed_by = operator
+    order.started_by = operator
     db.commit()
     db.refresh(order)
     return order
@@ -282,7 +283,7 @@ def complete(
         raise ValueError("只有执行中的执行单可以完成")
     order.status = "completed"
     order.completed_at = datetime.now()
-    order.executed_by = operator
+    order.completed_by = operator
     order.note = data.note or order.note
     order.adverse_reaction = data.adverse_reaction or order.adverse_reaction
     db.commit()

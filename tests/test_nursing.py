@@ -133,6 +133,7 @@ def test_nursing_sync_and_execution(client, auth):
     assert started.status_code == 200
     assert started.json()["status"] == "executing"
     assert started.json()["seat_no"] == "输液-08"
+    assert started.json()["started_by"] == "nurse"
 
     observed = client.post(
         f"/nursing/orders/{infusion['id']}/observe",
@@ -150,6 +151,8 @@ def test_nursing_sync_and_execution(client, auth):
     assert completed.status_code == 200
     assert completed.json()["status"] == "completed"
     assert completed.json()["completed_at"] is not None
+    assert completed.json()["started_by"] == "nurse"
+    assert completed.json()["completed_by"] == "nurse"
 
     detail = client.get(
         f"/nursing/orders/{infusion['id']}/detail", headers=auth["nurse"]
