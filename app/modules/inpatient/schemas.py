@@ -87,7 +87,24 @@ class ChargeResponse(BaseModel):
 class BillResponse(BaseModel):
     admission_id: int
     total_amount: float
+    paid_amount: float = 0
+    balance: float = 0
     charge_count: int
+
+
+class InpatientPaymentCreate(BaseModel):
+    amount: float = Field(gt=0)
+    method: str = "cash"
+
+
+class InpatientPaymentResponse(BaseModel):
+    id: int
+    admission_id: int
+    amount: float
+    method: str
+    operator: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DispenseRequestResponse(BaseModel):

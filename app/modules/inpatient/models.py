@@ -194,3 +194,18 @@ class DischargeMedication(Base):
     @property
     def drug_name(self) -> str:
         return self.drug.name if self.drug else ""
+
+
+class InpatientPayment(Base):
+    """住院账单缴费记录（不替代门诊收费）。"""
+
+    __tablename__ = "inpatient_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    admission_id: Mapped[int] = mapped_column(
+        ForeignKey("admissions.id"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(nullable=False)
+    method: Mapped[str] = mapped_column(String(20), default="cash", nullable=False)
+    operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

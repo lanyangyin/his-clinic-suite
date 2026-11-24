@@ -348,3 +348,11 @@ def test_discharge_medications(client, auth):
     assert dispensed.json()["status"] == "dispensed"
     bill = client.get(f"/admissions/{admission['id']}/bill", headers=auth["doctor"]).json()
     assert bill["total_amount"] >= 10.0
+    paid = client.post(
+        f"/admissions/{admission['id']}/bill/pay",
+        json={"amount": bill["balance"], "method": "cash"},
+        headers=auth["cashier"],
+    )
+    assert paid.status_code == 201, paid.text
+    bill = client.get(f"/admissions/{admission['id']}/bill", headers=auth["doctor"]).json()
+    assert bill["balance"] == 0

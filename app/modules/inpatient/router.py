@@ -13,6 +13,8 @@ from .schemas import (
     ChargeResponse,
     DischargeMedicationCreate,
     DischargeMedicationResponse,
+    InpatientPaymentCreate,
+    InpatientPaymentResponse,
     DispenseRequestResponse,
     ExecuteRequest,
     ExecutionResponse,
@@ -42,6 +44,7 @@ from .service import (
     get_bed,
     get_bill,
     get_charges,
+    pay_bill,
     get_dispense_request,
     get_order,
     get_ward,
@@ -274,6 +277,23 @@ def get_admission_charges(admission_id: int, db: Session = Depends(get_db)):
     if not get_admission(db, admission_id):
         raise HTTPException(status_code=404, detail="住院记录不存在")
     return get_charges(db, admission_id)
+
+
+@router.post(
+    "/admissions/{admission_id}/bill/pay",
+    response_model=InpatientPaymentResponse,
+    status_code=201,
+)
+def pay_admission_bill(
+    admission_id: int,
+    data: InpatientPaymentCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("cashier", "admin")),
+):
+    try:
+        return pay_bill(db, admission_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/admissions/{admission_id}/bill", response_model=BillResponse)

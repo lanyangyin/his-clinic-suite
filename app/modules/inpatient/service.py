@@ -10,6 +10,7 @@ from .models import (
     Admission,
     Bed,
     DischargeMedication,
+    InpatientPayment,
     InpatientCharge,
     InpatientDispenseRequest,
     InpatientOrder,
@@ -287,9 +288,21 @@ def get_charges(db: Session, admission_id: int) -> list[InpatientCharge]:
 def get_bill(db: Session, admission_id: int) -> dict:
     """住院费用汇总（日清单总额）。"""
     charges = get_charges(db, admission_id)
+    total = round(sum(c.amount for c in charges), 2)
+    paid = round(
+        sum(
+            row.amount
+            for row in db.query(InpatientPayment)
+            .filter(InpatientPayment.admission_id == admission_id)
+            .all()
+        ),
+        2,
+    )
     return {
         "admission_id": admission_id,
-        "total_amount": round(sum(c.amount for c in charges), 2),
+        "total_amount": total,
+        "paid_amount": paid,
+        "balance": round(total - paid, 2),
         "charge_count": len(charges),
     }
 
@@ -544,6 +557,25 @@ def dispense_discharge_medication(
             amount=row.amount,
         )
     )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def pay_bill(db: Session, admission_id: int, data, operator: str = "") -> InpatientPayment:
+    admission = get_admission(db, admission_id)
+    if not admission:
+        raise ValueError("住院记录不存在")
+    bill = get_bill(db, admission_id)
+    if data.amount > bill["balance"] + 0.001:
+        raise ValueError(f"缴费金额超过待缴余额 {bill['balance']:.2f}")
+    row = InpatientPayment(
+        admission_id=admission_id,
+        amount=round(data.amount, 2),
+        method=(data.method or "cash").strip(),
+        operator=operator,
+    )
+    db.add(row)
     db.commit()
     db.refresh(row)
     return row
