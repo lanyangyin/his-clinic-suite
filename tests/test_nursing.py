@@ -221,3 +221,13 @@ def test_nursing_high_alert_orders_first(client, auth):
     ).json()
     assert rows[0]["item_name"] == "高警示化疗药", rows
     assert rows[0]["high_alert"] is True
+
+
+def test_nursing_checker_token_issue(client, auth):
+    issued = client.post(
+        "/nursing/checker-tokens",
+        json={"username": "nurse", "password": "nurse123"},
+        headers=auth["nurse"],
+    )
+    assert issued.status_code == 200, issued.text
+    assert len(issued.json()["token"]) == 32

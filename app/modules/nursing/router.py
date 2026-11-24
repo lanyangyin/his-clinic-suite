@@ -5,6 +5,7 @@ from app.database import get_db
 from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import (
+    CheckerTokenRequest,
     CompleteRequest,
     NursingOrderResponse,
     ObserveRequest,
@@ -18,6 +19,7 @@ from .service import (
     complete,
     detail,
     get_order,
+    issue_checker_token,
     list_orders,
     observe,
     prepare,
@@ -39,6 +41,18 @@ def sync(
         return sync_orders(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/checker-tokens")
+def create_checker_token(
+    data: CheckerTokenRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("nurse", "admin")),
+):
+    try:
+        return {"token": issue_checker_token(db, data.username, data.password)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/orders")

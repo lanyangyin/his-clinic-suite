@@ -10,7 +10,7 @@ from app.modules.registration.models import Registration
 from app.modules.staff.models import Doctor
 from app.modules.treatment.models import TreatmentOrder
 
-from .models import NursingObservation, NursingOrder, NursingPreparation
+from .models import NursingCheckerToken, NursingObservation, NursingOrder, NursingPreparation
 from .schemas import (
     CompleteRequest,
     ObserveRequest,
@@ -199,6 +199,7 @@ def prepare(
                 raise ValueError("该执行单尚未发药，不能配药")
 
     checked_by = (data.checked_by or "").strip()
+    token = None
     if order.high_alert:
         if not checked_by:
             raise ValueError("高危药品必须填写第二核对人")
@@ -211,7 +212,20 @@ def prepare(
             raise ValueError("高危药品第二核对人必须是有效的护士账号")
         from app.modules.auth.service import verify_password
 
-        if not data.checker_password or not verify_password(checker, data.checker_password):
+        token = None
+        if data.checker_token:
+            token = (
+                db.query(NursingCheckerToken)
+                .filter(
+                    NursingCheckerToken.token == data.checker_token,
+                    NursingCheckerToken.used.is_(False),
+                    NursingCheckerToken.expires_at > datetime.now(),
+                )
+                .first()
+            )
+            if not token or token.username != checked_by:
+                raise ValueError("高危药品核对令牌无效或已过期")
+        elif not data.checker_password or not verify_password(checker, data.checker_password):
             raise ValueError("高危药品第二核对人密码错误")
     import hashlib
 
@@ -221,6 +235,8 @@ def prepare(
         content = f"{order.id}|{operator}|{checked_by}|{datetime.now().isoformat()}"
         checker_signature = hashlib.sha256(content.encode()).hexdigest()
         checker_signed_at = datetime.now()
+    if token:
+        token.used = True
     row = NursingPreparation(
         order_id=order.id,
         solvent=data.solvent,
@@ -333,3 +349,24 @@ def detail(db: Session, order_id: int) -> dict:
         "preparations": order.preparations,
         "observations": order.observations,
     }
+
+
+def issue_checker_token(db: Session, username: str, password: str) -> str:
+    from app.modules.auth.models import User
+    from app.modules.auth.service import verify_password
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user or user.role not in ("nurse", "admin") or not verify_password(user, password):
+        raise ValueError("核对人账号或密码错误")
+    import secrets
+    from datetime import timedelta
+
+    token = NursingCheckerToken(
+        token=secrets.token_hex(16),
+        username=username,
+        expires_at=datetime.now() + timedelta(minutes=5),
+    )
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+    return token.token

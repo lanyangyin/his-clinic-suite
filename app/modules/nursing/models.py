@@ -89,3 +89,16 @@ class NursingObservation(Base):
     nurse: Mapped[str] = mapped_column(String(50), default="", nullable=False)
 
     order: Mapped[NursingOrder] = relationship(back_populates="observations")
+
+
+class NursingCheckerToken(Base):
+    """高危药品第二核对人的独立短期令牌。"""
+
+    __tablename__ = "nursing_checker_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
