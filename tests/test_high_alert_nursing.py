@@ -64,6 +64,7 @@ def test_high_alert_requires_second_checker(client, auth):
         json={
             "solvent": "0.9%氯化钠", "dose": "1g", "batch_no": "B1",
             "checked_by": "nurse",
+            "checker_password": "nurse123",
         },
         headers=auth["nurse"],
     )
@@ -75,6 +76,7 @@ def test_high_alert_requires_second_checker(client, auth):
         json={
             "solvent": "0.9%氯化钠", "dose": "1g", "batch_no": "B1",
             "checked_by": "second-nurse",
+            "checker_password": "secondpass",
         },
         headers=auth["nurse"],
     )
@@ -85,11 +87,22 @@ def test_high_alert_requires_second_checker(client, auth):
         json={"username": "second-nurse", "password": "secondpass", "role": "nurse"},
         headers=auth["admin"],
     )
+    wrong = client.post(
+        f"/nursing/orders/{order['id']}/prepare",
+        json={
+            "solvent": "0.9%氯化钠", "dose": "1g", "batch_no": "B1",
+            "checked_by": "second-nurse", "checker_password": "wrong",
+        },
+        headers=auth["nurse"],
+    )
+    assert wrong.status_code == 400
+    assert "密码" in wrong.json()["detail"]
     ok = client.post(
         f"/nursing/orders/{order['id']}/prepare",
         json={
             "solvent": "0.9%氯化钠", "dose": "1g", "batch_no": "B1",
             "checked_by": "second-nurse",
+            "checker_password": "secondpass",
         },
         headers=auth["nurse"],
     )

@@ -431,12 +431,16 @@ class NurseWidget(QWidget):
         self.batch_no.setPlaceholderText("药品批号")
         self.checked_by = QLineEdit()
         self.checked_by.setPlaceholderText("核对人")
+        self.checker_password = QLineEdit()
+        self.checker_password.setPlaceholderText("核对人密码（高危药品必填）")
+        self.checker_password.setEchoMode(QLineEdit.Password)
         prep_btn = QPushButton("配药完成")
         prep_btn.clicked.connect(self._prepare_nursing)
         prep.addRow("溶媒", self.solvent)
         prep.addRow("剂量", self.dose)
         prep.addRow("批号", self.batch_no)
         prep.addRow("核对人", self.checked_by)
+        prep.addRow("核对密码", self.checker_password)
         prep.addRow("", prep_btn)
         right_layout.addWidget(prep_box)
 
@@ -559,6 +563,7 @@ class NurseWidget(QWidget):
                     "dose": self.dose.text().strip(),
                     "batch_no": self.batch_no.text().strip(),
                     "checked_by": self.checked_by.text().strip(),
+                    "checker_password": self.checker_password.text(),
                     "expires_minutes": 120,
                 },
             )

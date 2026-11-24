@@ -8,6 +8,7 @@ class PrepareRequest(BaseModel):
     dose: str = Field(default="", max_length=50)
     batch_no: str = Field(default="", max_length=50)
     checked_by: str = Field(default="", max_length=50)
+    checker_password: str = Field(default="", max_length=100)
     expires_minutes: int = Field(default=120, ge=1, le=1440)
     note: str = Field(default="", max_length=200)
 

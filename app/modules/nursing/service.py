@@ -209,6 +209,10 @@ def prepare(
         checker = db.query(User).filter(User.username == checked_by).first()
         if not checker or checker.role not in ("nurse", "admin"):
             raise ValueError("高危药品第二核对人必须是有效的护士账号")
+        from app.modules.auth.service import verify_password
+
+        if not data.checker_password or not verify_password(checker, data.checker_password):
+            raise ValueError("高危药品第二核对人密码错误")
     row = NursingPreparation(
         order_id=order.id,
         solvent=data.solvent,
