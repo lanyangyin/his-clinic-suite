@@ -55,6 +55,9 @@ class TcmStockAdjustment(Base):
     delta_g: Mapped[float] = mapped_column(Float, nullable=False)
     reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="approved", nullable=False)
+    approved_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 

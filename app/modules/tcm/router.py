@@ -23,6 +23,8 @@ from .schemas import (
 from .service import (
     add_stock_batch,
     adjust_stock_batch,
+    approve_stock_adjustment,
+    request_stock_adjustment,
     create_herb,
     create_prescription,
     decoct,
@@ -66,6 +68,33 @@ def adjust_batch(
 ):
     try:
         return adjust_stock_batch(db, batch_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/stock-batches/{batch_id}/adjust-requests", response_model=StockAdjustResponse, status_code=201)
+def request_adjustment(
+    batch_id: int,
+    data: StockAdjustRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist", "admin")),
+):
+    try:
+        return request_stock_adjustment(db, batch_id, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/adjustments/{adjustment_id}/approve", response_model=StockAdjustResponse)
+def approve_adjustment(
+    adjustment_id: int,
+    approve: bool = True,
+    note: str = "",
+    db: Session = Depends(get_db),
+    user=Depends(require_role("director", "admin")),
+):
+    try:
+        return approve_stock_adjustment(db, adjustment_id, approve, user.username, note)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

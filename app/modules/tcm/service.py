@@ -143,6 +143,9 @@ def adjust_stock_batch(
         delta_g=data.delta_g,
         reason=data.reason.strip(),
         operator=operator,
+        status="approved",
+        approved_by=operator,
+        approved_at=datetime.now(),
     )
     db.add(row)
     db.commit()
@@ -156,6 +159,59 @@ def adjust_stock_batch(
         "created_at": row.created_at,
         "quantity_g": batch.quantity_g,
     }
+
+
+def request_stock_adjustment(
+    db: Session, batch_id: int, data: StockAdjustRequest, operator: str = ""
+) -> TcmStockAdjustment:
+    batch = db.get(TcmStockBatch, batch_id)
+    if not batch:
+        raise ValueError("饮片批次不存在")
+    if not data.reason.strip():
+        raise ValueError("请填写调整原因")
+    row = TcmStockAdjustment(
+        batch_id=batch.id,
+        delta_g=data.delta_g,
+        reason=data.reason.strip(),
+        operator=operator,
+        status="pending",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def approve_stock_adjustment(
+    db: Session, adjustment_id: int, approve: bool, reviewer: str, note: str = ""
+) -> TcmStockAdjustment:
+    row = db.get(TcmStockAdjustment, adjustment_id)
+    if not row:
+        raise ValueError("调整申请不存在")
+    if row.status != "pending":
+        raise ValueError("该调整申请已处理")
+    if not approve:
+        row.status = "rejected"
+        row.approved_by = reviewer
+        row.approved_at = datetime.now()
+        if note:
+            row.reason = f"{row.reason}（驳回：{note}）"
+        db.commit()
+        db.refresh(row)
+        return row
+    batch = db.get(TcmStockBatch, row.batch_id)
+    if not batch:
+        raise ValueError("饮片批次不存在")
+    new_qty = round(batch.quantity_g + row.delta_g, 2)
+    if new_qty < 0:
+        raise ValueError(f"调整后库存不能为负：现有 {batch.quantity_g:g}g")
+    batch.quantity_g = new_qty
+    row.status = "approved"
+    row.approved_by = reviewer
+    row.approved_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 def _deduct_batches(db: Session, herb: TcmHerb, needed: float) -> bool:

@@ -49,8 +49,11 @@ class StockAdjustResponse(BaseModel):
     delta_g: float
     reason: str
     operator: str
+    status: str = "approved"
+    approved_by: str = ""
+    approved_at: datetime | None = None
     created_at: datetime
-    quantity_g: float
+    quantity_g: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

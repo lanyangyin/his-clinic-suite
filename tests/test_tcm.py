@@ -429,3 +429,36 @@ def test_tcm_stock_adjust_and_negative_rejected(client, auth):
     )
     assert negative.status_code == 400
     assert "不能为负" in negative.json()["detail"]
+
+
+def test_tcm_adjustment_approval_flow(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-APPROVE", "name": "审批饮片", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    batch = client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "AP-1", "quantity_g": 10},
+        headers=auth["admin"],
+    ).json()
+    requested = client.post(
+        f"/tcm/stock-batches/{batch['id']}/adjust-requests",
+        json={"delta_g": -3, "reason": "盘点报损"},
+        headers=auth["pharmacist"],
+    )
+    assert requested.status_code == 201, requested.text
+    adjustment = requested.json()
+    assert adjustment["status"] == "pending"
+    # 未审批前库存不变
+    batches = client.get(f"/tcm/herbs/{herb['id']}/stock-batches", headers=auth["pharmacist"]).json()
+    assert next(row for row in batches if row["batch_no"] == "AP-1")["quantity_g"] == 10
+    approved = client.post(
+        f"/tcm/adjustments/{adjustment['id']}/approve",
+        params={"approve": "true", "note": "同意"},
+        headers=auth["director"],
+    )
+    assert approved.status_code == 200, approved.text
+    batches = client.get(f"/tcm/herbs/{herb['id']}/stock-batches", headers=auth["pharmacist"]).json()
+    assert next(row for row in batches if row["batch_no"] == "AP-1")["quantity_g"] == 7
