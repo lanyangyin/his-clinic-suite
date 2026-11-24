@@ -213,6 +213,14 @@ def prepare(
 
         if not data.checker_password or not verify_password(checker, data.checker_password):
             raise ValueError("高危药品第二核对人密码错误")
+    import hashlib
+
+    checker_signature = ""
+    checker_signed_at = None
+    if order.high_alert and checked_by:
+        content = f"{order.id}|{operator}|{checked_by}|{datetime.now().isoformat()}"
+        checker_signature = hashlib.sha256(content.encode()).hexdigest()
+        checker_signed_at = datetime.now()
     row = NursingPreparation(
         order_id=order.id,
         solvent=data.solvent,
@@ -220,6 +228,8 @@ def prepare(
         batch_no=data.batch_no,
         prepared_by=operator,
         checked_by=checked_by,
+        checker_signature=checker_signature,
+        checker_signed_at=checker_signed_at,
         expires_at=datetime.now() + timedelta(minutes=data.expires_minutes),
         note=data.note,
     )

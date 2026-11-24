@@ -66,6 +66,8 @@ class NursingPreparation(Base):
     batch_no: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     prepared_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     checked_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    checker_signature: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    checker_signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     prepared_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)

@@ -80,6 +80,8 @@ class PreparationResponse(BaseModel):
     batch_no: str
     prepared_by: str
     checked_by: str
+    checker_signature: str = ""
+    checker_signed_at: datetime | None = None
     prepared_at: datetime
     expires_at: datetime | None
     note: str
