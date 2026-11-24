@@ -20,6 +20,7 @@ def enqueue(
     biz_id: int | None = None,
     channel: str = "internal",
     template_code: str = "",
+    template_vars: dict | None = None,
 ) -> NotificationOutbox:
     if template_code:
         template = (
@@ -31,8 +32,12 @@ def enqueue(
             .first()
         )
         if template:
-            title = template.title or title
-            body = template.body or body
+            values = template_vars or {}
+            try:
+                title = (template.title or title).format(**values)
+                body = (template.body or body).format(**values)
+            except (KeyError, IndexError):
+                pass
             channel = template.channel or channel
     row = NotificationOutbox(
         biz_type=biz_type,
@@ -56,6 +61,7 @@ def notify_role(
     biz_type: str = "",
     biz_id: int | None = None,
     template_code: str = "",
+    template_vars: dict | None = None,
 ) -> None:
     enqueue(
         db,
@@ -66,6 +72,7 @@ def notify_role(
         biz_id=biz_id,
         channel="internal",
         template_code=template_code,
+        template_vars=template_vars,
     )
     from app.modules.integrations.service import get_value
 

@@ -295,6 +295,8 @@ def ensure_request(
         f"{applicant or '系统'} 提交，当前步骤 {steps[0][0]}。",
         biz_type=biz_type,
         biz_id=biz_id,
+        template_code="approval_pending",
+        template_vars={"title": title, "applicant": applicant or "系统", "step": steps[0][0]},
     )
     return request
 
@@ -399,6 +401,8 @@ def advance_request(
             f"{actor} 转交给 {step.assignee or step.role_required}。{note or ''}",
             biz_type=biz_type,
             biz_id=biz_id,
+            template_code="approval_transfer",
+            template_vars={"title": request.title, "actor": actor, "target": step.assignee or step.role_required, "note": note or ""},
         )
         return "transferred"
 
@@ -454,6 +458,8 @@ def advance_request(
             f"上一环节 {actor} 已通过，进入第 {next_step.step_no} 步。",
             biz_type=biz_type,
             biz_id=biz_id,
+            template_code="approval_pending",
+            template_vars={"title": request.title, "applicant": actor, "step": next_step.step_no},
         )
         return "pending"
     request.status = "approved"
@@ -538,6 +544,8 @@ def escalate_due(db: Session, actor: str) -> int:
             f"已超过审批时限，升级至院长处理。",
             biz_type=request.biz_type,
             biz_id=request.biz_id,
+            template_code="approval_escalate",
+            template_vars={"title": request.title},
         )
     db.commit()
     return len(rows)
