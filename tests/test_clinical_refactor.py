@@ -586,3 +586,14 @@ def test_catalog_approval_action_commits_step(client, auth):
         headers=auth["pharmacist"],
     ).json()
     assert request["current_step"] == 2
+
+
+def test_admin_notification_page(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/notifications")
+    assert page.status_code == 200, page.text
+    assert "通知中心" in page.text

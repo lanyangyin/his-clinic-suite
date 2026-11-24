@@ -138,6 +138,8 @@ from app.modules.warehouse.service import (
 from app.modules.encounter.service import list_record_revisions, review_record_revision
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
+from app.modules.notify.models import NotificationOutbox
+from app.modules.notify.service import dispatch_pending, retry_failed
 from app.modules.pacs.service import list_templates as list_imaging_templates
 from app.modules.publichealth.service import PublicHealthUnavailable
 from app.modules.publichealth.service import list_reports as list_public_health_reports
@@ -325,6 +327,43 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             recent_logs=list_recent_audit_logs(db, 5),
         ),
     )
+
+
+@router.get("/notifications", response_class=HTMLResponse)
+def notifications_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = (
+        db.query(NotificationOutbox)
+        .order_by(NotificationOutbox.id.desc())
+        .limit(200)
+        .all()
+    )
+    return templates.TemplateResponse(
+        request, "notifications.html", _ctx(request, notifications=rows)
+    )
+
+
+@router.post("/notifications/dispatch")
+def notifications_dispatch(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    result = dispatch_pending(db)
+    return RedirectResponse(
+        f"/admin/notifications?dispatched={result['sent']}&failed={result['failed']}",
+        status_code=302,
+    )
+
+
+@router.post("/notifications/retry")
+def notifications_retry(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    count = retry_failed(db)
+    return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
 
 
 @router.get("/master/departments", response_class=HTMLResponse)

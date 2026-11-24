@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}通知中心 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>通知中心</h2>
+<div class="panel">
+  {% if request.query_params.get('dispatched') is not none %}
+  <div class="ok">派发完成：成功 {{ request.query_params.get('dispatched') }}，失败 {{ request.query_params.get('failed') }}</div>
+  {% endif %}
+  {% if request.query_params.get('retried') is not none %}
+  <div class="ok">已重置 {{ request.query_params.get('retried') }} 条失败通知</div>
+  {% endif %}
+  <form class="inline" method="post" action="/admin/notifications/dispatch">
+    <button type="submit">立即派发</button>
+  </form>
+  <form class="inline" method="post" action="/admin/notifications/retry">
+    <button type="submit">重试到期失败</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>标题</th><th>收件人</th><th>渠道</th><th>状态</th><th>尝试</th><th>最后错误</th><th>创建时间</th></tr>
+    {% for row in notifications %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.title }}</td>
+      <td>{{ row.recipient }}</td>
+      <td>{{ row.channel }}</td>
+      <td>{{ row.status }}</td>
+      <td>{{ row.attempts }}</td>
+      <td>{{ row.last_error }}</td>
+      <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无通知</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
