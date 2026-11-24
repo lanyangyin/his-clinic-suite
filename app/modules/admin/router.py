@@ -141,6 +141,8 @@ from app.modules.encounter.service import list_record_revisions, review_record_r
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox, NotificationTemplate
+from app.modules.tcm.models import TcmStockAdjustment
+from app.modules.tcm.service import approve_stock_adjustment
 from app.modules.billing.models import RefundApproval
 from app.modules.patient.models import PatientMergeRequest
 from app.modules.patient.service import review_merge_request
@@ -369,6 +371,40 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/tcm-adjustments", response_class=HTMLResponse)
+def tcm_adjustments_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = (
+        db.query(TcmStockAdjustment)
+        .order_by(TcmStockAdjustment.id.desc())
+        .limit(200)
+        .all()
+    )
+    return templates.TemplateResponse(
+        request, "tcm_adjustments.html", _ctx(request, rows=rows)
+    )
+
+
+@router.post("/tcm-adjustments/{adjustment_id}/review")
+def tcm_adjustment_review(
+    adjustment_id: int,
+    approve: int = Form(...),
+    note: str = Form(""),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        approve_stock_adjustment(db, adjustment_id, bool(approve), "admin", note)
+    except ValueError:
+        pass
+    return RedirectResponse("/admin/tcm-adjustments", status_code=302)
 
 
 @router.get("/notification-templates", response_class=HTMLResponse)

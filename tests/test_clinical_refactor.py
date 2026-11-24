@@ -650,3 +650,14 @@ def test_admin_notification_templates_page(client, auth):
     assert created.status_code == 302
     page = client.get("/admin/notification-templates")
     assert "report_ready" in page.text
+
+
+def test_admin_tcm_adjustments_page(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/tcm-adjustments")
+    assert page.status_code == 200, page.text
+    assert "中药盘点调整审批" in page.text

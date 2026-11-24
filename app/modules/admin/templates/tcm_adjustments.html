@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}中药盘点审批 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>中药盘点调整审批</h2>
+<div class="panel">
+  <table>
+    <tr><th>ID</th><th>批次</th><th>增减(g)</th><th>原因</th><th>申请人</th><th>状态</th><th>审批人</th><th>操作</th></tr>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.id }}</td>
+      <td>{{ row.batch_id }}</td>
+      <td>{{ '%.2f'|format(row.delta_g) }}</td>
+      <td>{{ row.reason }}</td>
+      <td>{{ row.operator }}</td>
+      <td>{{ row.status }}</td>
+      <td>{{ row.approved_by }}</td>
+      <td>
+        {% if row.status == 'pending' %}
+        <form method="post" action="/admin/tcm-adjustments/{{ row.id }}/review" style="display:inline">
+          <input type="hidden" name="approve" value="1">
+          <input type="hidden" name="note" value="管理台批准">
+          <button type="submit">批准</button>
+        </form>
+        <form method="post" action="/admin/tcm-adjustments/{{ row.id }}/review" style="display:inline">
+          <input type="hidden" name="approve" value="0">
+          <input type="hidden" name="note" value="管理台驳回">
+          <button type="submit">驳回</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">暂无盘点调整</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
