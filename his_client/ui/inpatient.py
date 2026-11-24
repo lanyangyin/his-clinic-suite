@@ -1,6 +1,9 @@
 """住院工作站：在院列表、医嘱查看、出院。"""
 from PySide6.QtWidgets import (
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
+    QSpinBox,
     QLabel,
     QPushButton,
     QSplitter,
@@ -36,6 +39,22 @@ class InpatientWidget(QWidget):
         if role in ("doctor", "admin"):
             top.addWidget(discharge)
         layout.addLayout(top)
+        if role == "admin":
+            admit_box = QGroupBox("入院登记")
+            admit_form = QFormLayout(admit_box)
+            self.admit_patient = QSpinBox()
+            self.admit_patient.setRange(0, 100_000_000)
+            self.admit_doctor = QSpinBox()
+            self.admit_doctor.setRange(0, 100_000_000)
+            self.admit_bed = QSpinBox()
+            self.admit_bed.setRange(0, 100_000_000)
+            admit_btn = QPushButton("办理入院")
+            admit_btn.clicked.connect(self._admit)
+            admit_form.addRow("患者 ID", self.admit_patient)
+            admit_form.addRow("医生 ID", self.admit_doctor)
+            admit_form.addRow("床位 ID", self.admit_bed)
+            admit_form.addRow("", admit_btn)
+            layout.addWidget(admit_box)
         splitter = QSplitter(Qt.Vertical)
         self.admission_table = QTableWidget(0, 5)
         self.admission_table.setHorizontalHeaderLabels(
@@ -89,6 +108,21 @@ class InpatientWidget(QWidget):
             ]
             for j, value in enumerate(values):
                 self.order_table.setItem(i, j, QTableWidgetItem(str(value)))
+
+    def _admit(self) -> None:
+        patient_id = self.admit_patient.value()
+        doctor_id = self.admit_doctor.value()
+        bed_id = self.admit_bed.value()
+        if not patient_id or not doctor_id or not bed_id:
+            self.msg.setText("请填写患者、医生、床位 ID")
+            return
+        try:
+            self.api.create_inpatient_admission(patient_id, doctor_id, bed_id)
+        except ApiError as e:
+            self.msg.setText(f"入院失败：{e.detail}")
+            return
+        self._load()
+        self.msg.setText("入院办理完成")
 
     def _discharge(self) -> None:
         row = self.admission_table.currentRow()

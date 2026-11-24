@@ -30,6 +30,9 @@ class _NoopApi:
     def list_inpatient_orders(self, admission_id):
         return []
 
+    def create_inpatient_admission(self, patient_id, doctor_id, bed_id):
+        return {"id": 1}
+
     def list_tcm_stock_batches(self):
         return []
 
@@ -55,6 +58,13 @@ def test_admin_tcm_has_adjust_approval_tab(qapp):
 
 def test_inpatient_widget_has_lists(qapp):
     widget = InpatientWidget(_NoopApi(), role="doctor")
+    assert not hasattr(widget, "admit_patient")
     assert widget.admission_table.columnCount() == 5
     assert widget.order_table.columnCount() == 5
     assert widget.admission_table.rowCount() == 0
+
+
+def test_admin_inpatient_has_admit_form(qapp):
+    widget = InpatientWidget(_NoopApi(), role="admin")
+    assert hasattr(widget, "admit_patient")
+    assert widget.admit_patient.value() == 0

@@ -679,6 +679,15 @@ class ApiClient:
         params = {"status": status} if status else None
         return self._request("GET", "/admissions/", params=params)
 
+    def create_inpatient_admission(
+        self, patient_id: int, doctor_id: int, bed_id: int
+    ) -> dict:
+        return self._request(
+            "POST",
+            "/admissions/",
+            json={"patient_id": patient_id, "doctor_id": doctor_id, "bed_id": bed_id},
+        )
+
     def list_inpatient_orders(self, admission_id: int) -> list:
         return self._request("GET", f"/admissions/{admission_id}/orders")
 
