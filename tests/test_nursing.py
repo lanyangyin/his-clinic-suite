@@ -231,3 +231,9 @@ def test_nursing_checker_token_issue(client, auth):
     )
     assert issued.status_code == 200, issued.text
     assert len(issued.json()["token"]) == 32
+    denied = client.post(
+        "/nursing/checker-tokens",
+        json={"username": "nurse", "password": "bad"},
+        headers=auth["nurse"],
+    )
+    assert denied.status_code == 400
