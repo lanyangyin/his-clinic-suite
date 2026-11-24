@@ -200,6 +200,24 @@ class ApiClient:
             json={"card_uid": card_uid, "note": note},
         )
 
+    def create_patient_merge_request(
+        self, source_id: int, target_id: int, reason: str
+    ) -> dict:
+        return self._request(
+            "POST",
+            "/patients/merge-requests",
+            json={"source_id": source_id, "target_id": target_id, "reason": reason},
+        )
+
+    def merge_patient_direct(
+        self, source_id: int, target_id: int, reason: str
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/patients/{source_id}/merge",
+            json={"target_id": target_id, "reason": reason},
+        )
+
     def check_patient_duplicates(
         self, name: str = "", id_number: str = "", phone: str = ""
     ) -> dict:

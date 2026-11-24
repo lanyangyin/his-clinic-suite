@@ -37,6 +37,7 @@ from his_client.ui.sidebar_tabs import SidebarTabs
 from his_client.ui.patient_banner import PatientBanner
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.mixed_payment_dialog import MixedPaymentDialog
+from his_client.ui.patient_merge import PatientMergeDialog
 from his_client.ui.birth_age import BirthAgeEditor, age_text, parse_id_birth
 
 
@@ -222,6 +223,13 @@ class CashierWidget(QWidget):
         self.patient_table.cellDoubleClicked.connect(self._patient_to_registration)
         self.patient_table.setColumnHidden(0, True)
         layout.addWidget(self.patient_table)
+        if self.role in ("admin", "director"):
+            merge_row = QHBoxLayout()
+            merge_btn = QPushButton("合并患者档案")
+            merge_btn.clicked.connect(self._open_patient_merge)
+            merge_row.addWidget(merge_btn)
+            merge_row.addStretch(1)
+            layout.addLayout(merge_row)
         self.patient_rows: list[dict] = []
 
         self.patient_msg = QLabel("")
@@ -230,6 +238,16 @@ class CashierWidget(QWidget):
         self.p_id_number.editingFinished.connect(self._derive_patient_fields)
         self.p_id_type.currentIndexChanged.connect(self._on_id_type_changed)
         return page
+
+    def _open_patient_merge(self) -> None:
+        row = self.patient_table.currentRow()
+        source_id = None
+        if 0 <= row < len(self.patient_rows):
+            source_id = self.patient_rows[row].get("id")
+        dialog = PatientMergeDialog(self.api, self.role, source_id, self)
+        if dialog.exec():
+            self.patient_msg.setText("患者合并已提交/完成")
+            self._query_patients()
 
     def _on_id_type_changed(self) -> None:
         has_id = self.p_id_type.currentData() != "none"
