@@ -82,7 +82,7 @@ def _clinic_meta() -> dict:
     }
 
 
-def _collect(db: Session, encounter_id: int) -> dict:
+def _collect(db: Session, encounter_id: int, operator: str = "") -> dict:
     encounter = get_encounter(db, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
@@ -173,6 +173,7 @@ def _collect(db: Session, encounter_id: int) -> dict:
         ),
         "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
         "printed_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "printed_by": operator or "打印终端",
         "lines": lines,
         "total": round(total, 2),
         "tcm": _tcm_prescriptions(db, encounter_id),
@@ -495,7 +496,7 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
 def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
     print_count = _log_print(db, user, "prescription", encounter_id)
     try:
-        data = _collect(db, encounter_id)
+        data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return HTMLResponse(_with_reprint_banner(render_full_set(data), print_count))
@@ -505,7 +506,7 @@ def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=De
 def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
     print_count = _log_print(db, user, "medical-record", encounter_id)
     try:
-        data = _collect(db, encounter_id)
+        data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return HTMLResponse(_with_reprint_banner(render_record(data), print_count))
@@ -515,7 +516,7 @@ def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=
 def print_western(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
     print_count = _log_print(db, user, "western-prescription", encounter_id)
     try:
-        data = _collect(db, encounter_id)
+        data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return HTMLResponse(_with_reprint_banner(render_western(data), print_count))
@@ -525,7 +526,7 @@ def print_western(encounter_id: int, db: Session = Depends(get_db), user=Depends
 def print_tcm(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
     print_count = _log_print(db, user, "tcm-prescription", encounter_id)
     try:
-        data = _collect(db, encounter_id)
+        data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return HTMLResponse(_with_reprint_banner(render_tcm(data), print_count))
