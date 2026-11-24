@@ -15,11 +15,14 @@ from .schemas import (
     PrescriptionItemUpdate,
     PrescriptionResponse,
     SoakRequest,
+    StockAdjustRequest,
+    StockAdjustResponse,
     StockBatchCreate,
     StockBatchResponse,
 )
 from .service import (
     add_stock_batch,
+    adjust_stock_batch,
     create_herb,
     create_prescription,
     decoct,
@@ -50,6 +53,19 @@ def new_herb(
 ):
     try:
         return create_herb(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/stock-batches/{batch_id}/adjust", response_model=StockAdjustResponse)
+def adjust_batch(
+    batch_id: int,
+    data: StockAdjustRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin", "pharmacist")),
+):
+    try:
+        return adjust_stock_batch(db, batch_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

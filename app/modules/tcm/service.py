@@ -16,6 +16,7 @@ from .models import (
     TcmHerb,
     TcmPrescription,
     TcmPrescriptionItem,
+    TcmStockAdjustment,
     TcmStockBatch,
 )
 from .schemas import (
@@ -25,6 +26,7 @@ from .schemas import (
     PackageRequest,
     PrescriptionCreate,
     SoakRequest,
+    StockAdjustRequest,
     StockBatchCreate,
 )
 
@@ -124,6 +126,36 @@ def list_all_stock_batches(db: Session, herb_id: int | None = None) -> list[dict
         }
         for batch, herb in rows
     ]
+
+
+def adjust_stock_batch(
+    db: Session, batch_id: int, data: StockAdjustRequest, operator: str = ""
+) -> dict:
+    batch = db.get(TcmStockBatch, batch_id)
+    if not batch:
+        raise ValueError("饮片批次不存在")
+    new_qty = round(batch.quantity_g + data.delta_g, 2)
+    if new_qty < 0:
+        raise ValueError(f"调整后库存不能为负：现有 {batch.quantity_g:g}g")
+    batch.quantity_g = new_qty
+    row = TcmStockAdjustment(
+        batch_id=batch.id,
+        delta_g=data.delta_g,
+        reason=data.reason.strip(),
+        operator=operator,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "batch_id": batch.id,
+        "delta_g": row.delta_g,
+        "reason": row.reason,
+        "operator": row.operator,
+        "created_at": row.created_at,
+        "quantity_g": batch.quantity_g,
+    }
 
 
 def _deduct_batches(db: Session, herb: TcmHerb, needed: float) -> bool:

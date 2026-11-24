@@ -38,6 +38,22 @@ class StockBatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class StockAdjustRequest(BaseModel):
+    delta_g: float
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class StockAdjustResponse(BaseModel):
+    id: int
+    batch_id: int
+    delta_g: float
+    reason: str
+    operator: str
+    created_at: datetime
+    quantity_g: float
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PrescriptionItemCreate(BaseModel):
     herb_id: int
     dose_g: float = Field(gt=0, le=1000)

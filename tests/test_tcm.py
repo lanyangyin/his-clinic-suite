@@ -401,3 +401,31 @@ def test_tcm_batch_trace_list(client, auth):
     assert row["herb_name"] == "追溯饮片"
     assert row["quantity_g"] == 12
     assert row["expired"] is False
+
+
+def test_tcm_stock_adjust_and_negative_rejected(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-ADJ", "name": "调整饮片", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    batch = client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "ADJ-1", "quantity_g": 10},
+        headers=auth["admin"],
+    ).json()
+    adjusted = client.post(
+        f"/tcm/stock-batches/{batch['id']}/adjust",
+        json={"delta_g": -3, "reason": "盘点报损"},
+        headers=auth["pharmacist"],
+    )
+    assert adjusted.status_code == 200, adjusted.text
+    assert adjusted.json()["quantity_g"] == 7
+    negative = client.post(
+        f"/tcm/stock-batches/{batch['id']}/adjust",
+        json={"delta_g": -8, "reason": "超量报损"},
+        headers=auth["pharmacist"],
+    )
+    assert negative.status_code == 400
+    assert "不能为负" in negative.json()["detail"]

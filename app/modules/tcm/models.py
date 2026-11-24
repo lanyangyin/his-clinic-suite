@@ -45,6 +45,19 @@ class TcmStockBatch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
+class TcmStockAdjustment(Base):
+    """饮片库存调整/报损审计。"""
+
+    __tablename__ = "tcm_stock_adjustments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("tcm_stock_batches.id"), nullable=False, index=True)
+    delta_g: Mapped[float] = mapped_column(Float, nullable=False)
+    reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
 class TcmPrescription(Base):
     __tablename__ = "tcm_prescriptions"
 
