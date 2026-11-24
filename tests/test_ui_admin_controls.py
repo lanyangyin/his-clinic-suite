@@ -34,6 +34,7 @@ class _NoopApi:
         return {"total_amount": 10.0, "paid_amount": 0.0, "balance": 10.0, "charge_count": 1}
 
     def pay_inpatient_bill(self, admission_id, amount, method="cash"):
+        self.paid = (admission_id, amount)
         return {"id": 1}
 
     def create_inpatient_admission(self, patient_id, doctor_id, bed_id):
@@ -79,3 +80,17 @@ def test_admin_inpatient_has_admit_form(qapp):
     assert widget.admit_patient.value() == 0
     assert hasattr(widget, "takehome_drug")
     assert hasattr(widget, "pay_amount")
+
+
+def test_admin_inpatient_bill_payment_ui(qapp):
+    api = _NoopApi()
+    api.list_inpatient_admissions = lambda: [
+        {"id": 7, "patient_id": 1, "doctor_id": 2, "bed_id": 3, "status": "in"}
+    ]
+    widget = InpatientWidget(api, role="admin")
+    widget.admission_table.setCurrentCell(0, 0)
+    widget._select(0, 0)
+    assert "总费用" in widget.bill_label.text()
+    assert widget.pay_amount.value() == 10.0
+    widget._pay_bill()
+    assert api.paid == (7, 10.0)
