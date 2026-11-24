@@ -51,6 +51,11 @@ def void_invoice(
     _check_owner(payment, operator, allow_all)
     if payment.invoice_status == "void":
         raise ValueError("发票已作废")
+    from app import settings
+
+    threshold = getattr(settings, "INVOICE_VOID_APPROVAL_THRESHOLD", 500)
+    if threshold > 0 and payment.amount >= threshold and not allow_all:
+        raise ValueError(f"发票金额 {payment.amount:.2f} 达到 {threshold:.2f}，需院长/管理员审批")
     if not reason.strip():
         raise ValueError("请填写作废原因")
     payment.invoice_status = "void"

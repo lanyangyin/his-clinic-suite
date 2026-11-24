@@ -78,11 +78,11 @@ def void_invoice_route(
     payment_id: int,
     data: InvoiceVoid,
     db: Session = Depends(get_db),
-    user=Depends(require_role("cashier", "admin")),
+    user=Depends(require_role("cashier", "admin", "director")),
 ):
     try:
         payment = void_invoice(
-            db, payment_id, data.reason, user.username, user.role == "admin"
+            db, payment_id, data.reason, user.username, user.role in ("admin", "director")
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

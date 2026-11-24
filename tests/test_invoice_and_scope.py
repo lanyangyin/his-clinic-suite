@@ -8,7 +8,7 @@ def _basic(username, password):
     return {"Authorization": f"Basic {token}"}
 
 
-def _sale(client, auth, suffix):
+def _sale(client, auth, suffix, price=15):
     dept = client.post(
         "/departments/", json={"name": f"隔离科{suffix}"}, headers=auth["admin"]
     ).json()
@@ -33,7 +33,7 @@ def _sale(client, auth, suffix):
         headers=auth["doctor"],
     ).json()
     drug = client.post(
-        "/drugs/", json={"name": f"隔离药{suffix}", "base_price": 15},
+        "/drugs/", json={"name": f"隔离药{suffix}", "base_price": price},
         headers=auth["admin"],
     ).json()
     client.post(
@@ -194,3 +194,24 @@ def test_invoice_batch_overlap_across_cashiers_rejected(client, auth):
     )
     assert second.status_code == 400
     assert "重叠" in second.json()["detail"]
+
+
+def test_large_invoice_void_needs_admin(client, auth):
+    encounter = _sale(client, auth, "05", price=600)
+    payment = client.post(
+        "/payments/", json={"encounter_id": encounter["id"], "channel": "cash"},
+        headers=auth["cashier"],
+    ).json()
+    blocked = client.post(
+        f"/invoices/payments/{payment['id']}/void",
+        json={"reason": "大额作废"},
+        headers=auth["cashier"],
+    )
+    assert blocked.status_code == 400
+    assert "审批" in blocked.json()["detail"]
+    allowed = client.post(
+        f"/invoices/payments/{payment['id']}/void",
+        json={"reason": "大额作废"},
+        headers=auth["admin"],
+    )
+    assert allowed.status_code == 200, allowed.text
