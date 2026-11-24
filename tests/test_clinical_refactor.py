@@ -464,6 +464,10 @@ def test_approval_notifications(client, auth, monkeypatch):
     note_id = notes[0]["id"]
     read = client.post(f"/notifications/{note_id}/read", headers=auth["pharmacist"])
     assert read.status_code == 200, read.text
+    after = client.get("/notifications", headers=auth["pharmacist"]).json()
+    row = next(item for item in after if item["id"] == note_id)
+    assert row["read_at"] is not None
+    assert row["status"] != "read"  # 送达状态不与已读混用
 
 
 def test_narcotic_inventory_difference(client, auth):

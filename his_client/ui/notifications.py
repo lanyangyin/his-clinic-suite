@@ -61,14 +61,14 @@ class NotificationWidget(QWidget):
             ]
             for j, value in enumerate(values):
                 self.table.setItem(i, j, QTableWidgetItem(str(value)))
-        unread = sum(1 for row in self.rows if row.get("status") == "pending")
+        unread = sum(1 for row in self.rows if not row.get("read_at"))
         self.msg.setText(f"共 {len(self.rows)} 条，待读 {unread} 条")
 
     def _read(self, row: int, _col: int) -> None:
         if not 0 <= row < len(self.rows):
             return
         item = self.rows[row]
-        if item.get("status") == "pending":
+        if not item.get("read_at"):
             try:
                 self.api.read_notification(item["id"])
             except ApiError as e:

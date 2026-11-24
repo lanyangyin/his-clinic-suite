@@ -25,6 +25,7 @@ def my_notifications(
             "biz_type": row.biz_type,
             "biz_id": row.biz_id,
             "created_at": row.created_at,
+            "read_at": row.read_at,
         }
         for row in rows
     ]

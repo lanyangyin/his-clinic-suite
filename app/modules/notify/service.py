@@ -139,7 +139,7 @@ def mark_read(db: Session, notification_id: int, user) -> NotificationOutbox:
         raise ValueError("通知不存在")
     if user.role != "admin" and row.recipient not in (f"role:{user.role}", user.username):
         raise ValueError("无权操作该通知")
-    row.status = "read"
+    # 已读是独立时间语义，不覆盖 outbox 的送达状态
     row.read_at = datetime.now()
     db.commit()
     db.refresh(row)
@@ -149,7 +149,7 @@ def mark_read(db: Session, notification_id: int, user) -> NotificationOutbox:
 def retry_failed(db: Session) -> int:
     rows = (
         db.query(NotificationOutbox)
-        .filter(NotificationOutbox.status == "failed")
+        .filter(NotificationOutbox.status == "failed", NotificationOutbox.attempts < 3)
         .all()
     )
     for row in rows:
