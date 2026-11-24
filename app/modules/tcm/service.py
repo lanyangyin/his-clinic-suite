@@ -460,6 +460,12 @@ def package(db: Session, order_id: int, data: PackageRequest, operator: str = ""
             )
         )
     prescription.status = "completed"
+    # 代煎处方头也必须结束“调配中”，否则处方中心/打印长期显示未完成
+    if prescription.prescription_id:
+        header = db.get(Prescription, prescription.prescription_id)
+        if header:
+            header.status = "dispensed"
+            header.updated_at = datetime.now()
     db.commit()
     db.refresh(order)
     return order

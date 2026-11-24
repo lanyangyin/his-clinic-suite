@@ -127,6 +127,12 @@ def test_tcm_prescription_and_decoction_flow(client, auth):
     assert body["bags"] == 6
     assert len(body["bags_list"]) == 6
     assert "中药患者" in body["bags_list"][0]["label"]
+    headers = client.get(
+        f"/encounters/{body['encounter_id']}/prescriptions/headers",
+        headers=auth["pharmacist"],
+    ).json()
+    header = next(row for row in headers if row["id"] == prescription["prescription_id"])
+    assert header["status"] == "dispensed", header
 
     issued = client.post(
         f"/tcm/decoction-orders/{order['id']}/issue",
