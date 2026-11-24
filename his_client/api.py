@@ -675,6 +675,16 @@ class ApiClient:
         params = {"herb_id": herb_id} if herb_id else None
         return self._request("GET", "/tcm/stock-batches", params=params)
 
+    def list_tcm_adjustments(self, status: str = "pending") -> list:
+        return self._request("GET", "/tcm/adjustments", params={"status": status})
+
+    def approve_tcm_adjustment(self, adjustment_id: int, approve: bool, note: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/tcm/adjustments/{adjustment_id}/approve",
+            params={"approve": str(approve).lower(), "note": note},
+        )
+
     def adjust_tcm_stock_batch(self, batch_id: int, delta_g: float, reason: str) -> dict:
         return self._request(
             "POST",

@@ -161,6 +161,26 @@ def adjust_stock_batch(
     }
 
 
+def list_stock_adjustments(db: Session, status: str | None = "pending") -> list[dict]:
+    query = db.query(TcmStockAdjustment)
+    if status:
+        query = query.filter(TcmStockAdjustment.status == status)
+    rows = query.order_by(TcmStockAdjustment.id.desc()).limit(200).all()
+    return [
+        {
+            "id": row.id,
+            "batch_id": row.batch_id,
+            "delta_g": row.delta_g,
+            "reason": row.reason,
+            "operator": row.operator,
+            "status": row.status,
+            "approved_by": row.approved_by,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
+
+
 def request_stock_adjustment(
     db: Session, batch_id: int, data: StockAdjustRequest, operator: str = ""
 ) -> TcmStockAdjustment:

@@ -66,6 +66,8 @@ class TcmWidget(QWidget):
             tabs.addTab(self._build_decoction_tab(), "煎药室")
         if role in ("pharmacist", "admin"):
             tabs.addTab(self._build_batches_tab(), "批次库存")
+        if role == "admin":
+            tabs.addTab(self._build_adjust_approval_tab(), "盘点审批")
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
         layout.addWidget(tabs)
@@ -481,6 +483,65 @@ class TcmWidget(QWidget):
         self.batch_reason.clear()
         self._load_batches()
         self.batch_msg.setText(f"调整完成，当前库存 {result['quantity_g']:g}g")
+
+    def _build_adjust_approval_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新待审")
+        refresh.clicked.connect(self._load_adjustments)
+        self.adjust_msg = QLabel("")
+        top.addWidget(refresh)
+        top.addWidget(self.adjust_msg, 1)
+        layout.addLayout(top)
+        self.adjust_table = QTableWidget(0, 5)
+        self.adjust_table.setHorizontalHeaderLabels(["ID", "批次", "增减(g)", "原因", "申请人"])
+        self.adjust_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.adjust_table, 1)
+        actions = QHBoxLayout()
+        approve = QPushButton("批准选中")
+        approve.clicked.connect(lambda: self._review_adjustment(True))
+        reject = QPushButton("驳回选中")
+        reject.clicked.connect(lambda: self._review_adjustment(False))
+        actions.addWidget(approve)
+        actions.addWidget(reject)
+        actions.addStretch(1)
+        layout.addLayout(actions)
+        self._load_adjustments()
+        return page
+
+    def _load_adjustments(self) -> None:
+        try:
+            rows = self.api.list_tcm_adjustments()
+        except ApiError as e:
+            self.adjust_msg.setText(f"加载失败：{e.detail}")
+            return
+        self.adjust_rows = rows
+        self.adjust_table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            values = [
+                str(row.get("id")),
+                str(row.get("batch_id")),
+                f"{row.get('delta_g', 0):g}",
+                row.get("reason") or "",
+                row.get("operator") or "",
+            ]
+            for j, value in enumerate(values):
+                self.adjust_table.setItem(i, j, QTableWidgetItem(value))
+        self.adjust_msg.setText(f"待审 {len(rows)} 条")
+
+    def _review_adjustment(self, approve: bool) -> None:
+        row = self.adjust_table.currentRow()
+        if not 0 <= row < len(getattr(self, "adjust_rows", [])):
+            self.adjust_msg.setText("请先选择一条申请")
+            return
+        try:
+            self.api.approve_tcm_adjustment(self.adjust_rows[row]["id"], approve, "桌面端审批")
+        except ApiError as e:
+            self.adjust_msg.setText(f"审批失败：{e.detail}")
+            return
+        self._load_adjustments()
+        self.adjust_msg.setText("已批准" if approve else "已驳回")
 
     def _build_decoction_tab(self) -> QWidget:
         page = QWidget()

@@ -451,6 +451,8 @@ def test_tcm_adjustment_approval_flow(client, auth):
     assert requested.status_code == 201, requested.text
     adjustment = requested.json()
     assert adjustment["status"] == "pending"
+    pending = client.get("/tcm/adjustments", headers=auth["admin"]).json()
+    assert any(row["id"] == adjustment["id"] for row in pending)
     # 未审批前库存不变
     batches = client.get(f"/tcm/herbs/{herb['id']}/stock-batches", headers=auth["pharmacist"]).json()
     assert next(row for row in batches if row["batch_no"] == "AP-1")["quantity_g"] == 10

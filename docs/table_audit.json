@@ -690,6 +690,13 @@
           "editable_columns": null,
           "edit_triggers": 0,
           "object_name": ""
+        },
+        {
+          "type": "ReadOnlyTable",
+          "allow_cell_edit": false,
+          "editable_columns": null,
+          "edit_triggers": 0,
+          "object_name": ""
         }
       ],
       "errors": []
@@ -1518,6 +1525,6 @@
     }
   ],
   "errors": [],
-  "total_tables": 204,
+  "total_tables": 205,
   "allowed_tables": 2
 }

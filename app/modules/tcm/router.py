@@ -35,6 +35,7 @@ from .service import (
     list_decoctions,
     list_all_stock_batches,
     list_herbs,
+    list_stock_adjustments,
     list_prescriptions,
     list_stock_batches,
     package,
@@ -70,6 +71,15 @@ def adjust_batch(
         return adjust_stock_batch(db, batch_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/adjustments")
+def adjustments(
+    status: str | None = "pending",
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "director")),
+):
+    return list_stock_adjustments(db, status)
 
 
 @router.post("/stock-batches/{batch_id}/adjust-requests", response_model=StockAdjustResponse, status_code=201)
