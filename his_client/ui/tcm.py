@@ -423,6 +423,20 @@ class TcmWidget(QWidget):
         )
         self.batch_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.batch_table, 1)
+        adjust_row = QHBoxLayout()
+        self.batch_delta = QDoubleSpinBox()
+        self.batch_delta.setRange(-100000, 100000)
+        self.batch_delta.setDecimals(2)
+        self.batch_delta.setSuffix(" g")
+        self.batch_reason = QLineEdit()
+        self.batch_reason.setPlaceholderText("盘点/报损原因")
+        adjust = QPushButton("调整选中批次")
+        adjust.clicked.connect(self._adjust_batch)
+        adjust_row.addWidget(QLabel("增减"))
+        adjust_row.addWidget(self.batch_delta)
+        adjust_row.addWidget(self.batch_reason, 1)
+        adjust_row.addWidget(adjust)
+        layout.addLayout(adjust_row)
         self._load_batches()
         return page
 
@@ -432,6 +446,7 @@ class TcmWidget(QWidget):
         except ApiError as e:
             self.batch_msg.setText(f"加载失败：{e.detail}")
             return
+        self.batch_rows = rows
         self.batch_table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             values = [
@@ -445,6 +460,27 @@ class TcmWidget(QWidget):
             for j, value in enumerate(values):
                 self.batch_table.setItem(i, j, QTableWidgetItem(str(value)))
         self.batch_msg.setText(f"共 {len(rows)} 个批次")
+
+    def _adjust_batch(self) -> None:
+        row = self.batch_table.currentRow()
+        if not 0 <= row < len(getattr(self, "batch_rows", [])):
+            self.batch_msg.setText("请先选择一个批次")
+            return
+        reason = self.batch_reason.text().strip()
+        if not reason:
+            self.batch_msg.setText("请填写盘点/报损原因")
+            return
+        try:
+            result = self.api.adjust_tcm_stock_batch(
+                self.batch_rows[row]["id"], self.batch_delta.value(), reason
+            )
+        except ApiError as e:
+            self.batch_msg.setText(f"调整失败：{e.detail}")
+            return
+        self.batch_delta.setValue(0)
+        self.batch_reason.clear()
+        self._load_batches()
+        self.batch_msg.setText(f"调整完成，当前库存 {result['quantity_g']:g}g")
 
     def _build_decoction_tab(self) -> QWidget:
         page = QWidget()
