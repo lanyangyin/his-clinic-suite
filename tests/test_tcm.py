@@ -235,3 +235,30 @@ def test_tcm_pending_item_edit_and_delete(client, auth):
     ).json()
     herbs = [row for row in lines_after if row["kind"] == "herb"]
     assert len(herbs) == 1
+
+
+def test_tcm_incompatible_pair_rejected(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    gan_cao = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-GANCao", "name": "甘草", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    gan_sui = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-GanSui", "name": "甘遂", "price_per_g": 0.2, "toxicity": "toxic"},
+        headers=auth["admin"],
+    ).json()
+    response = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={
+            "formula_name": "禁忌方",
+            "items": [
+                {"herb_id": gan_cao["id"], "dose_g": 6},
+                {"herb_id": gan_sui["id"], "dose_g": 3},
+            ],
+        },
+        headers=auth["doctor"],
+    )
+    assert response.status_code == 400
+    assert "配伍禁忌" in response.json()["detail"]

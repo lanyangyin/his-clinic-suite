@@ -20,6 +20,25 @@ from .schemas import (
     SoakRequest,
 )
 
+# 十八反、十九畏的核心药对；名称做去炮制前缀后的包含匹配
+INCOMPATIBLE_PAIRS = (
+    ("甘草", "甘遂"), ("甘草", "大戟"), ("甘草", "海藻"), ("甘草", "芫花"),
+    ("乌头", "贝母"), ("乌头", "瓜蒌"), ("乌头", "半夏"), ("乌头", "白蔹"), ("乌头", "白及"),
+    ("藜芦", "人参"), ("藜芦", "沙参"), ("藜芦", "丹参"), ("藜芦", "玄参"),
+    ("藜芦", "细辛"), ("藜芦", "芍药"),
+    ("硫黄", "朴硝"), ("水银", "砒霜"), ("狼毒", "密陀僧"), ("巴豆", "牵牛"),
+    ("丁香", "郁金"), ("川乌", "犀角"), ("草乌", "犀角"), ("牙硝", "三棱"),
+    ("官桂", "石脂"), ("人参", "五灵脂"),
+)
+
+
+def _check_incompatibility(herbs: list[TcmHerb]) -> None:
+    names = [(herb.name or "").strip() for herb in herbs]
+    for left, right in INCOMPATIBLE_PAIRS:
+        if any(left in name for name in names) and any(right in name for name in names):
+            raise ValueError(f"存在配伍禁忌：{left} 与 {right}，请核对后再开方")
+
+
 SPECIAL_LABELS = {
     "none": "",
     "first": "先煎",
@@ -74,6 +93,8 @@ def create_prescription(
         if not herb or not herb.active:
             raise ValueError(f"饮片不存在：{item.herb_id}")
         herbs.append((item, herb))
+
+    _check_incompatibility([herb for _item, herb in herbs])
 
     prescription = TcmPrescription(
         prescription_no=_next_prescription_no(db),
