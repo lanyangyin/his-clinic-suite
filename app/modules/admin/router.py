@@ -507,6 +507,17 @@ def reconcile_finance(
     row.total_refund = total_refund
     row.net = round(total_payment + total_inpatient - total_refund, 2)
     row.operator = "admin"
+    from app.modules.ca.models import CACertificate
+    from app.modules.insurance.crypto import sm2_sign, sm3_hex
+
+    certificate = (
+        db.query(CACertificate).filter(CACertificate.status == "valid").order_by(CACertificate.id).first()
+    )
+    if certificate:
+        content = f"{biz_date}|{total_payment:.2f}|{total_inpatient:.2f}|{total_refund:.2f}|{row.net:.2f}"
+        row.certificate_id = certificate.id
+        row.content_hash = sm3_hex(content.encode())
+        row.signature = sm2_sign(row.content_hash.encode(), certificate.private_key, certificate.public_key)
     db.commit()
     return RedirectResponse("/admin/finance", status_code=302)
 

@@ -740,6 +740,9 @@ def test_finance_reconciliation(client, auth):
         data={"username": "admin", "password": "admin123"},
         follow_redirects=False,
     )
+    client.post(
+        "/ca/certificates", json={"subject": "财务对账"}, headers=auth["admin"]
+    )
     response = client.post(
         "/admin/finance/reconcile",
         data={"biz_date": "2026-01-01"},
@@ -748,3 +751,4 @@ def test_finance_reconciliation(client, auth):
     assert response.status_code == 302
     page = client.get("/admin/finance")
     assert "日对账签收" in page.text
+    assert "已签" in page.text
