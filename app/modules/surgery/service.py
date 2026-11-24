@@ -257,6 +257,13 @@ def start_case(db: Session, case_id: int, operator: str = "") -> SurgeryCase:
     )
     if not sign_in:
         raise ValueError("请先完成术前安全核查（sign_in）")
+    team = {
+        (case.surgeon or "").strip(),
+        (case.preop.anesthesiologist or "").strip(),
+        (sign_in.completed_by or "").strip(),
+    }
+    if all(team) and len(team) < 3:
+        raise ValueError("手术医生、麻醉医生、安全核查护士不能为同一人")
     case.status = "in_progress"
     case.started_at = datetime.now()
     db.commit()

@@ -268,3 +268,24 @@ def test_surgery_reschedule_and_conflict(client, auth):
     )
     assert other.status_code == 400
     assert "已有手术" in other.json()["detail"]
+
+
+def test_surgery_team_roles_must_differ(client, auth):
+    patient, room, case = _setup(client, auth)
+    client.post(
+        f"/surgery/cases/{case['id']}/preop",
+        json={
+            "anesthesiologist": "张医生", "asa_grade": "II", "airway": "I",
+            "allergies": "无", "comorbidities": "", "fasting": "8h",
+            "consent": True, "assessment": "可耐受", "plan": "全麻", "risk": "low",
+        },
+        headers=auth["surgery"],
+    )
+    client.post(
+        f"/surgery/cases/{case['id']}/safety",
+        json={"phase": "sign_in", "checklist": "身份核查"},
+        headers=auth["surgery"],
+    )
+    blocked = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
+    assert blocked.status_code == 400
+    assert "不能为同一人" in blocked.json()["detail"]
