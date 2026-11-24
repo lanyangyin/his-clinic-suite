@@ -454,12 +454,12 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)
 def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "prescription", encounter_id)
+    print_count = _log_print(db, user, "prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(render_full_set(data))
+    return HTMLResponse(_with_reprint_banner(render_full_set(data), print_count))
 
 
 @router.get("/medical-record/{encounter_id}", response_class=HTMLResponse)
@@ -474,27 +474,27 @@ def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=
 
 @router.get("/western-prescription/{encounter_id}", response_class=HTMLResponse)
 def print_western(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "western-prescription", encounter_id)
+    print_count = _log_print(db, user, "western-prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(render_western(data))
+    return HTMLResponse(_with_reprint_banner(render_western(data), print_count))
 
 
 @router.get("/tcm-prescription/{encounter_id}", response_class=HTMLResponse)
 def print_tcm(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "tcm-prescription", encounter_id)
+    print_count = _log_print(db, user, "tcm-prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(render_tcm(data))
+    return HTMLResponse(_with_reprint_banner(render_tcm(data), print_count))
 
 
 @router.get("/receipt/{payment_id}", response_class=HTMLResponse)
 def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
-    _log_print(db, user, "receipt", payment_id)
+    print_count = _log_print(db, user, "receipt", payment_id)
     payment = get_payment(db, payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="收费记录不存在")
@@ -521,7 +521,7 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(r
         .first()
     )
     data["pickup_code"] = pickup.code if pickup else ""
-    return HTMLResponse(render_receipt(data))
+    return HTMLResponse(_with_reprint_banner(render_receipt(data), print_count))
 
 @router.get("/retail/{sale_id}", response_class=HTMLResponse)
 def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):

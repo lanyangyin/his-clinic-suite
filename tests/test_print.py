@@ -282,3 +282,12 @@ def test_medical_record_reprint_banner(client, auth):
     second = client.get(f"/print/medical-record/{encounter['id']}")
     assert second.status_code == 200
     assert "补打 第2次" in second.text
+
+
+def test_western_prescription_reprint_banner(client, auth):
+    encounter, _payment = setup_paid_encounter(client, auth)
+    first = client.get(f"/print/western-prescription/{encounter['id']}")
+    assert first.status_code == 200
+    assert "补打" not in first.text
+    second = client.get(f"/print/western-prescription/{encounter['id']}")
+    assert "补打 第2次" in second.text
