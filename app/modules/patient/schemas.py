@@ -90,6 +90,31 @@ class PatientMergeRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=300)
 
 
+class PatientMergeRequestCreate(BaseModel):
+    source_id: int
+    target_id: int
+    reason: str = Field(min_length=1, max_length=300)
+
+
+class PatientMergeReview(BaseModel):
+    approve: bool
+    note: str = Field(default="", max_length=300)
+
+
+class PatientMergeRequestResponse(BaseModel):
+    id: int
+    source_id: int
+    target_id: int
+    reason: str
+    status: str
+    requested_by: str
+    reviewed_by: str
+    review_note: str
+    created_at: datetime
+    reviewed_at: datetime | None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class DuplicateCandidate(BaseModel):
     id: int
     patient_no: str | None

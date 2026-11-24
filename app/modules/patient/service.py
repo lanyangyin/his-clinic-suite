@@ -113,6 +113,68 @@ def get_patient(db: Session, patient_id: int) -> Patient | None:
     return patient
 
 
+def create_merge_request(
+    db: Session, source_id: int, target_id: int, reason: str, operator: str = ""
+):
+    from app.modules.patient.models import PatientMergeRequest
+
+    source = db.get(Patient, source_id)
+    target = db.get(Patient, target_id)
+    if not source or not target:
+        raise ValueError("患者不存在")
+    if source.id == target.id:
+        raise ValueError("不能把患者合并到自己")
+    if source.merged_into_id or source.status == "merged":
+        raise ValueError("源档案已经合并")
+    if target.merged_into_id or target.status == "merged":
+        raise ValueError("目标档案已经合并")
+    if not reason.strip():
+        raise ValueError("请填写合并原因")
+    existing = (
+        db.query(PatientMergeRequest)
+        .filter(
+            PatientMergeRequest.source_id == source_id,
+            PatientMergeRequest.status == "pending",
+        )
+        .first()
+    )
+    if existing:
+        raise ValueError("该患者已有待审批的合并申请")
+    row = PatientMergeRequest(
+        source_id=source_id,
+        target_id=target_id,
+        reason=reason.strip(),
+        requested_by=operator,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def review_merge_request(
+    db: Session, request_id: int, approve: bool, reviewer: str, note: str = ""
+):
+    from app.modules.patient.models import PatientMergeRequest
+
+    row = db.get(PatientMergeRequest, request_id)
+    if not row:
+        raise ValueError("合并申请不存在")
+    if row.status != "pending":
+        raise ValueError("该申请已处理")
+    if not approve and not note.strip():
+        raise ValueError("驳回必须填写原因")
+    row.status = "approved" if approve else "rejected"
+    row.reviewed_by = reviewer
+    row.review_note = note.strip()
+    row.reviewed_at = datetime.now()
+    if approve:
+        merge_patients(db, row.source_id, row.target_id, row.reason, reviewer)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def merge_patients(
     db: Session, source_id: int, target_id: int, reason: str, operator: str = ""
 ) -> Patient:

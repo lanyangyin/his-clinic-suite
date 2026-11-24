@@ -95,3 +95,38 @@ def test_patient_merge_moves_registration_and_redirects(client, auth):
         headers=auth["admin"],
     )
     assert again.status_code == 400
+
+
+def test_patient_merge_request_requires_director(client, auth):
+    source = client.post(
+        "/patients/", json={"name": "申请源", "id_number": "110101199303030011"},
+        headers=auth["cashier"],
+    ).json()
+    target = client.post(
+        "/patients/", json={"name": "申请目标", "id_number": "110101199303030022"},
+        headers=auth["cashier"],
+    ).json()
+    requested = client.post(
+        "/patients/merge-requests",
+        json={"source_id": source["id"], "target_id": target["id"], "reason": "重复档案"},
+        headers=auth["admin"],
+    )
+    assert requested.status_code == 201, requested.text
+    request_id = requested.json()["id"]
+    pending = client.get("/patients/merge-requests", headers=auth["director"]).json()
+    assert any(row["id"] == request_id for row in pending)
+    reviewed = client.post(
+        f"/patients/merge-requests/{request_id}/review",
+        json={"approve": True, "note": "同意合并"},
+        headers=auth["director"],
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["status"] == "approved"
+    assert client.get(f"/patients/{source['id']}").json()["id"] == target["id"]
+    # 收费员不能审批
+    denied = client.post(
+        f"/patients/merge-requests/{request_id}/review",
+        json={"approve": True},
+        headers=auth["cashier"],
+    )
+    assert denied.status_code == 403

@@ -18,6 +18,9 @@ from .schemas import (
     PatientCardResponse,
     PatientCreate,
     PatientMergeRequest,
+    PatientMergeRequestCreate,
+    PatientMergeRequestResponse,
+    PatientMergeReview,
     PatientResponse,
     PatientUpdate,
 )
@@ -30,6 +33,8 @@ from .service import (
     get_patient,
     issue_card,
     merge_patients,
+    create_merge_request,
+    review_merge_request,
     list_cards,
     list_patients,
     mark_card_lost,
@@ -58,6 +63,45 @@ def merge_patient(
 ):
     try:
         return merge_patients(db, source_id, data.target_id, data.reason, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/merge-requests", response_model=PatientMergeRequestResponse, status_code=201)
+def new_merge_request(
+    data: PatientMergeRequestCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    try:
+        return create_merge_request(db, data.source_id, data.target_id, data.reason, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/merge-requests", response_model=list[PatientMergeRequestResponse])
+def merge_requests(
+    status: str | None = "pending",
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "director")),
+):
+    from app.modules.patient.models import PatientMergeRequest
+
+    query = db.query(PatientMergeRequest)
+    if status:
+        query = query.filter(PatientMergeRequest.status == status)
+    return query.order_by(PatientMergeRequest.id.desc()).all()
+
+
+@router.post("/merge-requests/{request_id}/review", response_model=PatientMergeRequestResponse)
+def review_merge(
+    request_id: int,
+    data: PatientMergeReview,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("director")),
+):
+    try:
+        return review_merge_request(db, request_id, data.approve, user.username, data.note)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

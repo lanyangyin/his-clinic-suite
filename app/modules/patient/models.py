@@ -161,3 +161,20 @@ class PatientMergeLog(Base):
     reason: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     merged_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
+class PatientMergeRequest(Base):
+    """患者合并申请：管理员发起，院长审批后执行合并。"""
+
+    __tablename__ = "patient_merge_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)
+    requested_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    review_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
