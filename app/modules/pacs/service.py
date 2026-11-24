@@ -66,6 +66,7 @@ def create_request(
         encounter_id=encounter_id,
         item_id=data.item_id,
         status="pending",
+        priority=data.priority,
         requested_by=requested_by,
     )
     db.add(request)
@@ -82,7 +83,7 @@ def create_request(
             item_name=f"检查：{request.item.name}",
             quantity=1,
             unit_price=request.item.price,
-            insurance_ratio=0.7,
+            insurance_ratio=request.item.insurance_ratio,
         )
 
     db.commit()
@@ -192,7 +193,7 @@ def _notify_result_ready(db: Session, encounter_id: int) -> None:
         )
 
 
-def list_worklist(db: Session, status: str = "pending") -> list[dict]:
+def list_worklist(db: Session, status: str = "pending", priority: str | None = None) -> list[dict]:
     from app.modules.patient.models import Patient
     from app.modules.registration.models import Registration
 
@@ -204,7 +205,13 @@ def list_worklist(db: Session, status: str = "pending") -> list[dict]:
     )
     if status:
         query = query.filter(ImagingRequest.status == status)
-    rows = query.order_by(ImagingRequest.id).all()
+    if priority:
+        query = query.filter(ImagingRequest.priority == priority)
+    rows = query.order_by(
+        (ImagingRequest.priority == "routine").asc(),
+        ImagingRequest.requested_at.asc(),
+        ImagingRequest.id.asc(),
+    ).all()
     return [
         {
             "id": request.id,
@@ -218,6 +225,7 @@ def list_worklist(db: Session, status: str = "pending") -> list[dict]:
             "requested_by": request.requested_by,
             "requested_at": request.requested_at,
             "status": request.status,
+            "priority": request.priority,
             "report": request.report,
             "reported_by": request.reported_by,
             "reviewed_by": request.reviewed_by,

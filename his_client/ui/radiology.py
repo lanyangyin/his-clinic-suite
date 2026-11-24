@@ -36,19 +36,25 @@ class RadiologyWidget(QWidget):
         self.template_combo = QComboBox()
         self.template_combo.addItem("报告模板", None)
         self.template_combo.currentIndexChanged.connect(self._apply_template)
+        self.priority_filter = QComboBox()
+        self.priority_filter.addItem("全部优先级", None)
+        self.priority_filter.addItem("加急", "urgent")
+        self.priority_filter.addItem("普通", "routine")
+        self.priority_filter.currentIndexChanged.connect(lambda _index: self._load())
         self.status_filter.currentIndexChanged.connect(lambda _index: self._load())
         refresh = QPushButton("刷新")
         refresh.clicked.connect(self._load)
         top.addWidget(title)
         top.addStretch(1)
         top.addWidget(self.template_combo)
+        top.addWidget(self.priority_filter)
         top.addWidget(self.status_filter)
         top.addWidget(refresh)
         layout.addLayout(top)
         splitter = QSplitter(Qt.Vertical)
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels(
-            ["影像号", "患者", "检查项目", "申请医生", "时间", "状态", "报告人", "审核人"]
+            ["影像号", "患者", "检查项目", "优先级", "申请医生", "时间", "状态", "报告人", "审核人"]
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self._select)
@@ -121,7 +127,10 @@ class RadiologyWidget(QWidget):
 
     def _load(self) -> None:
         try:
-            self.rows = self.api.list_imaging_worklist(self.status_filter.currentData() or "pending")
+            self.rows = self.api.list_imaging_worklist(
+                self.status_filter.currentData() or "pending",
+                self.priority_filter.currentData(),
+            )
         except ApiError as e:
             self.msg.setText(f"加载失败：{e.detail}")
             return
@@ -131,6 +140,7 @@ class RadiologyWidget(QWidget):
                 item.get("accession_no") or "",
                 f"{item.get('patient_name') or ''} {item.get('patient_no') or ''}",
                 item.get("item_name") or "",
+                "加急" if item.get("priority") == "urgent" else "普通",
                 item.get("requested_by") or "",
                 str(item.get("requested_at") or "")[:16].replace("T", " "),
                 {"pending": "待检查", "reported": "已报告", "reviewed": "已审核", "rejected": "已退回"}.get(item.get("status"), item.get("status") or ""),

@@ -282,3 +282,22 @@ def test_imaging_report_template(client, auth):
         headers=auth["doctor"],
     )
     assert denied.status_code == 403
+
+
+def test_imaging_worklist_urgent_first(client, auth):
+    encounter = make_encounter(client, auth)
+    item = make_item(client, auth).json()
+    routine = client.post(
+        f"/pacs/encounters/{encounter['id']}/imaging-requests",
+        json={"item_id": item["id"], "priority": "routine"},
+        headers=auth["doctor"],
+    ).json()
+    urgent = client.post(
+        f"/pacs/encounters/{encounter['id']}/imaging-requests",
+        json={"item_id": item["id"], "priority": "urgent"},
+        headers=auth["doctor"],
+    ).json()
+    assert urgent["priority"] == "urgent"
+    rows = client.get("/pacs/worklist", headers=auth["radiology"]).json()
+    ids = [row["id"] for row in rows]
+    assert ids.index(urgent["id"]) < ids.index(routine["id"])

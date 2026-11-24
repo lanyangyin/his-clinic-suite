@@ -102,10 +102,11 @@ def new_template(
 @router.get("/worklist")
 def worklist(
     status: str = "pending",
+    priority: str | None = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_role("radiology", "admin")),
 ):
-    return list_worklist(db, status)
+    return list_worklist(db, status, priority)
 
 
 @router.post("/requests/{request_id}/review", response_model=ImagingRequestResponse)

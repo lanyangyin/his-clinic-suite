@@ -8,6 +8,7 @@ class ImagingItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     body_part: str = Field(default="", max_length=50)
     price: float = Field(default=0, ge=0)
+    insurance_ratio: float = Field(default=0.7, ge=0, le=1)
 
 
 class ImagingItemResponse(ImagingItemCreate):
@@ -30,6 +31,7 @@ class ImagingTemplateResponse(ImagingTemplateCreate):
 
 class ImagingRequestCreate(BaseModel):
     item_id: int
+    priority: str = Field(default="routine", pattern="^(routine|urgent)$")
 
 
 class ImagingReportRequest(BaseModel):
@@ -55,6 +57,7 @@ class ImagingRequestResponse(BaseModel):
     item_name: str
     accession_no: str
     status: str
+    priority: str = "routine"
     requested_by: str
     requested_at: datetime
     reported_at: datetime | None

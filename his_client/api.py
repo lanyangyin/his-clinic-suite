@@ -647,8 +647,11 @@ class ApiClient:
     def list_imaging_templates(self) -> list:
         return self._request("GET", "/pacs/templates")
 
-    def list_imaging_worklist(self, status: str = "pending") -> list:
-        return self._request("GET", "/pacs/worklist", params={"status": status})
+    def list_imaging_worklist(self, status: str = "pending", priority: str | None = None) -> list:
+        params = {"status": status}
+        if priority:
+            params["priority"] = priority
+        return self._request("GET", "/pacs/worklist", params=params)
 
     def report_imaging(
         self,

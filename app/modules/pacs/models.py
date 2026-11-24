@@ -14,6 +14,7 @@ class ImagingItem(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     body_part: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    insurance_ratio: Mapped[float] = mapped_column(default=0.7, server_default="0.7", nullable=False)
 
 
 class ImagingReportTemplate(Base):
@@ -45,6 +46,10 @@ class ImagingRequest(Base):
     )
     # pending 已申请 / reported 已出报告 / reviewed 已审核 / rejected 已退回
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    # routine 普通 / urgent 加急
+    priority: Mapped[str] = mapped_column(
+        String(10), default="routine", server_default="routine", nullable=False
+    )
     requested_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     requested_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False

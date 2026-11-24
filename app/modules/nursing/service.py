@@ -229,6 +229,14 @@ def start(db: Session, order_id: int, data: StartRequest, operator: str = "") ->
         raise ValueError("执行单不存在")
     if order.status != "prepared":
         raise ValueError("请先完成配药并核对，再开始执行")
+    prep = (
+        db.query(NursingPreparation)
+        .filter(NursingPreparation.order_id == order.id)
+        .order_by(NursingPreparation.id.desc())
+        .first()
+    )
+    if prep and prep.expires_at and prep.expires_at < datetime.now():
+        raise ValueError("配药已超过有效期，请重新配药并核对")
     order.status = "executing"
     order.seat_no = data.seat_no
     order.rate_ml_h = data.rate_ml_h
