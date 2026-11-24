@@ -19,3 +19,15 @@ class PrintToken(Base):
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
+class PrintLog(Base):
+    """打印流水：谁在何时打印了什么文档，用于补打/审计。"""
+
+    __tablename__ = "print_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    document_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

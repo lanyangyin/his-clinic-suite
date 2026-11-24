@@ -59,6 +59,11 @@ def test_print_prescription(client, auth):
     rx_no = headers[0]["prescription_no"]
     assert rx_no in html
     assert f"RX{encounter['id']:06d}" not in html
+    logs = client.get("/print/logs", headers=auth["admin"]).json()
+    assert any(
+        row["document_type"] == "prescription" and row["ref_id"] == encounter["id"]
+        for row in logs
+    )
 
 
 def test_print_prescription_missing(client):

@@ -17,7 +17,7 @@ from app.modules.print.documents import (
     render_western,
 )
 from app.modules.print.barcode import code128_svg
-from app.modules.print.models import PrintToken  # noqa: F401
+from app.modules.print.models import PrintLog, PrintToken  # noqa: F401
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.pharmacy.retail_service import get_retail_sale
 from app.modules.pharmacy.service import build_dispense_slip, get_dispense
@@ -40,6 +40,17 @@ from app.modules.registration.service import get_registration
 from app.modules.staff.service import get_doctor
 
 router = APIRouter(prefix="/print", tags=["print"], dependencies=[Depends(require_print_access)])
+
+
+def _log_print(db: Session, user, document_type: str, ref_id: int | None) -> None:
+    db.add(
+        PrintLog(
+            document_type=document_type,
+            ref_id=ref_id,
+            operator=getattr(user, "username", "") or "print-token",
+        )
+    )
+    db.commit()
 
 
 def _clinic_meta() -> dict:
@@ -344,6 +355,25 @@ def create_print_token(
     return {"token": raw, "expires_in": min(max(ttl_seconds, 10), 600)}
 
 
+@router.get("/logs")
+def logs(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_login),
+):
+    rows = db.query(PrintLog).order_by(PrintLog.id.desc()).limit(min(max(limit, 1), 500)).all()
+    return [
+        {
+            "id": row.id,
+            "document_type": row.document_type,
+            "ref_id": row.ref_id,
+            "operator": row.operator,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
+
+
 @router.get("/barcode/{code}.svg")
 def barcode_svg(code: str):
     try:
@@ -354,7 +384,8 @@ def barcode_svg(code: str):
 
 
 @router.get("/prescription-header/{prescription_id}", response_class=HTMLResponse)
-def print_prescription_header(prescription_id: int, db: Session = Depends(get_db)):
+def print_prescription_header(prescription_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "prescription-header", prescription_id)
     from app.modules.encounter.models import PrescriptionItem
 
     header = db.get(Prescription, prescription_id)
@@ -405,7 +436,8 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
 
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)
-def print_prescription(encounter_id: int, db: Session = Depends(get_db)):
+def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
@@ -414,7 +446,8 @@ def print_prescription(encounter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/medical-record/{encounter_id}", response_class=HTMLResponse)
-def print_medical_record(encounter_id: int, db: Session = Depends(get_db)):
+def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "medical-record", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
@@ -423,7 +456,8 @@ def print_medical_record(encounter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/western-prescription/{encounter_id}", response_class=HTMLResponse)
-def print_western(encounter_id: int, db: Session = Depends(get_db)):
+def print_western(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "western-prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
@@ -432,7 +466,8 @@ def print_western(encounter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/tcm-prescription/{encounter_id}", response_class=HTMLResponse)
-def print_tcm(encounter_id: int, db: Session = Depends(get_db)):
+def print_tcm(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "tcm-prescription", encounter_id)
     try:
         data = _collect(db, encounter_id)
     except ValueError as e:
@@ -441,7 +476,8 @@ def print_tcm(encounter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/receipt/{payment_id}", response_class=HTMLResponse)
-def print_receipt(payment_id: int, db: Session = Depends(get_db)):
+def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "receipt", payment_id)
     payment = get_payment(db, payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="收费记录不存在")
@@ -471,7 +507,8 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db)):
     return HTMLResponse(render_receipt(data))
 
 @router.get("/retail/{sale_id}", response_class=HTMLResponse)
-def print_retail(sale_id: int, db: Session = Depends(get_db)):
+def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "retail", sale_id)
     sale = get_retail_sale(db, sale_id)
     if not sale:
         raise HTTPException(status_code=404, detail="零售单不存在")
@@ -511,7 +548,8 @@ def print_retail(sale_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/dispense-slip/{encounter_id}", response_class=HTMLResponse)
-def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db)):
+def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "dispense-slip", encounter_id)
     try:
         data = build_dispense_slip(db, encounter_id)
     except ValueError as e:
@@ -580,7 +618,8 @@ def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/dispense-label/{dispense_id}", response_class=HTMLResponse)
-def print_dispense_label(dispense_id: int, db: Session = Depends(get_db)):
+def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "dispense-label", dispense_id)
     dispense = get_dispense(db, dispense_id)
     if not dispense:
         raise HTTPException(status_code=404, detail="发药记录不存在")
@@ -614,7 +653,8 @@ def print_dispense_label(dispense_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/nursing-label/{order_id}", response_class=HTMLResponse)
-def print_nursing_label(order_id: int, db: Session = Depends(get_db)):
+def print_nursing_label(order_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "nursing-label", order_id)
     order = db.get(NursingOrder, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="护理执行单不存在")
@@ -663,7 +703,8 @@ LAB_CSS = """
 
 
 @router.get("/lab-report/{request_id}", response_class=HTMLResponse)
-def print_lab_report(request_id: int, db: Session = Depends(get_db)):
+def print_lab_report(request_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    _log_print(db, user, "lab-report", request_id)
     request = get_request(db, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="检验申请不存在")
