@@ -29,6 +29,22 @@ class TcmHerb(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
 
+class TcmStockBatch(Base):
+    """饮片批次库存：按效期先出，记录批号/数量/效期。"""
+
+    __tablename__ = "tcm_stock_batches"
+    __table_args__ = (
+        __import__("sqlalchemy").UniqueConstraint("herb_id", "batch_no", name="uq_tcm_herb_batch"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    herb_id: Mapped[int] = mapped_column(ForeignKey("tcm_herbs.id"), nullable=False, index=True)
+    batch_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    quantity_g: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
 class TcmPrescription(Base):
     __tablename__ = "tcm_prescriptions"
 

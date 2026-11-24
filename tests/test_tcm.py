@@ -325,3 +325,60 @@ def test_tcm_stock_is_deducted_on_dispense(client, auth):
     herbs = client.get("/tcm/herbs", headers=auth["pharmacist"]).json()
     row = next(item for item in herbs if item["id"] == stocked["id"])
     assert row["stock_g"] == 84
+
+
+def test_tcm_batches_expire_first(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-BATCH", "name": "批次饮片", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    near = client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "NEAR", "quantity_g": 5, "expiry": "2026-12-01T00:00:00"},
+        headers=auth["admin"],
+    ).json()
+    far = client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "FAR", "quantity_g": 20, "expiry": "2027-12-01T00:00:00"},
+        headers=auth["admin"],
+    ).json()
+    prescription = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={"packs": 2, "items": [{"herb_id": herb["id"], "dose_g": 8}]},
+        headers=auth["doctor"],
+    ).json()
+    client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
+    assert client.post(
+        f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
+    ).status_code == 200
+    batches = client.get(f"/tcm/herbs/{herb['id']}/stock-batches", headers=auth["pharmacist"]).json()
+    by_no = {row["batch_no"]: row for row in batches}
+    assert by_no["NEAR"]["quantity_g"] == 0
+    assert by_no["FAR"]["quantity_g"] == 9
+
+
+def test_expired_tcm_batch_not_usable(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-EXPIRED", "name": "过期饮片", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "OLD", "quantity_g": 100, "expiry": "2020-01-01T00:00:00"},
+        headers=auth["admin"],
+    )
+    prescription = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={"items": [{"herb_id": herb["id"], "dose_g": 5}]},
+        headers=auth["doctor"],
+    ).json()
+    client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
+    blocked = client.post(
+        f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
+    )
+    assert blocked.status_code == 400
+    assert "无有效批次" in blocked.json()["detail"]

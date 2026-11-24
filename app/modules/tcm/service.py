@@ -10,7 +10,14 @@ from app.modules.encounter.service import get_encounter
 from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
 
-from .models import DecoctionBag, DecoctionOrder, TcmHerb, TcmPrescription, TcmPrescriptionItem
+from .models import (
+    DecoctionBag,
+    DecoctionOrder,
+    TcmHerb,
+    TcmPrescription,
+    TcmPrescriptionItem,
+    TcmStockBatch,
+)
 from .schemas import (
     DecoctRequest,
     HerbCreate,
@@ -18,6 +25,7 @@ from .schemas import (
     PackageRequest,
     PrescriptionCreate,
     SoakRequest,
+    StockBatchCreate,
 )
 
 # 十八反、十九畏的核心药对；名称做去炮制前缀后的包含匹配
@@ -69,6 +77,63 @@ def list_herbs(db: Session, active_only: bool = True) -> list[TcmHerb]:
 
 def get_herb(db: Session, herb_id: int) -> TcmHerb | None:
     return db.get(TcmHerb, herb_id)
+
+
+def add_stock_batch(db: Session, herb_id: int, data: StockBatchCreate) -> TcmStockBatch:
+    herb = get_herb(db, herb_id)
+    if not herb:
+        raise ValueError("饮片不存在")
+    if db.query(TcmStockBatch).filter(
+        TcmStockBatch.herb_id == herb_id, TcmStockBatch.batch_no == data.batch_no
+    ).first():
+        raise ValueError("该饮片批号已存在")
+    row = TcmStockBatch(herb_id=herb_id, **data.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_stock_batches(db: Session, herb_id: int) -> list[TcmStockBatch]:
+    return (
+        db.query(TcmStockBatch)
+        .filter(TcmStockBatch.herb_id == herb_id)
+        .order_by(TcmStockBatch.expiry.asc().nulls_last(), TcmStockBatch.id.asc())
+        .all()
+    )
+
+
+def _deduct_batches(db: Session, herb: TcmHerb, needed: float) -> bool:
+    batches = (
+        db.query(TcmStockBatch)
+        .filter(
+            TcmStockBatch.herb_id == herb.id,
+            TcmStockBatch.quantity_g > 0,
+            (TcmStockBatch.expiry.is_(None)) | (TcmStockBatch.expiry >= datetime.now()),
+        )
+        .order_by(TcmStockBatch.expiry.asc().nulls_last(), TcmStockBatch.id.asc())
+        .all()
+    )
+    if not batches:
+        has_any = (
+            db.query(TcmStockBatch)
+            .filter(TcmStockBatch.herb_id == herb.id, TcmStockBatch.quantity_g > 0)
+            .first()
+        )
+        if has_any:
+            raise ValueError(f"饮片 {herb.name} 无有效批次（已过期）")
+        return False
+    available = round(sum(batch.quantity_g for batch in batches), 2)
+    if available < needed:
+        raise ValueError(f"饮片库存不足：{herb.name} 需要 {needed:g}g，现有 {available:g}g")
+    remaining = needed
+    for batch in batches:
+        take = min(batch.quantity_g, remaining)
+        batch.quantity_g = round(batch.quantity_g - take, 2)
+        remaining = round(remaining - take, 2)
+        if remaining <= 0:
+            break
+    return True
 
 
 def _next_prescription_no(db: Session) -> str:
@@ -355,10 +420,11 @@ def dispense_prescription(
     # 饮片库存校验：未启用库存（None）的饮片不拦截
     for item in prescription.items:
         herb = get_herb(db, item.herb_id)
-        if herb and herb.stock_g is not None:
+        if herb:
             needed = round(item.dose_g * prescription.packs, 2)
-            if herb.stock_g < needed:
-                raise ValueError(f"饮片库存不足：{herb.name} 需要 {needed:g}g，现有 {herb.stock_g:g}g")
+            if not _deduct_batches(db, herb, needed):
+                if herb.stock_g is not None and herb.stock_g < needed:
+                    raise ValueError(f"饮片库存不足：{herb.name} 需要 {needed:g}g，现有 {herb.stock_g:g}g")
     prescription.status = "dispensed"
     prescription.dispense_by = operator
     prescription.dispensed_at = datetime.now()
@@ -369,7 +435,7 @@ def dispense_prescription(
             header.updated_at = datetime.now()
     for item in prescription.items:
         herb = get_herb(db, item.herb_id)
-        if herb and herb.stock_g is not None:
+        if herb and herb.stock_g is not None and not db.query(TcmStockBatch).filter(TcmStockBatch.herb_id == herb.id).first():
             herb.stock_g = round(max(0.0, herb.stock_g - item.dose_g * prescription.packs), 2)
     if prescription.decoct_service == "decoct":
         encounter = get_encounter(db, prescription.encounter_id)

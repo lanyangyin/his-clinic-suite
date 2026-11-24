@@ -15,8 +15,11 @@ from .schemas import (
     PrescriptionItemUpdate,
     PrescriptionResponse,
     SoakRequest,
+    StockBatchCreate,
+    StockBatchResponse,
 )
 from .service import (
+    add_stock_batch,
     create_herb,
     create_prescription,
     decoct,
@@ -27,6 +30,7 @@ from .service import (
     list_decoctions,
     list_herbs,
     list_prescriptions,
+    list_stock_batches,
     package,
     review_prescription,
     update_prescription_item,
@@ -47,6 +51,24 @@ def new_herb(
         return create_herb(db, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/herbs/{herb_id}/stock-batches", response_model=StockBatchResponse, status_code=201)
+def new_stock_batch(
+    herb_id: int,
+    data: StockBatchCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        return add_stock_batch(db, herb_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/herbs/{herb_id}/stock-batches", response_model=list[StockBatchResponse])
+def stock_batches(herb_id: int, db: Session = Depends(get_db)):
+    return list_stock_batches(db, herb_id)
 
 
 @router.get("/herbs", response_model=list[HerbResponse])

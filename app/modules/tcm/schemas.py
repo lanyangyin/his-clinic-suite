@@ -22,6 +22,22 @@ class HerbResponse(HerbCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class StockBatchCreate(BaseModel):
+    batch_no: str = Field(min_length=1, max_length=50)
+    quantity_g: float = Field(gt=0, le=100000)
+    expiry: datetime | None = None
+
+
+class StockBatchResponse(BaseModel):
+    id: int
+    herb_id: int
+    batch_no: str
+    quantity_g: float = Field(ge=0)
+    expiry: datetime | None = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 class PrescriptionItemCreate(BaseModel):
     herb_id: int
     dose_g: float = Field(gt=0, le=1000)
