@@ -37,7 +37,7 @@ def create_patient(db: Session, data: PatientCreate, operator: str = "") -> Pati
             db.query(Patient).filter(Patient.id_number == data.id_number).first()
         )
         if existing:
-            return existing
+            return get_patient(db, existing.id) or existing
 
     payload = data.model_dump(exclude={"privacy_consent"})
     if payload["id_type"] == "none":
@@ -72,6 +72,8 @@ def update_patient(
     patient = db.get(Patient, patient_id)
     if not patient:
         return None
+    if patient.status == "merged":
+        raise ValueError("该档案已合并，不能直接修改，请修改目标档案")
     values = data.model_dump(exclude_unset=True, exclude={"privacy_consent"})
     if "id_number" in values:
         values["id_number"] = (values["id_number"] or "").strip() or None
@@ -103,7 +105,75 @@ def update_patient(
 
 
 def get_patient(db: Session, patient_id: int) -> Patient | None:
-    return db.get(Patient, patient_id)
+    patient = db.get(Patient, patient_id)
+    seen = set()
+    while patient and patient.merged_into_id and patient.id not in seen:
+        seen.add(patient.id)
+        patient = db.get(Patient, patient.merged_into_id)
+    return patient
+
+
+def merge_patients(
+    db: Session, source_id: int, target_id: int, reason: str, operator: str = ""
+) -> Patient:
+    """把重复患者档案并入目标档案：迁移就诊/卡片/审计等引用，源档案标记 merged。"""
+    from app.modules.archive.models import ArchiveRecord
+    from app.modules.cssd.models import PackageUsage
+    from app.modules.inpatient.models import Admission
+    from app.modules.narcotic.models import NarcoticLedger
+    from app.modules.patient.models import (
+        PatientAccessLog,
+        PatientCard,
+        PatientClinicalChange,
+        PatientMergeLog,
+    )
+    from app.modules.registration.models import Registration
+    from app.modules.surgery.models import SurgeryCase
+    from app.modules.treatment_room.models import TreatmentFollowUp, TreatmentRoomCase
+
+    source = db.get(Patient, source_id)
+    target = db.get(Patient, target_id)
+    if not source or not target:
+        raise ValueError("患者不存在")
+    if source.id == target.id:
+        raise ValueError("不能把患者合并到自己")
+    if source.merged_into_id or source.status == "merged":
+        raise ValueError("源档案已经合并")
+    if target.merged_into_id or target.status == "merged":
+        raise ValueError("目标档案已经合并")
+    if not reason.strip():
+        raise ValueError("请填写合并原因")
+
+    refs = (
+        (Registration, Registration.patient_id),
+        (PatientCard, PatientCard.patient_id),
+        (PatientAccessLog, PatientAccessLog.patient_id),
+        (PatientClinicalChange, PatientClinicalChange.patient_id),
+        (ArchiveRecord, ArchiveRecord.patient_id),
+        (NarcoticLedger, NarcoticLedger.patient_id),
+        (SurgeryCase, SurgeryCase.patient_id),
+        (TreatmentRoomCase, TreatmentRoomCase.patient_id),
+        (TreatmentFollowUp, TreatmentFollowUp.patient_id),
+        (PackageUsage, PackageUsage.patient_id),
+        (Admission, Admission.patient_id),
+    )
+    for model, column in refs:
+        db.query(model).filter(column == source.id).update(
+            {column: target.id}, synchronize_session=False
+        )
+    source.merged_into_id = target.id
+    source.status = "merged"
+    db.add(
+        PatientMergeLog(
+            source_id=source.id,
+            target_id=target.id,
+            reason=reason.strip(),
+            merged_by=operator,
+        )
+    )
+    db.commit()
+    db.refresh(target)
+    return target
 
 
 def get_patient_by_id_number(db: Session, id_number: str | None) -> Patient | None:
@@ -118,7 +188,7 @@ def list_patients(
     id_number: str | None = None,
     phone: str | None = None,
 ) -> list[Patient]:
-    query = db.query(Patient)
+    query = db.query(Patient).filter(Patient.status == "normal")
     if name is not None:
         query = query.filter(Patient.name == name)
     if id_number is not None:

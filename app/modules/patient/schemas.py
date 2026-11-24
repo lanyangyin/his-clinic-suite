@@ -85,6 +85,11 @@ class PatientResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PatientMergeRequest(BaseModel):
+    target_id: int
+    reason: str = Field(min_length=1, max_length=300)
+
+
 class DuplicateCandidate(BaseModel):
     id: int
     patient_no: str | None

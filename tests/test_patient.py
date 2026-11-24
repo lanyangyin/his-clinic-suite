@@ -59,3 +59,39 @@ def test_patient_reads_require_login_when_anonymous_read_disabled(client, auth, 
     assert client.get("/patients/").status_code == 401
     ok = client.get("/patients/", headers=auth["cashier"])
     assert ok.status_code == 200
+
+
+def test_patient_merge_moves_registration_and_redirects(client, auth):
+    source = client.post(
+        "/patients/", json={"name": "合并源", "id_number": "110101199202020011"},
+        headers=auth["cashier"],
+    ).json()
+    target = client.post(
+        "/patients/", json={"name": "合并目标", "id_number": "110101199202020022"},
+        headers=auth["cashier"],
+    ).json()
+    dept = client.post("/departments/", json={"name": "合并科"}, headers=auth["admin"]).json()
+    doctor = client.post(
+        "/doctors/", json={"name": "合并医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    registration = client.post(
+        "/registrations/", json={"patient_id": source["id"], "doctor_id": doctor["id"]},
+        headers=auth["cashier"],
+    ).json()
+    merged = client.post(
+        f"/patients/{source['id']}/merge",
+        json={"target_id": target["id"], "reason": "同人重复建档"},
+        headers=auth["admin"],
+    )
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["id"] == target["id"]
+    assert client.get(f"/patients/{source['id']}").json()["id"] == target["id"]
+    moved = client.get(f"/registrations/{registration['id']}").json()
+    assert moved["patient_id"] == target["id"]
+    again = client.post(
+        f"/patients/{source['id']}/merge",
+        json={"target_id": target["id"], "reason": "重复"},
+        headers=auth["admin"],
+    )
+    assert again.status_code == 400

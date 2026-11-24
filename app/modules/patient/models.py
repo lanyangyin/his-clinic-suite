@@ -148,3 +148,16 @@ class PatientClinicalChange(Base):
     changed_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )
+
+
+class PatientMergeLog(Base):
+    """患者主索引合并审计：源档案并入目标档案。"""
+
+    __tablename__ = "patient_merge_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    merged_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

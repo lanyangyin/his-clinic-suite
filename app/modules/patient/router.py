@@ -17,6 +17,7 @@ from .schemas import (
     PatientCardCreate,
     PatientCardResponse,
     PatientCreate,
+    PatientMergeRequest,
     PatientResponse,
     PatientUpdate,
 )
@@ -28,6 +29,7 @@ from .service import (
     find_duplicates,
     get_patient,
     issue_card,
+    merge_patients,
     list_cards,
     list_patients,
     mark_card_lost,
@@ -45,6 +47,19 @@ def register_patient(
     user=Depends(require_role("cashier", "doctor")),
 ):
     return create_patient(db, data, user.username)
+
+
+@router.post("/{source_id}/merge", response_model=PatientResponse)
+def merge_patient(
+    source_id: int,
+    data: PatientMergeRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    try:
+        return merge_patients(db, source_id, data.target_id, data.reason, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/duplicates", response_model=DuplicateCheckResponse)
