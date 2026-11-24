@@ -103,6 +103,29 @@ def list_stock_batches(db: Session, herb_id: int) -> list[TcmStockBatch]:
     )
 
 
+def list_all_stock_batches(db: Session, herb_id: int | None = None) -> list[dict]:
+    query = (
+        db.query(TcmStockBatch, TcmHerb)
+        .join(TcmHerb, TcmStockBatch.herb_id == TcmHerb.id)
+    )
+    if herb_id:
+        query = query.filter(TcmStockBatch.herb_id == herb_id)
+    rows = query.order_by(TcmStockBatch.expiry.asc().nulls_last(), TcmStockBatch.id.asc()).all()
+    return [
+        {
+            "id": batch.id,
+            "herb_id": herb.id,
+            "herb_code": herb.code,
+            "herb_name": herb.name,
+            "batch_no": batch.batch_no,
+            "quantity_g": batch.quantity_g,
+            "expiry": batch.expiry,
+            "expired": bool(batch.expiry and batch.expiry < datetime.now()),
+        }
+        for batch, herb in rows
+    ]
+
+
 def _deduct_batches(db: Session, herb: TcmHerb, needed: float) -> bool:
     batches = (
         db.query(TcmStockBatch)

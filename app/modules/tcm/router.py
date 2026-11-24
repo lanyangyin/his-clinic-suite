@@ -28,6 +28,7 @@ from .service import (
     get_prescription,
     issue,
     list_decoctions,
+    list_all_stock_batches,
     list_herbs,
     list_prescriptions,
     list_stock_batches,
@@ -51,6 +52,15 @@ def new_herb(
         return create_herb(db, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/stock-batches")
+def stock_batch_list(
+    herb_id: int | None = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("pharmacist", "admin")),
+):
+    return list_all_stock_batches(db, herb_id)
 
 
 @router.post("/herbs/{herb_id}/stock-batches", response_model=StockBatchResponse, status_code=201)

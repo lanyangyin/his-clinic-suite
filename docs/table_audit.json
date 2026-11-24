@@ -683,6 +683,13 @@
           "editable_columns": null,
           "edit_triggers": 0,
           "object_name": ""
+        },
+        {
+          "type": "ReadOnlyTable",
+          "allow_cell_edit": false,
+          "editable_columns": null,
+          "edit_triggers": 0,
+          "object_name": ""
         }
       ],
       "errors": []
@@ -963,6 +970,13 @@
     {
       "role": "pharmacist",
       "tables": [
+        {
+          "type": "ReadOnlyTable",
+          "allow_cell_edit": false,
+          "editable_columns": null,
+          "edit_triggers": 0,
+          "object_name": ""
+        },
         {
           "type": "ReadOnlyTable",
           "allow_cell_edit": false,
@@ -1504,6 +1518,6 @@
     }
   ],
   "errors": [],
-  "total_tables": 202,
+  "total_tables": 204,
   "allowed_tables": 2
 }

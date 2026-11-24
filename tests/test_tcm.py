@@ -382,3 +382,22 @@ def test_expired_tcm_batch_not_usable(client, auth):
     )
     assert blocked.status_code == 400
     assert "无有效批次" in blocked.json()["detail"]
+
+
+def test_tcm_batch_trace_list(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    herb = client.post(
+        "/tcm/herbs",
+        json={"code": "TCM-TRACE", "name": "追溯饮片", "price_per_g": 0.1},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        f"/tcm/herbs/{herb['id']}/stock-batches",
+        json={"batch_no": "TRACE-1", "quantity_g": 12, "expiry": "2027-01-01T00:00:00"},
+        headers=auth["admin"],
+    )
+    rows = client.get("/tcm/stock-batches", headers=auth["pharmacist"]).json()
+    row = next(item for item in rows if item["batch_no"] == "TRACE-1")
+    assert row["herb_name"] == "追溯饮片"
+    assert row["quantity_g"] == 12
+    assert row["expired"] is False

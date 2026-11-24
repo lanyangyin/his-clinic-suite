@@ -64,6 +64,8 @@ class TcmWidget(QWidget):
             tabs.addTab(self._build_pharmacy_tab(), "中药房")
         if role in ("pharmacist", "decoction", "admin"):
             tabs.addTab(self._build_decoction_tab(), "煎药室")
+        if role in ("pharmacist", "admin"):
+            tabs.addTab(self._build_batches_tab(), "批次库存")
         layout = QVBoxLayout(self)
         layout.addWidget(self.banner)
         layout.addWidget(tabs)
@@ -405,6 +407,45 @@ class TcmWidget(QWidget):
         self._load_decoction()
 
     # ---------- 煎药室 ----------
+    def _build_batches_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        top = QHBoxLayout()
+        refresh = QPushButton("刷新批次")
+        refresh.clicked.connect(self._load_batches)
+        self.batch_msg = QLabel("")
+        top.addWidget(refresh)
+        top.addWidget(self.batch_msg, 1)
+        layout.addLayout(top)
+        self.batch_table = QTableWidget(0, 6)
+        self.batch_table.setHorizontalHeaderLabels(
+            ["饮片编码", "饮片", "批号", "数量(g)", "效期", "状态"]
+        )
+        self.batch_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.batch_table, 1)
+        self._load_batches()
+        return page
+
+    def _load_batches(self) -> None:
+        try:
+            rows = self.api.list_tcm_stock_batches()
+        except ApiError as e:
+            self.batch_msg.setText(f"加载失败：{e.detail}")
+            return
+        self.batch_table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            values = [
+                row.get("herb_code") or "",
+                row.get("herb_name") or "",
+                row.get("batch_no") or "",
+                f"{row.get('quantity_g', 0):g}",
+                str(row.get("expiry") or "—")[:16].replace("T", " "),
+                "已过期" if row.get("expired") else "有效",
+            ]
+            for j, value in enumerate(values):
+                self.batch_table.setItem(i, j, QTableWidgetItem(str(value)))
+        self.batch_msg.setText(f"共 {len(rows)} 个批次")
+
     def _build_decoction_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)

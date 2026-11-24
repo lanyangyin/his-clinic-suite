@@ -653,6 +653,10 @@ class ApiClient:
             params["priority"] = priority
         return self._request("GET", "/pacs/worklist", params=params)
 
+    def list_tcm_stock_batches(self, herb_id: int | None = None) -> list:
+        params = {"herb_id": herb_id} if herb_id else None
+        return self._request("GET", "/tcm/stock-batches", params=params)
+
     def report_imaging(
         self,
         request_id: int,
