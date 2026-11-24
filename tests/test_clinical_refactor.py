@@ -708,3 +708,15 @@ def test_admin_finance_page(client, auth):
     page = client.get("/admin/finance")
     assert page.status_code == 200, page.text
     assert "财务对账" in page.text
+
+
+def test_financial_voucher_generation(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    generated = client.post("/admin/finance/vouchers/generate", follow_redirects=False)
+    assert generated.status_code == 302
+    page = client.get("/admin/finance")
+    assert "财务凭证" in page.text

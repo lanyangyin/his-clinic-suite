@@ -20,6 +20,13 @@
   <table><tr><th>ID</th><th>住院</th><th>金额</th><th>方式</th><th>时间</th></tr>
   {% for row in inpatient %}<tr><td>{{ row.id }}</td><td>{{ row.admission_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.method }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}
   </table>
+  <h3>财务凭证</h3>
+  <form method="post" action="/admin/finance/vouchers/generate" style="display:inline">
+    <button type="submit">生成凭证</button>
+  </form>
+  <table><tr><th>凭证号</th><th>业务</th><th>ID</th><th>金额</th><th>方向</th></tr>
+  {% for row in vouchers %}<tr><td>{{ row.voucher_no }}</td><td>{{ row.biz_type }}</td><td>{{ row.biz_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ '收入' if row.direction == 'income' else '支出' }}</td></tr>{% endfor %}
+  </table>
   <h3>退费</h3>
   <table><tr><th>ID</th><th>支付单</th><th>金额</th><th>时间</th></tr>
   {% for row in refunds %}<tr><td>{{ row.id }}</td><td>{{ row.payment_id }}</td><td>{{ '%.2f'|format(row.amount) }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}

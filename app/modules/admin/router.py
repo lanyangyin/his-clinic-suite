@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
-from app.modules.admin.models import RefundExportTemplate
+from app.modules.admin.models import FinancialVoucher, RefundExportTemplate
 from app.modules.billing.models import ChargeRefund, Payment
 from app.modules.auth.schemas import UserCreate
 from app.modules.labels import zh
@@ -407,6 +407,62 @@ def refund_export_template_save(
     return RedirectResponse("/admin/refund-export-templates", status_code=302)
 
 
+@router.post("/finance/vouchers/generate")
+def generate_financial_vouchers(
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from datetime import datetime as _dt
+
+    day = _dt.now().strftime("%Y%m%d")
+    created = 0
+    cursor = db.query(FinancialVoucher).count() + 1
+    payments = db.query(Payment).filter(Payment.status.in_(("paid", "partially_refunded"))).all()
+    for payment in payments:
+        exists = db.query(FinancialVoucher).filter(
+            FinancialVoucher.biz_type == "payment", FinancialVoucher.biz_id == payment.id
+        ).first()
+        if exists:
+            continue
+        db.add(FinancialVoucher(
+            voucher_no=f"FV{day}{cursor:05d}", biz_type="payment", biz_id=payment.id,
+            amount=payment.amount, direction="income",
+        ))
+        cursor += 1
+        created += 1
+    inpatient = db.query(InpatientPayment).all()
+    for row in inpatient:
+        exists = db.query(FinancialVoucher).filter(
+            FinancialVoucher.biz_type == "inpatient_payment", FinancialVoucher.biz_id == row.id
+        ).first()
+        if exists:
+            continue
+        db.add(FinancialVoucher(
+            voucher_no=f"FV{day}{cursor:05d}", biz_type="inpatient_payment", biz_id=row.id,
+            amount=row.amount, direction="income",
+        ))
+        cursor += 1
+        created += 1
+    refunds = db.query(ChargeRefund).all()
+    for row in refunds:
+        exists = db.query(FinancialVoucher).filter(
+            FinancialVoucher.biz_type == "refund", FinancialVoucher.biz_id == row.id
+        ).first()
+        if exists:
+            continue
+        db.add(FinancialVoucher(
+            voucher_no=f"FV{day}{cursor:05d}", biz_type="refund", biz_id=row.id,
+            amount=row.amount, direction="expense",
+        ))
+        cursor += 1
+        created += 1
+    db.commit()
+    return RedirectResponse("/admin/finance", status_code=302)
+
+
 @router.get("/finance", response_class=HTMLResponse)
 def finance_page(
     request: Request,
@@ -447,7 +503,8 @@ def finance_page(
     return templates.TemplateResponse(
         request, "finance.html",
         _ctx(request, payments=payments, inpatient=inpatient, refunds=refunds, totals=totals,
-             start_date=start_date, end_date=end_date),
+             start_date=start_date, end_date=end_date,
+             vouchers=db.query(FinancialVoucher).order_by(FinancialVoucher.id.desc()).limit(100).all()),
     )
 
 
