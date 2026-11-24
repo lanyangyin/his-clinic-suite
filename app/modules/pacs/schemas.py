@@ -37,6 +37,14 @@ class ImagingRequestCreate(BaseModel):
 
 
 class ImagingReportRequest(BaseModel):
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def _validate_image_url(cls, value):
+        text = (value or "").strip()
+        if text and not (text.startswith("http://") or text.startswith("https://")):
+            raise ValueError("PACS 图像地址必须是 http(s) URL")
+        return text
+
     @field_validator("study_uid", "series_uid", mode="before")
     @classmethod
     def _validate_dicom_uid(cls, value):
