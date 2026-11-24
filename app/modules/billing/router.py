@@ -6,6 +6,7 @@ from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import BillingSummary, PaymentCreate, PaymentResponse, RefundRequest
 from .service import create_payment, get_payment, get_summary, list_payments, refund_payment
+from .models import RefundApproval
 
 router = APIRouter(prefix="/payments", tags=["payments"], dependencies=[Depends(require_read_login)])
 
@@ -57,6 +58,32 @@ def refund(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{payment_id}/refund-approvals")
+def refund_approvals(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("cashier", "admin", "director")),
+):
+    rows = (
+        db.query(RefundApproval)
+        .filter(RefundApproval.payment_id == payment_id)
+        .order_by(RefundApproval.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": row.id,
+            "refund_no": row.refund_no,
+            "amount": row.amount,
+            "reason": row.reason,
+            "operator": row.operator,
+            "operator_role": row.operator_role,
+            "created_at": row.created_at,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)

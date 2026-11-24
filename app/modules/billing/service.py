@@ -18,7 +18,7 @@ from app.modules.encounter.service import (
 from app.modules.insurance.adapter import InsuranceUnavailable, settle_payment
 from app.modules.payment_gateway.service import CHANNELS, charge as charge_payment, refund
 
-from .models import ChargeRefund, Payment, PaymentAllocation
+from .models import ChargeRefund, Payment, PaymentAllocation, RefundApproval
 from .schemas import PaymentCreate
 
 
@@ -346,6 +346,17 @@ def refund_payment(
                 raise ValueError(f"退款失败：{refund_result['message']}")
 
     refund_no = f"RF{datetime.now():%Y%m%d%H%M%S}{payment.id:04d}"
+    if threshold > 0 and total_amount >= threshold:
+        db.add(
+            RefundApproval(
+                payment_id=payment.id,
+                refund_no=refund_no,
+                amount=total_amount,
+                reason=(reason or "").strip(),
+                operator=operator,
+                operator_role=operator_role,
+            )
+        )
     for charge, quantity in plan:
         amount = round(charge.unit_price * quantity, 2)
         insurance = round(amount * charge.insurance_ratio * insurance_factor, 2)

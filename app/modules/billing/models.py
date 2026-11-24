@@ -152,3 +152,18 @@ class PaymentAllocation(Base):
     trade_no: Mapped[str] = mapped_column(
         String(64), default="", server_default="", nullable=False
     )
+
+
+class RefundApproval(Base):
+    """大额退费审批留痕：谁以什么角色批准/执行了超阈值退费。"""
+
+    __tablename__ = "refund_approvals"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id"), nullable=False, index=True)
+    refund_no: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    amount: Mapped[float] = mapped_column(nullable=False)
+    reason: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    operator_role: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
