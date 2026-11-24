@@ -215,6 +215,7 @@ def _western_page(data: dict) -> str:
       <span>调配药师：__________</span>
       <span>核对、发药药师：__________</span>
     </div>
+    <div>打印时间：{_value(data.get('printed_at'))}</div>
   </div>
 </div>"""
 
@@ -267,6 +268,7 @@ def _tcm_page(data: dict, rx: dict) -> str:
       <span>调配药师：__________</span>
       <span>核对、发药药师：__________</span>
     </div>
+    <div>打印时间：{_value(data.get('printed_at'))}</div>
   </div>
 </div>"""
 

@@ -172,6 +172,7 @@ def _collect(db: Session, encounter_id: int) -> dict:
             else {"signed": False}
         ),
         "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
+        "printed_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "lines": lines,
         "total": round(total, 2),
         "tcm": _tcm_prescriptions(db, encounter_id),
