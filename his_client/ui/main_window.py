@@ -75,7 +75,7 @@ class MainWindow(QMainWindow):
             tabs.add_lazy_tab("检验工作站", lambda: LabWidget(api))
         if role in ("radiology", "admin"):
             tabs.add_lazy_tab("影像工作站", lambda: RadiologyWidget(api))
-        if role in ("surgery", "admin"):
+        if role in ("surgery", "anesthesia", "surgery_nurse", "admin"):
             tabs.add_lazy_tab("手术室工作站", lambda: SurgeryWidget(api))
         if role in ("archive", "admin"):
             tabs.add_lazy_tab("病案档案工作站", lambda: ArchiveWidget(api))

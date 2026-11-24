@@ -289,3 +289,43 @@ def test_surgery_team_roles_must_differ(client, auth):
     blocked = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
     assert blocked.status_code == 400
     assert "不能为同一人" in blocked.json()["detail"]
+
+
+def test_surgery_role_separation(client, auth):
+    import base64
+
+    for username, role in (("anes", "anesthesia"), ("or-nurse", "surgery_nurse")):
+        created = client.post(
+            "/users/",
+            json={"username": username, "password": "pass1234", "role": role},
+            headers=auth["admin"],
+        )
+        assert created.status_code == 201, created.text
+
+    def basic(username):
+        token = base64.b64encode(f"{username}:pass1234".encode()).decode()
+        return {"Authorization": f"Basic {token}"}
+
+    patient, room, case = _setup(client, auth)
+    preop = client.post(
+        f"/surgery/cases/{case['id']}/preop",
+        json={"anesthesiologist": "麻醉医生", "consent": True},
+        headers=basic("anes"),
+    )
+    assert preop.status_code == 201, preop.text
+    denied_start = client.post(
+        f"/surgery/cases/{case['id']}/start", headers=basic("anes")
+    )
+    assert denied_start.status_code == 403
+    safety = client.post(
+        f"/surgery/cases/{case['id']}/safety",
+        json={"phase": "sign_in", "checklist": "身份核查"},
+        headers=basic("or-nurse"),
+    )
+    assert safety.status_code == 201, safety.text
+    denied_nurse = client.post(
+        f"/surgery/cases/{case['id']}/start", headers=basic("or-nurse")
+    )
+    assert denied_nurse.status_code == 403
+    started = client.post(f"/surgery/cases/{case['id']}/start", headers=auth["surgery"])
+    assert started.status_code == 200, started.text

@@ -56,7 +56,7 @@ router = APIRouter(prefix="/surgery", tags=["surgery"], dependencies=[Depends(re
 def new_room(
     data: RoomCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("surgery")),
+    _: None = Depends(require_role("surgery", "anesthesia", "surgery_nurse")),
 ):
     try:
         return create_room(db, data)
@@ -67,7 +67,7 @@ def new_room(
 @router.get("/rooms", response_model=list[RoomResponse])
 def rooms(
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("surgery")),
+    _: None = Depends(require_role("surgery", "anesthesia", "surgery_nurse")),
 ):
     return list_rooms(db)
 
@@ -114,7 +114,7 @@ def cancel(
 def cases(
     status: str | None = None,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("surgery")),
+    _: None = Depends(require_role("surgery", "anesthesia", "surgery_nurse")),
 ):
     return list_cases(db, status)
 
@@ -123,7 +123,7 @@ def cases(
 def case_detail(
     case_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("surgery")),
+    _: None = Depends(require_role("surgery", "anesthesia", "surgery_nurse")),
 ):
     data = detail(db, case_id)
     if not data:
@@ -136,7 +136,7 @@ def safety(
     case_id: int,
     data: SafetyCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return add_safety(db, case_id, data, user.username)
@@ -161,7 +161,7 @@ def record(
     case_id: int,
     data: RecordCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return add_record(db, case_id, data, user.username)
@@ -174,7 +174,7 @@ def counts(
     case_id: int,
     data: CountCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return add_count(db, case_id, data, user.username)
@@ -199,7 +199,7 @@ def recovery(
     case_id: int,
     data: RecoveryCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return add_recovery(db, case_id, data, user.username)
@@ -212,7 +212,7 @@ def package(
     case_id: int,
     package_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return attach_package(db, case_id, package_id, user.username)
@@ -224,7 +224,7 @@ def material(
     case_id: int,
     data: ProcedureMaterialCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "surgery_nurse")),
 ):
     try:
         return add_material(db, case_id, data, user.username)
@@ -236,7 +236,7 @@ def preop(
     case_id: int,
     data: PreopCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "anesthesia")),
 ):
     try:
         return save_preop(db, case_id, data, user.username)
@@ -249,7 +249,7 @@ def anesthesia(
     case_id: int,
     data: AnesthesiaCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_role("surgery")),
+    user=Depends(require_role("surgery", "anesthesia")),
 ):
     try:
         return save_anesthesia(db, case_id, data, user.username)
