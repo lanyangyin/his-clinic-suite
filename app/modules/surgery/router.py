@@ -22,6 +22,7 @@ from .schemas import (
     RecordResponse,
     RecoveryCreate,
     RecoveryResponse,
+    RescheduleRequest,
     RoomCreate,
     RoomResponse,
     SafetyCreate,
@@ -42,6 +43,7 @@ from .service import (
     get_case,
     list_cases,
     list_rooms,
+    reschedule_case,
     save_anesthesia,
     save_preop,
     start_case,
@@ -78,6 +80,19 @@ def new_case(
 ):
     try:
         return create_case(db, data, user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/cases/{case_id}/reschedule", response_model=CaseResponse)
+def reschedule(
+    case_id: int,
+    data: RescheduleRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("surgery")),
+):
+    try:
+        return reschedule_case(db, case_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

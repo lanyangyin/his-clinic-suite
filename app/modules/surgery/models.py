@@ -41,6 +41,9 @@ class SurgeryCase(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     cancel_reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    rescheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rescheduled_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    reschedule_reason: Mapped[str] = mapped_column(String(200), default="", nullable=False)
 
     patient = relationship("Patient")
     room = relationship("OperatingRoom")

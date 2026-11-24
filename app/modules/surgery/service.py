@@ -50,6 +50,22 @@ def _next_no(db: Session) -> str:
     return f"SR{datetime.now():%Y%m%d}{(last[0] if last else 0) + 1:04d}"
 
 
+def _check_room_conflict(
+    db: Session, room_id: int | None, scheduled_at: datetime, exclude_id: int | None = None
+) -> None:
+    if room_id is None:
+        return
+    query = db.query(SurgeryCase).filter(
+        SurgeryCase.room_id == room_id,
+        SurgeryCase.scheduled_at == scheduled_at,
+        SurgeryCase.status.in_(("scheduled", "in_progress")),
+    )
+    if exclude_id is not None:
+        query = query.filter(SurgeryCase.id != exclude_id)
+    if query.first():
+        raise ValueError("该手术间该时段已有手术")
+
+
 def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryCase:
     if not get_patient(db, data.patient_id):
         raise ValueError("患者不存在")
@@ -57,6 +73,7 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
         raise ValueError("就诊记录不存在")
     if data.room_id is not None and not db.get(OperatingRoom, data.room_id):
         raise ValueError("手术间不存在")
+    _check_room_conflict(db, data.room_id, data.scheduled_at or datetime.now())
     price = data.price
     insurance_ratio = 0.0
     if data.charge_item_id is not None:
@@ -98,6 +115,28 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
     db.commit()
     db.refresh(row)
     return row
+
+
+def reschedule_case(
+    db: Session, case_id: int, data, operator: str = ""
+) -> SurgeryCase:
+    case = get_case(db, case_id)
+    if not case:
+        raise ValueError("手术不存在")
+    if case.status != "scheduled":
+        raise ValueError("仅未开始的已排班手术可以改期")
+    room_id = case.room_id if data.room_id is None else data.room_id
+    if room_id is not None and not db.get(OperatingRoom, room_id):
+        raise ValueError("手术间不存在")
+    _check_room_conflict(db, room_id, data.scheduled_at, exclude_id=case.id)
+    case.room_id = room_id
+    case.scheduled_at = data.scheduled_at
+    case.rescheduled_at = datetime.now()
+    case.rescheduled_by = operator
+    case.reschedule_reason = data.reason.strip()
+    db.commit()
+    db.refresh(case)
+    return case
 
 
 def cancel_case(db: Session, case_id: int, reason: str, operator: str = "") -> SurgeryCase:

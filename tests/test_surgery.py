@@ -244,3 +244,27 @@ def test_surgery_cancel_scheduled_case(client, auth):
         headers=auth["surgery"],
     )
     assert again.status_code == 400
+
+
+def test_surgery_reschedule_and_conflict(client, auth):
+    patient, room, case = _setup(client, auth)
+    new_time = (date.today() + timedelta(days=2)).isoformat() + "T10:30:00"
+    moved = client.post(
+        f"/surgery/cases/{case['id']}/reschedule",
+        json={"scheduled_at": new_time, "room_id": room["id"], "reason": "患者要求改期"},
+        headers=auth["surgery"],
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["scheduled_at"].startswith(new_time[:16])
+    assert moved.json()["status"] == "scheduled"
+    other = client.post(
+        "/surgery/cases",
+        json={
+            "patient_id": patient["id"], "room_id": room["id"],
+            "procedure_name": "同时间段手术",
+            "scheduled_at": new_time,
+        },
+        headers=auth["surgery"],
+    )
+    assert other.status_code == 400
+    assert "已有手术" in other.json()["detail"]

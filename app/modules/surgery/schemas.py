@@ -19,6 +19,12 @@ class CancelRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=200)
 
 
+class RescheduleRequest(BaseModel):
+    scheduled_at: datetime
+    room_id: int | None = None
+    reason: str = Field(min_length=1, max_length=200)
+
+
 class CaseCreate(BaseModel):
     patient_id: int
     encounter_id: int | None = None
