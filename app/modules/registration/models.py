@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Integer, String
+from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -20,6 +20,10 @@ class DoctorSchedule(Base):
     # 出诊诊室（可选）
     room_id: Mapped[int | None] = mapped_column(
         ForeignKey("rooms.id"), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint("doctor_id", "schedule_date", "period", name="uq_doctor_schedule_slot"),
     )
 
 

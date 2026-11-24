@@ -1,5 +1,6 @@
 from datetime import date
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.patient.service import get_patient
@@ -41,7 +42,11 @@ def create_schedule(db: Session, data: ScheduleCreate) -> DoctorSchedule:
         room_id=data.room_id,
     )
     db.add(schedule)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("该医生该时段已有排班")
     db.refresh(schedule)
     return schedule
 

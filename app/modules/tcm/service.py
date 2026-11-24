@@ -95,6 +95,11 @@ def create_prescription(
         herbs.append((item, herb))
 
     _check_incompatibility([herb for _item, herb in herbs])
+    for item, herb in herbs:
+        if herb.toxicity == "toxic" and herb.max_dose_g > 0 and item.dose_g > herb.max_dose_g:
+            raise ValueError(
+                f"毒性饮片 {herb.name} 单味剂量 {item.dose_g:g}g 超过上限 {herb.max_dose_g:g}g"
+            )
 
     prescription = TcmPrescription(
         prescription_no=_next_prescription_no(db),

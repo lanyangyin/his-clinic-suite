@@ -262,3 +262,22 @@ def test_tcm_incompatible_pair_rejected(client, auth):
     )
     assert response.status_code == 400
     assert "配伍禁忌" in response.json()["detail"]
+
+
+def test_tcm_toxic_herb_dose_limit(client, auth):
+    patient, encounter, herb_a, herb_b = _setup(client, auth)
+    toxic = client.post(
+        "/tcm/herbs",
+        json={
+            "code": "TCM-TOXIC", "name": "制川乌", "price_per_g": 0.2,
+            "toxicity": "toxic", "max_dose_g": 3,
+        },
+        headers=auth["admin"],
+    ).json()
+    response = client.post(
+        f"/tcm/encounters/{encounter['id']}/prescriptions",
+        json={"items": [{"herb_id": toxic["id"], "dose_g": 5}]},
+        headers=auth["doctor"],
+    )
+    assert response.status_code == 400
+    assert "超过上限" in response.json()["detail"]

@@ -20,6 +20,8 @@ class TcmHerb(Base):
     insurance_code: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     # none 普通 / toxic 毒性 / precious 贵重
     toxicity: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
+    # 毒性饮片单味剂量上限（g）；0 表示未配置上限
+    max_dose_g: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

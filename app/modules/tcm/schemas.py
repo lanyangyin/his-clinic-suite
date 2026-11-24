@@ -11,6 +11,7 @@ class HerbCreate(BaseModel):
     price_per_g: float = Field(default=0, ge=0)
     insurance_code: str = Field(default="", max_length=40)
     toxicity: str = Field(default="none", pattern="^(none|toxic|precious)$")
+    max_dose_g: float = Field(default=0, ge=0, le=1000)
     note: str = Field(default="", max_length=200)
 
 
