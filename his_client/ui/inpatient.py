@@ -1,6 +1,7 @@
 """住院工作站：在院列表、医嘱查看、出院。"""
 from PySide6.QtWidgets import (
     QFormLayout,
+    QLineEdit,
     QGroupBox,
     QHBoxLayout,
     QSpinBox,
@@ -55,6 +56,22 @@ class InpatientWidget(QWidget):
             admit_form.addRow("床位 ID", self.admit_bed)
             admit_form.addRow("", admit_btn)
             layout.addWidget(admit_box)
+        if role in ("doctor", "admin"):
+            takehome_box = QGroupBox("出院带药")
+            takehome_form = QFormLayout(takehome_box)
+            self.takehome_drug = QSpinBox()
+            self.takehome_drug.setRange(0, 100_000_000)
+            self.takehome_qty = QSpinBox()
+            self.takehome_qty.setRange(1, 10000)
+            self.takehome_directions = QLineEdit()
+            self.takehome_directions.setPlaceholderText("用法用量")
+            takehome_btn = QPushButton("添加带药")
+            takehome_btn.clicked.connect(self._add_takehome)
+            takehome_form.addRow("药品 ID", self.takehome_drug)
+            takehome_form.addRow("数量", self.takehome_qty)
+            takehome_form.addRow("用法", self.takehome_directions)
+            takehome_form.addRow("", takehome_btn)
+            layout.addWidget(takehome_box)
         splitter = QSplitter(Qt.Vertical)
         self.admission_table = QTableWidget(0, 5)
         self.admission_table.setHorizontalHeaderLabels(
@@ -108,6 +125,25 @@ class InpatientWidget(QWidget):
             ]
             for j, value in enumerate(values):
                 self.order_table.setItem(i, j, QTableWidgetItem(str(value)))
+
+    def _add_takehome(self) -> None:
+        row = self.admission_table.currentRow()
+        if not 0 <= row < len(self.rows):
+            self.msg.setText("请先选择住院记录")
+            return
+        drug_id = self.takehome_drug.value()
+        if not drug_id:
+            self.msg.setText("请填写药品 ID")
+            return
+        try:
+            self.api.create_discharge_medication(
+                self.rows[row]["id"], drug_id, self.takehome_qty.value(),
+                self.takehome_directions.text().strip(),
+            )
+        except ApiError as e:
+            self.msg.setText(f"带药保存失败：{e.detail}")
+            return
+        self.msg.setText("出院带药已保存")
 
     def _admit(self) -> None:
         patient_id = self.admit_patient.value()

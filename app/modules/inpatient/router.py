@@ -11,6 +11,8 @@ from .schemas import (
     BedResponse,
     BillResponse,
     ChargeResponse,
+    DischargeMedicationCreate,
+    DischargeMedicationResponse,
     DispenseRequestResponse,
     ExecuteRequest,
     ExecutionResponse,
@@ -27,6 +29,7 @@ from .schemas import (
 from .service import (
     create_admission,
     create_bed,
+    create_discharge_medication,
     create_dispense_request,
     create_nursing_note,
     create_order,
@@ -43,6 +46,7 @@ from .service import (
     get_ward,
     list_admissions,
     list_beds,
+    list_discharge_medications,
     list_dispense_requests,
     list_nursing_notes,
     list_orders,
@@ -123,6 +127,34 @@ def admit(
 ):
     try:
         return create_admission(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/admissions/{admission_id}/discharge-medications",
+    response_model=list[DischargeMedicationResponse],
+)
+def discharge_medications(
+    admission_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_discharge_medications(db, admission_id)
+
+
+@router.post(
+    "/admissions/{admission_id}/discharge-medications",
+    response_model=DischargeMedicationResponse,
+    status_code=201,
+)
+def add_discharge_medication(
+    admission_id: int,
+    data: DischargeMedicationCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return create_discharge_medication(db, admission_id, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

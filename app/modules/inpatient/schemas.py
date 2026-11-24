@@ -146,3 +146,21 @@ class NursingNoteResponse(BaseModel):
     recorded_at: datetime
     recorded_by: str
     model_config = ConfigDict(from_attributes=True)
+
+
+class DischargeMedicationCreate(BaseModel):
+    drug_id: int
+    quantity: int = Field(gt=0)
+    directions: str = Field(default="", max_length=200)
+
+
+class DischargeMedicationResponse(BaseModel):
+    id: int
+    admission_id: int
+    drug_id: int
+    drug_name: str
+    quantity: int
+    directions: str
+    created_by: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

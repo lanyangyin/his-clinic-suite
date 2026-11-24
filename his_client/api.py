@@ -688,6 +688,18 @@ class ApiClient:
             json={"patient_id": patient_id, "doctor_id": doctor_id, "bed_id": bed_id},
         )
 
+    def list_discharge_medications(self, admission_id: int) -> list:
+        return self._request("GET", f"/admissions/{admission_id}/discharge-medications")
+
+    def create_discharge_medication(
+        self, admission_id: int, drug_id: int, quantity: int, directions: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/admissions/{admission_id}/discharge-medications",
+            json={"drug_id": drug_id, "quantity": quantity, "directions": directions},
+        )
+
     def list_inpatient_orders(self, admission_id: int) -> list:
         return self._request("GET", f"/admissions/{admission_id}/orders")
 

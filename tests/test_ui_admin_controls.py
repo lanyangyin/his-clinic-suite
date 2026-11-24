@@ -33,6 +33,9 @@ class _NoopApi:
     def create_inpatient_admission(self, patient_id, doctor_id, bed_id):
         return {"id": 1}
 
+    def create_discharge_medication(self, admission_id, drug_id, quantity, directions=""):
+        return {"id": 1}
+
     def list_tcm_stock_batches(self):
         return []
 
@@ -68,3 +71,4 @@ def test_admin_inpatient_has_admit_form(qapp):
     widget = InpatientWidget(_NoopApi(), role="admin")
     assert hasattr(widget, "admit_patient")
     assert widget.admit_patient.value() == 0
+    assert hasattr(widget, "takehome_drug")

@@ -308,3 +308,29 @@ def test_discharge_stops_open_orders(client, auth):
     client.post(f"/admissions/{admission['id']}/discharge", headers=auth["doctor"])
     got = client.get(f"/orders/{order['id']}", headers=auth["doctor"]).json()
     assert got["status"] == "stopped"
+
+
+def test_discharge_medications(client, auth):
+    patient = make_patient(client, auth)
+    doctor = make_doctor(client, auth)
+    _, beds = make_ward_and_beds(client, auth)
+    admission = client.post(
+        "/admissions/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "bed_id": beds[0]["id"]},
+        headers=auth["cashier"],
+    ).json()
+    drug = client.post(
+        "/drugs/", json={"name": "出院带药", "base_price": 5},
+        headers=auth["admin"],
+    ).json()
+    created = client.post(
+        f"/admissions/{admission['id']}/discharge-medications",
+        json={"drug_id": drug["id"], "quantity": 2, "directions": "bid"},
+        headers=auth["doctor"],
+    )
+    assert created.status_code == 201, created.text
+    rows = client.get(
+        f"/admissions/{admission['id']}/discharge-medications", headers=auth["doctor"]
+    ).json()
+    assert rows[0]["drug_name"] == "出院带药"
+    assert rows[0]["quantity"] == 2

@@ -9,6 +9,7 @@ from app.modules.staff.service import get_doctor
 from .models import (
     Admission,
     Bed,
+    DischargeMedication,
     InpatientCharge,
     InpatientDispenseRequest,
     InpatientOrder,
@@ -473,5 +474,42 @@ def list_nursing_notes(db: Session, admission_id: int) -> list[NursingNote]:
         db.query(NursingNote)
         .filter(NursingNote.admission_id == admission_id)
         .order_by(NursingNote.id)
+        .all()
+    )
+
+
+def create_discharge_medication(
+    db: Session, admission_id: int, data, operator: str = ""
+) -> DischargeMedication:
+    from .models import DischargeMedication
+    from app.modules.drug.service import get_drug
+
+    admission = get_admission(db, admission_id)
+    if not admission:
+        raise ValueError("住院记录不存在")
+    if admission.status not in ("in", "discharged"):
+        raise ValueError("当前住院状态不能开具出院带药")
+    if not get_drug(db, data.drug_id):
+        raise ValueError("药品不存在")
+    row = DischargeMedication(
+        admission_id=admission_id,
+        drug_id=data.drug_id,
+        quantity=data.quantity,
+        directions=(data.directions or "").strip(),
+        created_by=operator,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def list_discharge_medications(db: Session, admission_id: int) -> list[DischargeMedication]:
+    from .models import DischargeMedication
+
+    return (
+        db.query(DischargeMedication)
+        .filter(DischargeMedication.admission_id == admission_id)
+        .order_by(DischargeMedication.id)
         .all()
     )

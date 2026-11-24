@@ -164,3 +164,25 @@ class NursingNote(Base):
         DateTime, default=datetime.now, nullable=False
     )
     recorded_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+
+
+class DischargeMedication(Base):
+    """出院带药：住院结束时开具的带药清单。"""
+
+    __tablename__ = "discharge_medications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    admission_id: Mapped[int] = mapped_column(
+        ForeignKey("admissions.id"), nullable=False, index=True
+    )
+    drug_id: Mapped[int] = mapped_column(ForeignKey("drugs.id"), nullable=False)
+    quantity: Mapped[int] = mapped_column(nullable=False)
+    directions: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    drug = relationship("Drug")
+
+    @property
+    def drug_name(self) -> str:
+        return self.drug.name if self.drug else ""
