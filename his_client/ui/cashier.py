@@ -607,6 +607,13 @@ class CashierWidget(QWidget):
         self.r_schedule_id = QSpinBox()
         self.r_schedule_id.setRange(0, 10_000_000)
         self.r_schedule_id.setSpecialValueText("不选排班")
+        self.r_schedule_combo = QComboBox()
+        self.r_schedule_combo.addItem("不选排班", 0)
+        self.r_schedule_combo.currentIndexChanged.connect(
+            lambda _index: self.r_schedule_id.setValue(
+                int(self.r_schedule_combo.currentData() or 0)
+            )
+        )
         self.r_doctor_combo = QLineEdit()
         self.r_doctor_combo.setPlaceholderText("医生 ID")
         self.r_doctor_combo.setReadOnly(True)
@@ -653,7 +660,7 @@ class CashierWidget(QWidget):
         form.addRow("医生", row)
         form.addRow("", self.r_doctor_label)
         form.addRow("", refresh_btn)
-        form.addRow("排班 ID（可选）", self.r_schedule_id)
+        form.addRow("排班（可选）", self.r_schedule_combo)
         self.r_submit = QPushButton("挂号")
         self.r_submit.clicked.connect(self._create_registration)
         self.r_convert = QPushButton("改为初诊")
@@ -696,6 +703,24 @@ class CashierWidget(QWidget):
                 row, 1, QTableWidgetItem(f'{doctor["name"]}（科室 {doctor["department_id"]}）')
             )
 
+    def _load_schedules(self) -> None:
+        self.r_schedule_combo.blockSignals(True)
+        self.r_schedule_combo.clear()
+        self.r_schedule_combo.addItem("不选排班", 0)
+        try:
+            doctor_id = int(self.r_doctor_combo.text())
+            rows = self.api.list_schedules(doctor_id)
+        except (ValueError, ApiError):
+            rows = []
+        for row in rows:
+            remaining = max(0, int(row.get("capacity", 0)) - int(row.get("booked", 0)))
+            self.r_schedule_combo.addItem(
+                f"{row.get('schedule_date')} {row.get('period')}（余 {remaining}）",
+                row.get("id"),
+            )
+        self.r_schedule_combo.blockSignals(False)
+        self.r_schedule_id.setValue(int(self.r_schedule_combo.currentData() or 0))
+
     def _pick_doctor(self, row: int, _column: int) -> None:
         item = self.r_doctor_list.item(row, 0)
         if item:
@@ -704,6 +729,7 @@ class CashierWidget(QWidget):
             self.r_doctor_label.setText(
                 f"已选医生：{name_cell.text() if name_cell else item.text()}"
             )
+        self._load_schedules()
 
     def _lookup_registration_card(self) -> None:
         card_uid = self.r_card_uid.text().strip()
@@ -764,7 +790,7 @@ class CashierWidget(QWidget):
         try:
             registration = (
                 self.api.create_registration(
-                    patient["id"], doctor_id, self.r_schedule_id.value() or None
+                    patient["id"], doctor_id, self.r_schedule_combo.currentData() or None
                 )
                 if register_now
                 else None
@@ -794,7 +820,7 @@ class CashierWidget(QWidget):
         except ValueError:
             self.reg_msg.setText("请先刷新医生列表并选择医生")
             return
-        schedule_id = self.r_schedule_id.value() or None
+        schedule_id = self.r_schedule_combo.currentData() or None
         visit_type = self.r_visit_type.currentData() or "initial"
         original_id = (
             getattr(self, "_original_registration_id", None)
