@@ -178,6 +178,11 @@ class DischargeMedication(Base):
     drug_id: Mapped[int] = mapped_column(ForeignKey("drugs.id"), nullable=False)
     quantity: Mapped[int] = mapped_column(nullable=False)
     directions: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    unit_price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    amount: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    dispensed_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    dispensed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 

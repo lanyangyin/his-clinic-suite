@@ -489,13 +489,16 @@ def create_discharge_medication(
         raise ValueError("住院记录不存在")
     if admission.status not in ("in", "discharged"):
         raise ValueError("当前住院状态不能开具出院带药")
-    if not get_drug(db, data.drug_id):
+    drug = get_drug(db, data.drug_id)
+    if not drug:
         raise ValueError("药品不存在")
     row = DischargeMedication(
         admission_id=admission_id,
         drug_id=data.drug_id,
         quantity=data.quantity,
         directions=(data.directions or "").strip(),
+        unit_price=drug.base_price,
+        amount=round(drug.base_price * data.quantity, 2),
         created_by=operator,
     )
     db.add(row)
@@ -513,3 +516,25 @@ def list_discharge_medications(db: Session, admission_id: int) -> list[Discharge
         .order_by(DischargeMedication.id)
         .all()
     )
+
+
+def dispense_discharge_medication(
+    db: Session, medication_id: int, operator: str = ""
+) -> DischargeMedication:
+    from app.modules.pharmacy.service import deduct_stock
+
+    row = db.get(DischargeMedication, medication_id)
+    if not row:
+        raise ValueError("出院带药不存在")
+    if row.status != "pending":
+        raise ValueError("该带药已处理")
+    deduct_stock(
+        db, row.drug, row.quantity,
+        ref_type="discharge_medication", ref_id=row.id,
+    )
+    row.status = "dispensed"
+    row.dispensed_by = operator
+    row.dispensed_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row

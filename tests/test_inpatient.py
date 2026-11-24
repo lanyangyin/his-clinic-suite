@@ -323,6 +323,11 @@ def test_discharge_medications(client, auth):
         "/drugs/", json={"name": "出院带药", "base_price": 5},
         headers=auth["admin"],
     ).json()
+    client.post(
+        "/pharmacy/stock-in",
+        json={"drug_id": drug["id"], "batch_no": "DCM-1", "expiry": "2027-06-30", "quantity": 10},
+        headers=auth["pharmacist"],
+    )
     created = client.post(
         f"/admissions/{admission['id']}/discharge-medications",
         json={"drug_id": drug["id"], "quantity": 2, "directions": "bid"},
@@ -334,3 +339,10 @@ def test_discharge_medications(client, auth):
     ).json()
     assert rows[0]["drug_name"] == "出院带药"
     assert rows[0]["quantity"] == 2
+    assert rows[0]["amount"] == 10.0
+    dispensed = client.post(
+        f"/discharge-medications/{created.json()['id']}/dispense",
+        headers=auth["pharmacist"],
+    )
+    assert dispensed.status_code == 200, dispensed.text
+    assert dispensed.json()["status"] == "dispensed"

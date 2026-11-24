@@ -161,6 +161,11 @@ class DischargeMedicationResponse(BaseModel):
     drug_name: str
     quantity: int
     directions: str
+    unit_price: float = 0
+    amount: float = 0
+    status: str = "pending"
+    dispensed_by: str = ""
+    dispensed_at: datetime | None = None
     created_by: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)

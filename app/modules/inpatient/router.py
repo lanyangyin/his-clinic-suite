@@ -30,6 +30,7 @@ from .service import (
     create_admission,
     create_bed,
     create_discharge_medication,
+    dispense_discharge_medication,
     create_dispense_request,
     create_nursing_note,
     create_order,
@@ -127,6 +128,21 @@ def admit(
 ):
     try:
         return create_admission(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/discharge-medications/{medication_id}/dispense",
+    response_model=DischargeMedicationResponse,
+)
+def dispense_medication(
+    medication_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("pharmacist", "admin")),
+):
+    try:
+        return dispense_discharge_medication(db, medication_id, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
