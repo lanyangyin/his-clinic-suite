@@ -288,12 +288,11 @@ def refund_payment(
         raw_insurance += round(amount * charge.insurance_ratio, 2)
     total_amount = round(total_amount, 2)
     threshold = getattr(settings, "REFUND_APPROVAL_THRESHOLD", 500)
-    if (
-        threshold > 0
-        and total_amount >= threshold
-        and operator_role not in ("admin", "director")
-    ):
-        raise ValueError(f"退费金额 {total_amount:.2f} 达到 {threshold:.2f}，需院长/管理员审批")
+    if threshold > 0 and total_amount >= threshold:
+        if operator_role not in ("admin", "director"):
+            raise ValueError(f"退费金额 {total_amount:.2f} 达到 {threshold:.2f}，需院长/管理员审批")
+        if not (reason or "").strip():
+            raise ValueError(f"退费金额 {total_amount:.2f} 达到 {threshold:.2f}，请填写退费原因")
     raw_insurance = round(raw_insurance, 2)
     # 不能退超过该笔收费实际收到的医保金额；自费/医保关闭时比例为 0
     insurance_remaining = max(

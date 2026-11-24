@@ -225,7 +225,9 @@ def test_large_refund_requires_admin(client, auth, monkeypatch):
     assert blocked.status_code == 400
     assert "审批" in blocked.json()["detail"]
     allowed = client.post(
-        f"/payments/{payment.json()['id']}/refund", headers=auth["admin"]
+        f"/payments/{payment.json()['id']}/refund",
+        json={"reason": "大额退费审批"},
+        headers=auth["admin"],
     )
     assert allowed.status_code == 200, allowed.text
     assert allowed.json()["status"] == "refunded"

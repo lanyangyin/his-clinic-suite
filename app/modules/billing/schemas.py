@@ -67,7 +67,8 @@ class RefundItem(BaseModel):
 
 
 class RefundRequest(BaseModel):
-    items: list[RefundItem] = Field(min_length=1)
+    # 不传 items 表示整单退费；传 items 才按明细数量退
+    items: list[RefundItem] | None = None
     reason: str = Field(default="", max_length=200)
 
 
