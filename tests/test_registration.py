@@ -94,3 +94,24 @@ def test_cancel_unvisited_registration_releases_slot(client, auth):
     assert client.get(f"/schedules/{schedule['id']}").json()["booked"] == 0
     again = client.post(f"/registrations/{reg['id']}/cancel", headers=auth["cashier"])
     assert again.status_code == 400
+
+
+def test_registration_timestamps_and_cancel_audit(client, auth):
+    patient = client.post(
+        "/patients/", json={"name": "时间戳患者", "id_number": "110101199001017777"},
+        headers=auth["cashier"],
+    ).json()
+    dept = client.post("/departments/", json={"name": "时间戳科"}, headers=auth["admin"]).json()
+    doctor = client.post(
+        "/doctors/", json={"name": "时间戳医生", "department_id": dept["id"]},
+        headers=auth["admin"],
+    ).json()
+    reg = client.post(
+        "/registrations/",
+        json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
+        headers=auth["cashier"],
+    ).json()
+    assert reg["created_at"] is not None
+    assert reg["created_by"] == "cashier"
+    cancelled = client.post(f"/registrations/{reg['id']}/cancel", headers=auth["cashier"]).json()
+    assert cancelled["cancelled_at"] is not None

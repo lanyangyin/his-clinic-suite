@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,4 +35,7 @@ class VisitTypeUpdate(BaseModel):
 class RegistrationResponse(RegistrationCreate):
     id: int
     status: str
+    created_at: datetime
+    created_by: str = ""
+    cancelled_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)

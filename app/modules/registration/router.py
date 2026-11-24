@@ -35,10 +35,10 @@ _NOT_FOUND_MESSAGES = {"患者不存在", "医生不存在", "排班不存在"}
 def register(
     data: RegistrationCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("cashier", "doctor")),
+    user=Depends(require_role("cashier", "doctor")),
 ):
     try:
-        return create_registration(db, data)
+        return create_registration(db, data, user.username)
     except ValueError as e:
         code = 404 if str(e) in _NOT_FOUND_MESSAGES else 400
         raise HTTPException(status_code=code, detail=str(e))

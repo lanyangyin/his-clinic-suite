@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 
-from sqlalchemy import Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -37,6 +37,9 @@ class Registration(Base):
     # Doctor 表还没建，先用整数占位，不加外键
     doctor_id: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="registered", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # 号源排班（可空：不指定排班时为自由挂号，保持兼容）
     schedule_id: Mapped[int | None] = mapped_column(
         ForeignKey("doctor_schedules.id"), nullable=True, index=True

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -102,7 +102,7 @@ def release_schedule_slot(db: Session, schedule_id: int) -> None:
 
 
 def create_registration_for_appointment(
-    db: Session, patient_id: int, doctor_id: int, schedule_id: int
+    db: Session, patient_id: int, doctor_id: int, schedule_id: int, operator: str = ""
 ) -> Registration:
     """预约取号：号源在预约时已占用，这里直接生成挂号记录（不再占号）。"""
     registration = Registration(
@@ -110,13 +110,16 @@ def create_registration_for_appointment(
         doctor_id=doctor_id,
         schedule_id=schedule_id,
         visit_type="initial",
+        created_by=operator,
     )
     db.add(registration)
     db.flush()
     return registration
 
 
-def create_registration(db: Session, data: RegistrationCreate) -> Registration:
+def create_registration(
+    db: Session, data: RegistrationCreate, operator: str = ""
+) -> Registration:
     """挂号：确认患者和医生都存在；指定排班时校验号源并占用。"""
     patient = get_patient(db, data.patient_id)
     if not patient:
@@ -159,6 +162,7 @@ def create_registration(db: Session, data: RegistrationCreate) -> Registration:
         schedule_id=data.schedule_id,
         visit_type=data.visit_type,
         original_registration_id=original_id,
+        created_by=operator,
     )
     db.add(registration)
     db.commit()
@@ -180,6 +184,7 @@ def cancel_registration(db: Session, registration_id: int) -> Registration:
     if registration.schedule_id:
         release_schedule_slot(db, registration.schedule_id)
     registration.status = "cancelled"
+    registration.cancelled_at = datetime.now()
     db.commit()
     db.refresh(registration)
     return registration
