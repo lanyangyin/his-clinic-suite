@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}退费导出模板 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>退费留痕导出模板</h2>
+<div class="panel">
+  <form class="inline" method="post" action="/admin/refund-export-templates">
+    <label>名称 <input name="name" required maxlength="50"></label>
+    <label>字段 <input name="fields" required placeholder="id,payment_id,amount"></label>
+    <button type="submit">保存</button>
+  </form>
+  <table>
+    <tr><th>ID</th><th>名称</th><th>字段</th><th>创建时间</th></tr>
+    {% for row in rows %}
+    <tr><td>{{ row.id }}</td><td>{{ row.name }}</td><td>{{ row.fields }}</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    {% else %}
+    <tr><td colspan="4">暂无模板</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
+from app.modules.admin.models import RefundExportTemplate
 from app.modules.auth.schemas import UserCreate
 from app.modules.labels import zh
 from app.modules.materials.service import get_item as get_material_item
@@ -374,6 +375,37 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
 
 
+@router.get("/refund-export-templates", response_class=HTMLResponse)
+def refund_export_templates_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = db.query(RefundExportTemplate).order_by(RefundExportTemplate.id).all()
+    return templates.TemplateResponse(
+        request, "refund_export_templates.html", _ctx(request, rows=rows)
+    )
+
+
+@router.post("/refund-export-templates")
+def refund_export_template_save(
+    name: str = Form(...),
+    fields: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    name = name.strip()
+    row = db.query(RefundExportTemplate).filter(RefundExportTemplate.name == name).first()
+    if row is None:
+        row = RefundExportTemplate(name=name)
+        db.add(row)
+    row.fields = fields.strip()
+    db.commit()
+    return RedirectResponse("/admin/refund-export-templates", status_code=302)
+
+
 @router.get("/inpatient", response_class=HTMLResponse)
 def inpatient_page(request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)
@@ -491,6 +523,7 @@ def refund_approvals_csv(
     start_date: date | None = None,
     end_date: date | None = None,
     fields: str | None = None,
+    template_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     redirect = _guard(request, db)
@@ -514,6 +547,10 @@ def refund_approvals_csv(
         "role": ("角色", lambda row: row.operator_role),
         "created_at": ("时间", lambda row: row.created_at.strftime("%Y-%m-%d %H:%M")),
     }
+    if template_id and not fields:
+        template = db.get(RefundExportTemplate, template_id)
+        if template:
+            fields = template.fields
     selected = [item.strip() for item in (fields or "").split(",") if item.strip() in available]
     if not selected:
         selected = list(available)

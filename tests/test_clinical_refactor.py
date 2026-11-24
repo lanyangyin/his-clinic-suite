@@ -675,3 +675,25 @@ def test_admin_inpatient_page(client, auth):
     page = client.get("/admin/inpatient")
     assert page.status_code == 200, page.text
     assert "住院管理" in page.text
+
+
+def test_refund_export_templates(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/refund-export-templates")
+    assert page.status_code == 200, page.text
+    created = client.post(
+        "/admin/refund-export-templates",
+        data={"name": "简洁", "fields": "payment_id,amount"},
+        follow_redirects=False,
+    )
+    assert created.status_code == 302
+    page = client.get("/admin/refund-export-templates")
+    assert "简洁" in page.text
+    template_id = client.get("/admin/refund-export-templates").text.split("简洁")[0].count("<tr>")
+    custom = client.get("/admin/refund-approvals.csv", params={"template_id": 1})
+    assert "支付单" in custom.text
+    assert "退费单号" not in custom.text
