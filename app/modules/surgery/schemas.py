@@ -52,6 +52,7 @@ class CaseResponse(BaseModel):
     anesthesia_type: str
     scheduled_at: datetime
     status: str
+    signatures_required: bool = False
     notes: str
     price: float
     created_at: datetime

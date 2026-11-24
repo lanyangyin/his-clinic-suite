@@ -98,6 +98,11 @@ NURSING_REQUIRE_PAID_DISPENSED = (
     or _ini.getboolean("features", "nursing_require_paid_dispensed", fallback=False)
 )
 
+SURGERY_REQUIRE_SIGNATURES = (
+    os.environ.get("HIS_SURGERY_REQUIRE_SIGNATURES", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "surgery_require_signatures", fallback=False)
+)
+
 LIS_REQUIRE_SAMPLE = (
     os.environ.get("HIS_LIS_REQUIRE_SAMPLE", "").lower() in {"1", "true", "yes", "on"}
     or _ini.getboolean("features", "lis_require_sample", fallback=False)

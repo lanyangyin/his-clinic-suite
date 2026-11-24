@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app import settings
 from app.modules.encounter.service import get_encounter
 from app.modules.charges.models import ChargeItem, EncounterCharge
 from app.modules.charges.service import add_charge
@@ -85,6 +86,7 @@ def create_case(db: Session, data: CaseCreate, created_by: str = "") -> SurgeryC
         price = price or item.price
         insurance_ratio = item.insurance_ratio
     row = SurgeryCase(
+        signatures_required=settings.SURGERY_REQUIRE_SIGNATURES,
         surgery_no=_next_no(db),
         patient_id=data.patient_id,
         encounter_id=data.encounter_id,

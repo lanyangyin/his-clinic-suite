@@ -407,3 +407,12 @@ def test_surgery_signature_role_and_password_enforced(client, auth):
         headers=basic("or-nurse3"),
     )
     assert wrong_password.status_code == 400
+
+
+def test_surgery_signature_flag_sets_new_cases(client, auth, monkeypatch):
+    from app import settings
+    from tests.test_surgery import _setup
+
+    monkeypatch.setattr(settings, "SURGERY_REQUIRE_SIGNATURES", True)
+    patient, room, case = _setup(client, auth)
+    assert case["signatures_required"] is True
