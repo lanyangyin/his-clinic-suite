@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
-from app.modules.admin.models import FinancialVoucher, RefundExportTemplate
+from app.modules.admin.models import FinancialReconciliation, FinancialVoucher, RefundExportTemplate
 from app.modules.billing.models import ChargeRefund, Payment
 from app.modules.auth.schemas import UserCreate
 from app.modules.labels import zh
@@ -463,6 +463,54 @@ def generate_financial_vouchers(
     return RedirectResponse("/admin/finance", status_code=302)
 
 
+@router.post("/finance/reconcile")
+def reconcile_finance(
+    biz_date: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    from datetime import datetime as _dt
+
+    try:
+        day = _dt.strptime(biz_date, "%Y-%m-%d")
+    except ValueError:
+        return RedirectResponse("/admin/finance", status_code=302)
+    start = _dt.combine(day.date(), time.min)
+    end = _dt.combine(day.date(), time.max)
+    total_payment = round(
+        sum(row.amount for row in db.query(Payment).filter(
+            Payment.created_at >= start, Payment.created_at <= end,
+            Payment.status.in_(("paid", "partially_refunded")),
+        ).all()), 2
+    )
+    total_inpatient = round(
+        sum(row.amount for row in db.query(InpatientPayment).filter(
+            InpatientPayment.created_at >= start, InpatientPayment.created_at <= end,
+        ).all()), 2
+    )
+    total_refund = round(
+        sum(row.amount for row in db.query(ChargeRefund).filter(
+            ChargeRefund.created_at >= start, ChargeRefund.created_at <= end,
+        ).all()), 2
+    )
+    row = db.query(FinancialReconciliation).filter(
+        FinancialReconciliation.biz_date == biz_date
+    ).first()
+    if row is None:
+        row = FinancialReconciliation(biz_date=biz_date)
+        db.add(row)
+    row.total_payment = total_payment
+    row.total_inpatient = total_inpatient
+    row.total_refund = total_refund
+    row.net = round(total_payment + total_inpatient - total_refund, 2)
+    row.operator = "admin"
+    db.commit()
+    return RedirectResponse("/admin/finance", status_code=302)
+
+
 @router.get("/finance/vouchers.csv")
 def financial_vouchers_csv(request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)
@@ -526,7 +574,8 @@ def finance_page(
         request, "finance.html",
         _ctx(request, payments=payments, inpatient=inpatient, refunds=refunds, totals=totals,
              start_date=start_date, end_date=end_date,
-             vouchers=db.query(FinancialVoucher).order_by(FinancialVoucher.id.desc()).limit(100).all()),
+             vouchers=db.query(FinancialVoucher).order_by(FinancialVoucher.id.desc()).limit(100).all(),
+             reconciliations=db.query(FinancialReconciliation).order_by(FinancialReconciliation.biz_date.desc()).limit(30).all()),
     )
 
 

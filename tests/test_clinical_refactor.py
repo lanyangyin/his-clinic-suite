@@ -732,3 +732,19 @@ def test_financial_vouchers_csv(client, auth):
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
     assert "凭证号" in response.text
+
+
+def test_finance_reconciliation(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    response = client.post(
+        "/admin/finance/reconcile",
+        data={"biz_date": "2026-01-01"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    page = client.get("/admin/finance")
+    assert "日对账签收" in page.text

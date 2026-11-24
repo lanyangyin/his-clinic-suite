@@ -30,3 +30,18 @@ class FinancialVoucher(Base):
     amount: Mapped[float] = mapped_column(nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
+class FinancialReconciliation(Base):
+    """财务日对账签收（操作人+时间，非 CA 签章）。"""
+
+    __tablename__ = "financial_reconciliations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    biz_date: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    total_payment: Mapped[float] = mapped_column(nullable=False)
+    total_inpatient: Mapped[float] = mapped_column(nullable=False)
+    total_refund: Mapped[float] = mapped_column(nullable=False)
+    net: Mapped[float] = mapped_column(nullable=False)
+    operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
