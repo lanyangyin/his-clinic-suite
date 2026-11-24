@@ -106,6 +106,23 @@ class DiagnosisEditor(QWidget):
         self.edit_row = -1
         self._render()
 
+    def add_pending_diagnosis(self) -> None:
+        """检查结果未回时先记“待查”，作为主诊断占位。"""
+        if any((item.get("diagnosis") or "").strip() == "待查" for item in self.items):
+            return
+        self.items.insert(
+            0,
+            {
+                "diagnosis_code": "",
+                "diagnosis": "待查",
+                "note": "待检验/检查结果回报后修正",
+            },
+        )
+        self.edit_row = -1
+        self._render()
+        self.table.selectRow(0)
+        self.changed.emit()
+
     def get_items(self) -> list[dict]:
         return [dict(item) for item in self.items]
 

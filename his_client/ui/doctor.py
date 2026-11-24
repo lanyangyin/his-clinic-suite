@@ -1634,22 +1634,11 @@ class DoctorWidget(QWidget):
         apply_template.clicked.connect(self._apply_record_template)
         top.addWidget(self.record_template)
         top.addWidget(apply_template)
-        self.record_diagnosis = QLabel("诊断：—")
-        self.record_diagnosis.setStyleSheet("font-weight:bold")
-        top.addWidget(self.record_diagnosis, 1)
+        top.addStretch(1)
         layout.addLayout(top)
         self.record_state = QLabel("")
         self.record_state.setWordWrap(True)
         layout.addWidget(self.record_state)
-
-        diagnosis_box = QGroupBox("诊断（第一行为主诊断，按重要性排序）")
-        diagnosis_layout = QVBoxLayout(diagnosis_box)
-        self.record_diagnosis_editor = DiagnosisEditor()
-        diagnosis_layout.addWidget(self.record_diagnosis_editor)
-        self.record_save_diag = QPushButton("保存全部诊断")
-        self.record_save_diag.clicked.connect(self._save_record_diagnoses)
-        diagnosis_layout.addWidget(self.record_save_diag)
-        layout.addWidget(diagnosis_box)
 
         self.record_edits: dict[str, QTextEdit] = {}
         grid = QGridLayout()
@@ -1664,7 +1653,7 @@ class DoctorWidget(QWidget):
             "family_history": (2, 1),
             "physical_exam": (3, 0),
             "auxiliary_exam": (3, 1),
-            "treatment_advice": (4, 0),
+            "treatment_advice": (5, 0),
         }
         for key, label, _limit in _RECORD_FIELDS:
             box = QGroupBox(label)
@@ -1687,6 +1676,28 @@ class DoctorWidget(QWidget):
                 grid.addWidget(box, row, col)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+
+        diagnosis_box = QGroupBox("诊断（病史、查体后填写；结果未回可先记“待查”）")
+        diagnosis_layout = QVBoxLayout(diagnosis_box)
+        self.record_diagnosis = QLabel("诊断：—")
+        self.record_diagnosis.setStyleSheet("font-weight:bold")
+        diagnosis_layout.addWidget(self.record_diagnosis)
+        hint = QLabel("先完成病史与查体；检验/检查结果未回时可点“暂记待查”，结果回报后修改并保存。")
+        hint.setStyleSheet("color:#64748b")
+        hint.setWordWrap(True)
+        diagnosis_layout.addWidget(hint)
+        self.record_diagnosis_editor = DiagnosisEditor()
+        diagnosis_layout.addWidget(self.record_diagnosis_editor)
+        diag_actions = QHBoxLayout()
+        self.record_pending_diag = QPushButton("暂记待查")
+        self.record_pending_diag.clicked.connect(self._set_pending_diagnosis)
+        self.record_save_diag = QPushButton("保存全部诊断")
+        self.record_save_diag.clicked.connect(self._save_record_diagnoses)
+        diag_actions.addWidget(self.record_pending_diag)
+        diag_actions.addWidget(self.record_save_diag)
+        diag_actions.addStretch(1)
+        diagnosis_layout.addLayout(diag_actions)
+        grid.addWidget(diagnosis_box, 4, 0, 1, 2)
         layout.addLayout(grid, 1)
 
         buttons = QHBoxLayout()
@@ -1728,7 +1739,7 @@ class DoctorWidget(QWidget):
         editor = getattr(self, "record_diagnosis_editor", None)
         if editor is not None and hasattr(editor, "set_read_only"):
             editor.set_read_only(not editable)
-        for attr in ("record_save", "record_sign", "record_save_diag"):
+        for attr in ("record_save", "record_sign", "record_save_diag", "record_pending_diag"):
             button = getattr(self, attr, None)
             if button is not None:
                 button.setEnabled(editable)
@@ -1837,6 +1848,14 @@ class DoctorWidget(QWidget):
             self.record_msg.setText(
                 f"病历可编辑（书写：{record.get('written_by') or '—'}）"
             )
+
+    def _set_pending_diagnosis(self) -> None:
+        if self.record_diagnosis_editor.get_items():
+            self.record_msg.setText("已有诊断；如需改为待查，请先在诊断表中删除或修改原诊断")
+            return
+        self.record_diagnosis_editor.add_pending_diagnosis()
+        self.record_msg.setText("已暂记“待查”；拿到检验/检查结果后请修改诊断并保存")
+        self._save_record_diagnoses()
 
     def _save_record_diagnoses(self) -> None:
         encounter_id = self.mr_encounter_id.value()
