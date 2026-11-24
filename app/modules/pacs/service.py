@@ -117,6 +117,7 @@ def report_request(
     study_uid: str = "",
     series_uid: str = "",
     modality: str = "",
+    measurements: str = "",
 ) -> ImagingRequest:
     """影像科回传报告：仅 pending 可报告。"""
     request = get_request(db, request_id)
@@ -139,6 +140,7 @@ def report_request(
     request.study_uid = study_uid
     request.series_uid = series_uid
     request.modality = modality
+    request.measurements = measurements
     request.reported_at = datetime.now()
     request.reported_by = reported_by
     db.commit()

@@ -67,6 +67,7 @@ class ImagingRequest(Base):
     study_uid: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     series_uid: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     modality: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    measurements: Mapped[str] = mapped_column(String(500), default="", nullable=False)
 
     item = relationship("ImagingItem")
 

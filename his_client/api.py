@@ -662,6 +662,7 @@ class ApiClient:
         study_uid: str = "",
         series_uid: str = "",
         modality: str = "",
+        measurements: str = "",
     ) -> dict:
         return self._request(
             "POST",
@@ -674,6 +675,7 @@ class ApiClient:
                 "study_uid": study_uid,
                 "series_uid": series_uid,
                 "modality": modality,
+                "measurements": measurements,
             },
         )
 

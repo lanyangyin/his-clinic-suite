@@ -92,10 +92,13 @@ class RadiologyWidget(QWidget):
         self.series_uid.setPlaceholderText("SeriesUID")
         self.modality = QLineEdit()
         self.modality.setPlaceholderText("Modality")
+        self.measurements = QLineEdit()
+        self.measurements.setPlaceholderText("测量值（如 结节 8mm）")
         dicom_row.addWidget(self.study_uid, 2)
         dicom_row.addWidget(self.series_uid, 2)
         dicom_row.addWidget(self.modality, 1)
         dl.addLayout(dicom_row)
+        dl.addWidget(self.measurements)
         dl.addWidget(self.review_note)
         actions = QHBoxLayout()
         actions.addWidget(submit)
@@ -169,6 +172,7 @@ class RadiologyWidget(QWidget):
             self.study_uid.setText(item.get("study_uid") or "")
             self.series_uid.setText(item.get("series_uid") or "")
             self.modality.setText(item.get("modality") or "")
+            self.measurements.setText(item.get("measurements") or "")
 
     def _open_image(self) -> None:
         url = self.image_url.text().strip()
@@ -196,6 +200,7 @@ class RadiologyWidget(QWidget):
                 self.study_uid.text().strip(),
                 self.series_uid.text().strip(),
                 self.modality.text().strip(),
+                self.measurements.text().strip(),
             )
         except ApiError as e:
             self.msg.setText(f"提交失败：{e.detail}")
@@ -206,6 +211,7 @@ class RadiologyWidget(QWidget):
         self.study_uid.clear()
         self.series_uid.clear()
         self.modality.clear()
+        self.measurements.clear()
         self._load()
         self.msg.setText("报告已提交")
 

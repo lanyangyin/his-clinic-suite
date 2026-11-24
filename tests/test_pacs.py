@@ -242,6 +242,7 @@ def test_structured_imaging_report(client, auth):
             "study_uid": "1.2.3.4.5",
             "series_uid": "1.2.3.4.5.1",
             "modality": "CT",
+            "measurements": "右肺上叶结节 8mm",
         },
         headers=auth["radiology"],
     )
@@ -254,6 +255,7 @@ def test_structured_imaging_report(client, auth):
     assert body["study_uid"] == "1.2.3.4.5"
     assert body["series_uid"] == "1.2.3.4.5.1"
     assert body["modality"] == "CT"
+    assert body["measurements"] == "右肺上叶结节 8mm"
 
 
 def test_imaging_report_template(client, auth):

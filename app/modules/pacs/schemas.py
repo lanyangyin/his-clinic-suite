@@ -43,6 +43,7 @@ class ImagingReportRequest(BaseModel):
     study_uid: str = Field(default="", max_length=64)
     series_uid: str = Field(default="", max_length=64)
     modality: str = Field(default="", max_length=20)
+    measurements: str = Field(default="", max_length=500)
 
 
 class ImagingReviewRequest(BaseModel):
@@ -73,4 +74,5 @@ class ImagingRequestResponse(BaseModel):
     study_uid: str = ""
     series_uid: str = ""
     modality: str = ""
+    measurements: str = ""
     model_config = ConfigDict(from_attributes=True)

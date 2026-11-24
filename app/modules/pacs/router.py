@@ -150,6 +150,7 @@ def report(
             study_uid=data.study_uid,
             series_uid=data.series_uid,
             modality=data.modality,
+            measurements=data.measurements,
         )
     except ValueError as e:
         code = 404 if str(e) == "检查申请不存在" else 400
