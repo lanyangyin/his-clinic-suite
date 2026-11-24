@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app import settings
 
-from .models import NotificationOutbox, NotificationRead
+from .models import NotificationOutbox, NotificationRead, NotificationTemplate
 
 
 def enqueue(
@@ -19,7 +19,21 @@ def enqueue(
     biz_type: str = "",
     biz_id: int | None = None,
     channel: str = "internal",
+    template_code: str = "",
 ) -> NotificationOutbox:
+    if template_code:
+        template = (
+            db.query(NotificationTemplate)
+            .filter(
+                NotificationTemplate.code == template_code,
+                NotificationTemplate.active.is_(True),
+            )
+            .first()
+        )
+        if template:
+            title = template.title or title
+            body = template.body or body
+            channel = template.channel or channel
     row = NotificationOutbox(
         biz_type=biz_type,
         biz_id=biz_id,
@@ -41,6 +55,7 @@ def notify_role(
     *,
     biz_type: str = "",
     biz_id: int | None = None,
+    template_code: str = "",
 ) -> None:
     enqueue(
         db,
@@ -50,6 +65,7 @@ def notify_role(
         biz_type=biz_type,
         biz_id=biz_id,
         channel="internal",
+        template_code=template_code,
     )
     from app.modules.integrations.service import get_value
 
