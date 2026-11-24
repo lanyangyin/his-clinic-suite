@@ -535,6 +535,15 @@ def dispense_discharge_medication(
     row.status = "dispensed"
     row.dispensed_by = operator
     row.dispensed_at = datetime.now()
+    db.add(
+        InpatientCharge(
+            admission_id=row.admission_id,
+            discharge_medication_id=row.id,
+            quantity=row.quantity,
+            unit_price=row.unit_price,
+            amount=row.amount,
+        )
+    )
     db.commit()
     db.refresh(row)
     return row

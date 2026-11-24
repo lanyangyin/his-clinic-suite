@@ -346,3 +346,5 @@ def test_discharge_medications(client, auth):
     )
     assert dispensed.status_code == 200, dispensed.text
     assert dispensed.json()["status"] == "dispensed"
+    bill = client.get(f"/admissions/{admission['id']}/bill", headers=auth["doctor"]).json()
+    assert bill["total_amount"] >= 10.0

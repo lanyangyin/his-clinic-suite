@@ -95,8 +95,11 @@ class InpatientCharge(Base):
         ForeignKey("admissions.id"), nullable=False, index=True
     )
     # 一次执行对应一条费用（唯一约束防重复计费）
-    execution_id: Mapped[int] = mapped_column(
-        ForeignKey("order_executions.id"), nullable=False, unique=True, index=True
+    execution_id: Mapped[int | None] = mapped_column(
+        ForeignKey("order_executions.id"), nullable=True, unique=True, index=True
+    )
+    discharge_medication_id: Mapped[int | None] = mapped_column(
+        ForeignKey("discharge_medications.id"), nullable=True, unique=True, index=True
     )
     quantity: Mapped[int] = mapped_column(nullable=False)
     unit_price: Mapped[float] = mapped_column(nullable=False)
