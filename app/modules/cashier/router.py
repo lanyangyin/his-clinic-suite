@@ -7,7 +7,7 @@ from app.database import get_db
 from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import ShiftClose, ShiftOpen, ShiftResponse
-from .service import close_shift, daily, list_shifts, open_shift
+from .service import close_shift, daily, list_shifts, open_shift, shift_channel_summary
 
 router = APIRouter(prefix="/cashier", tags=["cashier"], dependencies=[Depends(require_read_login)])
 
@@ -42,6 +42,21 @@ def open_new(
         return open_shift(db, user.username, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/shifts/{shift_id}/summary")
+def shift_summary(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("cashier", "admin")),
+):
+    try:
+        data = shift_channel_summary(db, shift_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if user.role == "cashier" and data["cashier"] != user.username:
+        raise HTTPException(status_code=403, detail="不能查看其他收费员的交班汇总")
+    return data
 
 
 @router.post("/shifts/{shift_id}/close", response_model=ShiftResponse)

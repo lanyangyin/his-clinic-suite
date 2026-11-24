@@ -2,7 +2,7 @@
 from datetime import date
 
 
-def _sale(client, auth):
+def _sale(client, auth, channel="cash"):
     dept = client.post(
         "/departments/", json={"name": "日结内科"}, headers=auth["admin"]
     ).json()
@@ -35,7 +35,7 @@ def _sale(client, auth):
         headers=auth["doctor"],
     )
     payment = client.post(
-        "/payments/", json={"encounter_id": encounter["id"], "channel": "cash"},
+        "/payments/", json={"encounter_id": encounter["id"], "channel": channel},
         headers=auth["cashier"],
     )
     assert payment.status_code in (200, 201)
@@ -88,3 +88,18 @@ def test_cashier_shift_and_daily(client, auth):
     assert "门诊收费日结" in page.text
 
     assert client.get("/cashier/daily", headers=auth["doctor"]).status_code == 403
+
+
+def test_shift_channel_summary_includes_non_cash(client, auth):
+    opened = client.post(
+        "/cashier/shifts/open", json={"opening_float": 0}, headers=auth["cashier"]
+    ).json()
+    payment = _sale(client, auth, channel="wechat")
+    summary = client.get(
+        f"/cashier/shifts/{opened['id']}/summary", headers=auth["cashier"]
+    )
+    assert summary.status_code == 200, summary.text
+    data = summary.json()
+    row = next(item for item in data["channels"] if item["channel"] == "wechat")
+    assert row["amount"] == payment["amount"]
+    assert data["total_amount"] >= payment["amount"]

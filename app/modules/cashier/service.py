@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.modules.billing.models import ChargeRefund, Payment
+from app.modules.billing.models import ChargeRefund, Payment, PaymentAllocation
 from app.modules.charges.models import EncounterCharge
 
 from .models import CashierShift
@@ -87,6 +87,82 @@ def close_shift(db: Session, shift_id: int, cashier: str, data: ShiftClose) -> C
     db.commit()
     db.refresh(shift)
     return shift
+
+
+def shift_channel_summary(db: Session, shift_id: int) -> dict:
+    """交班期间全渠道收款/退款汇总，现金仍用于抽屉对账。"""
+    shift = db.get(CashierShift, shift_id)
+    if not shift:
+        raise ValueError("交班记录不存在")
+    end = shift.closed_at or datetime.now()
+    payments = (
+        db.query(Payment)
+        .filter(
+            Payment.created_by == shift.cashier,
+            Payment.created_at >= shift.opened_at,
+            Payment.created_at <= end,
+        )
+        .all()
+    )
+    payment_ids = [payment.id for payment in payments]
+    allocations = (
+        db.query(PaymentAllocation)
+        .filter(PaymentAllocation.payment_id.in_(payment_ids))
+        .all()
+        if payment_ids
+        else []
+    )
+    by_payment: dict[int, list[PaymentAllocation]] = {}
+    for allocation in allocations:
+        by_payment.setdefault(allocation.payment_id, []).append(allocation)
+    refunds = (
+        db.query(ChargeRefund)
+        .filter(
+            ChargeRefund.operator == shift.cashier,
+            ChargeRefund.created_at >= shift.opened_at,
+            ChargeRefund.created_at <= end,
+        )
+        .all()
+    )
+    channels: dict[str, dict] = {}
+    for payment in payments:
+        parts = by_payment.get(payment.id)
+        if parts:
+            for allocation in parts:
+                row = channels.setdefault(
+                    allocation.channel,
+                    {"channel": allocation.channel, "amount": 0.0, "refunded": 0.0, "count": 0},
+                )
+                row["amount"] = round(row["amount"] + allocation.amount, 2)
+                row["count"] += 0  # 笔数按支付头计，分渠道金额按分配
+        else:
+            row = channels.setdefault(
+                payment.channel,
+                {"channel": payment.channel, "amount": 0.0, "refunded": 0.0, "count": 0},
+            )
+            row["amount"] = round(row["amount"] + payment.amount, 2)
+            row["count"] += 1
+    for refund in refunds:
+        row = channels.setdefault(
+            refund.channel or "cash",
+            {"channel": refund.channel or "cash", "amount": 0.0, "refunded": 0.0, "count": 0},
+        )
+        row["refunded"] = round(row["refunded"] + refund.amount, 2)
+    return {
+        "shift_id": shift.id,
+        "shift_no": shift.shift_no,
+        "cashier": shift.cashier,
+        "status": shift.status,
+        "opened_at": shift.opened_at,
+        "closed_at": shift.closed_at,
+        "opening_float": shift.opening_float,
+        "expected_cash": shift.expected_cash,
+        "counted_cash": shift.counted_cash,
+        "difference": shift.difference,
+        "channels": sorted(channels.values(), key=lambda row: row["amount"], reverse=True),
+        "total_amount": round(sum(row["amount"] for row in channels.values()), 2),
+        "total_refunded": round(sum(row["refunded"] for row in channels.values()), 2),
+    }
 
 
 def list_shifts(db: Session, day: date | None = None, cashier: str | None = None) -> list[CashierShift]:
