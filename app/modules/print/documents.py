@@ -159,7 +159,7 @@ def _western_page(data: dict) -> str:
         for index, line in enumerate(data.get("lines") or [])
     ) or '<p class="blank">（无）</p>'
     fee_type = "医保" if settings.INSURANCE_ENABLED else "自费"
-    rx_no = f"RX{data['encounter'].id:06d}"
+    rx_no = data.get("prescription_no") or f"RX{data['encounter'].id:06d}"
     return f"""
 <div class="page">
   {_barcode(rx_no)}

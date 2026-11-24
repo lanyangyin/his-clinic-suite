@@ -58,6 +58,12 @@ def _collect(db: Session, encounter_id: int) -> dict:
     patient = get_patient(db, registration.patient_id)
     doctor = get_doctor(db, registration.doctor_id)
     record = get_medical_record(db, encounter_id)
+    header = (
+        db.query(Prescription)
+        .filter(Prescription.encounter_id == encounter_id)
+        .order_by(Prescription.id)
+        .first()
+    )
 
     lines = []
     total = 0.0
@@ -119,6 +125,7 @@ def _collect(db: Session, encounter_id: int) -> dict:
             for row in list_encounter_diagnoses(db, encounter_id)
         ],
         "record_no": f"BL{encounter.created_at:%Y%m%d}{encounter.id:04d}",
+        "prescription_no": header.prescription_no if header else "",
         "visit_date": encounter.created_at.strftime("%Y-%m-%d"),
         "lines": lines,
         "total": round(total, 2),
