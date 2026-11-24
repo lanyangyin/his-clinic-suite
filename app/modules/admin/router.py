@@ -139,6 +139,7 @@ from app.modules.encounter.service import list_record_revisions, review_record_r
 from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox
+from app.modules.billing.models import RefundApproval
 from app.modules.patient.models import PatientMergeRequest
 from app.modules.patient.service import review_merge_request
 from app.modules.notify.service import dispatch_pending, retry_failed
@@ -366,6 +367,22 @@ def notifications_retry(request: Request, db: Session = Depends(get_db)):
         return redirect
     count = retry_failed(db)
     return RedirectResponse(f"/admin/notifications?retried={count}", status_code=302)
+
+
+@router.get("/refund-approvals", response_class=HTMLResponse)
+def refund_approvals_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = (
+        db.query(RefundApproval)
+        .order_by(RefundApproval.id.desc())
+        .limit(200)
+        .all()
+    )
+    return templates.TemplateResponse(
+        request, "refund_approvals.html", _ctx(request, rows=rows)
+    )
 
 
 @router.get("/patient-merges", response_class=HTMLResponse)
