@@ -178,3 +178,19 @@ def test_invoice_print_and_void(client, auth):
     page = client.get("/admin/invoice-usage")
     assert page.status_code == 200
     assert "发票使用明细" in page.text
+
+
+def test_invoice_batch_overlap_across_cashiers_rejected(client, auth):
+    first = client.post(
+        "/invoices/batches",
+        json={"prefix": "OV", "start_no": 1, "end_no": 10, "assigned_to": "cashier"},
+        headers=auth["admin"],
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        "/invoices/batches",
+        json={"prefix": "OV", "start_no": 5, "end_no": 15, "assigned_to": "cashier2"},
+        headers=auth["admin"],
+    )
+    assert second.status_code == 400
+    assert "重叠" in second.json()["detail"]

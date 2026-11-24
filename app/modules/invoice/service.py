@@ -14,7 +14,6 @@ def create_batch(db: Session, data: InvoiceBatchCreate) -> InvoiceBatch:
             InvoiceBatch.status == "active",
             InvoiceBatch.start_no <= data.end_no,
             InvoiceBatch.end_no >= data.start_no,
-            InvoiceBatch.assigned_to == data.assigned_to,
         )
         .first()
     )
@@ -63,11 +62,24 @@ def allocate(db: Session, cashier: str) -> InvoiceBatch | None:
         .order_by(InvoiceBatch.id)
     )
     for batch in query.all():
-        if batch.next_no > batch.end_no:
+        old_next = batch.next_no
+        if old_next > batch.end_no:
             continue
-        batch.next_no += 1
-        if batch.next_no > batch.end_no:
-            batch.status = "closed"
-        db.flush()
-        return batch
+        new_next = old_next + 1
+        values = {InvoiceBatch.next_no: new_next}
+        if new_next > batch.end_no:
+            values[InvoiceBatch.status] = "closed"
+        affected = (
+            db.query(InvoiceBatch)
+            .filter(
+                InvoiceBatch.id == batch.id,
+                InvoiceBatch.status == "active",
+                InvoiceBatch.next_no == old_next,
+            )
+            .update(values, synchronize_session=False)
+        )
+        if affected == 1:
+            db.flush()
+            db.refresh(batch)
+            return batch
     return None
