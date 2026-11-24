@@ -424,6 +424,8 @@ def advance_request(
                 body=note or "审批被驳回",
                 biz_type=biz_type,
                 biz_id=biz_id,
+                template_code="approval_result",
+                template_vars={"title": request.title, "result": "审批驳回", "note": note or "审批被驳回"},
             )
         return "rejected"
 
@@ -475,6 +477,8 @@ def advance_request(
             body=note or "审批已通过",
             biz_type=biz_type,
             biz_id=biz_id,
+            template_code="approval_result",
+            template_vars={"title": request.title, "result": "审批通过", "note": note or "审批已通过"},
         )
     return "approved"
 
