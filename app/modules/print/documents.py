@@ -170,6 +170,14 @@ def _western_page(data: dict) -> str:
     ) or '<p class="blank">（无）</p>'
     fee_type = "医保" if settings.INSURANCE_ENABLED else "自费"
     rx_no = data.get("prescription_no") or f"RX{data['encounter'].id:06d}"
+    rx_status = {
+        "pending_review": "待药师审核",
+        "approved": "已审核",
+        "rejected": "已退回",
+        "dispensing": "调配中",
+        "dispensed": "已发药",
+        "cancelled": "已作废",
+    }.get(data.get("prescription_status") or "", data.get("prescription_status") or "")
     return f"""
 <div class="page">
   {_barcode(rx_no)}
@@ -184,7 +192,7 @@ def _western_page(data: dict) -> str:
     <tr><td>门诊/住院病历号：{_value(data.get('record_no'))}</td>
         <td>科室：{_value(data.get('department_name'))}</td>
         <td>开具日期：{_value(data.get('visit_date'))}</td></tr>
-    <tr><td colspan="2">临床诊断：{_value(data['encounter'].diagnosis)}</td><td></td></tr>
+    <tr><td colspan="2">临床诊断：{_value(data['encounter'].diagnosis)}</td><td>处方状态：{_value(rx_status)}</td></tr>
   </table>
   <div class="rule-thin"></div>
   <div class="prescription-box">
@@ -208,6 +216,14 @@ def _tcm_page(data: dict, rx: dict) -> str:
     meta = _clinic_meta()
     herbs = _herb_table(rx["items"])
     fee_type = "医保" if settings.INSURANCE_ENABLED else "自费"
+    rx_status = {
+        "pending": "待药师审核",
+        "reviewed": "已审核",
+        "dispensed": "已发药",
+        "decocting": "煎药中",
+        "completed": "已完成",
+        "cancelled": "已作废",
+    }.get(rx.get("status") or "", rx.get("status") or "")
     return f"""
 <div class="page">
   {_barcode(rx["prescription_no"])}
@@ -222,7 +238,7 @@ def _tcm_page(data: dict, rx: dict) -> str:
     <tr><td>门诊/住院病历号：{_value(data.get('record_no'))}</td>
         <td>科室：{_value(data.get('department_name'))}</td>
         <td>开具日期：{_value(data.get('visit_date'))}</td></tr>
-    <tr><td colspan="2">临床诊断：{_value(data['encounter'].diagnosis)}</td><td></td></tr>
+    <tr><td colspan="2">临床诊断：{_value(data['encounter'].diagnosis)}</td><td>处方状态：{_value(rx_status)}</td></tr>
   </table>
   <div class="rule-thin"></div>
   <div class="prescription-box">

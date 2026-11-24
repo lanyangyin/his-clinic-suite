@@ -158,6 +158,7 @@ def _collect(db: Session, encounter_id: int) -> dict:
         ],
         "record_no": f"BL{encounter.created_at:%Y%m%d}{encounter.id:04d}",
         "prescription_no": header.prescription_no if header else "",
+        "prescription_status": header.status if header else "",
         "signature": (
             {
                 "signed": True,
