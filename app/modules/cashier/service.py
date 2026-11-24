@@ -84,6 +84,8 @@ def close_shift(db: Session, shift_id: int, cashier: str, data: ShiftClose) -> C
     shift.difference = round(data.counted_cash - expected, 2)
     shift.status = "closed"
     shift.note = data.note or shift.note
+    shift.handover_to = data.handover_to.strip()
+    shift.handover_signature = data.handover_signature.strip()
     db.commit()
     db.refresh(shift)
     return shift

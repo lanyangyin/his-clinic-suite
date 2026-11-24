@@ -1272,9 +1272,15 @@ class CashierWidget(QWidget):
         self.counted_cash = QDoubleSpinBox()
         self.counted_cash.setRange(0, 10000000)
         self.counted_cash.setDecimals(2)
+        self.handover_to = QLineEdit()
+        self.handover_to.setPlaceholderText("接收人")
+        self.handover_signature = QLineEdit()
+        self.handover_signature.setPlaceholderText("交接签字")
         close_btn = QPushButton("交班")
         close_btn.clicked.connect(self._close_shift)
         close_form.addRow("实收现金", self.counted_cash)
+        close_form.addRow("接收人", self.handover_to)
+        close_form.addRow("交接签字", self.handover_signature)
         close_form.addRow("", close_btn)
         layout.addWidget(close_box)
 
@@ -1353,7 +1359,8 @@ class CashierWidget(QWidget):
             return
         try:
             shift = self.api.close_cashier_shift(
-                shift_id, self.counted_cash.value(), self.shift_note.text().strip()
+                shift_id, self.counted_cash.value(), self.shift_note.text().strip(),
+                self.handover_to.text().strip(), self.handover_signature.text().strip(),
             )
         except ApiError as e:
             self.shift_msg.setText(f"交班失败（{e.status_code}）：{e.detail}")

@@ -11,6 +11,8 @@ class ShiftOpen(BaseModel):
 class ShiftClose(BaseModel):
     counted_cash: float = Field(ge=0)
     note: str = Field(default="", max_length=200)
+    handover_to: str = Field(default="", max_length=50)
+    handover_signature: str = Field(default="", max_length=50)
 
 
 class ShiftResponse(BaseModel):
@@ -25,4 +27,6 @@ class ShiftResponse(BaseModel):
     difference: float | None
     status: str
     note: str
+    handover_to: str = ""
+    handover_signature: str = ""
     model_config = ConfigDict(from_attributes=True)

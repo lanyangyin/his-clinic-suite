@@ -69,7 +69,10 @@ def test_cashier_shift_and_daily(client, auth):
     expected = round(100 + payment["amount"] - payment.get("refunded_amount", 0), 2)
     closed = client.post(
         f"/cashier/shifts/{shift['id']}/close",
-        json={"counted_cash": expected + 5, "note": "交班测试"},
+        json={
+            "counted_cash": expected + 5, "note": "交班测试",
+            "handover_to": "财务王会计", "handover_signature": "cashier-sign",
+        },
         headers=auth["cashier"],
     )
     assert closed.status_code == 200, closed.text
@@ -77,6 +80,8 @@ def test_cashier_shift_and_daily(client, auth):
     assert body["status"] == "closed"
     assert body["expected_cash"] == expected
     assert body["difference"] == 5
+    assert body["handover_to"] == "财务王会计"
+    assert body["handover_signature"] == "cashier-sign"
 
     client.post(
         "/admin/login",

@@ -29,3 +29,5 @@ class CashierShift(Base):
     # open 交班中 / closed 已交班
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    handover_to: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    handover_signature: Mapped[str] = mapped_column(String(50), default="", nullable=False)

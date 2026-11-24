@@ -983,11 +983,17 @@ class ApiClient:
             json={"opening_float": opening_float, "note": note},
         )
 
-    def close_cashier_shift(self, shift_id: int, counted_cash: float, note: str = "") -> dict:
+    def close_cashier_shift(
+        self, shift_id: int, counted_cash: float, note: str = "",
+        handover_to: str = "", handover_signature: str = "",
+    ) -> dict:
         return self._request(
             "POST",
             f"/cashier/shifts/{shift_id}/close",
-            json={"counted_cash": counted_cash, "note": note},
+            json={
+                "counted_cash": counted_cash, "note": note,
+                "handover_to": handover_to, "handover_signature": handover_signature,
+            },
         )
 
     def print_invoice(self, payment_id: int) -> dict:
