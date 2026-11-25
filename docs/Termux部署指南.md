@@ -1,7 +1,7 @@
 # Android Termux 部署指南（优先 /sdcard）
 
 适用：Android 10+、arm64 手机/平板。  
-服务端版本：HIS 1.2.4。  
+服务端版本：HIS 1.3.1。桌面客户端仍是 Windows 包；Termux 只提供服务端，不是 Android 客户端。  
 目标：源码、配置、数据库、备份**优先放 `/sdcard/HIS`**；Python 虚拟环境放内部，保证可执行。
 
 > 说明：Android 的 `/sdcard` 是 FUSE/模拟存储，不是 ext4。  
@@ -107,31 +107,34 @@ date
 ## 第 4 步：获取服务端（推荐最小包，不必克隆整个仓库）
 
 完整仓库包含客户端、测试、视频和截图，Termux 不需要。  
-下载 **Termux 专用服务端源码包**，约 336 KB：
+下载 **Termux 专用服务端源码包**，约 450 KB：
 
 ```bash
 mkdir -p /sdcard/HIS
 cd /sdcard/HIS
 
-curl -L -o his-server-termux-1.2.4.tar.gz \
-  https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.2.4/his-server-termux-1.2.4.tar.gz
+curl -L -o his-server-termux-1.3.1.tar.gz \
+  https://github.com/lanyangyin/his-clinic-suite/releases/download/v1.3.1/his-server-termux-1.3.1.tar.gz
 
-tar -xzf his-server-termux-1.2.4.tar.gz -C /sdcard/HIS --strip-components=1
+tar -xzf his-server-termux-1.3.1.tar.gz -C /sdcard/HIS --strip-components=1
 ls
 ```
 
-包内只有：
+包内主要包含：
 
 ```text
 app/
 alembic/
 scripts/
 deploy/
+DEPLOY-TERMUX.md
 start-termux.sh
+backup.sh
+alembic.ini
+pyproject.toml
 config.ini
 config.release.ini
 requirements-server.txt
-DEPLOY-TERMUX.md
 ```
 
 不含：
@@ -203,9 +206,23 @@ url =
 name = 你的诊所名称
 address =
 phone =
+
+[insurance]
+; 国家医保接口先留空，机构上线后再填
+national_url =
+national_token =
+national_org_code =
+national_region_code =
+
+[features]
+insurance = false
+insurance_national_mock = false
 ```
 
 数据库路径有两种模式，见下一步。
+
+> Termux 只部署服务端；桌面客户端仍在 Windows 上运行。当前没有 Android 客户端包。
+> 打印抬头/Logo/字体/纸张等由管理台 `/admin/print-profile` 配置，不需要改代码。
 
 ---
 
@@ -358,7 +375,7 @@ curl http://127.0.0.1:8001/health
 应返回：
 
 ```json
-{"status":"ok","version":"1.2.4"}
+{"status":"ok","version":"1.3.1"}
 ```
 
 查看手机 IP（Termux 外层，不是 Ubuntu）：
@@ -506,7 +523,7 @@ git pull
 - [ ] `.venv` 在 `/root/his-venv`
 - [ ] `config.local.ini` 改了 secret_key
 - [ ] 数据库模式已选 A 或 B
-- [ ] `/health` 返回 1.2.0
+- [ ] `/health` 返回 1.3.1
 - [ ] 电脑能打开管理台
 - [ ] admin 密码已改
 - [ ] 客户端能连接
