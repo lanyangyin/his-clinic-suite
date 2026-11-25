@@ -163,6 +163,10 @@ uv run python -m his_client --auto-login
 |---|---|---|
 | ![医生](docs/screenshots/doctor.png) | ![药房](docs/screenshots/pharmacy.png) | ![护士](docs/screenshots/nurse.png) |
 
+## 操作教学录像
+
+门诊主流程、挂号收费、医生站、全院页签巡检的教学视频见 [docs/教学演示](docs/教学演示/README.md)。
+
 ## 下载（整包）
 
 GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）：

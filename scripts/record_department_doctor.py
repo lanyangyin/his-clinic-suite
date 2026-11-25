@@ -252,8 +252,20 @@ class DoctorDemo(LoginMixin, QMainWindow):
                     break
             self.widget._load_critical_alerts()
             self.scene("检验科报告危急值，医生工作台红色提醒", work)
-            self.widget.critical_table.selectRow(0)
-            self.widget._select_critical(0, 0)
+            target_critical = -1
+            for row in range(self.widget.critical_table.rowCount()):
+                patient_cell = self.widget.critical_table.item(row, 0)
+                item_cell = self.widget.critical_table.item(row, 1)
+                if (
+                    patient_cell and item_cell
+                    and self.patient["name"] in patient_cell.text()
+                    and self.lab["name"] in item_cell.text()
+                ):
+                    target_critical = row
+                    break
+            assert target_critical >= 0, "危急值列表没有本次报告"
+            self.widget.critical_table.selectRow(target_critical)
+            self.widget._select_critical(target_critical, 0)
             self.widget.critical_note.setText("已电话回读并确认")
             self.click(work, "确认危急值")
             ack = self.doctor_api.call("GET", f"/lab/requests/{lab_request['id']}")
