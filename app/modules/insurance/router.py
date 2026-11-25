@@ -28,6 +28,7 @@ def national_status(
         missing.append("region_code")
     return {
         "configured": cfg.configured,
+        "enabled": cfg.enabled,
         "mock": cfg.mock,
         "missing": missing,
         "supported": sorted(national.SUPPORTED),

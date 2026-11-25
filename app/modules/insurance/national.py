@@ -42,6 +42,7 @@ class NationalConfig:
     region_code: str
     operator: str
     mock: bool
+    enabled: bool
 
     @property
     def configured(self) -> bool:
@@ -64,6 +65,7 @@ def config(db=None) -> NationalConfig:
         region_code=(values or {}).get("national_region_code") or _get("INSURANCE_NATIONAL_REGION_CODE"),
         operator=(values or {}).get("national_operator") or _get("INSURANCE_NATIONAL_OPERATOR", "HIS"),
         mock=bool((values or {}).get("national_mock") or getattr(settings, "INSURANCE_NATIONAL_MOCK", False)),
+        enabled=bool((values or {}).get("insurance_enabled") or getattr(settings, "INSURANCE_ENABLED", False)),
     )
 
 
@@ -144,6 +146,8 @@ def _post(envelope: dict, db=None) -> dict:
 
 def call(infno: str, input_data: dict, db=None) -> dict:
     cfg = config(db)
+    if not cfg.enabled:
+        raise NationalInsuranceNotConfigured("本机构未启用医保接口")
     envelope = build_envelope(infno, input_data, db)
     if cfg.configured:
         return _post(envelope, db)

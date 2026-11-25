@@ -42,6 +42,7 @@ def test_national_status_reports_missing_config(client, auth, monkeypatch):
     monkeypatch.setattr(settings, "INSURANCE_NATIONAL_ORG_CODE", "")
     monkeypatch.setattr(settings, "INSURANCE_NATIONAL_REGION_CODE", "")
     monkeypatch.setattr(settings, "INSURANCE_NATIONAL_MOCK", False)
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", True)
     status = client.get("/insurance/national/status", headers=auth["admin"]).json()
     assert status["configured"] is False
     assert "url" in status["missing"]
@@ -58,6 +59,7 @@ def test_national_pre_settle_and_settle_mock(client, auth, monkeypatch):
 
     monkeypatch.setattr(settings, "INSURANCE_NATIONAL_URL", "")
     monkeypatch.setattr(settings, "INSURANCE_NATIONAL_MOCK", True)
+    monkeypatch.setattr(settings, "INSURANCE_ENABLED", True)
     encounter = make_encounter(client, auth)
     pre = client.post(
         f"/insurance/national/pre-settle/{encounter['id']}", headers=auth["cashier"]
