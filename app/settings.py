@@ -132,6 +132,26 @@ INSURANCE_GATEWAY_TOKEN = os.environ.get("HIS_INSURANCE_GATEWAY_TOKEN", "") or _
     "insurance", "gateway_token", fallback=""
 )
 
+INSURANCE_NATIONAL_URL = os.environ.get("HIS_INSURANCE_NATIONAL_URL", "") or _ini.get(
+    "insurance", "national_url", fallback=""
+)
+INSURANCE_NATIONAL_TOKEN = os.environ.get("HIS_INSURANCE_NATIONAL_TOKEN", "") or _ini.get(
+    "insurance", "national_token", fallback=""
+)
+INSURANCE_NATIONAL_ORG_CODE = os.environ.get("HIS_INSURANCE_NATIONAL_ORG_CODE", "") or _ini.get(
+    "insurance", "national_org_code", fallback=""
+)
+INSURANCE_NATIONAL_REGION_CODE = os.environ.get("HIS_INSURANCE_NATIONAL_REGION_CODE", "") or _ini.get(
+    "insurance", "national_region_code", fallback=""
+)
+INSURANCE_NATIONAL_OPERATOR = os.environ.get("HIS_INSURANCE_NATIONAL_OPERATOR", "") or _ini.get(
+    "insurance", "national_operator", fallback="HIS"
+)
+INSURANCE_NATIONAL_MOCK = (
+    os.environ.get("HIS_INSURANCE_NATIONAL_MOCK", "").lower() in {"1", "true", "yes", "on"}
+    or _ini.getboolean("features", "insurance_national_mock", fallback=False)
+)
+
 INSURANCE_ALLOW_MOCK = (
     os.environ.get("HIS_INSURANCE_ALLOW_MOCK", "").lower() in {"1", "true", "yes", "on"}
     or _ini.getboolean("features", "insurance_mock", fallback=False)

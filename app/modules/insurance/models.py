@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -23,4 +23,10 @@ class InsuranceTransaction(Base):
     message: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     settlement_no: Mapped[str] = mapped_column(String(60), default="", nullable=False)
     operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    infno: Mapped[str] = mapped_column(String(10), default="", nullable=False)
+    trade_no: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    request_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    response_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    mode: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
