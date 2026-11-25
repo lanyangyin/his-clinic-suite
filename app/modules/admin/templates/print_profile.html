@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}打印外观 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>打印外观配置</h2>
+<p class="small">用于不同机构部署：抬头、Logo、字体、颜色、纸张、页脚、签名栏和自定义 CSS；保存后病历/处方打印立即生效。</p>
+<div class="panel">
+  <form method="post" action="/admin/print-profile">
+    <h3>机构抬头</h3>
+    <label>机构名称 <input name="clinic_name" value="{{ profile.clinic_name }}" maxlength="100" style="width:360px"></label>
+    <label>地址 <input name="clinic_address" value="{{ profile.clinic_address }}" maxlength="200" style="width:360px"></label>
+    <label>电话 <input name="clinic_phone" value="{{ profile.clinic_phone }}" maxlength="40"></label>
+    <label>Logo URL <input name="logo_url" value="{{ profile.logo_url }}" maxlength="500" style="width:420px" placeholder="http(s):// 或 data:image/..."></label>
+    <label>标题下说明 <input name="header_note" value="{{ profile.header_note }}" maxlength="300" style="width:420px"></label>
+    <h3>版式</h3>
+    <label>主题色 <input type="color" name="theme_color" value="{{ profile.theme_color }}"></label>
+    <label>字体 <input name="font_family" value="{{ profile.font_family }}" maxlength="200" style="width:360px" placeholder='例如 "SimSun", serif'></label>
+    <label>纸张
+      <select name="paper_size">
+        <option value="A4" {% if profile.paper_size == 'A4' %}selected{% endif %}>A4</option>
+        <option value="A5" {% if profile.paper_size == 'A5' %}selected{% endif %}>A5</option>
+      </select>
+    </label>
+    <label>页边距 mm <input type="number" name="margin_mm" min="5" max="40" value="{{ profile.margin_mm }}"></label>
+    <h3>页脚与签名</h3>
+    <label>页脚说明 <input name="footer_note" value="{{ profile.footer_note }}" maxlength="500" style="width:460px"></label>
+    <label>医师栏 <input name="doctor_label" value="{{ profile.doctor_label }}" maxlength="30"></label>
+    <label>审核药师栏 <input name="reviewer_label" value="{{ profile.reviewer_label }}" maxlength="30"></label>
+    <label>调配药师栏 <input name="dispenser_label" value="{{ profile.dispenser_label }}" maxlength="30"></label>
+    <label>核对发药栏 <input name="checker_label" value="{{ profile.checker_label }}" maxlength="30"></label>
+    <h3>自定义 CSS</h3>
+    <textarea name="custom_css" rows="10" style="width:100%;font-family:monospace">{{ profile.custom_css }}</textarea>
+    <p><button type="submit">保存打印外观</button></p>
+  </form>
+</div>
+{% endblock %}

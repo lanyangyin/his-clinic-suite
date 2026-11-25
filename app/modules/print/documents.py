@@ -1,6 +1,7 @@
 """门诊病历 / 西药处方笺 / 中药处方笺打印文档。"""
 from datetime import datetime
 from html import escape
+import re
 
 from app import settings
 from app.modules.print.barcode import code128_svg
@@ -42,6 +43,71 @@ body { font-family: "Microsoft YaHei", "SimSun", sans-serif; color: #111; font-s
 """
 
 
+def _profile(profile: dict | None = None) -> dict:
+    base = {
+        "clinic_name": settings.CLINIC_NAME,
+        "clinic_address": settings.CLINIC_ADDRESS,
+        "clinic_phone": settings.CLINIC_PHONE,
+        "logo_url": "",
+        "theme_color": "#111111",
+        "font_family": '"Microsoft YaHei", "SimSun", sans-serif',
+        "paper_size": "A4",
+        "margin_mm": 12,
+        "header_note": "",
+        "footer_note": "",
+        "doctor_label": "医师",
+        "reviewer_label": "审核药师",
+        "dispenser_label": "调配药师",
+        "checker_label": "核对、发药药师",
+        "custom_css": "",
+    }
+    if profile:
+        base.update({key: value for key, value in profile.items() if value not in (None, "")})
+    paper = base.get("paper_size") if base.get("paper_size") in ("A4", "A5") else "A4"
+    margin = base.get("margin_mm")
+    try:
+        margin = max(5, min(40, int(margin)))
+    except (TypeError, ValueError):
+        margin = 12
+    color = str(base.get("theme_color") or "#111111")
+    if not re.fullmatch(r"#[0-9a-fA-F]{3,8}", color):
+        color = "#111111"
+    base["paper_size"] = paper
+    base["margin_mm"] = margin
+    base["theme_color"] = color
+    return base
+
+
+def _page_css(profile: dict) -> str:
+    css = PAGE_CSS.replace(
+        "@page { size: A4; margin: 12mm; }",
+        f"@page {{ size: {profile['paper_size']}; margin: {profile['margin_mm']}mm; }}",
+    )
+    css = css.replace(
+        'font-family: "Microsoft YaHei", "SimSun", sans-serif;',
+        f"font-family: {profile['font_family']};",
+    )
+    css = css.replace("color: #111;", f"color: {profile['theme_color']};", 1)
+    css += """
+.clinic-logo { display: block; max-height: 48px; max-width: 180px; margin: 0 auto 4px; }
+.header-note { text-align: center; font-size: 12px; color: #444; margin: 2px 0 4px; }
+.footer-note { margin-top: 8px; font-size: 12px; color: #333; border-top: 1px dotted #999; padding-top: 4px; }
+"""
+    custom = str(profile.get("custom_css") or "").strip()
+    if custom:
+        css += "\n/* institution custom css */\n" + custom
+    return css
+
+
+def _logo_html(profile: dict) -> str:
+    url = str(profile.get("logo_url") or "").strip()
+    if not url:
+        return ""
+    if not (url.startswith("http://") or url.startswith("https://") or url.startswith("data:image/")):
+        return ""
+    return f'<img class="clinic-logo" src="{escape(url, quote=True)}" alt="机构标识">'
+
+
 def _value(value, fallback="—"):
     text = str(value or "").strip()
     return escape(text) if text else fallback
@@ -69,12 +135,9 @@ def _herb_table(items: list[dict]) -> str:
     return '<table class="herbs">' + "".join(rows) + "</table>"
 
 
-def _record_page(data: dict) -> str:
-    meta = {
-        "name": settings.CLINIC_NAME,
-        "phone": settings.CLINIC_PHONE,
-        "address": settings.CLINIC_ADDRESS,
-    }
+def _record_page(data: dict, profile: dict | None = None) -> str:
+    profile = _profile(profile)
+    meta = _clinic_meta(profile)
     record = data.get("record")
     diagnosis = data["encounter"].diagnosis or ""
     diagnoses = data.get("diagnoses")
@@ -115,7 +178,9 @@ def _record_page(data: dict) -> str:
     ) or "—"
     return f"""
 <div class="page">
+  {_logo_html(profile)}
   <div class="clinic">{escape(meta['name'])}</div>
+  {f'<div class="header-note">{escape(profile["header_note"])}</div>' if profile.get('header_note') else ''}
   <div class="doc-title">门诊病历</div>
   <div class="rule"></div>
   <table class="info">
@@ -146,9 +211,10 @@ def _record_page(data: dict) -> str:
   <div class="section"><span class="section-title">建议：</span>{_value(record.treatment_advice if record else '')}</div>
   <div class="section"><span class="section-title">合计：</span>{data['total']:.2f} 元</div>
   <div class="sign">
-    <span>医师：{_value(data.get('doctor_name'))}</span>
+    <span>{escape(profile.get('doctor_label') or '医师')}：{_value(data.get('doctor_name'))}</span>
     {_signature_html(data.get('signature') or {})}
   </div>
+  {f'<div class="footer-note">{escape(profile["footer_note"])}</div>' if profile.get('footer_note') else ''}
 </div>"""
 
 
@@ -162,8 +228,9 @@ def _signature_html(signature: dict) -> str:
     )
 
 
-def _western_page(data: dict) -> str:
-    meta = _clinic_meta()
+def _western_page(data: dict, profile: dict | None = None) -> str:
+    profile = _profile(profile)
+    meta = _clinic_meta(profile)
     lines = "".join(
         f'<div class="rx-line">{index + 1}. {escape(line["name"])}　'
         f'{escape(line.get("spec") or "")}　×{line["qty"]}{escape(line.get("unit") or "")}</div>'
@@ -189,7 +256,9 @@ def _western_page(data: dict) -> str:
 <div class="page">{watermark}
   {_barcode(rx_no)}
   <div class="barcode-no">{rx_no}</div>
+  {_logo_html(profile)}
   <div class="clinic">{escape(meta['name'])}</div>
+  {f'<div class="header-note">{escape(profile["header_note"])}</div>' if profile.get('header_note') else ''}
   <div class="doc-title">处方笺</div>
   <table class="rx-meta">
     <tr><td>费别：{fee_type}</td><td>医保卡号：</td><td>处方编号：{rx_no}</td></tr>
@@ -210,18 +279,20 @@ def _western_page(data: dict) -> str:
   </div>
   <div class="footer">
     <div class="sign">
-      <span>医师：{_value(data.get('doctor_name'))}</span>
-      <span>审核药师：__________</span>
-      <span>调配药师：__________</span>
-      <span>核对、发药药师：__________</span>
+      <span>{escape(profile.get('doctor_label') or '医师')}：{_value(data.get('doctor_name'))}</span>
+      <span>{escape(profile.get('reviewer_label') or '审核药师')}：__________</span>
+      <span>{escape(profile.get('dispenser_label') or '调配药师')}：__________</span>
+      <span>{escape(profile.get('checker_label') or '核对、发药药师')}：__________</span>
     </div>
     <div>打印时间：{_value(data.get('printed_at'))}　打印人：{_value(data.get('printed_by'))}</div>
+    {f'<div class="footer-note">{escape(profile["footer_note"])}</div>' if profile.get('footer_note') else ''}
   </div>
 </div>"""
 
 
-def _tcm_page(data: dict, rx: dict) -> str:
-    meta = _clinic_meta()
+def _tcm_page(data: dict, rx: dict, profile: dict | None = None) -> str:
+    profile = _profile(profile)
+    meta = _clinic_meta(profile)
     herbs = _herb_table(rx["items"])
     fee_type = "医保" if settings.INSURANCE_ENABLED else "自费"
     rx_status = {
@@ -241,7 +312,9 @@ def _tcm_page(data: dict, rx: dict) -> str:
 <div class="page">{watermark}
   {_barcode(rx["prescription_no"])}
   <div class="barcode-no">{escape(rx["prescription_no"])}</div>
+  {_logo_html(profile)}
   <div class="clinic">{escape(meta['name'])}</div>
+  {f'<div class="header-note">{escape(profile["header_note"])}</div>' if profile.get('header_note') else ''}
   <div class="doc-title">处方笺</div>
   <table class="rx-meta">
     <tr><td>费别：{fee_type}</td><td>医保卡号：</td><td>处方编号：{escape(rx["prescription_no"])}</td></tr>
@@ -263,50 +336,53 @@ def _tcm_page(data: dict, rx: dict) -> str:
   </div>
   <div class="footer">
     <div class="sign">
-      <span>医师：{_value(data.get('doctor_name'))}</span>
-      <span>审核药师：__________</span>
-      <span>调配药师：__________</span>
-      <span>核对、发药药师：__________</span>
+      <span>{escape(profile.get('doctor_label') or '医师')}：{_value(data.get('doctor_name'))}</span>
+      <span>{escape(profile.get('reviewer_label') or '审核药师')}：__________</span>
+      <span>{escape(profile.get('dispenser_label') or '调配药师')}：__________</span>
+      <span>{escape(profile.get('checker_label') or '核对、发药药师')}：__________</span>
     </div>
     <div>打印时间：{_value(data.get('printed_at'))}　打印人：{_value(data.get('printed_by'))}</div>
+    {f'<div class="footer-note">{escape(profile["footer_note"])}</div>' if profile.get('footer_note') else ''}
   </div>
 </div>"""
 
 
-def _clinic_meta() -> dict:
+def _clinic_meta(profile: dict | None = None) -> dict:
+    profile = _profile(profile)
     return {
-        "name": settings.CLINIC_NAME,
-        "phone": settings.CLINIC_PHONE,
-        "address": settings.CLINIC_ADDRESS,
+        "name": profile["clinic_name"],
+        "phone": profile["clinic_phone"],
+        "address": profile["clinic_address"],
     }
 
 
-def _html(body: str, title: str = "门诊病历 / 处方笺") -> str:
+def _html(body: str, title: str = "门诊病历 / 处方笺", profile: dict | None = None) -> str:
+    profile = _profile(profile)
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>{escape(title)}</title>
-<style>{PAGE_CSS}</style></head><body>
+<style>{_page_css(profile)}</style></head><body>
 {_print_button()}
 {body}
 </body></html>"""
 
 
-def render_record(data: dict) -> str:
-    return _html(_record_page(data), "门诊病历")
+def render_record(data: dict, profile: dict | None = None) -> str:
+    return _html(_record_page(data, profile), "门诊病历", profile)
 
 
-def render_western(data: dict) -> str:
-    return _html(_western_page(data), "处方笺")
+def render_western(data: dict, profile: dict | None = None) -> str:
+    return _html(_western_page(data, profile), "处方笺", profile)
 
 
-def render_tcm(data: dict) -> str:
-    pages = "".join(_tcm_page(data, rx) for rx in data.get("tcm") or [])
-    return _html(pages or '<div class="page"><p class="blank">（无中药处方）</p></div>', "中药处方笺")
+def render_tcm(data: dict, profile: dict | None = None) -> str:
+    pages = "".join(_tcm_page(data, rx, profile) for rx in data.get("tcm") or [])
+    return _html(pages or '<div class="page"><p class="blank">（无中药处方）</p></div>', "中药处方笺", profile)
 
 
-def render_full_set(data: dict) -> str:
-    pages = [_record_page(data)]
+def render_full_set(data: dict, profile: dict | None = None) -> str:
+    pages = [_record_page(data, profile)]
     if data.get("lines"):
-        pages.append(_western_page(data))
+        pages.append(_western_page(data, profile))
     for rx in data.get("tcm") or []:
-        pages.append(_tcm_page(data, rx))
-    return _html("".join(pages))
+        pages.append(_tcm_page(data, rx, profile))
+    return _html("".join(pages), "门诊病历 / 处方笺", profile)

@@ -324,3 +324,39 @@ def test_signed_record_print_has_verification_code(client, auth):
     )
     assert verify.status_code == 200, verify.text
     assert verify.json()["valid"] is True
+
+
+def test_admin_print_profile_applies_to_print(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    saved = client.post(
+        "/admin/print-profile",
+        data={
+            "clinic_name": "测试机构打印抬头",
+            "clinic_address": "测试地址",
+            "clinic_phone": "010-12345678",
+            "theme_color": "#123456",
+            "font_family": "SimSun, serif",
+            "paper_size": "A5",
+            "margin_mm": 10,
+            "header_note": "机构自定义说明",
+            "footer_note": "机构页脚",
+            "doctor_label": "主诊医师",
+            "reviewer_label": "审方药师",
+            "dispenser_label": "配药药师",
+            "checker_label": "发药核对",
+            "custom_css": ".clinic { letter-spacing: 8px; }",
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code == 302
+    encounter, _payment = setup_paid_encounter(client, auth)
+    html = client.get(f"/print/prescription/{encounter['id']}").text
+    assert "测试机构打印抬头" in html
+    assert "机构自定义说明" in html
+    assert "机构页脚" in html
+    assert "letter-spacing: 8px" in html
+    assert "A5" in html

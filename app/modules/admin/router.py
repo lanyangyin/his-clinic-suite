@@ -144,6 +144,8 @@ from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox, NotificationTemplate
 from app.modules.inpatient.models import Admission, Bed, InpatientOrder, InpatientPayment, Ward
+from app.modules.print.profile import load as load_print_profile
+from app.modules.print.profile import save as save_print_profile
 from app.modules.tcm.models import TcmStockAdjustment
 from app.modules.tcm.service import approve_stock_adjustment
 from app.modules.billing.models import RefundApproval
@@ -572,6 +574,59 @@ def financial_vouchers_csv(request: Request, db: Session = Depends(get_db)):
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=financial-vouchers.csv"},
     )
+
+
+@router.get("/print-profile", response_class=HTMLResponse)
+def print_profile_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse(
+        request, "print_profile.html", _ctx(request, profile=load_print_profile(db))
+    )
+
+
+@router.post("/print-profile")
+def print_profile_save(
+    clinic_name: str = Form(""),
+    clinic_address: str = Form(""),
+    clinic_phone: str = Form(""),
+    logo_url: str = Form(""),
+    theme_color: str = Form("#111111"),
+    font_family: str = Form(""),
+    paper_size: str = Form("A4"),
+    margin_mm: int = Form(12),
+    header_note: str = Form(""),
+    footer_note: str = Form(""),
+    doctor_label: str = Form("医师"),
+    reviewer_label: str = Form("审核药师"),
+    dispenser_label: str = Form("调配药师"),
+    checker_label: str = Form("核对、发药药师"),
+    custom_css: str = Form(""),
+    request: Request = None,
+    db: Session = Depends(get_db),
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    save_print_profile(db, {
+        "clinic_name": clinic_name.strip(),
+        "clinic_address": clinic_address.strip(),
+        "clinic_phone": clinic_phone.strip(),
+        "logo_url": logo_url.strip(),
+        "theme_color": theme_color.strip(),
+        "font_family": font_family.strip(),
+        "paper_size": paper_size.strip(),
+        "margin_mm": margin_mm,
+        "header_note": header_note.strip(),
+        "footer_note": footer_note.strip(),
+        "doctor_label": doctor_label.strip(),
+        "reviewer_label": reviewer_label.strip(),
+        "dispenser_label": dispenser_label.strip(),
+        "checker_label": checker_label.strip(),
+        "custom_css": custom_css.strip(),
+    }, "admin")
+    return RedirectResponse("/admin/print-profile", status_code=302)
 
 
 @router.get("/finance", response_class=HTMLResponse)

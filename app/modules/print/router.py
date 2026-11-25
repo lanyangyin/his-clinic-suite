@@ -19,6 +19,7 @@ from app.modules.print.documents import (
 )
 from app.modules.print.barcode import code128_svg
 from app.modules.print.models import PrintLog, PrintToken  # noqa: F401
+from app.modules.print.profile import load as load_print_profile
 from app.modules.pharmacy.models import PharmacyPickupCode
 from app.modules.pharmacy.retail_service import get_retail_sale
 from app.modules.pharmacy.service import build_dispense_slip, get_dispense
@@ -499,7 +500,7 @@ def print_prescription(encounter_id: int, db: Session = Depends(get_db), user=De
         data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(_with_reprint_banner(render_full_set(data), print_count))
+    return HTMLResponse(_with_reprint_banner(render_full_set(data, load_print_profile(db)), print_count))
 
 
 @router.get("/medical-record/{encounter_id}", response_class=HTMLResponse)
@@ -509,7 +510,7 @@ def print_medical_record(encounter_id: int, db: Session = Depends(get_db), user=
         data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(_with_reprint_banner(render_record(data), print_count))
+    return HTMLResponse(_with_reprint_banner(render_record(data, load_print_profile(db)), print_count))
 
 
 @router.get("/western-prescription/{encounter_id}", response_class=HTMLResponse)
@@ -519,7 +520,7 @@ def print_western(encounter_id: int, db: Session = Depends(get_db), user=Depends
         data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(_with_reprint_banner(render_western(data), print_count))
+    return HTMLResponse(_with_reprint_banner(render_western(data, load_print_profile(db)), print_count))
 
 
 @router.get("/tcm-prescription/{encounter_id}", response_class=HTMLResponse)
@@ -529,7 +530,7 @@ def print_tcm(encounter_id: int, db: Session = Depends(get_db), user=Depends(req
         data = _collect(db, encounter_id, getattr(user, "username", "") or "")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return HTMLResponse(_with_reprint_banner(render_tcm(data), print_count))
+    return HTMLResponse(_with_reprint_banner(render_tcm(data, load_print_profile(db)), print_count))
 
 
 @router.get("/receipt/{payment_id}", response_class=HTMLResponse)

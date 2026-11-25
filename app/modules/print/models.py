@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -31,3 +31,28 @@ class PrintLog(Base):
     ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     operator: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
+class PrintProfile(Base):
+    """机构级打印外观配置（单例 id=1）。"""
+
+    __tablename__ = "print_profile"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    clinic_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    clinic_address: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    clinic_phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    logo_url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    theme_color: Mapped[str] = mapped_column(String(20), default="#111111", nullable=False)
+    font_family: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    paper_size: Mapped[str] = mapped_column(String(10), default="A4", nullable=False)
+    margin_mm: Mapped[int] = mapped_column(default=12, nullable=False)
+    header_note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    footer_note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    doctor_label: Mapped[str] = mapped_column(String(30), default="医师", nullable=False)
+    reviewer_label: Mapped[str] = mapped_column(String(30), default="审核药师", nullable=False)
+    dispenser_label: Mapped[str] = mapped_column(String(30), default="调配药师", nullable=False)
+    checker_label: Mapped[str] = mapped_column(String(30), default="核对、发药药师", nullable=False)
+    custom_css: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
