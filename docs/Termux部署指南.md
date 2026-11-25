@@ -185,10 +185,20 @@ cp config.release.ini config.local.ini
 /root/his-venv/bin/python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-编辑：
+编辑（推荐 `micro`，比 nano 更容易复制粘贴）：
 
 ```bash
-nano /sdcard/HIS/config.local.ini
+micro /sdcard/HIS/config.local.ini
+```
+
+- `Ctrl+S` 保存
+- `Ctrl+Q` 退出
+- 如果终端里 Ctrl+S 被当成流控，先按 `Ctrl+Q` 解除，再保存
+
+保存后可用下面命令确认：
+
+```bash
+grep -E "^(host|port|secret_key|national_|insurance)" /sdcard/HIS/config.local.ini
 ```
 
 修改：
@@ -273,12 +283,21 @@ export HIS_DATABASE_URL=sqlite:////root/his-data/his.db
 start-termux.sh
 ```
 
+> **重要：`/sdcard` 通常是 `noexec`，`chmod +x` 也不会让 `./start-termux.sh` 可执行。**
+>
+> 正确方式始终是用 bash 解释执行：
+>
+> ```bash
+> bash ./start-termux.sh
+> ```
+>
+> 不要用 `./start-termux.sh`，也不要在 proot Ubuntu 里用 `sudo ./start-termux.sh`。
+
 在 Termux 外层执行：
 
 ```bash
 cd /sdcard/HIS
-chmod +x start-termux.sh
-./start-termux.sh
+bash ./start-termux.sh
 ```
 
 脚本会：
@@ -295,7 +314,7 @@ chmod +x start-termux.sh
 
 ```bash
 cd /sdcard/HIS
-./start-termux.sh
+bash ./start-termux.sh
 ```
 
 ### 手动启动（等价命令）
@@ -328,15 +347,15 @@ bash ./scripts/run_server_linux.sh
 
 ```bash
 cd /sdcard/HIS
-./start-termux.sh --background
+bash ./start-termux.sh --background
 ```
 
 查看状态、停止和日志：
 
 ```bash
-./start-termux.sh status
-./start-termux.sh stop
-./start-termux.sh logs
+bash ./start-termux.sh status
+bash ./start-termux.sh stop
+bash ./start-termux.sh logs
 ```
 
 后台模式使用：
@@ -413,10 +432,10 @@ url = http://手机IP:8001
 
 ```bash
 cd /sdcard/HIS
-./start-termux.sh --background
-./start-termux.sh status
-./start-termux.sh logs
-./start-termux.sh stop
+bash ./start-termux.sh --background
+bash ./start-termux.sh status
+bash ./start-termux.sh logs
+bash ./start-termux.sh stop
 ```
 
 Termux 外层仍然需要：
@@ -438,7 +457,7 @@ tmux new -s his
 
 ```bash
 cd /sdcard/HIS
-./start-termux.sh
+bash ./start-termux.sh
 ```
 
 按 `Ctrl+B`，再按 `D` 脱离。
@@ -533,7 +552,70 @@ git pull
 
 ---
 
-## 常见问题
+## 启动失败排查（先看这一节）
+
+### `start-termux.sh: command not found`
+
+原因：当前目录不在 `PATH`，不能直接敲 `start-termux.sh`。
+
+正确：
+
+```bash
+cd /sdcard/HIS
+bash ./start-termux.sh
+```
+
+### `./start-termux.sh: Permission denied`
+
+原因：`/sdcard` 是 FUSE/noexec 挂载，`chmod +x` 不会生效。不要反复 chmod，也不要用 sudo。
+
+正确：
+
+```bash
+cd /sdcard/HIS
+bash ./start-termux.sh
+```
+
+如果 `bash ./start-termux.sh` 仍报 Permission denied：
+
+```bash
+ls -l /sdcard/HIS/start-termux.sh
+file /sdcard/HIS/start-termux.sh
+head -1 /sdcard/HIS/start-termux.sh
+bash -x /sdcard/HIS/start-termux.sh 2>&1 | head -40
+```
+
+常见原因：
+
+- 文件是 CRLF：`sed -i 's/\r$//' /sdcard/HIS/start-termux.sh`
+- 文件没有读权限：重新解压 Termux 包
+- 挂载点异常：重新 `proot-distro login ubuntu --bind /sdcard:/sdcard`
+
+### `sudo: ./start-termux.sh: command not found`
+
+proot Ubuntu 里不要用 sudo 启动；用：
+
+```bash
+bash ./start-termux.sh
+```
+
+### `curl: (23) Failure writing output` / 解压不完整
+
+检查 `/sdcard` 剩余空间，重新下载；Termux 包约 436 KB。
+
+### 配置保存后不生效
+
+确认改的是：
+
+```text
+/sdcard/HIS/config.local.ini
+```
+
+并用 `micro` 保存；可执行：
+
+```bash
+grep -E "^(host|port|secret_key|national_|insurance)" /sdcard/HIS/config.local.ini
+```
 
 ### Ubuntu 里看不到 /sdcard
 

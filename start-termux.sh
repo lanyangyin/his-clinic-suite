@@ -34,7 +34,7 @@ if [ "${HIS_TERMUX_NO_REEXEC:-0}" != "1" ] \
     fi
     echo "[HIS] Entering proot Ubuntu..."
     exec proot-distro login ubuntu --bind /sdcard:/sdcard -- \
-        bash -lc "cd \"$ROOT\" && exec ./start-termux.sh $*"
+        bash -lc "cd \"$ROOT\" && exec bash ./start-termux.sh $*"
 fi
 
 # 外层 Termux 的唤醒锁只在外层有效；Ubuntu 内通常没有该命令。
