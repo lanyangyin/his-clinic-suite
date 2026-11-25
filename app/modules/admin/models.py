@@ -68,3 +68,14 @@ class InstitutionSetting(Base):
     national_mock: Mapped[bool] = mapped_column(default=False, nullable=False)
     updated_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SystemSetting(Base):
+    """可在管理台维护的运行参数（key/value）。"""
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

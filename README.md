@@ -173,7 +173,7 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 
 - `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`（首次启动自动建库并创建 `admin/admin123`）
 - `his-client.zip`：客户端，解压 → 改 `config.ini` 服务器地址 → 双击 `his-client.exe`
-- `his-server-termux-1.3.2.tar.gz`：Termux 专用服务端最小源码包，约 450 KB，不含客户端/测试/视频
+- `his-server-termux-1.3.3.tar.gz`：Termux 专用服务端最小源码包，约 450 KB，不含客户端/测试/视频
 
 源码与构建脚本都在本仓库；国家医保接口模板与公开资料来源见 [docs/医保接口模板.md](docs/医保接口模板.md)；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 
@@ -184,7 +184,7 @@ app/                后端（modules/ 下按业务模块组织四件套 models/s
   modules/admin/    Web 管理台（Jinja2 模板）
 alembic/            Alembic 迁移（0001~0089）
 his_client/         PySide6 客户端（api/config/ui）
-tests/              pytest（820 个用例）
+tests/              pytest（821 个用例）
 scripts/            初始化、演示、并发检查、打包、服务安装脚本
 docs/               部署手册、试用手册、界面截图
 config.ini          服务端配置（端口/密钥/数据库）
@@ -193,7 +193,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 820 passed
+uv run pytest                                  # 821 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
@@ -234,6 +234,7 @@ uv run python scripts/check_concurrency.py     # 并发抢号验证
 
 - 演示用医保/短信/CA 均为本地 Mock；国家医保门诊接口模板见 [docs/医保接口模板.md](docs/医保接口模板.md)，生产接入需替换真实前置机、密钥与地方待遇规则
 - 不同机构的打印抬头/Logo/字体/纸张/页脚/签名栏/自定义 CSS 可在管理台“打印外观”配置，见 [docs/打印模板配置.md](docs/打印模板配置.md)
+- 机构/业务/医保/短信/公卫等运行参数在管理台“系统参数”与“机构参数”，见 [docs/系统参数配置.md](docs/系统参数配置.md)
 - 金额、检查检验、医保结算等按演示规则实现，实际使用请按当地政策调整
 - 采用 GPL-3.0-only 开源授权，详见下方 License 章节
 

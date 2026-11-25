@@ -782,3 +782,37 @@ def test_admin_institution_settings_and_national_status(client, auth):
     assert saved.status_code == 302
     status = client.get("/insurance/national/status", headers=auth["admin"]).json()
     assert status["configured"] is True
+
+
+def test_admin_system_settings_applies(client, auth):
+    from app import settings
+    from app.modules.admin.system_settings import MUTABLE_KEYS
+
+    old = {key: getattr(settings, key, None) for key in MUTABLE_KEYS}
+    try:
+        client.post(
+            "/admin/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        page = client.get("/admin/system-settings")
+        assert page.status_code == 200, page.text
+        assert "系统参数" in page.text
+        saved = client.post(
+            "/admin/system-settings",
+            data={
+                "CLINIC_NAME": "网页机构",
+                "REFUND_APPROVAL_THRESHOLD": "777",
+                "REQUIRE_PRESCRIPTION_REVIEW": "1",
+                "INSURANCE_ENABLED": "1",
+            },
+            follow_redirects=False,
+        )
+        assert saved.status_code == 302
+        assert settings.CLINIC_NAME == "网页机构"
+        assert float(settings.REFUND_APPROVAL_THRESHOLD) == 777
+        assert settings.REQUIRE_PRESCRIPTION_REVIEW is True
+        assert settings.INSURANCE_ENABLED is True
+    finally:
+        for key, value in old.items():
+            setattr(settings, key, value)

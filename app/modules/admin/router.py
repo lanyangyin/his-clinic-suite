@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
 from app.modules.admin.institution import load as load_institution
+from app.modules.admin.system_settings import FIELDS as SYSTEM_SETTING_FIELDS
+from app.modules.admin.system_settings import load as load_system_settings
+from app.modules.admin.system_settings import save as save_system_settings
 from app.modules.admin.institution import save as save_institution
 from app.modules.admin.models import FinancialReconciliation, FinancialVoucher, RefundExportTemplate
 from app.modules.billing.models import ChargeRefund, Payment
@@ -599,6 +602,41 @@ def print_preview_document(kind: str, request: Request, db: Session = Depends(ge
     except ValueError:
         raise HTTPException(status_code=404, detail="未知打印模板")
     return HTMLResponse(html)
+
+
+@router.get("/system-settings", response_class=HTMLResponse)
+def system_settings_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    grouped = {}
+    for key, label, group, kind, secret, mutable in SYSTEM_SETTING_FIELDS:
+        grouped.setdefault(group, []).append(
+            {"key": key, "label": label, "kind": kind, "secret": secret, "mutable": mutable}
+        )
+    return templates.TemplateResponse(
+        request, "system_settings.html",
+        _ctx(request, grouped=grouped, values=load_system_settings(db),
+             msg=request.query_params.get("msg", "")),
+    )
+
+
+@router.post("/system-settings")
+async def system_settings_save(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    values = {}
+    for key, _label, _group, kind, _secret, mutable in SYSTEM_SETTING_FIELDS:
+        if not mutable:
+            continue
+        if kind == "bool":
+            values[key] = form.get(key) == "1"
+        else:
+            values[key] = str(form.get(key, ""))
+    save_system_settings(db, values, "admin")
+    return RedirectResponse("/admin/system-settings?msg=已保存并生效", status_code=302)
 
 
 @router.get("/institution-settings", response_class=HTMLResponse)

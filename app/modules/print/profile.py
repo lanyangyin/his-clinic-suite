@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app import settings
+from app.modules.admin.models import InstitutionSetting
 from .models import PrintProfile
 
 FIELDS = (
@@ -26,10 +27,11 @@ def _row(db: Session) -> PrintProfile:
 
 def load(db: Session) -> dict:
     row = _row(db)
+    institution = db.get(InstitutionSetting, 1)
     return {
-        "clinic_name": row.clinic_name or settings.CLINIC_NAME,
-        "clinic_address": row.clinic_address or settings.CLINIC_ADDRESS,
-        "clinic_phone": row.clinic_phone or settings.CLINIC_PHONE,
+        "clinic_name": row.clinic_name or (institution.clinic_name if institution else "") or settings.CLINIC_NAME,
+        "clinic_address": row.clinic_address or (institution.clinic_address if institution else "") or settings.CLINIC_ADDRESS,
+        "clinic_phone": row.clinic_phone or (institution.clinic_phone if institution else "") or settings.CLINIC_PHONE,
         "logo_url": row.logo_url,
         "theme_color": row.theme_color or "#111111",
         "font_family": row.font_family or '"Microsoft YaHei", "SimSun", sans-serif',

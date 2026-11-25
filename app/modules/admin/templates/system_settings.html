@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}系统参数 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>系统参数</h2>
+{% if msg %}<div class="ok">{{ msg }}</div>{% endif %}
+<p class="small">这里放各机构不同的运行参数。保存后写入数据库并立即应用到当前进程；部署级参数（监听地址/端口/密钥/数据库）仍需改 config.ini 或环境变量并重启。</p>
+<div class="panel">
+  <form method="post" action="/admin/system-settings">
+    {% for group, items in grouped.items() %}
+      <h3>{{ group }}</h3>
+      {% if group.startswith('部署') %}
+        <p class="small">只展示当前值，不在网页修改；请改 config.ini / 环境变量后重启。</p>
+      {% endif %}
+      {% for item in items %}
+        <label style="display:block;margin:4px 0">
+          {{ item.label }}
+          {% if item.kind == 'bool' %}
+            <input type="checkbox" name="{{ item.key }}" value="1" {% if values[item.key] %}checked{% endif %} {% if not item.mutable %}disabled{% endif %}>
+          {% elif item.kind == 'int' or item.kind == 'float' %}
+            <input type="number" name="{{ item.key }}" value="{{ values[item.key] }}" {% if item.kind == 'float' %}step="0.01"{% endif %} {% if not item.mutable %}readonly{% endif %}>
+          {% else %}
+            <input type="{% if item.secret %}password{% else %}text{% endif %}" name="{{ item.key }}" value="{% if item.secret %}{% else %}{{ values[item.key] }}{% endif %}" placeholder="{% if item.secret %}已配置，留空保持{% endif %}" style="width:420px" {% if not item.mutable %}readonly{% endif %}>
+          {% endif %}
+        </label>
+      {% endfor %}
+    {% endfor %}
+    <p><button type="submit">保存可热更新参数</button></p>
+  </form>
+  <p class="small">国家医保门诊接口的机构编码/区域编码/前置机地址，优先在 <a href="/admin/institution-settings">机构参数</a> 配置；打印样式在 <a href="/admin/print-profile">打印外观</a>，全部模板在 <a href="/admin/print-preview">打印预览</a>。</p>
+</div>
+{% endblock %}

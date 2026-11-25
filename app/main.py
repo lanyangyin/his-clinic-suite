@@ -272,6 +272,14 @@ from app.modules.notify import dispatcher as notify_dispatcher  # noqa: E402
 
 @app.on_event("startup")
 def _start_notify_dispatcher() -> None:
+    from app.database import SessionLocal
+    from app.modules.admin.system_settings import apply_startup
+
+    db = SessionLocal()
+    try:
+        apply_startup(db)
+    finally:
+        db.close()
     notify_dispatcher.start()
 
 
