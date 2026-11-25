@@ -48,23 +48,28 @@ class NationalConfig:
         return bool(self.url and self.org_code and self.region_code)
 
 
-def config() -> NationalConfig:
+def config(db=None) -> NationalConfig:
     def _get(name: str, fallback: str = "") -> str:
         return str(getattr(settings, name, "") or fallback).strip()
 
+    values = None
+    if db is not None:
+        from app.modules.admin.institution import load as load_institution
+
+        values = load_institution(db)
     return NationalConfig(
-        url=_get("INSURANCE_NATIONAL_URL", _get("INSURANCE_GATEWAY_URL")),
-        token=_get("INSURANCE_NATIONAL_TOKEN", _get("INSURANCE_GATEWAY_TOKEN")),
-        org_code=_get("INSURANCE_NATIONAL_ORG_CODE"),
-        region_code=_get("INSURANCE_NATIONAL_REGION_CODE"),
-        operator=_get("INSURANCE_NATIONAL_OPERATOR", "HIS"),
-        mock=bool(getattr(settings, "INSURANCE_NATIONAL_MOCK", False)),
+        url=(values or {}).get("national_url") or _get("INSURANCE_NATIONAL_URL", _get("INSURANCE_GATEWAY_URL")),
+        token=(values or {}).get("national_token") or _get("INSURANCE_NATIONAL_TOKEN", _get("INSURANCE_GATEWAY_TOKEN")),
+        org_code=(values or {}).get("national_org_code") or _get("INSURANCE_NATIONAL_ORG_CODE"),
+        region_code=(values or {}).get("national_region_code") or _get("INSURANCE_NATIONAL_REGION_CODE"),
+        operator=(values or {}).get("national_operator") or _get("INSURANCE_NATIONAL_OPERATOR", "HIS"),
+        mock=bool((values or {}).get("national_mock") or getattr(settings, "INSURANCE_NATIONAL_MOCK", False)),
     )
 
 
-def build_envelope(infno: str, input_data: dict) -> dict:
+def build_envelope(infno: str, input_data: dict, db=None) -> dict:
     """构造国家医保平台通用输入报文（加密/签名留出适配点）。"""
-    cfg = config()
+    cfg = config(db)
     if infno not in SUPPORTED:
         raise ValueError(f"不支持的医保交易 {infno}")
     return {
@@ -110,8 +115,8 @@ def _mock_response(infno: str, data: dict) -> dict:
     }
 
 
-def _post(envelope: dict) -> dict:
-    cfg = config()
+def _post(envelope: dict, db=None) -> dict:
+    cfg = config(db)
     if not cfg.configured:
         raise NationalInsuranceNotConfigured(
             "未配置医保国家平台网关（URL/机构编码/区域编码）"
@@ -137,11 +142,11 @@ def _post(envelope: dict) -> dict:
     return body
 
 
-def call(infno: str, input_data: dict) -> dict:
-    cfg = config()
-    envelope = build_envelope(infno, input_data)
+def call(infno: str, input_data: dict, db=None) -> dict:
+    cfg = config(db)
+    envelope = build_envelope(infno, input_data, db)
     if cfg.configured:
-        return _post(envelope)
+        return _post(envelope, db)
     if cfg.mock:
         return _mock_response(infno, input_data)
     raise NationalInsuranceNotConfigured(
@@ -226,7 +231,7 @@ def outpatient_payload(db: Session, encounter_id: int) -> tuple[dict, dict]:
 
 def pre_settle(db: Session, encounter_id: int, operator: str = "") -> dict:
     patient, data = outpatient_payload(db, encounter_id)
-    response = call(INFNO_PRE_SETTLE, {"data": {**patient, **data}})
+    response = call(INFNO_PRE_SETTLE, {"data": {**patient, **data}}, db)
     _record(db, encounter_id, INFNO_PRE_SETTLE, data, response, operator)
     return response
 
@@ -235,13 +240,13 @@ def settle(db: Session, encounter_id: int, operator: str = "", setl_id: str = ""
     patient, data = outpatient_payload(db, encounter_id)
     if setl_id:
         data["setl_id"] = setl_id
-    response = call(INFNO_SETTLE, {"data": {**patient, **data}})
+    response = call(INFNO_SETTLE, {"data": {**patient, **data}}, db)
     _record(db, encounter_id, INFNO_SETTLE, data, response, operator)
     return response
 
 
 def cancel_settle(db: Session, encounter_id: int, setl_id: str, operator: str = "") -> dict:
-    response = call(INFNO_CANCEL_SETTLE, {"data": {"setl_id": setl_id}})
+    response = call(INFNO_CANCEL_SETTLE, {"data": {"setl_id": setl_id}}, db)
     _record(db, encounter_id, INFNO_CANCEL_SETTLE, {"setl_id": setl_id}, response, operator)
     return response
 

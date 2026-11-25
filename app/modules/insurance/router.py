@@ -14,8 +14,11 @@ router = APIRouter(prefix="/insurance", tags=["insurance"], dependencies=[Depend
 
 
 @router.get("/national/status")
-def national_status(_: None = Depends(require_role("admin", "cashier"))):
-    cfg = national.config()
+def national_status(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin", "cashier")),
+):
+    cfg = national.config(db)
     missing = []
     if not cfg.url:
         missing.append("url")

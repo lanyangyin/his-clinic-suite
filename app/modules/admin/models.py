@@ -48,3 +48,23 @@ class FinancialReconciliation(Base):
     content_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     signature: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+
+class InstitutionSetting(Base):
+    """机构级运行参数：医保国家接口与机构抬头。"""
+
+    __tablename__ = "institution_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    clinic_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    clinic_address: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    clinic_phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    insurance_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
+    national_url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_token: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_org_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_region_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_operator: Mapped[str] = mapped_column(String(50), default="HIS", nullable=False)
+    national_mock: Mapped[bool] = mapped_column(default=False, nullable=False)
+    updated_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

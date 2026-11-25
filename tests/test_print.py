@@ -360,3 +360,23 @@ def test_admin_print_profile_applies_to_print(client, auth):
     assert "机构页脚" in html
     assert "letter-spacing: 8px" in html
     assert "A5" in html
+
+
+def test_admin_print_preview_all_templates(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/print-preview")
+    assert page.status_code == 200, page.text
+    assert "门诊病历" in page.text
+    for kind, marker in (
+        ("record", "门诊病历"),
+        ("western", "处方笺"),
+        ("tcm", "中药处方"),
+        ("full", "演示患者"),
+    ):
+        response = client.get(f"/admin/print-preview/{kind}")
+        assert response.status_code == 200, (kind, response.text)
+        assert marker in response.text

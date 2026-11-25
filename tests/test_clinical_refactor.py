@@ -756,3 +756,29 @@ def test_finance_reconciliation(client, auth):
     verify = client.get("/admin/finance/reconcile/1/verify")
     assert verify.status_code == 200
     assert verify.json()["valid"] is True
+
+
+def test_admin_institution_settings_and_national_status(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/institution-settings")
+    assert page.status_code == 200, page.text
+    saved = client.post(
+        "/admin/institution-settings",
+        data={
+            "clinic_name": "机构测试",
+            "insurance_enabled": "1",
+            "national_url": "https://insurance.example.test/gateway",
+            "national_token": "secret-token",
+            "national_org_code": "H001",
+            "national_region_code": "110000",
+            "national_operator": "HIS-TEST",
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code == 302
+    status = client.get("/insurance/national/status", headers=auth["admin"]).json()
+    assert status["configured"] is True

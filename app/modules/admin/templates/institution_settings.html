@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}机构参数 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>机构参数</h2>
+<p class="small">每个诊所/医院独立部署时在这里填自己的信息；留空回退 <code>config.ini</code>，不会影响其他机构。</p>
+<div class="panel">
+  <form method="post" action="/admin/institution-settings">
+    <h3>机构信息</h3>
+    <label>机构名称 <input name="clinic_name" value="{{ profile.clinic_name }}" maxlength="100" style="width:360px"></label>
+    <label>地址 <input name="clinic_address" value="{{ profile.clinic_address }}" maxlength="200" style="width:360px"></label>
+    <label>电话 <input name="clinic_phone" value="{{ profile.clinic_phone }}" maxlength="40"></label>
+
+    <h3>国家医保接口</h3>
+    <label><input type="checkbox" name="insurance_enabled" value="1" {% if profile.insurance_enabled %}checked{% endif %}> 启用医保业务</label>
+    <p class="small">未配置/未启用时，医保结算接口返回未配置，不会伪造成功；启用前请确认当地前置机参数。</p>
+    <label>前置机 URL <input name="national_url" value="{{ profile.national_url }}" maxlength="500" style="width:460px" placeholder="https://..."></label>
+    <label>访问令牌 <input type="password" name="national_token" value="" maxlength="500" style="width:360px" placeholder="留空表示保持原值"></label>
+    <label>机构编码 <input name="national_org_code" value="{{ profile.national_org_code }}" maxlength="100"></label>
+    <label>区域编码 <input name="national_region_code" value="{{ profile.national_region_code }}" maxlength="100"></label>
+    <label>操作员编号 <input name="national_operator" value="{{ profile.national_operator }}" maxlength="50"></label>
+    <label><input type="checkbox" name="national_mock" value="1" {% if profile.national_mock %}checked{% endif %}> 启用本地 Mock（只用于联调，生产关闭）</label>
+    <p class="small">当前仅完成国家医保门诊接口模板；真实 SM2/SM4、地方待遇算法和前置机差异仍需实施时补适配。</p>
+    <p><button type="submit">保存机构参数</button></p>
+  </form>
+  <p><a href="/insurance/national/status" target="_blank">查看医保接口配置状态</a></p>
+</div>
+{% endblock %}
