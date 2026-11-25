@@ -17,6 +17,10 @@ his-clinic-suite/
 └─ alembic/             数据库迁移
 ```
 
+## 文档索引
+
+完整文档状态与历史报告说明见 [docs/文档索引.md](docs/文档索引.md)。
+
 ## 部署文档
 
 - [Linux 服务端独立部署](docs/Linux部署指南.md)
