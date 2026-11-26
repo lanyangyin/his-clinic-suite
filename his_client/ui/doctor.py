@@ -718,6 +718,7 @@ class DoctorWidget(QWidget):
             "closed": "已收费",
         }.get(item.get("encounter_status"), item.get("encounter_status") or "")
 
+    @staticmethod
     def _is_active_patient(item: dict) -> bool:
         """只有接诊中/挂起/治疗中的患者才进入全局患者条和左侧患者卡。"""
         return (
