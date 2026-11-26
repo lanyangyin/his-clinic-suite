@@ -9,7 +9,7 @@
 它不是三级医院全院级 HIS，也不替代独立的 PACS/LIS/EMR/集成平台。小诊所采用“一个服务端 + 多个逻辑模块”的模块化单体是正常架构；只有大型医院才通常需要独立子系统服务端 + HL7/DICOM/ESB 集成。真实医保加密、CA、设备接口和等保合规仍需按机构上线实施。
 
 - 后端 62 个业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
-- 839 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
+- 841 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
 - **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
 
@@ -203,7 +203,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 839 passed
+uv run pytest                                  # 841 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
