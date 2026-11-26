@@ -88,6 +88,25 @@ def _qt_application():
         pass
 
 
+@pytest.fixture(autouse=True)
+def _cleanup_qt_widgets():
+    yield
+    try:
+        from PySide6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        if app is not None:
+            for widget in app.topLevelWidgets():
+                try:
+                    widget.close()
+                    widget.deleteLater()
+                except Exception:
+                    pass
+            app.processEvents()
+    except Exception:
+        pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _prepare_schema():
     """整个测试会话只建一次表（DDL 慢，避免每个用例重建）。"""

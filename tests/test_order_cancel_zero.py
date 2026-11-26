@@ -139,3 +139,38 @@ def test_imaging_worklist_hidden_until_paid(client, auth):
     assert paid.status_code == 201, paid.text
     after = client.get("/pacs/worklist", headers=auth["radiology"]).json()
     assert any(row["id"] == request["id"] for row in after)
+
+
+def test_lab_item_can_be_edited_and_deleted(client, auth):
+    item = client.post(
+        "/lab/items/", json={"code": "EDITLAB", "name": "原名", "price": 10},
+        headers=auth["admin"],
+    ).json()
+    edited = client.put(
+        f"/lab/items/{item['id']}",
+        json={"code": "EDITLAB", "name": "新名", "price": 12},
+        headers=auth["admin"],
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["name"] == "新名"
+    assert edited.json()["price"] == 12
+    deleted = client.delete(f"/lab/items/{item['id']}", headers=auth["admin"])
+    assert deleted.status_code == 204
+
+
+def test_charge_item_can_be_edited_and_disabled(client, auth):
+    item = client.post(
+        "/charges/items/",
+        json={"code": "EDITCHG", "name": "原收费", "category": "other", "price": 5},
+        headers=auth["admin"],
+    ).json()
+    edited = client.put(
+        f"/charges/items/{item['id']}",
+        json={"code": "EDITCHG", "name": "新收费", "category": "other", "price": 8},
+        headers=auth["admin"],
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["name"] == "新收费"
+    disabled = client.delete(f"/charges/items/{item['id']}", headers=auth["admin"])
+    assert disabled.status_code == 200
+    assert disabled.json()["active"] is False
