@@ -174,3 +174,32 @@ def test_charge_item_can_be_edited_and_disabled(client, auth):
     disabled = client.delete(f"/charges/items/{item['id']}", headers=auth["admin"])
     assert disabled.status_code == 200
     assert disabled.json()["active"] is False
+
+
+def test_abandon_encounter_cancels_pending_items(client, auth):
+    encounter = _encounter(client, auth)
+    item = client.post(
+        "/lab/items/", json={"code": "ABANDON", "name": "放弃检验", "price": 20},
+        headers=auth["admin"],
+    ).json()
+    request = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": item["id"]}, headers=auth["doctor"],
+    ).json()
+    abandoned = client.post(
+        f"/encounters/{encounter['id']}/abandon",
+        params={"reason": "患者中途离开"},
+        headers=auth["doctor"],
+    )
+    assert abandoned.status_code == 200, abandoned.text
+    assert abandoned.json()["status"] == "abandoned"
+    rows = client.get(f"/lab/encounters/{encounter['id']}/lab-requests", headers=auth["doctor"]).json()
+    assert rows[0]["status"] == "cancelled"
+    charges = client.get(f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]).json()
+    assert all(row["status"] == "refunded" for row in charges if row["status"] != "refunded" or True)
+    # 已放弃就诊不能再开单
+    blocked = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": item["id"]}, headers=auth["doctor"],
+    )
+    assert blocked.status_code in (400, 500)

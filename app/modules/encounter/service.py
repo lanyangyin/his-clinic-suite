@@ -182,7 +182,7 @@ def replace_encounter_diagnoses(
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise EncounterClosedError("就诊已收费，不能再修改诊断")
     record = get_medical_record(db, encounter_id)
     if record and record.signed_at:
@@ -242,7 +242,7 @@ def update_diagnosis(
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise EncounterClosedError("就诊已收费，不能再修改诊断")
     code, name = _resolve_diagnosis(db, diagnosis_code, diagnosis)
     primary = (
@@ -631,7 +631,7 @@ def add_prescription_item(
     if not encounter:
         raise ValueError("就诊记录不存在")
 
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise EncounterClosedError("就诊已收费，不能再开处方")
     record = get_medical_record(db, encounter_id)
     if record and record.signed_at:
@@ -859,7 +859,7 @@ def update_prescription_item(
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise EncounterClosedError("就诊已收费，不能修改处方")
     item = (
         db.query(PrescriptionItem)
@@ -919,7 +919,7 @@ def delete_prescription_item(db: Session, encounter_id: int, item_id: int) -> No
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise EncounterClosedError("就诊已收费，不能删除处方")
     item = (
         db.query(PrescriptionItem)
@@ -1008,6 +1008,68 @@ def list_encounters(db: Session, patient_id: int | None = None) -> list[Encounte
             return []
         query = query.filter(Encounter.registration_id.in_(registration_ids))
     return query.order_by(Encounter.id.desc()).all()
+
+
+def abandon_encounter(db: Session, encounter_id: int, reason: str = "") -> Encounter:
+    """患者中途放弃：关闭本次接诊，作废未收费项目；不生成收费单。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status in ("closed", "abandoned"):
+        raise ValueError("就诊已收费，不能放弃；请走退费流程")
+    if encounter.status in ("abandoned", "cancelled"):
+        raise ValueError("该就诊已经结束")
+    from app.modules.billing.models import Payment
+    from app.modules.charges.models import EncounterCharge
+    from app.modules.lis.models import LabRequest
+    from app.modules.pacs.models import ImagingRequest
+    from app.modules.treatment.models import TreatmentOrder
+
+    if db.query(Payment).filter(
+        Payment.encounter_id == encounter_id,
+        Payment.status.in_(("paid", "partially_refunded")),
+    ).first():
+        raise ValueError("该就诊已有有效收费，不能直接放弃；请先退费")
+    encounter.status = "abandoned"
+    if reason:
+        encounter.diagnosis = (encounter.diagnosis or "")[:180]
+    for row in db.query(EncounterCharge).filter(
+        EncounterCharge.encounter_id == encounter_id,
+        EncounterCharge.status == "pending",
+    ):
+        row.status = "refunded"
+    for row in db.query(LabRequest).filter(
+        LabRequest.encounter_id == encounter_id,
+        LabRequest.status.in_(("pending", "collected", "received", "testing")),
+    ):
+        row.status = "cancelled"
+    for row in db.query(ImagingRequest).filter(
+        ImagingRequest.encounter_id == encounter_id,
+        ImagingRequest.status == "pending",
+    ):
+        row.status = "cancelled"
+    for row in db.query(TreatmentOrder).filter(
+        TreatmentOrder.encounter_id == encounter_id,
+        TreatmentOrder.status == "pending",
+    ):
+        row.status = "cancelled"
+    from app.modules.encounter.models import Prescription
+
+    for row in db.query(Prescription).filter(
+        Prescription.encounter_id == encounter_id,
+        Prescription.status.in_(("pending_review", "draft")),
+    ):
+        row.status = "cancelled"
+    from app.modules.registration.service import get_registration
+    from app.modules.staff.models import Doctor
+
+    registration = get_registration(db, encounter.registration_id)
+    doctor = db.get(Doctor, registration.doctor_id) if registration else None
+    if doctor and doctor.current_encounter_id == encounter.id:
+        doctor.current_encounter_id = None
+    db.commit()
+    db.refresh(encounter)
+    return encounter
 
 
 def close_encounter(db: Session, encounter: Encounter) -> None:
@@ -1126,7 +1188,7 @@ def create_medical_record(
     encounter = get_encounter(db, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise ValueError("就诊已关闭，不能书写病历")
 
     existing = (
@@ -1184,7 +1246,7 @@ def update_medical_record(
     encounter = get_encounter(db, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise ValueError("就诊已关闭，不能修改病历")
 
     record = get_medical_record(db, encounter_id)
@@ -1517,7 +1579,7 @@ def pause_encounter(db: Session, encounter_id: int) -> Encounter:
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
+    if encounter.status in ("closed", "abandoned"):
         raise ValueError("就诊已收费关闭，不能挂起")
     encounter.status = "paused"
     db.commit()
@@ -1600,8 +1662,8 @@ def resume_encounter(db: Session, encounter_id: int) -> Encounter:
     encounter = db.get(Encounter, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
-    if encounter.status == "closed":
-        raise ValueError("就诊已收费关闭，不能恢复")
+    if encounter.status in ("closed", "abandoned"):
+        raise ValueError("就诊已收费/已放弃关闭，不能恢复")
     from app.modules.registration.service import get_registration
     from app.modules.staff.models import Doctor
 

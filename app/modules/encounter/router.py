@@ -42,6 +42,7 @@ from .schemas import (
 from .service import (
     EncounterClosedError,
     PrescriptionRuleError,
+    abandon_encounter,
     add_prescription_item,
     create_encounter,
     create_medical_record,
@@ -238,6 +239,19 @@ def pause_visit(
 ):
     try:
         return pause_encounter(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/abandon", response_model=EncounterResponse)
+def abandon_visit(
+    encounter_id: int,
+    reason: str = "",
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return abandon_encounter(db, encounter_id, reason)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

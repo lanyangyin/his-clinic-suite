@@ -58,6 +58,8 @@ def create_request(
         raise ValueError("就诊记录不存在")
     if encounter.status == "closed":
         raise ValueError("就诊已关闭，不能开检查申请")
+    if encounter.status == "abandoned":
+        raise ValueError("就诊已放弃，不能开检查申请")
 
     if not get_item(db, data.item_id):
         raise ValueError("检查项目不存在")

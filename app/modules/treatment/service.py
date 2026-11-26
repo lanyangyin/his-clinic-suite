@@ -19,6 +19,8 @@ def create_treatment(
         raise ValueError("就诊记录不存在")
     if encounter.status == "closed":
         raise ValueError("就诊已收费，不能再开治疗单")
+    if encounter.status in ("abandoned", "cancelled"):
+        raise ValueError("就诊已放弃，不能再开治疗单")
 
     item = get_item(db, data.item_id)
     if not item or not item.active:

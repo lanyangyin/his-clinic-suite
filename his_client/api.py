@@ -317,6 +317,11 @@ class ApiClient:
             },
         )
 
+    def abandon_encounter(self, encounter_id: int, reason: str = "") -> dict:
+        return self._request(
+            "POST", f"/encounters/{encounter_id}/abandon", params={"reason": reason}
+        )
+
     def return_encounter(
         self, encounter_id: int, diagnosis: str = "", diagnosis_code: str = ""
     ) -> dict:

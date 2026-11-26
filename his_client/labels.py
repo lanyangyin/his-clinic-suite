@@ -49,7 +49,7 @@ LABELS: dict[str, dict[str, str]] = {
         "visited": "已就诊",
         "cancelled": "已取消",
     },
-    "encounter_status": {"open": "就诊中", "closed": "已结束"},
+    "encounter_status": {"open": "就诊中", "closed": "已结束", "abandoned": "已放弃"},
     "lab_status": {
         "pending": "待采样",
         "collected": "已采样",
@@ -99,6 +99,7 @@ LABELS: dict[str, dict[str, str]] = {
         "open": "接诊中",
         "closed": "已收费",
         "paused": "已挂起",
+        "abandoned": "已放弃",
     },
     "payment_channel": {
         "cash": "现金",

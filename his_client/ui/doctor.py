@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QButtonGroup,
+    QCheckBox,
+    QDialogButtonBox,
     QScrollArea,
     QSpinBox,
     QSplitter,
@@ -93,6 +95,65 @@ TREATMENT_STATUS_LABELS = {
     "done": "已执行",
     "cancelled": "已取消",
 }
+
+
+_COPY_RECORD_FIELDS = [
+    ("chief_complaint", "主诉"),
+    ("present_illness", "现病史"),
+    ("past_history", "既往史"),
+    ("personal_history", "个人史"),
+    ("marital_history", "婚育史"),
+    ("family_history", "家族史"),
+    ("physical_exam", "体格检查"),
+    ("auxiliary_exam", "辅助检查"),
+    ("treatment_advice", "处理意见"),
+]
+
+
+class HistoryApplyDialog(QDialog):
+    """历史病历套用多选：只选需要的条目，避免整份覆盖。"""
+
+    def __init__(self, encounter: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("套用历史就诊")
+        self.checks: dict[str, QCheckBox] = {}
+        layout = QVBoxLayout(self)
+        title = QLabel(
+            f"来源：就诊 {encounter.get('id')} · "
+            f"{str(encounter.get('visited_at') or '')[:16].replace('T', ' ')} · "
+            f"{encounter.get('doctor_name') or ''}"
+        )
+        title.setWordWrap(True)
+        layout.addWidget(title)
+        record = encounter.get("medical_record") or {}
+        layout.addWidget(QLabel("病历内容"))
+        for key, label in _COPY_RECORD_FIELDS:
+            if not record.get(key):
+                continue
+            box = QCheckBox(label)
+            box.setChecked(True)
+            self.checks[f"record:{key}"] = box
+            layout.addWidget(box)
+        for key, label, count in (
+            ("diagnoses", "诊断", len(encounter.get("diagnoses") or [])),
+            ("prescriptions", "处方", len(encounter.get("prescriptions") or [])),
+        ):
+            if count:
+                box = QCheckBox(f"{label}（{count} 条）")
+                box.setChecked(True)
+                self.checks[key] = box
+                layout.addWidget(box)
+        hint = QLabel("只套用勾选内容；处方会重新计入当前就诊费用，需收费员确认。")
+        hint.setStyleSheet("color:#64748b")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected(self) -> set[str]:
+        return {key for key, box in self.checks.items() if box.isChecked()}
 
 
 class DoctorWidget(QWidget):
@@ -358,6 +419,7 @@ class DoctorWidget(QWidget):
                 ("挂起当前", self._pause_workbench),
                 ("继续接诊", self._resume_workbench),
                 ("药物反应 / 换药", self._adverse_reaction),
+                ("放弃接诊", self._abandon_workbench),
                 ("回诊 / 看结果", self._return_workbench),
             ]
         ):
@@ -474,6 +536,8 @@ class DoctorWidget(QWidget):
         self.wb_current = None
         self._active_patient_id = None
         self._active_patient_name = ""
+        self._active_encounter_status = ""
+        self._active_encounter_id = None
         self._clear_side_history()
         self.wb_table.clearSelection()
         self.banner.clear()
@@ -752,15 +816,22 @@ class DoctorWidget(QWidget):
         elif item.get("treatment_status") == "waiting":
             status = "待治疗"
         elif status_text := item.get("encounter_status"):
-            status = {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
-                status_text, "已接诊" if item.get("encounter_id") else "待接诊"
-            )
+            status = {
+                "open": "接诊中", "paused": "已挂起", "closed": "已收费",
+                "abandoned": "已放弃",
+            }.get(status_text, "已接诊" if item.get("encounter_id") else "待接诊")
         else:
             status = "已接诊" if item.get("encounter_id") else "待接诊"
         # 有正在接诊的患者时，单击队列里的其他患者只切换顶部查看，
         # 不切换当前接诊上下文、不改变病历/开方/检验/治疗页签。
         active_id = getattr(self, "_active_patient_id", None)
-        if active_id and item.get("patient_id") != active_id and not active:
+        active_status = getattr(self, "_active_encounter_status", "")
+        if (
+            active_id
+            and item.get("patient_id") != active_id
+            and not active
+            and active_status == "open"
+        ):
             self.banner.set_patient(patient, item.get("encounter_id"), status)
             active_name = getattr(self, "_active_patient_name", "") or f"患者 {active_id}"
             self.wb_summary.setText(
@@ -774,6 +845,8 @@ class DoctorWidget(QWidget):
         if active:
             self._active_patient_id = item.get("patient_id")
             self._active_patient_name = item.get("patient_name") or ""
+            self._active_encounter_status = item.get("encounter_status") or ""
+            self._active_encounter_id = item.get("encounter_id")
             self.side_info.set_patient(
                 patient,
                 item.get("encounter_id"),
@@ -825,12 +898,14 @@ class DoctorWidget(QWidget):
             self.wb_action_buttons["挂起当前"].setEnabled(status == "open")
             self.wb_action_buttons["继续接诊"].setEnabled(status == "paused")
             self.wb_action_buttons["药物反应 / 换药"].setEnabled(has_encounter)
+            self.wb_action_buttons["放弃接诊"].setEnabled(status in ("open", "paused"))
             self.wb_action_buttons["回诊 / 看结果"].setEnabled(
                 has_encounter and status == "closed"
             )
             if has_encounter and status == "closed":
                 for text in ("写病历", "开方", "开检验", "开治疗", "挂起当前", "继续接诊", "药物反应 / 换药"):
                     self.wb_action_buttons[text].setEnabled(False)
+                self.wb_action_buttons["放弃接诊"].setEnabled(False)
         if item.get("encounter_id"):
             self._set_encounter_everywhere(item["encounter_id"])
             self._load_workbench_summary(item["encounter_id"])
@@ -838,6 +913,9 @@ class DoctorWidget(QWidget):
             self._set_encounter_everywhere(None)
             self.wb_fee_summary.setText("")
             self.wb_summary.setText("尚未接诊，点「开始接诊」；诊断在病历页填写")
+        # 当前正在病历页时切换接诊患者，立即重新载入，避免继续显示上一位患者的病历。
+        if active and self.tabs.tabText(self.tabs.currentIndex()) == "病历":
+            self._load_record()
 
     def _load_workbench_summary(self, encounter_id: int) -> None:
         try:
@@ -901,6 +979,7 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
             return
+        self._active_encounter_status = "open"
         self._load_workbench()
         for row, candidate in enumerate(self.workbench_rows):
             if candidate["registration_id"] == item["registration_id"]:
@@ -926,6 +1005,8 @@ class DoctorWidget(QWidget):
         )
         self._active_patient_id = item.get("patient_id")
         self._active_patient_name = item.get("patient_name") or ""
+        self._active_encounter_status = "open"
+        self._active_encounter_id = encounter["id"]
         self._clear_side_history()
         # 接诊成功直接进入病历，避免停在队列页以为没反应
         self._wb_record()
@@ -940,8 +1021,39 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.wb_summary.setText(f"挂起失败（{e.status_code}）：{e.detail}")
             return
+        self._active_encounter_status = "paused"
         self.wb_summary.setText("已挂起当前患者；现在可以开始下一位，之后从队列继续接诊")
         self._load_workbench()
+
+    def _abandon_workbench(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择当前接诊患者")
+            return
+        if item.get("encounter_status") not in ("open", "paused"):
+            self.wb_summary.setText("只有接诊中/已挂起的患者可以放弃接诊")
+            return
+        if QMessageBox.question(
+            self, "放弃接诊",
+            "确认放弃本次接诊？未收费的处方/检验/检查/治疗会同步作废，不会生成收费单。",
+        ) != QMessageBox.Yes:
+            return
+        try:
+            self.api.abandon_encounter(item["encounter_id"], "医生放弃接诊")
+        except ApiError as e:
+            self.wb_summary.setText(f"放弃接诊失败（{e.status_code}）：{e.detail}")
+            return
+        self.wb_current = None
+        self._active_patient_id = None
+        self._active_patient_name = ""
+        self._active_encounter_status = ""
+        self._active_encounter_id = None
+        self.banner.clear()
+        self.side_info.clear()
+        self._clear_side_history()
+        self._set_clinical_tabs(False, False)
+        self._load_workbench()
+        self.wb_summary.setText("已放弃本次接诊；未收费项目已作废")
 
     def _resume_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
@@ -1035,13 +1147,22 @@ class DoctorWidget(QWidget):
         )
         menu = QMenu(self)
         load = menu.addAction("加载历史诊疗（含处方/检验/治疗）")
+        apply_history = menu.addAction("套用选中历史就诊（多选）…")
         open_tab = menu.addAction("打开历史诊疗页")
         clear = menu.addAction("清空历史列表")
+        row = self.side_history.indexAt(pos).row()
+        if row < 0:
+            row = self.side_history.currentRow()
+        apply_history.setEnabled(
+            bool(patient_id) and row >= 0 and bool(getattr(self, "side_history_data", None))
+        )
         load.setEnabled(bool(patient_id))
         open_tab.setEnabled(bool(patient_id))
         action = menu.exec(self.side_history.viewport().mapToGlobal(pos))
         if action == load and patient_id:
             self._load_side_history(patient_id, force=True)
+        elif action == apply_history and patient_id and row >= 0:
+            self._apply_history(row)
         elif action == open_tab and patient_id:
             self._wb_history()
         elif action == clear:
@@ -1086,6 +1207,83 @@ class DoctorWidget(QWidget):
         patient_id = getattr(self, "side_info", None).patient_id
         if patient_id:
             self._load_side_history(patient_id, force=True)
+
+    def _apply_history(self, row: int) -> None:
+        source = (getattr(self, "side_history_data", None) or [])
+        if not (0 <= row < len(source)):
+            self.side_history_msg.setText("请先加载并选择一条历史就诊")
+            return
+        target = getattr(self, "_active_encounter_id", None) or (
+            (getattr(self, "wb_current", None) or {}).get("encounter_id")
+        )
+        if not target:
+            self.side_history_msg.setText("请先接诊当前患者，再套用历史病历")
+            return
+        if not getattr(self, "_record_editable", True):
+            self.side_history_msg.setText("当前病历只读，不能套用历史病历")
+            return
+        source_enc = source[row]
+        dialog = HistoryApplyDialog(source_enc, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        selected = dialog.selected()
+        if not selected:
+            self.side_history_msg.setText("没有选择要套用的内容")
+            return
+        errors = []
+        record_keys = [key.split(":", 1)[1] for key in selected if key.startswith("record:")]
+        if record_keys:
+            source_record = source_enc.get("medical_record") or {}
+            try:
+                current = self.api.get_medical_record(target)
+            except ApiError:
+                current = {}
+            payload = {key: current.get(key) or "" for key, _label, _limit in _RECORD_FIELDS}
+            for key in record_keys:
+                payload[key] = source_record.get(key) or ""
+            if not payload.get("chief_complaint"):
+                payload["chief_complaint"] = source_record.get("chief_complaint") or "历史病历套用"
+            try:
+                try:
+                    self.api.update_medical_record(target, payload)
+                except ApiError as e:
+                    if e.status_code == 404 or "还没有病历" in (e.detail or ""):
+                        self.api.create_medical_record(target, payload)
+                    else:
+                        raise
+            except ApiError as e:
+                errors.append(f"病历：{e.detail}")
+        if "diagnoses" in selected:
+            diags = source_enc.get("diagnoses") or []
+            if diags:
+                try:
+                    self.api.save_encounter_diagnoses(target, [
+                        {key: row.get(key) for key in (
+                            "diagnosis_code", "diagnosis", "note", "diagnosis_stage",
+                            "diagnosis_phase", "diagnosis_certainty",
+                        ) if row.get(key) is not None}
+                        for row in diags
+                    ])
+                except ApiError as e:
+                    errors.append(f"诊断：{e.detail}")
+        if "prescriptions" in selected:
+            for item in source_enc.get("prescriptions") or []:
+                try:
+                    self.api.add_prescription(target, {
+                        "drug_id": item.get("drug_id"),
+                        "quantity": item.get("quantity") or 1,
+                        "dosage": item.get("dosage") or "",
+                        "frequency": item.get("frequency") or "",
+                        "route": item.get("route") or "",
+                        "days": item.get("days") or 1,
+                    })
+                except ApiError as e:
+                    errors.append(f"处方 {item.get('drug_name') or ''}：{e.detail}")
+        self._load_record()
+        self._refresh_prescriptions()
+        self.side_history_msg.setText(
+            "历史病历已套用" + (f"；部分失败：{'; '.join(errors)}" if errors else "")
+        )
 
     def _open_side_history(self, row: int, _col: int) -> None:
         data = getattr(self, "side_history_data", None)
@@ -1724,6 +1922,7 @@ class DoctorWidget(QWidget):
         self.record_template.addItem("伤口换药", "wound")
         apply_template = QPushButton("套用")
         apply_template.clicked.connect(self._apply_record_template)
+        self.record_template_apply = apply_template
         top.addWidget(self.record_template)
         top.addWidget(apply_template)
         top.addStretch(1)
@@ -1826,6 +2025,7 @@ class DoctorWidget(QWidget):
         return label
 
     def _set_record_editable(self, editable: bool, signed: bool = False) -> None:
+        self._record_editable = bool(editable)
         for edit in getattr(self, "record_edits", {}).values():
             edit.setReadOnly(not editable)
         editor = getattr(self, "record_diagnosis_editor", None)
@@ -1835,10 +2035,17 @@ class DoctorWidget(QWidget):
             button = getattr(self, attr, None)
             if button is not None:
                 button.setEnabled(editable)
+        if hasattr(self, "record_template"):
+            self.record_template.setEnabled(editable)
+        if hasattr(self, "record_template_apply"):
+            self.record_template_apply.setEnabled(editable)
         if hasattr(self, "record_revision"):
             self.record_revision.setEnabled(signed)
 
     def _apply_record_template(self) -> None:
+        if getattr(self, "_record_editable", True) is False:
+            self.record_msg.setText("病历当前只读，已签名或已收费，不能套用模板")
+            return
         code = self.record_template.currentData()
         if not code:
             return
@@ -1887,11 +2094,33 @@ class DoctorWidget(QWidget):
         self.wb_summary.setText(f"已套用病历模板：{self.record_template.currentText()}")
 
     def _load_record(self) -> None:
+        encounter_id = self.mr_encounter_id.value() or getattr(
+            self, "_active_encounter_id", None
+        )
+        if not encounter_id:
+            self.record_msg.setText("请先选择或开始接诊患者，再载入病历")
+            return
+        self.mr_encounter_id.setValue(int(encounter_id))
+        # 先清空旧患者内容，避免接口 404/网络错误时继续显示上一位患者的病历。
+        for edit in getattr(self, "record_edits", {}).values():
+            edit.clear()
+        if hasattr(self, "record_diagnosis_editor"):
+            self.record_diagnosis_editor.set_items([])
+        if hasattr(self, "record_diagnosis"):
+            self.record_diagnosis.setText("诊断：—")
         try:
-            record = self.api.get_medical_record(self.mr_encounter_id.value())
-            encounter = self.api.get_encounter(self.mr_encounter_id.value())
+            record = self.api.get_medical_record(encounter_id)
+            encounter = self.api.get_encounter(encounter_id)
         except ApiError as e:
-            self.record_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
+            if e.status_code == 404:
+                self._set_record_editable(True)
+                if hasattr(self, "record_state"):
+                    self.record_state.setText("尚无病历，可填写后保存")
+                    self.record_state.setStyleSheet("color:#64748b")
+                self.record_msg.setText("该就诊还没有病历，填写后点「保存 / 更新」")
+            else:
+                self._set_record_editable(False)
+                self.record_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
         if hasattr(self, "record_diagnosis"):
             prefix = "复诊 · " if encounter.get("visit_type") == "follow_up" else ""

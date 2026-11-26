@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 from app.modules.billing.service import list_payments
 from app.modules.charges.service import list_charges
 from app.modules.encounter.models import Encounter
-from app.modules.encounter.service import get_medical_record, list_prescription_items
+from app.modules.encounter.service import (
+    get_medical_record,
+    list_encounter_diagnoses,
+    list_prescription_items,
+)
 from app.modules.lis.service import list_requests
 from app.modules.patient.service import get_patient
 from app.modules.registration.models import Registration
@@ -15,7 +19,11 @@ _RECORD_FIELDS = (
     "chief_complaint",
     "present_illness",
     "past_history",
+    "personal_history",
+    "marital_history",
+    "family_history",
     "physical_exam",
+    "auxiliary_exam",
     "treatment_advice",
     "written_by",
     "signed_by",
@@ -43,6 +51,10 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
         prescriptions = list_prescription_items(db, encounter.id)
         labs = list_requests(db, encounter.id)
         treatments = list_treatments(db, encounter.id)
+        from app.modules.pacs.service import list_requests as list_imaging_requests
+
+        imaging_requests = list_imaging_requests(db, encounter.id)
+        diagnoses = list_encounter_diagnoses(db, encounter.id)
         charges = list_charges(db, encounter.id)
         payments = list_payments(db, encounter_id=encounter.id)
         encounters.append(
@@ -51,6 +63,16 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                 "registration_id": encounter.registration_id,
                 "diagnosis": encounter.diagnosis,
                 "diagnosis_code": encounter.diagnosis_code,
+                "diagnoses": [
+                    {
+                        "diagnosis_code": row.diagnosis_code,
+                        "diagnosis": row.diagnosis,
+                        "diagnosis_type": row.diagnosis_type,
+                        "note": row.note,
+                        "sort_no": row.sort_no,
+                    }
+                    for row in diagnoses
+                ],
                 "status": encounter.status,
                 "visited_at": encounter.created_at,
                 "doctor_id": registration.doctor_id,
@@ -79,6 +101,7 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                 "lab_requests": [
                     {
                         "id": item.id,
+                        "item_id": item.item_id,
                         "item_name": item.item_name,
                         "status": item.status,
                         "result": item.result,
@@ -94,9 +117,21 @@ def get_patient_history(db: Session, patient_id: int) -> dict | None:
                     }
                     for item in labs
                 ],
+                "imaging_requests": [
+                    {
+                        "id": row.id,
+                        "item_id": row.item_id,
+                        "item_name": row.item_name,
+                        "status": row.status,
+                        "report": row.report,
+                        "requested_at": row.requested_at,
+                    }
+                    for row in imaging_requests
+                ],
                 "treatments": [
                     {
                         "id": item.id,
+                        "charge_item_id": item.charge_item_id,
                         "item_name": item.item_name,
                         "quantity": item.quantity,
                         "note": item.note,
