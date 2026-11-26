@@ -138,3 +138,14 @@ def test_paid_patient_disables_clinical_tabs(qapp=None):
     assert enabled["治疗"] is False
     assert enabled["收费"] is False
     assert enabled["历史诊疗"] is True
+
+
+def test_active_patient_definition():
+    from his_client.ui.doctor import DoctorWidget
+
+    assert DoctorWidget._is_active_patient({"encounter_status": "open"}) is True
+    assert DoctorWidget._is_active_patient({"encounter_status": "paused"}) is True
+    assert DoctorWidget._is_active_patient({"treatment_status": "waiting"}) is True
+    assert DoctorWidget._is_active_patient({"treatment_status": "in_progress"}) is True
+    assert DoctorWidget._is_active_patient({"encounter_status": "closed"}) is False
+    assert DoctorWidget._is_active_patient({"encounter_id": None}) is False

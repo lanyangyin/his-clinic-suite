@@ -718,11 +718,25 @@ class DoctorWidget(QWidget):
             "closed": "已收费",
         }.get(item.get("encounter_status"), item.get("encounter_status") or "")
 
+    def _is_active_patient(item: dict) -> bool:
+        """只有接诊中/挂起/治疗中的患者才进入全局患者条和左侧患者卡。"""
+        return (
+            item.get("encounter_status") in ("open", "paused")
+            or item.get("treatment_status") in ("waiting", "in_progress")
+        )
+
     def _select_workbench(self, row: int, _col: int) -> None:
         if not (0 <= row < len(self.workbench_rows)):
             return
         item = self.workbench_rows[row]
         self.wb_current = item
+        active = self._is_active_patient(item)
+        if not active:
+            # 单击待接诊/已收费患者只选中队列行，不把其信息常驻到顶部/侧栏。
+            self.banner.clear()
+            self.side_info.clear()
+            self.side_history.setRowCount(0)
+            self._side_history_patient_id = None
         patient = {
             "id": item.get("patient_id"),
             "patient_no": item.get("patient_no"),
@@ -740,22 +754,23 @@ class DoctorWidget(QWidget):
         else:
             status = "已接诊" if item.get("encounter_id") else "待接诊"
         self._set_patient_actions(True)
-        self.banner.set_patient(patient, item.get("encounter_id"), status)
-        self.patient_info.set_patient(
-            patient,
-            item.get("encounter_id"),
-            status,
-            f"分诊：{item.get('triage_level') or '—'} 级\n"
-            f"生命体征：{item.get('vital_summary') or '未测'}",
-        )
-        self.side_info.set_patient(
-            patient,
-            item.get("encounter_id"),
-            status,
-            f"分诊：{item.get('triage_level') or '—'} 级\n"
-            f"生命体征：{item.get('vital_summary') or '未测'}",
-        )
-        self._load_side_history(item.get("patient_id"))
+        if active:
+            self.banner.set_patient(patient, item.get("encounter_id"), status)
+            self.patient_info.set_patient(
+                patient,
+                item.get("encounter_id"),
+                status,
+                f"分诊：{item.get('triage_level') or '—'} 级\n"
+                f"生命体征：{item.get('vital_summary') or '未测'}",
+            )
+            self.side_info.set_patient(
+                patient,
+                item.get("encounter_id"),
+                status,
+                f"分诊：{item.get('triage_level') or '—'} 级\n"
+                f"生命体征：{item.get('vital_summary') or '未测'}",
+            )
+            self._load_side_history(item.get("patient_id"))
         gender = {"male": "男", "female": "女"}.get(
             item.get("gender"), "性别不详"
         )
