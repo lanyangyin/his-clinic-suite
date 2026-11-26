@@ -270,6 +270,12 @@ DATABASE_URL = (
 
 # 客户端下载包位置（相对程序目录）
 CLIENT_ZIP_PATH = BASE_DIR / "dist" / "his-client.zip"
+# 客户端下载地址：默认指向 GitHub Release 最新资产；留空则回退本机 dist/his-client.zip
+CLIENT_DOWNLOAD_URL = (
+    os.environ.get("HIS_CLIENT_DOWNLOAD_URL")
+    or _ini.get("client", "download_url", fallback="")
+    or "https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/his-client.zip"
+)
 
 # 备份目录
 BACKUP_DIR = BASE_DIR / "backups"

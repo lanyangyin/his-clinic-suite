@@ -42,6 +42,7 @@ FIELDS = [
     ("DATABASE_URL", "数据库 URL", "部署（需重启）", "str", False, False),
     ("BACKUP_DIR", "备份目录", "部署（需重启）", "str", False, False),
     ("CLIENT_ZIP_PATH", "客户端下载包", "部署（需重启）", "str", False, False),
+    ("CLIENT_DOWNLOAD_URL", "客户端下载地址（GitHub/镜像）", "客户端", "str", False, True),
 ]
 BY_KEY = {item[0]: item for item in FIELDS}
 SECRET_KEYS = {item[0] for item in FIELDS if item[4]}

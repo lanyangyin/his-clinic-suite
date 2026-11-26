@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
+from app import settings
 from app.settings import CLIENT_ZIP_PATH
 from app.version import API_VERSION, APP_NAME, APP_VERSION, CLIENT_MIN_VERSION
 
@@ -23,7 +24,10 @@ def version():
 
 @router.get("/download/client")
 def download_client():
-    """下载客户端绿色包（局域网内部分发）。"""
+    """下载客户端：优先跳转机构配置的 GitHub/镜像地址，未配置时回退本地包。"""
+    url = str(getattr(settings, "CLIENT_DOWNLOAD_URL", "") or "").strip()
+    if url:
+        return RedirectResponse(url, status_code=307)
     if not CLIENT_ZIP.exists():
         raise HTTPException(
             status_code=404,
