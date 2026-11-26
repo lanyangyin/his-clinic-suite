@@ -35,6 +35,30 @@ def create_item(db: Session, data: LabItemCreate) -> LabItem:
     return item
 
 
+def update_item(db: Session, item_id: int, data: LabItemCreate) -> LabItem:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("检验项目不存在")
+    existing = db.query(LabItem).filter(LabItem.code == data.code, LabItem.id != item_id).first()
+    if existing:
+        raise ValueError("检验项目编码已存在")
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_item(db: Session, item_id: int) -> None:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("检验项目不存在")
+    if db.query(LabRequest).filter(LabRequest.item_id == item_id).first():
+        raise ValueError("该检验项目已被申请引用，不能删除；可修改名称/价格")
+    db.delete(item)
+    db.commit()
+
+
 def get_item(db: Session, item_id: int) -> LabItem | None:
     return db.get(LabItem, item_id)
 
@@ -72,19 +96,46 @@ def create_request(
     db.flush()
     request.specimen_no = f"LAB{datetime.now():%Y%m%d}{request.id:05d}"
 
-    if item.price > 0:
-        add_charge(
-            db,
-            encounter_id=encounter_id,
-            source_type="lab_request",
-            source_id=request.id,
-            charge_type="lab",
-            item_name=f"检验：{item.name}",
-            quantity=1,
-            unit_price=item.price,
-            insurance_ratio=item.insurance_ratio,
-        )
+    # 0 元项目也生成 0 元费用行：这样收费员可以完成“0 元收费”并关闭就诊
+    add_charge(
+        db,
+        encounter_id=encounter_id,
+        source_type="lab_request",
+        source_id=request.id,
+        charge_type="lab",
+        item_name=f"检验：{item.name}",
+        quantity=1,
+        unit_price=item.price,
+        insurance_ratio=item.insurance_ratio,
+    )
 
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+def cancel_request(db: Session, request_id: int, operator: str = "") -> LabRequest:
+    """取消尚未采样的检验申请；已收费必须先走退费。"""
+    request = get_request(db, request_id)
+    if not request:
+        raise ValueError("检验申请不存在")
+    if request.status != "pending":
+        raise ValueError("只有待采样的检验申请可以取消")
+    from app.modules.charges.models import EncounterCharge
+
+    charges = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.source_type == "lab_request",
+            EncounterCharge.source_id == request.id,
+        )
+        .all()
+    )
+    if any(row.status in ("paid", "partially_refunded") for row in charges):
+        raise ValueError("该检验已收费，不能直接取消；请先按退费流程处理")
+    request.status = "cancelled"
+    for row in charges:
+        row.status = "refunded"
     db.commit()
     db.refresh(request)
     return request
@@ -295,11 +346,17 @@ def worklist(
     priority: str | None = None,
 ) -> list[dict]:
     """检验科工作列表：带患者/就诊/标本/结果信息。"""
+    from app.modules.billing.models import Payment
+
+    paid_encounters = db.query(Payment.encounter_id).filter(
+        Payment.status.in_(("paid", "partially_refunded"))
+    )
     query = (
         db.query(LabRequest, Patient)
         .join(Encounter, LabRequest.encounter_id == Encounter.id)
         .join(Registration, Encounter.registration_id == Registration.id)
         .join(Patient, Registration.patient_id == Patient.id)
+        .filter(LabRequest.encounter_id.in_(paid_encounters))
     )
     if status:
         statuses = [item.strip() for item in status.split(",") if item.strip()]

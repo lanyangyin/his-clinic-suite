@@ -3243,7 +3243,10 @@ class DoctorWidget(QWidget):
         list_row.addWidget(QLabel("本次已开检验 / 检查"))
         refresh_requests = QPushButton("刷新已开单")
         refresh_requests.clicked.connect(self._refresh_exam_requests)
+        cancel_request = QPushButton("取消选中检验/检查")
+        cancel_request.clicked.connect(self._cancel_exam)
         list_row.addStretch(1)
+        list_row.addWidget(cancel_request)
         list_row.addWidget(refresh_requests)
         layout.addLayout(list_row)
         self.exam_table = QTableWidget(0, 5)
@@ -3260,8 +3263,10 @@ class DoctorWidget(QWidget):
             self.exam_table.setRowCount(0)
             return
         rows = []
+        self.exam_rows = []
         try:
             for request in self.api.list_lab_requests(encounter_id):
+                self.exam_rows.append({"kind": "lab", "id": request.get("id")})
                 rows.append(
                     (
                         "检验",
@@ -3276,6 +3281,7 @@ class DoctorWidget(QWidget):
                     )
                 )
             for request in self.api.list_imaging_requests(encounter_id):
+                self.exam_rows.append({"kind": "imaging", "id": request.get("id")})
                 rows.append(
                     (
                         "检查",
@@ -3310,6 +3316,7 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.treat_msg.setText(f"已开治疗加载失败：{e.detail}")
             return
+        self.treat_rows = rows
         self.treat_table.setRowCount(len(rows))
         for index, row in enumerate(rows):
             values = [
@@ -3323,6 +3330,51 @@ class DoctorWidget(QWidget):
             for col, value in enumerate(values):
                 self.treat_table.setItem(index, col, QTableWidgetItem(str(value)))
         self.treat_msg.setText(f"本次已开 {len(rows)} 条治疗")
+
+    def _cancel_exam(self) -> None:
+        row = self.exam_table.currentRow()
+        rows = getattr(self, "exam_rows", [])
+        if not (0 <= row < len(rows)):
+            self.exam_msg.setText("请先选择一条检验/检查")
+            return
+        item = rows[row]
+        label = "检验" if item["kind"] == "lab" else "检查"
+        if QMessageBox.question(
+            self, f"取消{label}", f"确认取消这条{label}？未收费费用会同步取消"
+        ) != QMessageBox.Yes:
+            return
+        try:
+            if item["kind"] == "lab":
+                self.api.cancel_lab_request(item["id"])
+            else:
+                self.api.cancel_imaging_request(item["id"])
+        except ApiError as e:
+            self.exam_msg.setText(f"取消失败（{e.status_code}）：{e.detail}")
+            return
+        self.exam_msg.setText(f"{label}已取消")
+        self._refresh_exam_requests()
+
+    def _cancel_treatment_order(self) -> None:
+        row = self.treat_table.currentRow()
+        rows = getattr(self, "treat_rows", [])
+        if not (0 <= row < len(rows)):
+            self.treat_msg.setText("请先选择一条治疗单")
+            return
+        order = rows[row]
+        if order.get("status") != "pending":
+            self.treat_msg.setText("只有待执行的治疗单可以取消")
+            return
+        if QMessageBox.question(
+            self, "取消治疗", f"确认取消 {order.get('item_name') or '该治疗'}？"
+        ) != QMessageBox.Yes:
+            return
+        try:
+            self.api.cancel_treatment(order["id"])
+        except ApiError as e:
+            self.treat_msg.setText(f"取消失败（{e.status_code}）：{e.detail}")
+            return
+        self.treat_msg.setText("治疗单已取消")
+        self._refresh_treatments()
 
     def _load_lab_items(self) -> None:
         try:
@@ -3415,7 +3467,10 @@ class DoctorWidget(QWidget):
         list_row.addWidget(QLabel("本次已开治疗"))
         refresh_list = QPushButton("刷新已开治疗")
         refresh_list.clicked.connect(self._refresh_treatments)
+        cancel_order = QPushButton("取消选中治疗")
+        cancel_order.clicked.connect(self._cancel_treatment_order)
         list_row.addStretch(1)
+        list_row.addWidget(cancel_order)
         list_row.addWidget(refresh_list)
         layout.addLayout(list_row)
         self.treat_table = QTableWidget(0, 4)

@@ -17,9 +17,12 @@ from .schemas import (
 )
 from .service import (
     acknowledge_critical,
+    cancel_request,
     collect_request,
     create_item,
     create_request,
+    delete_item,
+    update_item,
     critical_alerts,
     get_item,
     get_request,
@@ -54,6 +57,31 @@ def get_items(db: Session = Depends(get_db)):
     return list_items(db)
 
 
+@router.put("/items/{item_id}", response_model=LabItemResponse)
+def edit_item(
+    item_id: int,
+    data: LabItemCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        return update_item(db, item_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/items/{item_id}", status_code=204)
+def remove_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        delete_item(db, item_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/items/{item_id}", response_model=LabItemResponse)
 def get_item_one(item_id: int, db: Session = Depends(get_db)):
     item = get_item(db, item_id)
@@ -86,6 +114,19 @@ def new_request(
 )
 def get_encounter_requests(encounter_id: int, db: Session = Depends(get_db)):
     return list_requests(db, encounter_id)
+
+
+@router.post("/requests/{request_id}/cancel", response_model=LabRequestResponse)
+def cancel(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return cancel_request(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检验申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.get("/requests/{request_id}", response_model=LabRequestResponse)

@@ -349,6 +349,7 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.treat_msg.setText(f"加载治疗单失败：{e.detail}")
             return
+        orders = [order for order in orders if order.get("paid", True)]
         self.treat_table.setRowCount(len(orders))
         for row, order in enumerate(orders):
             self.treat_table.setItem(row, 0, QTableWidgetItem(str(order["id"])))
@@ -509,6 +510,7 @@ class NurseWidget(QWidget):
         except ApiError as e:
             self.nursing_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
+        self.nursing_rows = [row for row in self.nursing_rows if row.get("paid", True)]
         self.nursing_table.setRowCount(len(self.nursing_rows))
         for row, order in enumerate(self.nursing_rows):
             values = [

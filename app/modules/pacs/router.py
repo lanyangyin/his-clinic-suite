@@ -15,6 +15,7 @@ from .schemas import (
     ImagingRequestResponse,
 )
 from .service import (
+    cancel_request,
     create_item,
     list_worklist,
     create_request,
@@ -120,6 +121,19 @@ def review(
         return review_request(db, request_id, data.approve, user.username, data.note)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/requests/{request_id}/cancel", response_model=ImagingRequestResponse)
+def cancel(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return cancel_request(db, request_id, user.username)
+    except ValueError as e:
+        code = 404 if str(e) == "检查申请不存在" else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.get("/requests/{request_id}", response_model=ImagingRequestResponse)

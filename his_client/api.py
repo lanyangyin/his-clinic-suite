@@ -510,6 +510,9 @@ class ApiClient:
     def list_lab_requests(self, encounter_id: int) -> list:
         return self._request("GET", f"/lab/encounters/{encounter_id}/lab-requests")
 
+    def cancel_lab_request(self, request_id: int) -> dict:
+        return self._request("POST", f"/lab/requests/{request_id}/cancel")
+
     def lab_worklist(self, status: str | None = None, priority: str | None = None) -> list:
         params = {}
         if status:
@@ -780,6 +783,9 @@ class ApiClient:
     def list_imaging_requests(self, encounter_id: int) -> list:
         return self._request("GET", f"/pacs/encounters/{encounter_id}/imaging-requests")
 
+    def cancel_imaging_request(self, request_id: int) -> dict:
+        return self._request("POST", f"/pacs/requests/{request_id}/cancel")
+
     # ---- 治疗 ----
     def create_treatment(
         self, encounter_id: int, item_id: int, quantity: int = 1, note: str = ""
@@ -798,6 +804,9 @@ class ApiClient:
 
     def execute_treatment(self, order_id: int) -> dict:
         return self._request("POST", f"/treatments/{order_id}/execute")
+
+    def cancel_treatment(self, order_id: int) -> dict:
+        return self._request("POST", f"/treatments/{order_id}/cancel")
 
     # ---- 药房 ----
     def list_stocks(self, drug_id: int | None = None) -> list:

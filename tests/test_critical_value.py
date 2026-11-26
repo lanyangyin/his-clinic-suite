@@ -30,6 +30,10 @@ def setup_lab(client, auth, notified_to="急诊医生"):
         json={"item_id": item["id"]},
         headers=auth["doctor"],
     ).json()
+    paid = client.post(
+        "/payments/", json={"encounter_id": enc["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
     client.post(f"/lab/requests/{request['id']}/collect", headers=auth["lab"])
     client.post(f"/lab/requests/{request['id']}/receive", headers=auth["lab"])
     client.post(f"/lab/requests/{request['id']}/start", headers=auth["lab"])

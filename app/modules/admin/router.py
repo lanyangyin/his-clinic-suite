@@ -35,7 +35,10 @@ from app.modules.auth.service import (
 )
 from app.modules.charges.schemas import ChargeItemCreate
 from app.modules.charges.service import create_item as create_charge_item
+from app.modules.charges.service import delete_item as delete_charge_item
+from app.modules.charges.service import get_item as get_charge_item
 from app.modules.charges.service import list_items as list_charge_items
+from app.modules.charges.service import update_item as update_charge_item
 from app.modules.drug.schemas import DrugCreate, DrugUpdate
 from app.modules.drug.service import create_drug, list_drugs, update_drug
 from app.modules.insurance_catalog.schemas import CatalogSyncRequest
@@ -105,7 +108,10 @@ from app.modules.cssd.service import (
 from app.modules.lis.schemas import LabItemCreate
 from app.modules.lis.service import (
     create_item as create_lab_item,
+    delete_item as delete_lab_item,
+    get_item as get_lab_item,
     list_items as list_lab_items,
+    update_item as update_lab_item,
 )
 from app.modules.archive.schemas import (
     ArchiveCompleteRequest,
@@ -1454,6 +1460,40 @@ def charge_items_create(
     return RedirectResponse("/admin/master/charge-items?ok=1", status_code=302)
 
 
+@router.post("/master/charge-items/{item_id}/update")
+async def charge_items_update(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    item = get_charge_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="收费项目不存在")
+    try:
+        update_charge_item(db, item_id, ChargeItemCreate(
+            code=item.code, name=str(form.get("name") or item.name).strip(),
+            category=item.category, price=float(form.get("price") or item.price),
+            insurance_ratio=float(form.get("insurance_ratio") or item.insurance_ratio),
+            insurance_code=item.insurance_code, insurance_name=item.insurance_name,
+            insurance_category=item.insurance_category, unit=item.unit,
+        ))
+    except (ValueError, TypeError) as e:
+        return RedirectResponse(f"/admin/master/charge-items?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse("/admin/master/charge-items?ok=1", status_code=302)
+
+
+@router.post("/master/charge-items/{item_id}/delete")
+def charge_items_delete(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        delete_charge_item(db, item_id)
+    except ValueError as e:
+        return RedirectResponse(f"/admin/master/charge-items?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse("/admin/master/charge-items?ok=1", status_code=302)
+
+
 @router.get("/users", response_class=HTMLResponse)
 def users_page(request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)
@@ -2531,6 +2571,43 @@ async def lab_item_submit(request: Request, db: Session = Depends(get_db)):
     except Exception as e:  # noqa: BLE001
         msg = f"创建失败：{e}"
     return RedirectResponse(f"/admin/lab-items?msg={quote(msg)}", status_code=302)
+
+@router.post("/lab-items/{item_id}/update")
+async def lab_item_update(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    item = get_lab_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="检验项目不存在")
+    try:
+        update_lab_item(db, item_id, LabItemCreate(
+            code=item.code,
+            name=str(form.get("name") or item.name).strip(),
+            price=float(form.get("price") or item.price),
+            specimen_type=item.specimen_type, unit=item.unit,
+            reference_low=item.reference_low, reference_high=item.reference_high,
+            method=item.method, tat_minutes=item.tat_minutes,
+            insurance_ratio=item.insurance_ratio,
+        ))
+    except (ValueError, TypeError) as e:
+        return RedirectResponse(f"/admin/lab-items?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse("/admin/lab-items?msg=已保存", status_code=302)
+
+
+@router.post("/lab-items/{item_id}/delete")
+def lab_item_delete(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        delete_lab_item(db, item_id)
+        msg = "已删除"
+    except ValueError as e:
+        msg = str(e)
+    return RedirectResponse(f"/admin/lab-items?msg={quote(msg)}", status_code=302)
+
 
 # ---------- 病案档案 ----------
 

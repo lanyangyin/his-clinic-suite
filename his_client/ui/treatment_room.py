@@ -294,6 +294,7 @@ class TreatmentRoomWidget(QWidget):
         except ApiError as e:
             self.queue_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
+        self.cases = [case for case in self.cases if case.get("paid", True)]
         self.table.setRowCount(len(self.cases))
         for row, case in enumerate(self.cases):
             values = [

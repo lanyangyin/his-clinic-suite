@@ -21,4 +21,5 @@ class TreatmentOrderResponse(BaseModel):
     ordered_at: datetime
     executed_by: str | None
     executed_at: datetime | None
+    paid: bool = True
     model_config = ConfigDict(from_attributes=True)

@@ -609,9 +609,18 @@ def list_cases(db: Session, status: str | None = None) -> list[dict]:
     if status:
         query = query.filter(TreatmentRoomCase.status == status)
     rows = query.order_by(TreatmentRoomCase.id.desc()).all()
+    from app.modules.billing.models import Payment
+
+    paid_encounters = {
+        row.encounter_id
+        for row in db.query(Payment.encounter_id)
+        .filter(Payment.status.in_(("paid", "partially_refunded")))
+        .all()
+    }
     return [
         {
             "id": case.id,
+            "paid": case.encounter_id is None or case.encounter_id in paid_encounters,
             "case_no": case.case_no,
             "patient_id": case.patient_id,
             "patient_name": patient.name,

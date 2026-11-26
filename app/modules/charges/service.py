@@ -21,6 +21,35 @@ def create_item(db: Session, data: ChargeItemCreate) -> ChargeItem:
     return item
 
 
+def update_item(db: Session, item_id: int, data: ChargeItemCreate) -> ChargeItem:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("收费项目不存在")
+    existing = (
+        db.query(ChargeItem)
+        .filter(ChargeItem.code == data.code, ChargeItem.id != item_id)
+        .first()
+    )
+    if existing:
+        raise ValueError("收费项目编码已存在")
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_item(db: Session, item_id: int) -> ChargeItem:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("收费项目不存在")
+    # 软停用：历史费用仍引用该字典
+    item.active = False
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def get_item(db: Session, item_id: int) -> ChargeItem | None:
     return db.get(ChargeItem, item_id)
 

@@ -127,6 +127,14 @@ def list_orders(
         NursingOrder.status.asc(),
         NursingOrder.id.asc(),
     ).all()
+    from app.modules.billing.models import Payment
+
+    paid_encounters = {
+        row.encounter_id
+        for row in db.query(Payment.encounter_id)
+        .filter(Payment.status.in_(("paid", "partially_refunded")))
+        .all()
+    }
     result = []
     for order, patient in rows:
         encounter = get_encounter(db, order.encounter_id)
@@ -153,6 +161,7 @@ def list_orders(
                 "started_at": order.started_at,
                 "completed_at": order.completed_at,
                 "adverse_reaction": order.adverse_reaction,
+                "paid": order.encounter_id in paid_encounters,
             }
         )
     return result

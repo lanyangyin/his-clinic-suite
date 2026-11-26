@@ -73,10 +73,22 @@ def list_all_treatments(
     db: Session, status: str | None = None
 ) -> list[TreatmentOrder]:
     """全部治疗单（可按状态过滤，最新在前）。"""
+    from app.modules.billing.models import Payment
+
     query = db.query(TreatmentOrder)
     if status is not None:
         query = query.filter(TreatmentOrder.status == status)
-    return query.order_by(TreatmentOrder.id.desc()).all()
+    rows = query.order_by(TreatmentOrder.id.desc()).all()
+    paid_encounters = {
+        row.encounter_id
+        for row in db.query(Payment.encounter_id)
+        .filter(Payment.status.in_(("paid", "partially_refunded")))
+        .all()
+    }
+    for order in rows:
+        # 给响应模型提供“是否已收费”，工作站据此隐藏未收费治疗
+        order.paid = order.encounter_id in paid_encounters
+    return rows
 
 
 def execute_treatment(db: Session, order_id: int, executed_by: str) -> TreatmentOrder:

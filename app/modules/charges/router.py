@@ -13,6 +13,8 @@ from .schemas import (
 )
 from .service import (
     create_item,
+    delete_item,
+    update_item,
     get_item,
     get_item_by_code,
     list_charges,
@@ -38,6 +40,31 @@ def new_item(
 @router.get("/items/", response_model=list[ChargeItemResponse])
 def get_items(category: str | None = None, db: Session = Depends(get_db)):
     return list_items(db, category)
+
+
+@router.put("/items/{item_id}", response_model=ChargeItemResponse)
+def edit_item(
+    item_id: int,
+    data: ChargeItemCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        return update_item(db, item_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/items/{item_id}", response_model=ChargeItemResponse)
+def remove_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("admin")),
+):
+    try:
+        return delete_item(db, item_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/items/by-code/{code}", response_model=ChargeItemResponse)

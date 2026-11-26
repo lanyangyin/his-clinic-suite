@@ -213,6 +213,10 @@ def test_radiology_worklist_and_report(client, auth):
         json={"item_id": item["id"]},
         headers=auth["doctor"],
     ).json()
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
     work = client.get("/pacs/worklist", headers=auth["radiology"])
     assert work.status_code == 200, work.text
     assert any(row["id"] == request["id"] for row in work.json())
@@ -300,6 +304,10 @@ def test_imaging_worklist_urgent_first(client, auth):
         headers=auth["doctor"],
     ).json()
     assert urgent["priority"] == "urgent"
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
     rows = client.get("/pacs/worklist", headers=auth["radiology"]).json()
     ids = [row["id"] for row in rows]
     assert ids.index(urgent["id"]) < ids.index(routine["id"])

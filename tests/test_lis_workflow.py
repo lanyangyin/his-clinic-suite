@@ -1,7 +1,7 @@
 """LIS 标本流转、结构化报告、审核、危急值、工作列表。"""
 
 
-def _encounter(client, auth):
+def _encounter(client, auth, pay=True):
     patient = client.post(
         "/patients/",
         json={"name": "检验患者", "id_number": "110101198801011234", "phone": "13800000001"},
@@ -43,6 +43,11 @@ def _encounter(client, auth):
         json={"item_id": item["id"], "priority": "urgent"},
         headers=auth["doctor"],
     ).json()
+    if pay:
+        paid = client.post(
+            "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+        )
+        assert paid.status_code == 201, paid.text
     return patient, encounter, item, request
 
 
@@ -149,12 +154,16 @@ def test_worklist_permissions(client, auth):
 
 
 def test_lab_worklist_urgent_before_routine(client, auth):
-    patient, encounter, item, urgent = _encounter(client, auth)
+    patient, encounter, item, urgent = _encounter(client, auth, pay=False)
     routine = client.post(
         f"/lab/encounters/{encounter['id']}/lab-requests",
         json={"item_id": item["id"], "priority": "routine"},
         headers=auth["doctor"],
     ).json()
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
     work = client.get(
         "/lab/worklist", params={"status": "pending"}, headers=auth["lab"]
     ).json()
