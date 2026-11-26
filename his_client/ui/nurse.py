@@ -501,6 +501,7 @@ class NurseWidget(QWidget):
         self._load_nursing()
 
     def _load_nursing(self) -> None:
+        current_id = (getattr(self, "current_nursing", None) or {}).get("id")
         try:
             self.nursing_rows = self.api.list_nursing_orders(
                 self.nursing_filter.currentData()
@@ -534,6 +535,9 @@ class NurseWidget(QWidget):
                 if order.get("high_alert"):
                     cell.setForeground(Qt.red)
                 self.nursing_table.setItem(row, col, cell)
+            if current_id is not None and order["id"] == current_id:
+                self.nursing_table.selectRow(row)
+                self.current_nursing = order
         self.nursing_msg.setText(f"执行单 {len(self.nursing_rows)} 条")
 
     def _select_nursing(self, row: int, _col: int) -> None:

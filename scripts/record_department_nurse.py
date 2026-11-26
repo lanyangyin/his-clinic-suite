@@ -109,6 +109,19 @@ class NurseDemo(LoginMixin, QMainWindow):
         self.frames.append(path)
 
     def setup(self):
+        try:
+            self.admin.call(
+                "POST", "/users/",
+                json={
+                    "username": "second-nurse",
+                    "password": "nurse123",
+                    "role": "nurse",
+                    "display_name": "第二核对护士",
+                },
+            )
+        except Exception:
+            # 已存在时直接使用
+            pass
         dept = self.admin.call("POST", "/departments/", json={"name": f"护理演示科{self.suffix}"})
         self.doc = self.admin.call(
             "POST", "/doctors/", json={"name": f"护理演示医生{self.suffix}", "department_id": dept["id"]}
@@ -222,7 +235,9 @@ class NurseDemo(LoginMixin, QMainWindow):
             self.widget.dose.setText("1g")
             self.widget.batch_no.setText(f"NR-{self.suffix}")
             self.widget.checked_by.setText("second-nurse")
+            self.widget.checker_password.setText("nurse123")
             self.click(nursing, "配药完成")
+            assert "配药完成" in self.widget.nursing_msg.text(), self.widget.nursing_msg.text()
             self.scene("配药完成，开始穿刺执行")
             self.click(nursing, "开始执行")
             self.scene("执行中，记录巡视")
