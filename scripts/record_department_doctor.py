@@ -318,8 +318,9 @@ class DoctorDemo(LoginMixin, QMainWindow):
             self.widget.treat_quantity.setValue(1)
             self.click(treat_tab, "开治疗单")
             self.scene("处方/检验/治疗已开，最后查看历史诊疗", self.tab("历史诊疗"))
-            self.scene("左侧历史就诊：双击一行跳转", self.tab("病历"))
-            assert self.widget.side_history.rowCount() >= 1, "左侧没有历史就诊"
+            self.scene("默认不加载历史；现在显式加载后再双击", self.tab("病历"))
+            self.widget._load_side_history(self.patient["id"], force=True)
+            assert self.widget.side_history.rowCount() >= 1, "显式加载后左侧没有历史就诊"
             self.double_click_cell(self.widget.side_history, 0, 1)
             assert "历史诊疗" in self.tabs.tabText(self.tabs.currentIndex())
             self.scene("已从左侧历史跳转到历史诊疗")

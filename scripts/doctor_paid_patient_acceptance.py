@@ -39,8 +39,8 @@ def main() -> int:
     cashier = ApiClient("http://127.0.0.1:8001", "cashier", "cashier123", timeout=10)
     doctor = ApiClient("http://127.0.0.1:8001", "doctor", "doctor123", timeout=10)
 
-    active_patient, _, active_enc = _visit(admin, None)
-    paid_patient, _, paid_enc = _visit(admin, None)
+    active_patient, active_reg, active_enc = _visit(admin, None)
+    paid_patient, paid_reg, paid_enc = _visit(admin, None)
     drug = admin._request("POST", "/drugs/", json={"name": f"验收药{int(time.time())}", "base_price": 1})
     doctor.add_prescription(paid_enc["id"], {"drug_id": drug["id"], "quantity": 1})
     paid = cashier.create_payment(paid_enc["id"])
@@ -61,17 +61,25 @@ def main() -> int:
 
     select(active_patient["id"])
     assert widget.banner.patient_id == active_patient["id"], widget.banner.patient_id
+    assert widget.side_info.patient_id == active_patient["id"]
+    assert widget.side_history.rowCount() == 0, "默认不应自动加载历史"
     indexes = {widget.tabs.tabText(i): i for i in range(widget.tabs.count())}
     assert widget.tabs.isTabEnabled(indexes["病历"]) is True
     assert widget.tabs.isTabEnabled(indexes["治疗"]) is True
 
     select(paid_patient["id"])
-    assert widget.banner.patient_id == 0, widget.banner.patient_id
-    assert widget.banner.name.text() == "未选择患者"
+    # 顶部跟随队列点击；左侧仍是正在接诊的 active 患者
+    assert widget.banner.patient_id == paid_patient["id"], widget.banner.patient_id
+    assert widget.side_info.patient_id == active_patient["id"]
+    assert widget.side_history.rowCount() == 0, "点击已收费患者不应自动加载历史"
     for label in ("病历", "开方", "检验 / 检查", "治疗", "收费"):
         assert widget.tabs.isTabEnabled(indexes[label]) is False, label
     assert widget.tabs.isTabEnabled(indexes["历史诊疗"]) is True
     assert widget.wb_action_buttons["回诊 / 看结果"].isEnabled() is True
+    # 右键/显式加载才拉历史，一次带出处方/检验/治疗计数
+    widget._load_side_history(paid_patient["id"], force=True)
+    assert widget.side_history.rowCount() >= 1
+    assert widget.side_history.columnCount() == 6
 
     # 已收费患者回诊：同挂号新建回诊就诊，不重新挂号
     widget._return_workbench()

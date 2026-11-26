@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QInputDialog,
     QLabel,
+    QMenu,
     QMessageBox,
     QLineEdit,
     QPushButton,
@@ -139,21 +140,22 @@ class DoctorWidget(QWidget):
         history_row = QHBoxLayout()
         history_title = QLabel("历史就诊")
         history_title.setStyleSheet("font-weight:bold;margin-top:6px")
-        history_refresh = QPushButton("刷新")
-        history_refresh.clicked.connect(self._refresh_side_history)
         history_row.addWidget(history_title)
         history_row.addStretch(1)
-        history_row.addWidget(history_refresh)
         side_layout.addLayout(history_row)
-        self.side_history = QTableWidget(0, 3)
-        self.side_history.setHorizontalHeaderLabels(["日期", "诊断", "医生"])
+        self.side_history = QTableWidget(0, 6)
+        self.side_history.setHorizontalHeaderLabels(
+            ["日期", "诊断", "医生", "处方", "检验", "治疗"]
+        )
         self.side_history.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.side_history.verticalHeader().setVisible(False)
         self.side_history.cellDoubleClicked.connect(self._open_side_history)
+        self.side_history.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.side_history.customContextMenuRequested.connect(self._side_history_menu)
         side_layout.addWidget(self.side_history, 1)
-        self.side_history_msg = QLabel("")
+        self.side_history_msg = QLabel("默认不加载历史；在历史列表上右键选择“加载历史诊疗”")
         self.side_history_msg.setWordWrap(True)
-        self.side_history_msg.setStyleSheet("")
+        self.side_history_msg.setStyleSheet("color:#64748b")
         side_layout.addWidget(self.side_history_msg)
         body.addWidget(self.side_panel)
         body.addWidget(self.tabs, 1)
@@ -470,6 +472,8 @@ class DoctorWidget(QWidget):
     def _on_payment_completed(self) -> None:
         """收费即完诊：回队列，清空当前患者，等待选择下一位。"""
         self.wb_current = None
+        self._active_patient_id = None
+        self._clear_side_history()
         self.wb_table.clearSelection()
         self.banner.clear()
         self.side_info.clear()
@@ -733,12 +737,6 @@ class DoctorWidget(QWidget):
         item = self.workbench_rows[row]
         self.wb_current = item
         active = self._is_active_patient(item)
-        if not active:
-            # 单击待接诊/已收费患者只选中队列行，不把其信息常驻到顶部/侧栏。
-            self.banner.clear()
-            self.side_info.clear()
-            self.side_history.setRowCount(0)
-            self._side_history_patient_id = None
         patient = {
             "id": item.get("patient_id"),
             "patient_no": item.get("patient_no"),
@@ -753,18 +751,17 @@ class DoctorWidget(QWidget):
             status = "治疗中"
         elif item.get("treatment_status") == "waiting":
             status = "待治疗"
+        elif status_text := item.get("encounter_status"):
+            status = {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
+                status_text, "已接诊" if item.get("encounter_id") else "待接诊"
+            )
         else:
             status = "已接诊" if item.get("encounter_id") else "待接诊"
         self._set_patient_actions(True)
+        # 顶部始终显示队列中刚刚点击的患者；左侧只显示当前真正接诊中的患者。
+        self.banner.set_patient(patient, item.get("encounter_id"), status)
         if active:
-            self.banner.set_patient(patient, item.get("encounter_id"), status)
-            self.patient_info.set_patient(
-                patient,
-                item.get("encounter_id"),
-                status,
-                f"分诊：{item.get('triage_level') or '—'} 级\n"
-                f"生命体征：{item.get('vital_summary') or '未测'}",
-            )
+            self._active_patient_id = item.get("patient_id")
             self.side_info.set_patient(
                 patient,
                 item.get("encounter_id"),
@@ -772,7 +769,10 @@ class DoctorWidget(QWidget):
                 f"分诊：{item.get('triage_level') or '—'} 级\n"
                 f"生命体征：{item.get('vital_summary') or '未测'}",
             )
-            self._load_side_history(item.get("patient_id"))
+            self._clear_side_history()
+        elif not getattr(self, "_active_patient_id", None):
+            self.side_info.clear()
+            self._clear_side_history()
         gender = {"male": "男", "female": "女"}.get(
             item.get("gender"), "性别不详"
         )
@@ -912,8 +912,8 @@ class DoctorWidget(QWidget):
         self.patient_info.set_patient(
             patient, encounter["id"], "已接诊", f"诊断：{diagnosis}"
         )
-        self._side_history_patient_id = None
-        self._load_side_history(item.get("patient_id"))
+        self._active_patient_id = item.get("patient_id")
+        self._clear_side_history()
         # 接诊成功直接进入病历，避免停在队列页以为没反应
         self._wb_record()
 
@@ -1007,13 +1007,38 @@ class DoctorWidget(QWidget):
                     self.tabs.setCurrentIndex(index)
                 return
 
-    def _load_side_history(self, patient_id: int | None) -> None:
+    def _clear_side_history(self) -> None:
+        self.side_history_data = []
+        self.side_history.setRowCount(0)
+        self._side_history_patient_id = None
+        self.side_history_msg.setText(
+            "默认不加载历史；在历史列表上右键选择“加载历史诊疗”"
+        )
+
+    def _side_history_menu(self, pos) -> None:
+        patient_id = (
+            (getattr(self, "side_info", None).patient_id if hasattr(self, "side_info") else 0)
+            or (self.wb_current or {}).get("patient_id")
+        )
+        menu = QMenu(self)
+        load = menu.addAction("加载历史诊疗（含处方/检验/治疗）")
+        open_tab = menu.addAction("打开历史诊疗页")
+        clear = menu.addAction("清空历史列表")
+        load.setEnabled(bool(patient_id))
+        open_tab.setEnabled(bool(patient_id))
+        action = menu.exec(self.side_history.viewport().mapToGlobal(pos))
+        if action == load and patient_id:
+            self._load_side_history(patient_id, force=True)
+        elif action == open_tab and patient_id:
+            self._wb_history()
+        elif action == clear:
+            self._clear_side_history()
+
+    def _load_side_history(self, patient_id: int | None, force: bool = False) -> None:
         if not patient_id:
-            self.side_history.setRowCount(0)
-            self.side_history_msg.setText("")
-            self._side_history_patient_id = None
+            self._clear_side_history()
             return
-        if getattr(self, "_side_history_patient_id", None) == patient_id:
+        if not force and getattr(self, "_side_history_patient_id", None) == patient_id:
             return
         self._side_history_patient_id = patient_id
         try:
@@ -1030,20 +1055,24 @@ class DoctorWidget(QWidget):
                 str(encounter.get("visited_at") or "")[:10],
                 f"{encounter.get('diagnosis_code') or ''} {encounter.get('diagnosis') or ''}".strip() or "—",
                 encounter.get("doctor_name") or "—",
+                str(len(encounter.get("prescriptions") or [])),
+                str(len(encounter.get("lab_requests") or [])),
+                str(len(encounter.get("treatments") or [])),
             ]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(str(value))
-                item.setToolTip(str(value))
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self.side_history.setItem(row, col, item)
         self.side_history_msg.setText(
-            f"共 {len(encounters)} 次；双击一行查看完整历史"
+            f"共 {len(encounters)} 次；双击一行查看完整历史（处方/检验/治疗）"
+            if encounters
+            else "该患者没有历史就诊"
         )
 
     def _refresh_side_history(self) -> None:
-        self._side_history_patient_id = None
         patient_id = getattr(self, "side_info", None).patient_id
         if patient_id:
-            self._load_side_history(patient_id)
+            self._load_side_history(patient_id, force=True)
 
     def _open_side_history(self, row: int, _col: int) -> None:
         data = getattr(self, "side_history_data", None)
@@ -1093,23 +1122,23 @@ class DoctorWidget(QWidget):
             summary = self.api.encounter_summary(encounter_id)
         except ApiError:
             return
-        self.side_info.set_patient(
-            {
-                "id": summary.get("patient_id"),
-                "patient_no": summary.get("patient_no"),
-                "name": summary.get("patient_name"),
-                "gender": summary.get("gender"),
-                "age": summary.get("age"),
-                "allergy_label": summary.get("allergy_label"),
-                "special_history": summary.get("special_history"),
-                "phone": summary.get("phone"),
-            },
-            encounter_id,
-            {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
-                summary.get("status") or "", summary.get("status") or ""
-            ),
-        )
-        self._load_side_history(summary.get("patient_id"))
+        if self._is_active_patient(getattr(self, "wb_current", {}) or {}):
+            self.side_info.set_patient(
+                {
+                    "id": summary.get("patient_id"),
+                    "patient_no": summary.get("patient_no"),
+                    "name": summary.get("patient_name"),
+                    "gender": summary.get("gender"),
+                    "age": summary.get("age"),
+                    "allergy_label": summary.get("allergy_label"),
+                    "special_history": summary.get("special_history"),
+                    "phone": summary.get("phone"),
+                },
+                encounter_id,
+                {"open": "接诊中", "paused": "已挂起", "closed": "已收费"}.get(
+                    summary.get("status") or "", summary.get("status") or ""
+                ),
+            )
 
     def _sync_payment_panel(self, encounter_id: int | None) -> None:
         panel = getattr(self, "payment_panel", None)
@@ -1641,7 +1670,8 @@ class DoctorWidget(QWidget):
                 patient = self.api.get_patient(row["patient_id"])
                 self.banner.set_patient(patient, encounter["id"], "已接诊")
                 self.patient_info.set_patient(patient, encounter["id"], "已接诊")
-                self._load_side_history(row["patient_id"])
+                self._active_patient_id = row["patient_id"]
+                self._clear_side_history()
             except ApiError:
                 pass
         self._set_encounter_everywhere(encounter["id"])
