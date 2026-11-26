@@ -1,6 +1,10 @@
 import base64
 import os
 import tempfile
+
+# Qt 测试统一使用 offscreen，并在整个会话期间保持 QApplication 引用，
+# 避免多个 UI 测试文件各自创建/回收 QApplication 导致解释器退出时崩溃。
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from pathlib import Path
 
 # 测试环境默认开启医保，覆盖生产 config.ini 的关闭开关（必须在导入 app 前设置）
@@ -66,6 +70,22 @@ app.dependency_overrides[get_db] = override_get_db
 def basic_auth(username: str, password: str) -> dict:
     token = base64.b64encode(f"{username}:{password}".encode()).decode()
     return {"Authorization": f"Basic {token}"}
+
+
+_QT_APP = None
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _qt_application():
+    global _QT_APP
+    from PySide6.QtWidgets import QApplication
+
+    _QT_APP = QApplication.instance() or QApplication([])
+    yield _QT_APP
+    try:
+        _QT_APP.processEvents()
+    except Exception:
+        pass
 
 
 @pytest.fixture(scope="session", autouse=True)

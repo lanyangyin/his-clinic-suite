@@ -2,16 +2,22 @@
 {% block title %}打印模板预览 · HIS 管理台{% endblock %}
 {% block content %}
 <h2>打印模板预览</h2>
-<p class="small">下面用演示数据渲染当前机构配置；不是真实患者数据。修改“打印外观”后刷新本页即可看效果。</p>
+<p class="small">全部单据使用演示数据，不读取真实患者；当前使用已保存的机构打印外观。修改外观请到 <a href="/admin/print-profile">打印外观</a>，那里支持实时预览。</p>
 <div class="panel">
-  <p><a href="/admin/print-profile">修改打印外观</a></p>
-  <h3>门诊病历</h3>
-  <iframe src="/admin/print-preview/record" style="width:100%;height:900px;border:1px solid #ccc"></iframe>
-  <h3>西药处方笺</h3>
-  <iframe src="/admin/print-preview/western" style="width:100%;height:900px;border:1px solid #ccc"></iframe>
-  <h3>中药处方笺</h3>
-  <iframe src="/admin/print-preview/tcm" style="width:100%;height:900px;border:1px solid #ccc"></iframe>
-  <h3>病历+处方全套</h3>
-  <iframe src="/admin/print-preview/full" style="width:100%;height:1200px;border:1px solid #ccc"></iframe>
+  <p>
+    <a href="/admin/print-profile">修改打印外观（实时预览）</a>
+    &nbsp;|&nbsp;
+    <a href="#doc-record">病历</a>
+    <a href="#doc-western">处方</a>
+    <a href="#doc-dispense-slip">取药</a>
+    <a href="#doc-lab-report">检验/标签/收据</a>
+  </p>
 </div>
+{% for key, title, desc, height in documents %}
+<div class="panel" id="doc-{{ key }}">
+  <h3>{{ title }}</h3>
+  <p class="small">{{ desc }} · <code>{{ key }}</code></p>
+  <iframe src="/admin/print-preview/{{ key }}" style="width:100%;height:{{ height }}px;border:1px solid #ccc;background:#fff" loading="lazy"></iframe>
+</div>
+{% endfor %}
 {% endblock %}

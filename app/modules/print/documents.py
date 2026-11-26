@@ -386,3 +386,38 @@ def render_full_set(data: dict, profile: dict | None = None) -> str:
     for rx in data.get("tcm") or []:
         pages.append(_tcm_page(data, rx, profile))
     return _html("".join(pages), "门诊病历 / 处方笺", profile)
+
+
+def apply_print_profile(html: str, profile: dict | None = None) -> str:
+    """让收据/检验/标签等非病历模板也套用机构打印外观。"""
+    p = _profile(profile)
+    old_name = str(settings.CLINIC_NAME or "")
+    new_name = str(p.get("clinic_name") or "")
+    if old_name and new_name:
+        html = html.replace(escape(old_name), escape(new_name))
+        html = html.replace(old_name, new_name)
+    logo = _logo_html(p)
+    header = (
+        f'<div class="profile-header-note">{escape(p["header_note"])}</div>'
+        if p.get("header_note") else ""
+    )
+    if logo or header:
+        html = re.sub(r"(<h2[^>]*>)", logo + r"\1", html, count=1)
+        html = re.sub(r"(</h2>)", r"\1" + header, html, count=1)
+    extra_css = f"""
+<style>
+body {{ font-family: {p['font_family']}; }}
+h2 {{ color: {p['theme_color']}; }}
+.profile-footer {{ margin-top: 10px; border-top: 1px dotted #999; padding-top: 4px; font-size: 11px; color: #444; }}
+</style>"""
+    html = html.replace("</head>", extra_css + "\n</head>", 1)
+    footer = (
+        f'<div class="profile-footer">{escape(p["footer_note"])}</div>'
+        if p.get("footer_note") else ""
+    )
+    if footer:
+        html = html.replace("</body>", footer + "\n</body>", 1)
+    custom = str(p.get("custom_css") or "").strip()
+    if custom:
+        html = html.replace("</head>", f"<style>{custom}</style></head>", 1)
+    return html

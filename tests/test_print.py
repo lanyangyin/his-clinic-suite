@@ -353,13 +353,19 @@ def test_admin_print_profile_applies_to_print(client, auth):
         follow_redirects=False,
     )
     assert saved.status_code == 302
-    encounter, _payment = setup_paid_encounter(client, auth)
+    encounter, payment = setup_paid_encounter(client, auth)
     html = client.get(f"/print/prescription/{encounter['id']}").text
     assert "测试机构打印抬头" in html
     assert "机构自定义说明" in html
     assert "机构页脚" in html
     assert "letter-spacing: 8px" in html
     assert "A5" in html
+
+    # 收据也套用同一套机构打印外观
+    receipt = client.get(f"/print/receipt/{payment['id']}").text
+    assert "测试机构打印抬头" in receipt
+    assert "机构页脚" in receipt
+    assert "letter-spacing: 8px" in receipt
 
 
 def test_admin_print_preview_all_templates(client, auth):
@@ -380,3 +386,71 @@ def test_admin_print_preview_all_templates(client, auth):
         response = client.get(f"/admin/print-preview/{kind}")
         assert response.status_code == 200, (kind, response.text)
         assert marker in response.text
+
+
+def test_admin_print_preview_all_documents(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    cases = {
+        "record": "门诊病历",
+        "western": "处方笺",
+        "tcm": "中药处方",
+        "full": "演示患者",
+        "prescription-header": "处方笺",
+        "receipt": "收费收据",
+        "retail": "零售小票",
+        "dispense-slip": "取药凭证",
+        "dispense-label": "发药袋标签",
+        "nursing-label": "输液",
+        "lab-report": "检验报告单",
+    }
+    for kind, marker in cases.items():
+        response = client.get(f"/admin/print-preview/{kind}")
+        assert response.status_code == 200, (kind, response.text)
+        assert marker in response.text, (kind, marker)
+
+    page = client.get("/admin/print-preview")
+    assert page.status_code == 200
+    for marker in ("取药凭证", "检验报告单", "收费收据", "发药袋标签"):
+        assert marker in page.text
+
+
+def test_admin_print_profile_live_preview(client, auth):
+    client.post(
+        "/admin/login",
+        data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    page = client.get("/admin/print-profile")
+    assert page.status_code == 200
+    assert 'id="print-preview-frame"' in page.text
+    assert "/admin/print-preview/draft" in page.text
+
+    response = client.post(
+        "/admin/print-preview/draft",
+        data={
+            "kind": "receipt",
+            "clinic_name": "实时预览机构",
+            "clinic_address": "实时地址",
+            "clinic_phone": "010-12345678",
+            "theme_color": "#ff0000",
+            "font_family": '"SimSun", serif',
+            "paper_size": "A5",
+            "margin_mm": "10",
+            "header_note": "实时页眉",
+            "footer_note": "实时页脚",
+            "doctor_label": "医师",
+            "reviewer_label": "审核药师",
+            "dispenser_label": "调配药师",
+            "checker_label": "核对药师",
+            "custom_css": "body { letter-spacing: 1px; }",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 200, response.text
+    assert "实时预览机构" in response.text
+    assert "实时页脚" in response.text
+    assert "letter-spacing" in response.text

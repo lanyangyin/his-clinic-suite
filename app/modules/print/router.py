@@ -12,6 +12,7 @@ from app.database import get_db
 from app import settings
 from app.modules.billing.service import get_payment
 from app.modules.print.documents import (
+    apply_print_profile,
     render_full_set,
     render_record,
     render_tcm,
@@ -474,7 +475,7 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
         "dispensed": "已发药",
         "cancelled": "已作废",
     }.get(header.status, header.status)
-    return HTMLResponse(_with_reprint_banner(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>处方 {escape(header.prescription_no)}</title><style>{PRESCRIPTION_CSS}</style></head><body>
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
@@ -490,7 +491,9 @@ def print_prescription_header(prescription_id: int, db: Session = Depends(get_db
 <div class="divider"></div>
 <p>审核药师：{escape(header.reviewed_by or '—')}　审核意见：{escape(header.review_note or '—')}</p>
 <p>医师签名：__________　日期：{header.created_at:%Y-%m-%d}</p>
-</body></html>""", print_count))
+</body></html>"""
+    html = apply_print_profile(html, load_print_profile(db))
+    return HTMLResponse(_with_reprint_banner(html, print_count))
 
 
 @router.get("/prescription/{encounter_id}", response_class=HTMLResponse)
@@ -562,7 +565,8 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(r
         .first()
     )
     data["pickup_code"] = pickup.code if pickup else ""
-    return HTMLResponse(_with_reprint_banner(render_receipt(data), print_count))
+    html = apply_print_profile(render_receipt(data), load_print_profile(db))
+    return HTMLResponse(_with_reprint_banner(html, print_count))
 
 @router.get("/retail/{sale_id}", response_class=HTMLResponse)
 def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
@@ -581,8 +585,7 @@ def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(requi
     )
     meta = _clinic_meta()
     status = "已退货" if sale.status == "refunded" else "已完成"
-    return HTMLResponse(
-        f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>零售小票</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
@@ -602,6 +605,8 @@ def print_retail(sale_id: int, db: Session = Depends(get_db), user=Depends(requi
 <p class="center">非医保零售，请保留小票</p>
 <p class="center">打印时间：{datetime.now():%Y-%m-%d %H:%M}</p>
 </body></html>"""
+    return HTMLResponse(
+        _with_reprint_banner(apply_print_profile(html, load_print_profile(db)), print_count)
     )
 
 
@@ -633,7 +638,7 @@ def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=D
         for rx in data["tcm_prescriptions"]
     )
     total = sum(item["amount"] for item in data["items"])
-    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>取药凭证</title><style>{RECEIPT_CSS}
 .small {{ color:#555; font-size:10px; }}
 </style></head><body>{_reprint_banner(print_count)}
@@ -672,7 +677,10 @@ def print_dispense_slip(encounter_id: int, db: Session = Depends(get_db), user=D
 <div class="divider"></div>
 {''.join(f'<p class="small">{escape(tip)}</p>' for tip in data['tips'])}
 <p class="center small">打印时间：{escape(data['printed_at'].replace('T', ' '))}</p>
-</body></html>""")
+</body></html>"""
+    return HTMLResponse(
+        _with_reprint_banner(apply_print_profile(html, load_print_profile(db)), print_count)
+    )
 
 
 @router.get("/dispense-label/{dispense_id}", response_class=HTMLResponse)
@@ -691,7 +699,7 @@ def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=D
         for item in items
     )
     meta = _clinic_meta()
-    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>发药袋标签</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
@@ -707,7 +715,10 @@ def print_dispense_label(dispense_id: int, db: Session = Depends(get_db), user=D
 <p>发药人：{escape(dispense.verified_by or '—')}　
    时间：{dispense.verified_at.strftime('%Y-%m-%d %H:%M') if dispense.verified_at else '—'}</p>
 <p class="center">请核对姓名、药名、用法；有疑问请咨询药师</p>
-</body></html>""")
+</body></html>"""
+    return HTMLResponse(
+        _with_reprint_banner(apply_print_profile(html, load_print_profile(db)), print_count)
+    )
 
 
 @router.get("/nursing-label/{order_id}", response_class=HTMLResponse)
@@ -721,7 +732,7 @@ def print_nursing_label(order_id: int, db: Session = Depends(get_db), user=Depen
     patient = get_patient(db, registration.patient_id) if registration else None
     preparation = order.preparations[-1] if order.preparations else None
     meta = _clinic_meta()
-    return HTMLResponse(f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>输液瓶签</title><style>{RECEIPT_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])}</h2>
@@ -741,7 +752,10 @@ def print_nursing_label(order_id: int, db: Session = Depends(get_db), user=Depen
    核对：{escape(preparation.checked_by if preparation else '—')}</p>
 <div class="divider"></div>
 <p class="center">执行前请核对患者姓名、药名、剂量、途径、时间</p>
-</body></html>""")
+</body></html>"""
+    return HTMLResponse(
+        _with_reprint_banner(apply_print_profile(html, load_print_profile(db)), print_count)
+    )
 
 
 LAB_CSS = """
@@ -795,8 +809,7 @@ def print_lab_report(request_id: int, db: Session = Depends(get_db), user=Depend
         "testing": "检验中",
         "rejected": "标本拒收",
     }.get(request.status, request.status)
-    return HTMLResponse(
-        f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+    html = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>检验报告单</title><style>{LAB_CSS}</style></head><body>{_reprint_banner(print_count)}
 {_print_button()}
 <h2>{escape(meta['name'])} · 检验报告单</h2>
@@ -831,4 +844,6 @@ def print_lab_report(request_id: int, db: Session = Depends(get_db), user=Depend
 <p class="right">审核时间：{request.reviewed_at.strftime('%Y-%m-%d %H:%M') if request.reviewed_at else '—'}</p>
 <p class="center">本报告仅对送检标本负责，如有疑问请及时联系检验科。</p>
 </body></html>"""
+    return HTMLResponse(
+        _with_reprint_banner(apply_print_profile(html, load_print_profile(db)), print_count)
     )

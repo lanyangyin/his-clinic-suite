@@ -150,7 +150,9 @@ from app.modules.pacs.schemas import ImagingTemplateCreate
 from app.modules.pacs.service import create_template as create_imaging_template
 from app.modules.notify.models import NotificationOutbox, NotificationTemplate
 from app.modules.inpatient.models import Admission, Bed, InpatientOrder, InpatientPayment, Ward
+from app.modules.print.preview import DOCUMENTS as PRINT_PREVIEW_DOCUMENTS
 from app.modules.print.preview import render as render_print_preview
+from app.modules.print.profile import FIELDS as PRINT_PROFILE_FIELDS
 from app.modules.print.profile import load as load_print_profile
 from app.modules.print.profile import save as save_print_profile
 from app.modules.tcm.models import TcmStockAdjustment
@@ -589,8 +591,24 @@ def print_preview_page(request: Request, db: Session = Depends(get_db)):
     if redirect:
         return redirect
     return templates.TemplateResponse(
-        request, "print_preview.html", _ctx(request, profile=load_print_profile(db))
+        request, "print_preview.html",
+        _ctx(request, profile=load_print_profile(db), documents=PRINT_PREVIEW_DOCUMENTS),
     )
+
+
+@router.post("/print-preview/draft", response_class=HTMLResponse)
+async def print_preview_draft(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    kind = str(form.get("kind") or "full")
+    profile = {field: str(form.get(field, "")) for field in PRINT_PROFILE_FIELDS}
+    try:
+        html = render_print_preview(kind, profile)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="未知打印模板")
+    return HTMLResponse(html)
 
 
 @router.get("/print-preview/{kind}", response_class=HTMLResponse)
@@ -672,7 +690,8 @@ def print_profile_page(request: Request, db: Session = Depends(get_db)):
     if redirect:
         return redirect
     return templates.TemplateResponse(
-        request, "print_profile.html", _ctx(request, profile=load_print_profile(db))
+        request, "print_profile.html",
+        _ctx(request, profile=load_print_profile(db), documents=PRINT_PREVIEW_DOCUMENTS),
     )
 
 
