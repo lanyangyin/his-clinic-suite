@@ -9,9 +9,9 @@ class Encounter(Base):
     __tablename__ = "encounters"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    # 一次挂号对应一次就诊
+    # 同一挂号可有一次初诊 + 多次回诊/看结果；由 original_encounter_id 串起来
     registration_id: Mapped[int] = mapped_column(
-        ForeignKey("registrations.id"), unique=True, nullable=False, index=True
+        ForeignKey("registrations.id"), nullable=False, index=True
     )
     diagnosis: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     diagnosis_code: Mapped[str] = mapped_column(

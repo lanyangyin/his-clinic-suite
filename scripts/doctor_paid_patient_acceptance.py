@@ -71,7 +71,17 @@ def main() -> int:
     for label in ("病历", "开方", "检验 / 检查", "治疗", "收费"):
         assert widget.tabs.isTabEnabled(indexes[label]) is False, label
     assert widget.tabs.isTabEnabled(indexes["历史诊疗"]) is True
-    print(f"ACTIVE={active_patient['id']} PAID={paid_patient['id']} OK")
+    assert widget.wb_action_buttons["回诊 / 看结果"].isEnabled() is True
+
+    # 已收费患者回诊：同挂号新建回诊就诊，不重新挂号
+    widget._return_workbench()
+    assert widget.wb_current["registration_id"] == widget.workbench_rows[
+        widget.wb_table.currentRow()
+    ]["registration_id"]
+    assert widget.wb_current["encounter_id"] != paid_enc["id"]
+    assert widget.tabs.isTabEnabled(indexes["病历"]) is True
+    assert widget.banner.patient_id == paid_patient["id"]
+    print(f"ACTIVE={active_patient['id']} PAID={paid_patient['id']} RETURN=OK")
     widget.close()
     widget.deleteLater()
     app.processEvents()

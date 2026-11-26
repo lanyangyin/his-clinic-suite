@@ -87,6 +87,7 @@ def create_encounter(
     existing = (
         db.query(Encounter)
         .filter(Encounter.registration_id == data.registration_id)
+        .order_by(Encounter.id.desc())
         .first()
     )
     if existing:
@@ -107,6 +108,7 @@ def create_encounter(
         original_encounter = (
             db.query(Encounter)
             .filter(Encounter.registration_id == registration.original_registration_id)
+            .order_by(Encounter.id.desc())
             .first()
         )
     encounter = Encounter(
@@ -1374,6 +1376,7 @@ def worklist(db: Session, doctor_id: int | None = None) -> list[dict]:
         encounter = (
             db.query(Encounter)
             .filter(Encounter.registration_id == registration.id)
+            .order_by(Encounter.id.desc())
             .first()
         )
         if encounter is None and registration.status != "registered":
@@ -1517,6 +1520,76 @@ def pause_encounter(db: Session, encounter_id: int) -> Encounter:
     if encounter.status == "closed":
         raise ValueError("就诊已收费关闭，不能挂起")
     encounter.status = "paused"
+    db.commit()
+    db.refresh(encounter)
+    return encounter
+
+
+def return_encounter(
+    db: Session,
+    encounter_id: int,
+    diagnosis: str = "",
+    diagnosis_code: str = "",
+) -> Encounter:
+    """已收费患者回诊：同一挂号下新建回诊就诊，不重新挂号。"""
+    original = db.get(Encounter, encounter_id)
+    if not original:
+        raise ValueError("就诊记录不存在")
+    if original.status != "closed":
+        raise ValueError("只有已收费关闭的就诊可以回诊")
+    registration = get_registration(db, original.registration_id)
+    if not registration:
+        raise ValueError("挂号记录不存在")
+
+    # 同一挂号如果已有进行中/挂起的回诊，直接返回，避免重复点出多条
+    current = (
+        db.query(Encounter)
+        .filter(
+            Encounter.registration_id == registration.id,
+            Encounter.status.in_(("open", "paused")),
+            Encounter.id != original.id,
+        )
+        .order_by(Encounter.id.desc())
+        .first()
+    )
+    if current:
+        return current
+
+    from app.modules.staff.models import Doctor
+
+    doctor = db.get(Doctor, registration.doctor_id)
+    if doctor and doctor.current_encounter_id:
+        active = db.get(Encounter, doctor.current_encounter_id)
+        if active and active.status == "open" and active.id != original.id:
+            raise ValueError("当前患者尚未完成诊治，请先完成或挂起当前患者，再回诊")
+
+    encounter = Encounter(
+        registration_id=registration.id,
+        diagnosis=diagnosis,
+        diagnosis_code=diagnosis_code,
+        status="open",
+        visit_type="follow_up",
+        original_encounter_id=original.id,
+    )
+    encounter.diagnosis_code, encounter.diagnosis = _resolve_diagnosis(
+        db, diagnosis_code, diagnosis
+    )
+    db.add(encounter)
+    db.flush()
+    if encounter.diagnosis:
+        db.add(
+            EncounterDiagnosis(
+                encounter_id=encounter.id,
+                diagnosis_code=encounter.diagnosis_code,
+                diagnosis=encounter.diagnosis,
+                diagnosis_type="primary",
+                sort_no=0,
+            )
+        )
+    mark_registration_visited(db, registration)
+    if doctor:
+        doctor.current_encounter_id = encounter.id
+    # 回诊不自动收挂号费/诊疗费；医生实际开药/开治疗时再产生费用
     db.commit()
     db.refresh(encounter)
     return encounter

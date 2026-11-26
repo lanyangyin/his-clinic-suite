@@ -317,6 +317,15 @@ class ApiClient:
             },
         )
 
+    def return_encounter(
+        self, encounter_id: int, diagnosis: str = "", diagnosis_code: str = ""
+    ) -> dict:
+        return self._request(
+            "POST",
+            f"/encounters/{encounter_id}/return",
+            json={"diagnosis": diagnosis, "diagnosis_code": diagnosis_code},
+        )
+
     def list_encounter_diagnoses(self, encounter_id: int) -> list:
         return self._request("GET", f"/encounters/{encounter_id}/diagnoses")
 

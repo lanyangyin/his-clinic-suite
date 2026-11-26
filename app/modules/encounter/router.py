@@ -37,6 +37,7 @@ from .schemas import (
     RecordRevisionCreate,
     RecordRevisionResponse,
     RecordRevisionReview,
+    ReturnEncounterRequest,
 )
 from .service import (
     EncounterClosedError,
@@ -68,6 +69,7 @@ from .service import (
     encounter_summary,
     pause_encounter,
     resume_encounter,
+    return_encounter,
     record_adverse_reaction,
     list_adverse_reactions,
 )
@@ -248,6 +250,22 @@ def resume_visit(
 ):
     try:
         return resume_encounter(db, encounter_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/return", response_model=EncounterResponse, status_code=201)
+def return_visit(
+    encounter_id: int,
+    data: ReturnEncounterRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role("doctor", "admin")),
+):
+    """已收费回诊：同一挂号下新建回诊就诊，不重新挂号。"""
+    try:
+        return return_encounter(
+            db, encounter_id, diagnosis=data.diagnosis, diagnosis_code=data.diagnosis_code
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

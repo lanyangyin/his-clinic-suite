@@ -332,7 +332,31 @@ class DoctorDemo(LoginMixin, QMainWindow):
                     self.widget._select_history_patient(row, 0)
                     break
             assert self.widget.history_enc_table.rowCount() >= 1
-            self.scene("历史诊疗可见，医生站演示完成")
+            self.scene("历史诊疗可见；现在演示已收费患者去化验后回诊", work)
+            paid = self.cashier.call(
+                "POST", "/payments/", json={"encounter_id": self.encounter["id"], "channel": "cash"}
+            )
+            assert paid.get("status") == "paid", paid
+            self.widget._load_workbench()
+            paid_row = -1
+            for row in range(self.widget.wb_table.rowCount()):
+                if self.patient["name"] in self.widget.wb_table.item(row, 1).text():
+                    paid_row = row
+                    break
+            assert paid_row >= 0, "收费后队列没有本次患者"
+            self.widget.wb_table.selectRow(paid_row)
+            self.widget._select_workbench(paid_row, 0)
+            assert self.widget.wb_action_buttons["回诊 / 看结果"].isEnabled()
+            self.scene("已收费：回诊 / 看结果可用，不需要重新挂号", work)
+            self.click(work, "回诊 / 看结果")
+            returned = self.doctor_api.call(
+                "GET", "/encounters/", params={"patient_id": self.patient["id"]}
+            )[0]
+            assert returned["id"] != self.encounter["id"], returned
+            assert returned["registration_id"] == self.registration["id"], returned
+            assert returned["status"] == "open", returned
+            self.scene("回诊成功：同一挂号新建就诊，可继续看结果/开单", self.tab("病历"))
+            self.scene("回诊流程演示完成")
             self.wait(3.0)
             self.timer.stop()
             self.capture()

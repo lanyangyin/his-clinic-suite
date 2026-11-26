@@ -9,6 +9,11 @@ class EncounterCreate(BaseModel):
     diagnosis_code: str = ""
 
 
+class ReturnEncounterRequest(BaseModel):
+    diagnosis: str = ""
+    diagnosis_code: str = ""
+
+
 class EncounterResponse(EncounterCreate):
     id: int
     status: str

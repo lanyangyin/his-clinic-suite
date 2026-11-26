@@ -356,6 +356,7 @@ class DoctorWidget(QWidget):
                 ("挂起当前", self._pause_workbench),
                 ("继续接诊", self._resume_workbench),
                 ("药物反应 / 换药", self._adverse_reaction),
+                ("回诊 / 看结果", self._return_workbench),
             ]
         ):
             button = QPushButton(text)
@@ -812,6 +813,9 @@ class DoctorWidget(QWidget):
             self.wb_action_buttons["挂起当前"].setEnabled(status == "open")
             self.wb_action_buttons["继续接诊"].setEnabled(status == "paused")
             self.wb_action_buttons["药物反应 / 换药"].setEnabled(has_encounter)
+            self.wb_action_buttons["回诊 / 看结果"].setEnabled(
+                has_encounter and status == "closed"
+            )
             if has_encounter and status == "closed":
                 for text in ("写病历", "开方", "开检验", "开治疗", "挂起当前", "继续接诊", "药物反应 / 换药"):
                     self.wb_action_buttons[text].setEnabled(False)
@@ -942,6 +946,31 @@ class DoctorWidget(QWidget):
                 self.wb_table.selectRow(row)
                 self._select_workbench(row, 0)
                 break
+
+    def _return_workbench(self) -> None:
+        """已收费患者回诊：同挂号新建回诊就诊，不重新挂号。"""
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择已收费患者")
+            return
+        if item.get("encounter_status") != "closed":
+            self.wb_summary.setText("只有已收费关闭的就诊可以回诊")
+            return
+        try:
+            encounter = self.api.return_encounter(item["encounter_id"])
+        except ApiError as e:
+            self.wb_summary.setText(f"回诊失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_workbench()
+        for row, candidate in enumerate(self.workbench_rows):
+            if candidate["registration_id"] == item["registration_id"]:
+                self.wb_table.selectRow(row)
+                self._select_workbench(row, 0)
+                break
+        self.wb_summary.setText(
+            f"已回诊：新就诊 {encounter['id']}（关联原就诊 {item['encounter_id']}），无需重新挂号"
+        )
+        self._wb_record()
 
     def _adverse_reaction(self) -> None:
         item = getattr(self, "wb_current", None)
