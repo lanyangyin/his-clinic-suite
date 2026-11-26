@@ -151,6 +151,59 @@ INSURANCE_NATIONAL_MOCK = (
     os.environ.get("HIS_INSURANCE_NATIONAL_MOCK", "").lower() in {"1", "true", "yes", "on"}
     or _ini.getboolean("features", "insurance_national_mock", fallback=False)
 )
+INSURANCE_NATIONAL_ORG_NAME = os.environ.get("HIS_INSURANCE_NATIONAL_ORG_NAME", "") or _ini.get(
+    "insurance", "national_org_name", fallback=""
+)
+INSURANCE_NATIONAL_INFVER = os.environ.get("HIS_INSURANCE_NATIONAL_INFVER", "") or _ini.get(
+    "insurance", "national_infver", fallback="V1.0"
+)
+INSURANCE_NATIONAL_RECER_SYS_CODE = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_RECER_SYS_CODE", ""
+) or _ini.get("insurance", "national_recer_sys_code", fallback="HIS")
+INSURANCE_NATIONAL_MDTRTAREA_CODE = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_MDTRTAREA_CODE", ""
+) or _ini.get("insurance", "national_mdtrtarea_code", fallback="")
+INSURANCE_NATIONAL_INSUPLC_CODE = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_INSUPLC_CODE", ""
+) or _ini.get("insurance", "national_insuplc_code", fallback="")
+INSURANCE_NATIONAL_MED_TYPE = os.environ.get("HIS_INSURANCE_NATIONAL_MED_TYPE", "") or _ini.get(
+    "insurance", "national_med_type", fallback="11"
+)
+INSURANCE_NATIONAL_SIGN_TYPE = os.environ.get("HIS_INSURANCE_NATIONAL_SIGN_TYPE", "") or _ini.get(
+    "insurance", "national_sign_type", fallback="SM2"
+)
+INSURANCE_NATIONAL_SECURITY_MODE = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_SECURITY_MODE", ""
+) or _ini.get("insurance", "national_security_mode", fallback="plain")
+INSURANCE_NATIONAL_TIMEOUT = int(
+    os.environ.get("HIS_INSURANCE_NATIONAL_TIMEOUT", "")
+    or _ini.get("insurance", "national_timeout", fallback="15")
+)
+INSURANCE_NATIONAL_RETRY = int(
+    os.environ.get("HIS_INSURANCE_NATIONAL_RETRY", "")
+    or _ini.get("insurance", "national_retry", fallback="0")
+)
+INSURANCE_NATIONAL_DEV_NO = os.environ.get("HIS_INSURANCE_NATIONAL_DEV_NO", "") or _ini.get(
+    "insurance", "national_dev_no", fallback=""
+)
+INSURANCE_NATIONAL_DEV_SAFE_INFO = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_DEV_SAFE_INFO", ""
+) or _ini.get("insurance", "national_dev_safe_info", fallback="")
+INSURANCE_NATIONAL_CERT_PATH = os.environ.get("HIS_INSURANCE_NATIONAL_CERT_PATH", "") or _ini.get(
+    "insurance", "national_cert_path", fallback=""
+)
+INSURANCE_NATIONAL_CERT_PASSWORD = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_CERT_PASSWORD", ""
+) or _ini.get("insurance", "national_cert_password", fallback="")
+INSURANCE_NATIONAL_SM2_PRIVATE_KEY = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_SM2_PRIVATE_KEY", ""
+) or _ini.get("insurance", "national_sm2_private_key", fallback="")
+INSURANCE_NATIONAL_SM2_PUBLIC_KEY = os.environ.get(
+    "HIS_INSURANCE_NATIONAL_SM2_PUBLIC_KEY", ""
+) or _ini.get("insurance", "national_sm2_public_key", fallback="")
+INSURANCE_NATIONAL_SM4_KEY = os.environ.get("HIS_INSURANCE_NATIONAL_SM4_KEY", "") or _ini.get(
+    "insurance", "national_sm4_key", fallback=""
+)
 
 INSURANCE_ALLOW_MOCK = (
     os.environ.get("HIS_INSURANCE_ALLOW_MOCK", "").lower() in {"1", "true", "yes", "on"}

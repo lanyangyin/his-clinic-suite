@@ -1172,6 +1172,33 @@ class ApiClient:
             params["batch_no"] = batch_no
         return self._request("GET", "/trace/codes/summary", params=params)
 
+    # ---- 国家医保接口联调 ----
+    def national_insurance_status(self) -> dict:
+        return self._request("GET", "/insurance/national/status")
+
+    def national_pre_settle(self, encounter_id: int) -> dict:
+        return self._request(
+            "POST", f"/insurance/national/pre-settle/{encounter_id}", json={}
+        )
+
+    def national_settle(self, encounter_id: int, setl_id: str = "") -> dict:
+        return self._request(
+            "POST",
+            f"/insurance/national/settle/{encounter_id}",
+            json={"setl_id": setl_id},
+        )
+
+    def national_cancel_settle(self, encounter_id: int, setl_id: str) -> dict:
+        return self._request(
+            "POST",
+            f"/insurance/national/cancel-settle/{encounter_id}",
+            json={"setl_id": setl_id},
+        )
+
+    def national_insurance_transactions(self, encounter_id: int | None = None) -> list:
+        params = {"encounter_id": encounter_id} if encounter_id else {}
+        return self._request("GET", "/insurance/national/transactions", params=params)
+
     # ---- 医保目录 ----
     def search_insurance_catalog(
         self, q: str | None = None, category: str | None = None, limit: int = 50

@@ -1,7 +1,7 @@
 # Linux 独立部署指南（从第 0 步到可用）
 
 适用：Ubuntu 24.04 LTS，x86_64 或 arm64。Debian 12 默认 Python 3.11，需自行安装 Python 3.12 后再按本文部署。  
-服务端版本：HIS 1.3.7。  
+服务端版本：HIS 1.3.8。  
 目标：一台 Linux 主机跑服务端，局域网内 Windows 客户端可以登录使用。
 
 > 不要使用 Windows 的 `his-server.exe`；Linux 用源码 + Python 虚拟环境部署。
@@ -179,7 +179,7 @@ phone = 你的电话
 - `database.url` 留空 = `/opt/his/his.db`
 - 不要把数据库放 Windows 共享盘/NFS
 
-### 医保/打印机构参数（1.3.7）
+### 医保/打印机构参数（1.3.8）
 
 `config.local.ini` 中以下值可先留空：
 
@@ -243,7 +243,7 @@ curl http://127.0.0.1:8001/health
 应返回：
 
 ```json
-{"status":"ok","version":"1.3.7"}
+{"status":"ok","version":"1.3.8"}
 ```
 
 管理台：

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
+from app.modules.admin.institution import FIELDS as INSTITUTION_FIELDS
 from app.modules.admin.institution import load as load_institution
 from app.modules.admin.system_settings import FIELDS as SYSTEM_SETTING_FIELDS
 from app.modules.admin.system_settings import load as load_system_settings
@@ -650,35 +651,18 @@ def institution_settings_page(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/institution-settings")
-def institution_settings_save(
-    clinic_name: str = Form(""),
-    clinic_address: str = Form(""),
-    clinic_phone: str = Form(""),
-    insurance_enabled: int = Form(0),
-    national_url: str = Form(""),
-    national_token: str = Form(""),
-    national_org_code: str = Form(""),
-    national_region_code: str = Form(""),
-    national_operator: str = Form("HIS"),
-    national_mock: int = Form(0),
-    request: Request = None,
-    db: Session = Depends(get_db),
-):
+async def institution_settings_save(request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)
     if redirect:
         return redirect
-    save_institution(db, {
-        "clinic_name": clinic_name.strip(),
-        "clinic_address": clinic_address.strip(),
-        "clinic_phone": clinic_phone.strip(),
-        "insurance_enabled": bool(insurance_enabled),
-        "national_url": national_url.strip(),
-        "national_token": national_token.strip(),
-        "national_org_code": national_org_code.strip(),
-        "national_region_code": national_region_code.strip(),
-        "national_operator": national_operator.strip() or "HIS",
-        "national_mock": bool(national_mock),
-    }, "admin")
+    form = await request.form()
+    values = {}
+    for field in INSTITUTION_FIELDS:
+        if field in ("insurance_enabled", "national_mock"):
+            values[field] = form.get(field) == "1"
+        else:
+            values[field] = str(form.get(field, ""))
+    save_institution(db, values, "admin")
     return RedirectResponse("/admin/institution-settings", status_code=302)
 
 

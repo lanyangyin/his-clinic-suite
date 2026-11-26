@@ -15,10 +15,35 @@
     <p class="small">未配置/未启用时，医保结算接口返回未配置，不会伪造成功；启用前请确认当地前置机参数。</p>
     <label>前置机 URL <input name="national_url" value="{{ profile.national_url }}" maxlength="500" style="width:460px" placeholder="https://..."></label>
     <label>访问令牌 <input type="password" name="national_token" value="" maxlength="500" style="width:360px" placeholder="留空表示保持原值"></label>
-    <label>机构编码 <input name="national_org_code" value="{{ profile.national_org_code }}" maxlength="100"></label>
-    <label>区域编码 <input name="national_region_code" value="{{ profile.national_region_code }}" maxlength="100"></label>
+    <label>机构编码 fixmedins_code <input name="national_org_code" value="{{ profile.national_org_code }}" maxlength="100"></label>
+    <label>机构名称 <input name="national_org_name" value="{{ profile.national_org_name }}" maxlength="100"></label>
+    <label>区域编码（默认） <input name="national_region_code" value="{{ profile.national_region_code }}" maxlength="100"></label>
+    <label>就医地编码 mdtrtarea_admvs <input name="national_mdtrtarea_code" value="{{ profile.national_mdtrtarea_code }}" maxlength="100" placeholder="留空回退区域编码"></label>
+    <label>参保地编码 insuplc_admdvs <input name="national_insuplc_code" value="{{ profile.national_insuplc_code }}" maxlength="100" placeholder="留空回退区域编码"></label>
     <label>操作员编号 <input name="national_operator" value="{{ profile.national_operator }}" maxlength="50"></label>
+    <label>接口版本 infver <input name="national_infver" value="{{ profile.national_infver }}" maxlength="10"></label>
+    <label>接收系统编码 <input name="national_recer_sys_code" value="{{ profile.national_recer_sys_code }}" maxlength="20"></label>
+    <label>医疗类别 med_type <input name="national_med_type" value="{{ profile.national_med_type }}" maxlength="10"></label>
     <label><input type="checkbox" name="national_mock" value="1" {% if profile.national_mock %}checked{% endif %}> 启用本地 Mock（只用于联调，生产关闭）</label>
+
+    <h3>安全与连接</h3>
+    <p class="small">plain：当前适配器可直连第三方模拟器/明文测试桩；sm2_sm4：保留生产参数，但标准加密适配尚未实现，未配置时不会伪造调用成功。</p>
+    <label>安全模式
+      <select name="national_security_mode">
+        <option value="plain" {% if profile.national_security_mode == "plain" %}selected{% endif %}>plain（明文联调）</option>
+        <option value="sm2_sm4" {% if profile.national_security_mode == "sm2_sm4" %}selected{% endif %}>sm2_sm4（生产加密，待适配）</option>
+      </select>
+    </label>
+    <label>签名类型 <input name="national_sign_type" value="{{ profile.national_sign_type }}" maxlength="10"></label>
+    <label>超时秒 <input type="number" name="national_timeout" value="{{ profile.national_timeout }}" min="1" max="120"></label>
+    <label>重试次数 <input type="number" name="national_retry" value="{{ profile.national_retry }}" min="0" max="3"></label>
+    <label>设备编号 dev_no <input name="national_dev_no" value="{{ profile.national_dev_no }}" maxlength="100"></label>
+    <label>设备安全信息 <input name="national_dev_safe_info" value="{{ profile.national_dev_safe_info }}" maxlength="200" style="width:420px"></label>
+    <label>证书路径 <input name="national_cert_path" value="{{ profile.national_cert_path }}" maxlength="500" style="width:420px"></label>
+    <label>证书口令 <input type="password" name="national_cert_password" value="" maxlength="500" style="width:360px" placeholder="留空保持"></label>
+    <label>SM2 私钥 <input type="password" name="national_sm2_private_key" value="" maxlength="500" style="width:360px" placeholder="留空保持"></label>
+    <label>SM2 公钥 <input type="password" name="national_sm2_public_key" value="" maxlength="500" style="width:360px" placeholder="留空保持"></label>
+    <label>SM4 密钥 <input type="password" name="national_sm4_key" value="" maxlength="500" style="width:360px" placeholder="留空保持"></label>
     <p class="small">当前仅完成国家医保门诊接口模板；真实 SM2/SM4、地方待遇算法和前置机差异仍需实施时补适配。</p>
     <p><button type="submit">保存机构参数</button></p>
   </form>

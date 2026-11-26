@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -65,6 +65,23 @@ class InstitutionSetting(Base):
     national_org_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     national_region_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     national_operator: Mapped[str] = mapped_column(String(50), default="HIS", nullable=False)
+    national_org_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_infver: Mapped[str] = mapped_column(String(10), default="V1.0", nullable=False)
+    national_recer_sys_code: Mapped[str] = mapped_column(String(20), default="HIS", nullable=False)
+    national_mdtrtarea_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_insuplc_code: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_med_type: Mapped[str] = mapped_column(String(10), default="11", nullable=False)
+    national_sign_type: Mapped[str] = mapped_column(String(10), default="SM2", nullable=False)
+    national_security_mode: Mapped[str] = mapped_column(String(20), default="plain", nullable=False)
+    national_timeout: Mapped[int] = mapped_column(Integer, default=15, nullable=False)
+    national_retry: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    national_dev_no: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    national_dev_safe_info: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    national_cert_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_cert_password: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_sm2_private_key: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_sm2_public_key: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    national_sm4_key: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     national_mock: Mapped[bool] = mapped_column(default=False, nullable=False)
     updated_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

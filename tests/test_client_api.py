@@ -296,3 +296,23 @@ def test_material_catalog_methods():
     assert session.calls[0][1] == "http://x/insurance/materials/search"
     assert session.calls[0][2]["params"]["q"] == "注射"
     assert session.calls[1][1] == "http://x/insurance/materials/MATC001/ensure-item"
+
+
+def test_national_insurance_client_methods():
+    session = FakeSession(
+        [
+            FakeResponse(200, {"configured": True, "security_mode": "plain"}),
+            FakeResponse(200, {"infcode": 0}),
+            FakeResponse(200, {"infcode": 0}),
+            FakeResponse(200, {"infcode": 0}),
+            FakeResponse(200, [{"infno": "2206"}]),
+        ]
+    )
+    client = ApiClient("http://x", "cashier", "pw", session=session)
+    assert client.national_insurance_status()["configured"] is True
+    client.national_pre_settle(7)
+    client.national_settle(7, "SETL1")
+    client.national_cancel_settle(7, "SETL1")
+    assert client.national_insurance_transactions(7)[0]["infno"] == "2206"
+    assert session.calls[1][1] == "http://x/insurance/national/pre-settle/7"
+    assert session.calls[2][2]["json"] == {"setl_id": "SETL1"}

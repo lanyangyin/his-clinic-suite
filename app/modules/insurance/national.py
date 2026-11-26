@@ -43,10 +43,56 @@ class NationalConfig:
     operator: str
     mock: bool
     enabled: bool
+    org_name: str = ""
+    infver: str = "V1.0"
+    recer_sys_code: str = "HIS"
+    mdtrtarea_code: str = ""
+    insuplc_code: str = ""
+    med_type: str = "11"
+    sign_type: str = "SM2"
+    security_mode: str = "plain"
+    timeout: int = 15
+    retry: int = 0
+    dev_no: str = ""
+    dev_safe_info: str = ""
+    cert_path: str = ""
+    cert_password: str = ""
+    sm2_private_key: str = ""
+    sm2_public_key: str = ""
+    sm4_key: str = ""
 
     @property
     def configured(self) -> bool:
         return bool(self.url and self.org_code and self.region_code)
+
+    @property
+    def effective_mdtrtarea(self) -> str:
+        return self.mdtrtarea_code or self.region_code
+
+    @property
+    def effective_insuplc(self) -> str:
+        return self.insuplc_code or self.region_code
+
+    def missing(self) -> list[str]:
+        missing = []
+        if not self.url:
+            missing.append("url")
+        if not self.org_code:
+            missing.append("org_code")
+        if not self.region_code:
+            missing.append("region_code")
+        if not self.effective_mdtrtarea:
+            missing.append("mdtrtarea_code")
+        if not self.effective_insuplc:
+            missing.append("insuplc_code")
+        if self.security_mode not in ("plain", "sm2_sm4"):
+            missing.append("security_mode")
+        if self.security_mode == "sm2_sm4":
+            if not self.sm2_private_key:
+                missing.append("sm2_private_key")
+            if not self.sm4_key:
+                missing.append("sm4_key")
+        return missing
 
 
 def config(db=None) -> NationalConfig:
@@ -66,6 +112,23 @@ def config(db=None) -> NationalConfig:
         operator=(values or {}).get("national_operator") or _get("INSURANCE_NATIONAL_OPERATOR", "HIS"),
         mock=bool((values or {}).get("national_mock") or getattr(settings, "INSURANCE_NATIONAL_MOCK", False)),
         enabled=bool((values or {}).get("insurance_enabled") or getattr(settings, "INSURANCE_ENABLED", False)),
+        org_name=(values or {}).get("national_org_name") or _get("INSURANCE_NATIONAL_ORG_NAME"),
+        infver=(values or {}).get("national_infver") or _get("INSURANCE_NATIONAL_INFVER", "V1.0"),
+        recer_sys_code=(values or {}).get("national_recer_sys_code") or _get("INSURANCE_NATIONAL_RECER_SYS_CODE", "HIS"),
+        mdtrtarea_code=(values or {}).get("national_mdtrtarea_code") or _get("INSURANCE_NATIONAL_MDTRTAREA_CODE"),
+        insuplc_code=(values or {}).get("national_insuplc_code") or _get("INSURANCE_NATIONAL_INSUPLC_CODE"),
+        med_type=(values or {}).get("national_med_type") or _get("INSURANCE_NATIONAL_MED_TYPE", "11"),
+        sign_type=(values or {}).get("national_sign_type") or _get("INSURANCE_NATIONAL_SIGN_TYPE", "SM2"),
+        security_mode=(values or {}).get("national_security_mode") or _get("INSURANCE_NATIONAL_SECURITY_MODE", "plain"),
+        timeout=int((values or {}).get("national_timeout") or _get("INSURANCE_NATIONAL_TIMEOUT", "15") or 15),
+        retry=int((values or {}).get("national_retry") or _get("INSURANCE_NATIONAL_RETRY", "0") or 0),
+        dev_no=(values or {}).get("national_dev_no") or _get("INSURANCE_NATIONAL_DEV_NO"),
+        dev_safe_info=(values or {}).get("national_dev_safe_info") or _get("INSURANCE_NATIONAL_DEV_SAFE_INFO"),
+        cert_path=(values or {}).get("national_cert_path") or _get("INSURANCE_NATIONAL_CERT_PATH"),
+        cert_password=(values or {}).get("national_cert_password") or _get("INSURANCE_NATIONAL_CERT_PASSWORD"),
+        sm2_private_key=(values or {}).get("national_sm2_private_key") or _get("INSURANCE_NATIONAL_SM2_PRIVATE_KEY"),
+        sm2_public_key=(values or {}).get("national_sm2_public_key") or _get("INSURANCE_NATIONAL_SM2_PUBLIC_KEY"),
+        sm4_key=(values or {}).get("national_sm4_key") or _get("INSURANCE_NATIONAL_SM4_KEY"),
     )
 
 
@@ -74,18 +137,25 @@ def build_envelope(infno: str, input_data: dict, db=None) -> dict:
     cfg = config(db)
     if infno not in SUPPORTED:
         raise ValueError(f"不支持的医保交易 {infno}")
+    if cfg.security_mode != "plain":
+        raise NationalInsuranceNotConfigured(
+            "当前配置为 sm2_sm4 生产安全模式，但本版本尚未实现 SM2/SM4 封装；"
+            "请先用 plain 模式对接第三方模拟器，或按当地规范补加密适配"
+        )
     return {
         "infno": infno,
         "msgid": uuid.uuid4().hex,
-        "mdtrtarea_admvs": cfg.region_code,
-        "insuplc_admdvs": cfg.region_code,
-        "recer_sys_code": "HIS",
-        "infver": "V1.0",
+        "mdtrtarea_admvs": cfg.effective_mdtrtarea,
+        "insuplc_admdvs": cfg.effective_insuplc,
+        "recer_sys_code": cfg.recer_sys_code or "HIS",
+        "infver": cfg.infver or "V1.0",
         "opter_no": cfg.operator,
-        "signtype": "SM2",
-        "dev_no": "",
-        "dev_safe_info": "",
+        "signtype": cfg.sign_type or "SM2",
+        "dev_no": cfg.dev_no,
+        "dev_safe_info": cfg.dev_safe_info,
         "cert": "",
+        "fixmedins_code": cfg.org_code,
+        "fixmedins_name": cfg.org_name or getattr(settings, "CLINIC_NAME", ""),
         # 真实平台需按当地规范对 input 做 SM4 加密并 SM2 签名；此处保留明文模板。
         "input": input_data,
     }
@@ -123,26 +193,41 @@ def _post(envelope: dict, db=None) -> dict:
         raise NationalInsuranceNotConfigured(
             "未配置医保国家平台网关（URL/机构编码/区域编码）"
         )
+    import urllib.error
     import urllib.request
 
-    request = urllib.request.Request(
-        cfg.url,
-        data=json.dumps(envelope, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json; charset=utf-8",
-            "Authorization": f"Bearer {cfg.token}" if cfg.token else "",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            body = json.loads(response.read().decode("utf-8"))
-    except Exception as exc:
-        raise NationalInsuranceNotConfigured(f"医保平台调用失败：{exc}") from exc
+    body = None
+    last_error = None
+    for attempt in range(max(0, cfg.retry) + 1):
+        request = urllib.request.Request(
+            cfg.url,
+            data=json.dumps(envelope, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": f"Bearer {cfg.token}" if cfg.token else "",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=max(1, cfg.timeout)) as response:
+                raw = response.read().decode("utf-8")
+                body = json.loads(raw)
+            break
+        except Exception as exc:
+            last_error = exc
+            if attempt >= max(0, cfg.retry):
+                raise NationalInsuranceNotConfigured(
+                    f"医保平台调用失败（第 {attempt + 1} 次）：{exc}"
+                ) from exc
     if not isinstance(body, dict):
         raise NationalInsuranceNotConfigured("医保平台响应不是 JSON 对象")
+    if "infcode" not in body:
+        raise NationalInsuranceNotConfigured("医保平台响应缺少 infcode")
+    code = str(body.get("infcode")).strip()
+    if code not in ("0", ""):
+        message = body.get("infmsg") or body.get("errmsg") or "业务失败"
+        raise NationalInsuranceNotConfigured(f"医保平台返回业务错误 [{code}]：{message}")
     return body
-
 
 def call(infno: str, input_data: dict, db=None) -> dict:
     cfg = config(db)

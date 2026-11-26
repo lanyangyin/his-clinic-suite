@@ -19,20 +19,24 @@ def national_status(
     _: None = Depends(require_role("admin", "cashier")),
 ):
     cfg = national.config(db)
-    missing = []
-    if not cfg.url:
-        missing.append("url")
-    if not cfg.org_code:
-        missing.append("org_code")
-    if not cfg.region_code:
-        missing.append("region_code")
     return {
         "configured": cfg.configured,
         "enabled": cfg.enabled,
         "mock": cfg.mock,
-        "missing": missing,
+        "missing": cfg.missing(),
         "supported": sorted(national.SUPPORTED),
-        "note": "真实接入需按当地医保前置机规范配置密钥/证书/加密；当前模板保留 input 明文适配点",
+        "security_mode": cfg.security_mode,
+        "infver": cfg.infver,
+        "recer_sys_code": cfg.recer_sys_code,
+        "fixmedins_code": cfg.org_code,
+        "mdtrtarea_admvs": cfg.effective_mdtrtarea,
+        "insuplc_admdvs": cfg.effective_insuplc,
+        "timeout": cfg.timeout,
+        "retry": cfg.retry,
+        "note": (
+            "plain 模式可直接对接允许明文 input 的第三方模拟器；"
+            "sm2_sm4 模式参数已预留，但本版本尚未实现 SM2/SM4 封装，不会伪造成功"
+        ),
     }
 
 
