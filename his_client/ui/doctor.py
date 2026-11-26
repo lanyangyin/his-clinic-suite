@@ -444,15 +444,18 @@ class DoctorWidget(QWidget):
             if widget is not None:
                 widget.setEnabled(enabled)
 
-    def _set_clinical_tabs(self, has_patient: bool, has_encounter: bool) -> None:
+    def _set_clinical_tabs(
+        self, has_patient: bool, has_encounter: bool, closed: bool = False
+    ) -> None:
+        clinical_enabled = has_encounter and not closed
         allowed = {
-            "病历": has_encounter,
+            "病历": clinical_enabled,
             # 历史诊疗是独立只读查询：不需要挂号/接诊，始终可用
             "历史诊疗": True,
-            "开方": has_encounter,
-            "收费": has_encounter,
-            "检验 / 检查": has_encounter,
-            "治疗": has_encounter,
+            "开方": clinical_enabled,
+            "收费": clinical_enabled,
+            "检验 / 检查": clinical_enabled,
+            "治疗": clinical_enabled,
         }
         for text, enabled in allowed.items():
             for index in range(self.tabs.count()):
@@ -786,8 +789,8 @@ class DoctorWidget(QWidget):
         self.wb_start.setEnabled(not item.get("encounter_id") or status == "paused")
         if hasattr(self, "wb_action_buttons"):
             has_encounter = bool(item.get("encounter_id"))
-            self._set_clinical_tabs(True, has_encounter)
-            self._set_rx_enabled(has_encounter)
+            self._set_clinical_tabs(True, has_encounter, status == "closed")
+            self._set_rx_enabled(has_encounter and status != "closed")
             for text in ("写病历", "开方", "开检验", "开治疗", "历史诊疗"):
                 self.wb_action_buttons[text].setEnabled(has_encounter)
             self.wb_action_buttons["挂起当前"].setEnabled(status == "open")

@@ -111,3 +111,30 @@ def test_worklist_filters_by_linked_doctor(client, auth):
     ).json()
     assert any(item["registration_id"] == reg["id"] for item in rows)
     assert all(item["doctor_name"] == "工作台医生" for item in rows)
+
+
+def test_paid_patient_disables_clinical_tabs(qapp=None):
+    """已收费患者不能通过页签进入病历/开方/检验/治疗/收费。"""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QTabWidget
+
+    app = QApplication.instance() or QApplication([])
+    from his_client.ui.doctor import DoctorWidget
+
+    widget = DoctorWidget.__new__(DoctorWidget)
+    widget.tabs = QTabWidget()
+    for label in ("门诊队列", "病历", "历史诊疗", "开方", "检验 / 检查", "治疗", "收费"):
+        widget.tabs.addTab(QTabWidget(), label)
+    widget._set_clinical_tabs(True, True, closed=True)
+    enabled = {
+        widget.tabs.tabText(i): widget.tabs.isTabEnabled(i)
+        for i in range(widget.tabs.count())
+    }
+    assert enabled["病历"] is False
+    assert enabled["开方"] is False
+    assert enabled["检验 / 检查"] is False
+    assert enabled["治疗"] is False
+    assert enabled["收费"] is False
+    assert enabled["历史诊疗"] is True
