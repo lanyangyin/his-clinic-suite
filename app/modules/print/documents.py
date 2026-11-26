@@ -421,3 +421,32 @@ h2 {{ color: {p['theme_color']}; }}
     if custom:
         html = html.replace("</head>", f"<style>{custom}</style></head>", 1)
     return html
+
+
+def render_imaging_report(data: dict, profile: dict | None = None) -> str:
+    """影像/检查报告单（不嵌入 DICOM，只打印报告文字与图像链接）。"""
+    meta = _clinic_meta(profile)
+    image = str(data.get("image_url") or "").strip()
+    image_html = (
+        f'<p class="barcode-no">图像：{escape(image)}</p>'
+        if image else ""
+    )
+    body = f"""
+<h2>{escape(meta['name'])} · 检查报告单</h2>
+<table class="info">
+<tr><td>患者：{_value(data.get('patient_name'))}</td><td>报告号：{_value(data.get('report_no'))}</td></tr>
+<tr><td>就诊：{_value(data.get('encounter_id'))}</td><td>检查项目：{_value(data.get('item_name'))}</td></tr>
+<tr><td>检查部位：{_value(data.get('body_part'))}</td><td>诊断：{_value(data.get('diagnosis'))}</td></tr>
+<tr><td>医生：{_value(data.get('doctor_name'))}</td><td>状态：{_value(data.get('status'))}</td></tr>
+</table>
+<div class="rule-thin"></div>
+<div class="section"><span class="section-title">检查所见</span><br>{escape(str(data.get('findings') or '—'))}</div>
+<div class="section"><span class="section-title">检查意见</span><br>{escape(str(data.get('impression') or '—'))}</div>
+{image_html}
+<div class="sign">
+  <span>报告医师：{_value(data.get('reported_by'))}</span>
+  <span>审核医师：{_value(data.get('reviewed_by'))}</span>
+</div>
+<div class="footer">{f'报告时间：{_value(data.get("reported_at"))}' if data.get('reported_at') else ''}</div>
+"""
+    return _html(body, "检查报告单", profile)

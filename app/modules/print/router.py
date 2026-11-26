@@ -14,6 +14,7 @@ from app.modules.billing.service import get_payment
 from app.modules.print.documents import (
     apply_print_profile,
     render_full_set,
+    render_imaging_report,
     render_record,
     render_tcm,
     render_western,
@@ -772,6 +773,36 @@ LAB_CSS = """
     .sign { margin-top: 16px; display: flex; justify-content: space-between; }
     @media print { .no-print { display: none; } }
 """
+
+
+@router.get("/imaging-report/{request_id}", response_class=HTMLResponse)
+def print_imaging_report(request_id: int, db: Session = Depends(get_db), user=Depends(require_print_access)):
+    print_count = _log_print(db, user, "imaging-report", request_id)
+    request = db.get(ImagingRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=404, detail="检查申请不存在")
+    encounter = get_encounter(db, request.encounter_id)
+    registration = get_registration(db, encounter.registration_id) if encounter else None
+    patient = get_patient(db, registration.patient_id) if registration else None
+    doctor = get_doctor(db, registration.doctor_id) if registration else None
+    data = {
+        "patient_name": patient.name if patient else "",
+        "report_no": request.accession_no,
+        "encounter_id": request.encounter_id,
+        "item_name": request.item_name,
+        "body_part": request.item.body_part if request.item else "",
+        "diagnosis": encounter.diagnosis if encounter else "",
+        "doctor_name": doctor.name if doctor else "",
+        "status": request.status,
+        "findings": request.findings or request.report or "",
+        "impression": request.impression or "",
+        "image_url": request.image_url,
+        "reported_by": request.reported_by or "",
+        "reviewed_by": request.reviewed_by or "",
+        "reported_at": request.reported_at.strftime("%Y-%m-%d %H:%M") if request.reported_at else "",
+    }
+    html = apply_print_profile(render_imaging_report(data, load_print_profile(db)), load_print_profile(db))
+    return HTMLResponse(_with_reprint_banner(html, print_count))
 
 
 @router.get("/lab-report/{request_id}", response_class=HTMLResponse)

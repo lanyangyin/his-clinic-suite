@@ -24,6 +24,47 @@ def _auto_login():
         return None
 
 
+def _version_tuple(value: str) -> tuple[int, ...]:
+    parts = []
+    for part in str(value or "").replace("-", ".").split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        if digits:
+            parts.append(int(digits))
+    return tuple(parts)
+
+
+def _check_update(api) -> None:
+    """最低版本检查：客户端过旧时提示，并打开配置的下载地址。"""
+    from his_client import CLIENT_VERSION
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+    from PySide6.QtWidgets import QMessageBox
+
+    try:
+        info = api.version()
+    except Exception:
+        return
+    minimum = str(info.get("client_min_version") or "")
+    if not minimum or _version_tuple(CLIENT_VERSION) >= _version_tuple(minimum):
+        return
+    box = QMessageBox()
+    box.setWindowTitle("客户端需要升级")
+    box.setIcon(QMessageBox.Warning)
+    box.setText(
+        f"当前客户端版本 {CLIENT_VERSION}，服务器要求至少 {minimum}。\n"
+        "请下载新客户端后再使用。"
+    )
+    download = QMessageBox()
+    open_button = box.addButton("打开下载页", QMessageBox.AcceptRole)
+    box.addButton("稍后", QMessageBox.RejectRole)
+    box.exec()
+    if box.clickedButton() is open_button:
+        url = str(info.get("download_url") or "").strip()
+        if not url:
+            url = api.base_url.rstrip("/") + "/download/client"
+        QDesktopServices.openUrl(QUrl(url))
+
+
 def _open_main_window(app, api, user):
     """显示加载提示后再构造主窗口，避免认证成功后出现空白/像闪退。"""
     from PySide6.QtCore import Qt
@@ -73,6 +114,7 @@ def main() -> int:
     if "--auto-login" in sys.argv:
         pair = _auto_login()
         if pair:
+            _check_update(pair[0])
             window = _open_main_window(app, pair[0], pair[1])
             if window is None:
                 return 1
@@ -82,6 +124,7 @@ def main() -> int:
     dialog = LoginDialog(load_config())
     if dialog.exec() != QDialog.Accepted or not dialog.api or not dialog.user:
         return 0
+    _check_update(dialog.api)
 
     window = _open_main_window(app, dialog.api, dialog.user)
     if window is None:

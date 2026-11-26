@@ -76,7 +76,12 @@ def test_treatment_list_filter(client, auth):
     assert len(pending) == 1
     assert pending[0]["id"] == order["id"]
 
-    client.post(f"/treatments/{order['id']}/execute", headers=auth["nurse"])
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
+    executed = client.post(f"/treatments/{order['id']}/execute", headers=auth["nurse"])
+    assert executed.status_code == 200, executed.text
     assert client.get("/treatments/?status=pending").json() == []
     done = client.get("/treatments/?status=done").json()
     assert len(done) == 1

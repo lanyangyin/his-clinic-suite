@@ -11,6 +11,7 @@ from app.modules.print.documents import (
     _profile,
     apply_print_profile,
     render_full_set,
+    render_imaging_report,
     render_record,
     render_tcm,
     render_western,
@@ -28,6 +29,7 @@ DOCUMENTS = [
     ("dispense-label", "发药袋标签", "患者、药品、用法、发药人", 620),
     ("nursing-label", "输液/注射瓶签", "座位、药品、溶媒、核对人", 620),
     ("lab-report", "检验报告单", "检验结果、参考范围、危急值、审核", 760),
+    ("imaging-report", "检查报告单", "影像/检查所见、意见、审核", 760),
 ]
 
 
@@ -151,6 +153,17 @@ def sample_data() -> dict:
             "dosage": "2g", "route": "静脉滴注", "frequency": "每日1次",
             "solvent": "0.9% 氯化钠注射液 100ml", "batch_no": "S20261101",
             "prepared_by": "演示护士", "checked_by": "演示护士",
+        },
+        "imaging_report": {
+            "patient_name": patient.name, "encounter_id": encounter.id,
+            "diagnosis": encounter.diagnosis, "doctor_name": "演示医生",
+            "report_no": "IMG-DEMO-0001", "item_name": "胸部正位片",
+            "body_part": "胸部", "status": "已报告",
+            "findings": "双肺纹理清晰，未见明显实变。",
+            "impression": "胸部正位片未见明显异常。",
+            "image_url": "", "reported_by": "演示影像医师",
+            "reviewed_by": "演示审核医师",
+            "reported_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         },
         "lab_report": {
             "patient": patient, "encounter_id": encounter.id, "diagnosis": encounter.diagnosis,
@@ -343,4 +356,6 @@ def render(kind: str, profile: dict | None = None) -> str:
         return _add_profile_notes(_nursing_label(data, p), p)
     if kind == "lab-report":
         return _add_profile_notes(_lab_report(data, p), p)
+    if kind == "imaging-report":
+        return render_imaging_report(data["imaging_report"], p)
     raise ValueError("未知打印模板")

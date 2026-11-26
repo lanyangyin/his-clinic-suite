@@ -655,6 +655,7 @@ def start_case(db: Session, case_id: int, data: StartRequest, operator: str = ""
         raise ValueError("治疗室病例不存在")
     if case.status != "waiting":
         raise ValueError("该病例当前状态不可开始")
+
     if not data.consent:
         raise ValueError("请先完成知情同意")
     if not data.consent_signer.strip():

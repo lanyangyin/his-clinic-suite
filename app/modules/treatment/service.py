@@ -100,6 +100,13 @@ def execute_treatment(db: Session, order_id: int, executed_by: str) -> Treatment
         raise ValueError("治疗单不存在")
     if order.status != "pending":
         raise ValueError("该治疗单已执行或已取消")
+    from app.modules.billing.models import Payment
+
+    if not db.query(Payment).filter(
+        Payment.encounter_id == order.encounter_id,
+        Payment.status.in_(("paid", "partially_refunded")),
+    ).first():
+        raise ValueError("该就诊尚未收费，不能执行治疗")
 
     affected = (
         db.query(TreatmentOrder)

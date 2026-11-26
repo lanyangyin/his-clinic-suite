@@ -85,6 +85,10 @@ def test_execute_treatment(client, auth):
         f"/treatments/encounters/{encounter['id']}",
         json={"item_id": item["id"]}, headers=auth["doctor"],
     ).json()
+    paid = client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
+    assert paid.status_code == 201, paid.text
     r = client.post(f"/treatments/{order['id']}/execute", headers=auth["nurse"])
     assert r.status_code == 200
     assert r.json()["status"] == "done"

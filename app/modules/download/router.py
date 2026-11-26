@@ -19,6 +19,7 @@ def version():
         "version": APP_VERSION,
         "api_version": API_VERSION,
         "client_min_version": CLIENT_MIN_VERSION,
+        "download_url": str(getattr(settings, "CLIENT_DOWNLOAD_URL", "") or ""),
     }
 
 

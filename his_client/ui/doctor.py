@@ -137,6 +137,9 @@ class HistoryApplyDialog(QDialog):
         for key, label, count in (
             ("diagnoses", "诊断", len(encounter.get("diagnoses") or [])),
             ("prescriptions", "处方", len(encounter.get("prescriptions") or [])),
+            ("lab_requests", "检验", len(encounter.get("lab_requests") or [])),
+            ("imaging_requests", "检查", len(encounter.get("imaging_requests") or [])),
+            ("treatments", "治疗", len(encounter.get("treatments") or [])),
         ):
             if count:
                 box = QCheckBox(f"{label}（{count} 条）")
@@ -1279,7 +1282,38 @@ class DoctorWidget(QWidget):
                     })
                 except ApiError as e:
                     errors.append(f"处方 {item.get('drug_name') or ''}：{e.detail}")
+        if "lab_requests" in selected:
+            for item in source_enc.get("lab_requests") or []:
+                if not item.get("item_id"):
+                    continue
+                try:
+                    self.api.create_lab_request(target, item["item_id"])
+                except ApiError as e:
+                    errors.append(f"检验 {item.get('item_name') or ''}：{e.detail}")
+        if "imaging_requests" in selected:
+            for item in source_enc.get("imaging_requests") or []:
+                if not item.get("item_id"):
+                    continue
+                try:
+                    self.api.create_imaging_request(target, item["item_id"])
+                except ApiError as e:
+                    errors.append(f"检查 {item.get('item_name') or ''}：{e.detail}")
+        if "treatments" in selected:
+            for item in source_enc.get("treatments") or []:
+                if not item.get("charge_item_id"):
+                    continue
+                try:
+                    self.api.create_treatment(
+                        target, item["charge_item_id"], item.get("quantity") or 1,
+                        item.get("note") or "",
+                    )
+                except ApiError as e:
+                    errors.append(f"治疗 {item.get('item_name') or ''}：{e.detail}")
         self._load_record()
+        if hasattr(self, "_refresh_exam_requests"):
+            self._refresh_exam_requests()
+        if hasattr(self, "_refresh_treatments"):
+            self._refresh_treatments()
         self._refresh_prescriptions()
         self.side_history_msg.setText(
             "历史病历已套用" + (f"；部分失败：{'; '.join(errors)}" if errors else "")

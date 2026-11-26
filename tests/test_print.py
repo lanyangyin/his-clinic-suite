@@ -406,6 +406,7 @@ def test_admin_print_preview_all_documents(client, auth):
         "dispense-label": "发药袋标签",
         "nursing-label": "输液",
         "lab-report": "检验报告单",
+        "imaging-report": "检查报告单",
     }
     for kind, marker in cases.items():
         response = client.get(f"/admin/print-preview/{kind}")
