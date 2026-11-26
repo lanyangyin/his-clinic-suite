@@ -473,6 +473,7 @@ class DoctorWidget(QWidget):
         """收费即完诊：回队列，清空当前患者，等待选择下一位。"""
         self.wb_current = None
         self._active_patient_id = None
+        self._active_patient_name = ""
         self._clear_side_history()
         self.wb_table.clearSelection()
         self.banner.clear()
@@ -735,7 +736,6 @@ class DoctorWidget(QWidget):
         if not (0 <= row < len(self.workbench_rows)):
             return
         item = self.workbench_rows[row]
-        self.wb_current = item
         active = self._is_active_patient(item)
         patient = {
             "id": item.get("patient_id"),
@@ -757,11 +757,23 @@ class DoctorWidget(QWidget):
             )
         else:
             status = "已接诊" if item.get("encounter_id") else "待接诊"
+        # 有正在接诊的患者时，单击队列里的其他患者只切换顶部查看，
+        # 不切换当前接诊上下文、不改变病历/开方/检验/治疗页签。
+        active_id = getattr(self, "_active_patient_id", None)
+        if active_id and item.get("patient_id") != active_id and not active:
+            self.banner.set_patient(patient, item.get("encounter_id"), status)
+            active_name = getattr(self, "_active_patient_name", "") or f"患者 {active_id}"
+            self.wb_summary.setText(
+                f"当前接诊患者仍是 {active_name}；刚才点击的 {item.get('patient_name') or ''} 仅用于查看"
+            )
+            return
+        self.wb_current = item
         self._set_patient_actions(True)
         # 顶部始终显示队列中刚刚点击的患者；左侧只显示当前真正接诊中的患者。
         self.banner.set_patient(patient, item.get("encounter_id"), status)
         if active:
             self._active_patient_id = item.get("patient_id")
+            self._active_patient_name = item.get("patient_name") or ""
             self.side_info.set_patient(
                 patient,
                 item.get("encounter_id"),
@@ -913,6 +925,7 @@ class DoctorWidget(QWidget):
             patient, encounter["id"], "已接诊", f"诊断：{diagnosis}"
         )
         self._active_patient_id = item.get("patient_id")
+        self._active_patient_name = item.get("patient_name") or ""
         self._clear_side_history()
         # 接诊成功直接进入病历，避免停在队列页以为没反应
         self._wb_record()
@@ -1671,6 +1684,7 @@ class DoctorWidget(QWidget):
                 self.banner.set_patient(patient, encounter["id"], "已接诊")
                 self.patient_info.set_patient(patient, encounter["id"], "已接诊")
                 self._active_patient_id = row["patient_id"]
+                self._active_patient_name = row.get("patient_name") or ""
                 self._clear_side_history()
             except ApiError:
                 pass

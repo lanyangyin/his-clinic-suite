@@ -5,6 +5,6 @@
 - api：REST API 封装
 - ui：登录对话框、主窗口、收费员工作站
 """
-CLIENT_VERSION = "1.3.12"
+CLIENT_VERSION = "1.3.13"
 
 __all__ = ["CLIENT_VERSION"]

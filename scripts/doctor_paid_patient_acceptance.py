@@ -68,30 +68,48 @@ def main() -> int:
     assert widget.tabs.isTabEnabled(indexes["治疗"]) is True
 
     select(paid_patient["id"])
-    # 顶部跟随队列点击；左侧仍是正在接诊的 active 患者
+    # 顶部跟随队列点击；左侧仍是正在接诊的 active 患者；
+    # 关键回归：不能因为点了已收费患者而把当前接诊患者的页签禁用。
     assert widget.banner.patient_id == paid_patient["id"], widget.banner.patient_id
     assert widget.side_info.patient_id == active_patient["id"]
+    assert widget.wb_current["patient_id"] == active_patient["id"]
     assert widget.side_history.rowCount() == 0, "点击已收费患者不应自动加载历史"
     for label in ("病历", "开方", "检验 / 检查", "治疗", "收费"):
-        assert widget.tabs.isTabEnabled(indexes[label]) is False, label
+        assert widget.tabs.isTabEnabled(indexes[label]) is True, label
     assert widget.tabs.isTabEnabled(indexes["历史诊疗"]) is True
-    assert widget.wb_action_buttons["回诊 / 看结果"].isEnabled() is True
-    # 右键/显式加载才拉历史，一次带出处方/检验/治疗计数
-    widget._load_side_history(paid_patient["id"], force=True)
-    assert widget.side_history.rowCount() >= 1
-    assert widget.side_history.columnCount() == 6
-
-    # 已收费患者回诊：同挂号新建回诊就诊，不重新挂号
-    widget._return_workbench()
-    assert widget.wb_current["registration_id"] == widget.workbench_rows[
-        widget.wb_table.currentRow()
-    ]["registration_id"]
-    assert widget.wb_current["encounter_id"] != paid_enc["id"]
+    assert widget.wb_action_buttons["回诊 / 看结果"].isEnabled() is False
+    # 再次点回当前接诊患者，页签仍正常
+    select(active_patient["id"])
     assert widget.tabs.isTabEnabled(indexes["病历"]) is True
-    assert widget.banner.patient_id == paid_patient["id"]
-    print(f"ACTIVE={active_patient['id']} PAID={paid_patient['id']} RETURN=OK")
     widget.close()
     widget.deleteLater()
+    app.processEvents()
+
+    # 没有当前接诊患者时，已收费患者页签应禁用，回诊按钮可用。
+    paid_widget = DoctorWidget(doctor)
+    paid_widget.auto_timer.stop()
+    paid_widget._load_workbench()
+    for row in range(paid_widget.wb_table.rowCount()):
+        if paid_widget.workbench_rows[row].get("patient_id") == paid_patient["id"]:
+            paid_widget.wb_table.selectRow(row)
+            paid_widget._select_workbench(row, 0)
+            break
+    paid_indexes = {paid_widget.tabs.tabText(i): i for i in range(paid_widget.tabs.count())}
+    for label in ("病历", "开方", "检验 / 检查", "治疗", "收费"):
+        assert paid_widget.tabs.isTabEnabled(paid_indexes[label]) is False, label
+    assert paid_widget.wb_action_buttons["回诊 / 看结果"].isEnabled() is True
+    paid_widget._load_side_history(paid_patient["id"], force=True)
+    assert paid_widget.side_history.rowCount() >= 1
+    assert paid_widget.side_history.columnCount() == 6
+    paid_widget._return_workbench()
+    assert paid_widget.tabs.isTabEnabled(paid_indexes["病历"]) is True
+    assert paid_widget.banner.patient_id == paid_patient["id"]
+    print(
+        f"ACTIVE={active_patient['id']} PAID={paid_patient['id']} "
+        "ACTIVE_CONTEXT=OK RETURN=OK"
+    )
+    paid_widget.close()
+    paid_widget.deleteLater()
     app.processEvents()
     return 0
 
