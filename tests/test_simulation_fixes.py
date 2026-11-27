@@ -411,3 +411,25 @@ def test_pending_payment_encounters(client, auth):
     )
     rows = client.get("/payments/pending-encounters", headers=auth["cashier"]).json()
     assert any(row["encounter_id"] == encounter["id"] for row in rows)
+
+
+def test_inactive_lab_item_hidden_from_doctor_and_blocked(client, auth):
+    _patient, _doctor, _registration, encounter = _encounter(client, auth, "停用检验")
+    item = client.post(
+        "/lab/items/", json={"code": "INACTIVE", "name": "停用项目", "price": 10},
+        headers=auth["admin"],
+    ).json()
+    client.post(
+        "/admin/login", data={"username": "admin", "password": "admin123"},
+        follow_redirects=False,
+    )
+    disabled = client.post(f"/admin/lab-items/{item['id']}/toggle", follow_redirects=False)
+    assert disabled.status_code == 302
+    items = client.get("/lab/items/", headers=auth["doctor"]).json()
+    assert all(row["id"] != item["id"] for row in items)
+    blocked = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": item["id"]}, headers=auth["doctor"],
+    )
+    assert blocked.status_code == 400
+    assert "停用" in blocked.json()["detail"]

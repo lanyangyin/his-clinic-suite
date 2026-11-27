@@ -97,8 +97,8 @@ def test_paid_lab_cancel_rejected(client, auth):
     response = client.post(
         f"/lab/requests/{request['id']}/cancel", headers=auth["doctor"]
     )
-    assert response.status_code == 400
-    assert "已收费" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["status"] == "dc"
 
 
 def test_lab_worklist_hidden_until_paid(client, auth):

@@ -88,21 +88,24 @@ def list_all_treatments(
     db: Session, status: str | None = None
 ) -> list[TreatmentOrder]:
     """全部治疗单（可按状态过滤，最新在前）。"""
-    from app.modules.billing.models import Payment
+    from app.modules.charges.models import EncounterCharge
 
     query = db.query(TreatmentOrder)
     if status is not None:
         query = query.filter(TreatmentOrder.status == status)
     rows = query.order_by(TreatmentOrder.id.desc()).all()
-    paid_encounters = {
-        row.encounter_id
-        for row in db.query(Payment.encounter_id)
-        .filter(Payment.status.in_(("paid", "partially_refunded")))
+    paid_ids = {
+        row.source_id
+        for row in db.query(EncounterCharge.source_id)
+        .filter(
+            EncounterCharge.source_type == "treatment",
+            EncounterCharge.status.in_(("paid", "partially_refunded")),
+        )
         .all()
     }
     for order in rows:
-        # 给响应模型提供“是否已收费”，工作站据此隐藏未收费治疗
-        order.paid = order.encounter_id in paid_encounters
+        # 只按本治疗单的费用判断，不能拿同就诊其他已付费用冒充
+        order.paid = order.id in paid_ids
     return rows
 
 
@@ -113,13 +116,15 @@ def execute_treatment(db: Session, order_id: int, executed_by: str) -> Treatment
         raise ValueError("治疗单不存在")
     if order.status != "pending":
         raise ValueError("该治疗单已执行或已取消")
-    from app.modules.billing.models import Payment
+    from app.modules.charges.models import EncounterCharge
 
-    if not db.query(Payment).filter(
-        Payment.encounter_id == order.encounter_id,
-        Payment.status.in_(("paid", "partially_refunded")),
-    ).first():
-        raise ValueError("该就诊尚未收费，不能执行治疗")
+    paid_charge = db.query(EncounterCharge).filter(
+        EncounterCharge.source_type == "treatment",
+        EncounterCharge.source_id == order.id,
+        EncounterCharge.status.in_(("paid", "partially_refunded")),
+    ).first()
+    if not paid_charge:
+        raise ValueError("该治疗项目尚未收费，不能执行治疗")
 
     affected = (
         db.query(TreatmentOrder)
@@ -156,7 +161,10 @@ def cancel_treatment(db: Session, order_id: int) -> TreatmentOrder:
         if charge.source_type == "treatment" and charge.source_id == order.id
     ]
     if any(charge.status in ("paid", "partially_refunded") for charge in treatment_charges):
-        raise ValueError("该治疗已收费，不能直接取消；请先按退费流程处理")
+        order.status = "dc"
+        db.commit()
+        db.refresh(order)
+        return order
     order.status = "cancelled"
     for charge in treatment_charges:
         charge.status = "cancelled"

@@ -23,6 +23,7 @@ LABELS: dict[str, dict[str, str]] = {
         "checked": "已验收",
         "stocked": "已入库",
         "cancelled": "已取消",
+        "dc": "已停止（DC）",
     },
     "outbound_status": {
         "submitted": "已申请",

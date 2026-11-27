@@ -53,8 +53,11 @@ def new_item(
 
 
 @router.get("/items/", response_model=list[LabItemResponse])
-def get_items(db: Session = Depends(get_db)):
-    return list_items(db)
+def get_items(
+    include_inactive: bool = False,
+    db: Session = Depends(get_db),
+):
+    return list_items(db, include_inactive=include_inactive)
 
 
 @router.put("/items/{item_id}", response_model=LabItemResponse)

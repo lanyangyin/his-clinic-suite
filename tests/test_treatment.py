@@ -210,8 +210,9 @@ def test_paid_treatment_cannot_be_cancelled_without_refund(client, auth):
     blocked = client.post(
         f"/treatments/{order['id']}/cancel", headers=auth["doctor"]
     )
-    assert blocked.status_code == 400
-    assert "已收费" in blocked.json()["detail"]
+    assert blocked.status_code == 200
+    assert blocked.json()["status"] == "dc"
     charges = client.get(f"/charges/encounters/{encounter['id']}").json()
     charge = next(c for c in charges if c["charge_type"] == "treatment")
+    assert charge["status"] == "paid"
     assert charge["status"] == "paid"

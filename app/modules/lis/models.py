@@ -10,6 +10,7 @@ class LabItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    active: Mapped[bool] = mapped_column(default=True, server_default="1", nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     price: Mapped[float] = mapped_column(default=0.0, server_default="0", nullable=False)
     # 标本类型（血液/尿液/粪便/痰/分泌物等）

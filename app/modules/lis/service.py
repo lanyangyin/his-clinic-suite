@@ -49,6 +49,15 @@ def update_item(db: Session, item_id: int, data: LabItemCreate) -> LabItem:
     return item
 
 
+def set_item_active(db: Session, item_id: int, active: bool) -> LabItem:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("检验项目不存在")
+    item.active = bool(active)
+    db.commit(); db.refresh(item)
+    return item
+
+
 def delete_item(db: Session, item_id: int) -> None:
     item = get_item(db, item_id)
     if not item:
@@ -63,8 +72,11 @@ def get_item(db: Session, item_id: int) -> LabItem | None:
     return db.get(LabItem, item_id)
 
 
-def list_items(db: Session) -> list[LabItem]:
-    return db.query(LabItem).order_by(LabItem.id).all()
+def list_items(db: Session, include_inactive: bool = False) -> list[LabItem]:
+    query = db.query(LabItem)
+    if not include_inactive:
+        query = query.filter(LabItem.active.is_(True))
+    return query.order_by(LabItem.id).all()
 
 
 def create_request(
@@ -98,6 +110,8 @@ def create_request(
     item = get_item(db, data.item_id)
     if not item:
         raise ValueError("检验项目不存在")
+    if not item.active:
+        raise ValueError("检验项目已停用")
 
     request = LabRequest(
         encounter_id=encounter_id,
@@ -147,7 +161,11 @@ def cancel_request(db: Session, request_id: int, operator: str = "") -> LabReque
         .all()
     )
     if any(row.status in ("paid", "partially_refunded") for row in charges):
-        raise ValueError("该检验已收费，不能直接取消；请先按退费流程处理")
+        # 已收费但未执行：医生可下 DC（停止医嘱），费用由收费处后续退费
+        request.status = "dc"
+        db.commit()
+        db.refresh(request)
+        return request
     request.status = "cancelled"
     for row in charges:
         row.status = "cancelled"
@@ -363,19 +381,21 @@ def worklist(
     """检验科工作列表：带患者/就诊/标本/结果信息。"""
     from app.modules.billing.models import Payment
 
-    paid_encounters = db.query(Payment.encounter_id).filter(
-        Payment.status.in_(("paid", "partially_refunded"))
-    )
+    from app.modules.charges.models import EncounterCharge
+
     history_only = status in ("reported", "reviewed", "rejected")
     query = (
         db.query(LabRequest, Patient)
         .join(Encounter, LabRequest.encounter_id == Encounter.id)
         .join(Registration, Encounter.registration_id == Registration.id)
         .join(Patient, Registration.patient_id == Patient.id)
-        .filter(
-            true() if history_only else LabRequest.encounter_id.in_(paid_encounters)
-        )
     )
+    if not history_only:
+        paid_requests = db.query(EncounterCharge.source_id).filter(
+            EncounterCharge.source_type == "lab_request",
+            EncounterCharge.status.in_(("paid", "partially_refunded")),
+        )
+        query = query.filter(LabRequest.id.in_(paid_requests))
     if status:
         statuses = [item.strip() for item in status.split(",") if item.strip()]
         if statuses:

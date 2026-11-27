@@ -834,19 +834,18 @@ class DoctorWidget(QWidget):
         # 不切换当前接诊上下文、不改变病历/开方/检验/治疗页签。
         active_id = getattr(self, "_active_patient_id", None)
         active_status = getattr(self, "_active_encounter_status", "")
-        if (
-            active_id
-            and item.get("patient_id") != active_id
-            and not active
-            and active_status == "open"
-        ):
+        if active_id and item.get("patient_id") != active_id:
+            # 队列点击只改变顶部患者条；左侧患者卡、当前就诊和临床页签始终属于当前接诊患者。
+            self.wb_selected_item = item
             self.banner.set_patient(patient, item.get("encounter_id"), status)
             active_name = getattr(self, "_active_patient_name", "") or f"患者 {active_id}"
             self.wb_summary.setText(
-                f"当前接诊患者仍是 {active_name}；刚才点击的 {item.get('patient_name') or ''} 仅用于查看"
+                f"当前接诊患者仍是 {active_name}；刚才点击的 {item.get('patient_name') or ''} 仅用于查看。"
+                "挂起当前患者后可点击“开始接诊”接诊选中患者。"
             )
             return
         self.wb_current = item
+        self.wb_selected_item = item
         self._set_patient_actions(True)
         # 顶部始终显示队列中刚刚点击的患者；左侧只显示当前真正接诊中的患者。
         self.banner.set_patient(patient, item.get("encounter_id"), status)
@@ -981,10 +980,18 @@ class DoctorWidget(QWidget):
         self.wb_summary.setText("已转为初诊；接诊时按初诊收挂号费")
 
     def _start_workbench(self) -> None:
-        item = getattr(self, "wb_current", None)
+        item = getattr(self, "wb_selected_item", None) or getattr(self, "wb_current", None)
         if not item:
             self.wb_summary.setText("请先选择患者")
             return
+        active_id = getattr(self, "_active_patient_id", None)
+        if (
+            active_id and item.get("patient_id") != active_id
+            and getattr(self, "_active_encounter_status", "") == "open"
+        ):
+            self.wb_summary.setText("当前患者尚未挂起/完成，不能直接接诊下一位；请先挂起当前患者")
+            return
+        self.wb_current = item
         try:
             if item.get("encounter_status") == "paused" and item.get("encounter_id"):
                 encounter = self.api.resume_encounter(item["encounter_id"])
@@ -1032,6 +1039,7 @@ class DoctorWidget(QWidget):
         self._active_patient_name = item.get("patient_name") or ""
         self._active_encounter_status = "open"
         self._active_encounter_id = encounter["id"]
+        self.wb_selected_item = None
         self._clear_side_history()
         # 接诊成功直接进入病历，避免停在队列页以为没反应
         self._wb_record()
@@ -2047,7 +2055,7 @@ class DoctorWidget(QWidget):
             "treatment_advice": (5, 0),
         }
         for key, label, _limit in _RECORD_FIELDS:
-            box = QGroupBox(label)
+            box = QGroupBox("主诉（简短一句话）" if key == "chief_complaint" else label)
             box_layout = QVBoxLayout(box)
             edit = QTextEdit()
             placeholders = {
@@ -2057,7 +2065,13 @@ class DoctorWidget(QWidget):
                 "auxiliary_exam": "外院检查、既往检查结果；本次检验检查自动列在打印页",
             }
             edit.setPlaceholderText(placeholders.get(key, f"填写{label}"))
-            edit.setMinimumHeight(72 if key != "treatment_advice" else 80)
+            if key == "chief_complaint":
+                edit.setPlaceholderText("用一句话概括，如：发热咳嗽 2 天")
+                edit.setMinimumHeight(44)
+                edit.setMaximumHeight(52)
+                edit.setTabChangesFocus(True)
+            else:
+                edit.setMinimumHeight(72 if key != "treatment_advice" else 80)
             self.record_edits[key] = edit
             box_layout.addWidget(edit)
             row, col = positions[key]

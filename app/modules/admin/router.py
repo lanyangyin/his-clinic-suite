@@ -117,6 +117,7 @@ from app.modules.lis.service import (
     delete_item as delete_lab_item,
     get_item as get_lab_item,
     list_items as list_lab_items,
+    set_item_active as set_lab_item_active,
     update_item as update_lab_item,
 )
 from app.modules.archive.schemas import (
@@ -2626,7 +2627,7 @@ def lab_items_page(request: Request, db: Session = Depends(get_db)):
         "lab_items.html",
         _ctx(
             request,
-            items=list_lab_items(db),
+            items=list_lab_items(db, include_inactive=True),
             msg=request.query_params.get("msg", ""),
         ),
     )
@@ -2681,6 +2682,18 @@ async def lab_item_update(item_id: int, request: Request, db: Session = Depends(
     except (ValueError, TypeError) as e:
         return RedirectResponse(f"/admin/lab-items?msg={quote(str(e))}", status_code=302)
     return RedirectResponse("/admin/lab-items?msg=已保存", status_code=302)
+
+
+@router.post("/lab-items/{item_id}/toggle")
+def lab_item_toggle(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    item = get_lab_item(db, item_id)
+    if not item:
+        return RedirectResponse("/admin/lab-items?msg=检验项目不存在", status_code=302)
+    set_lab_item_active(db, item_id, not item.active)
+    return RedirectResponse("/admin/lab-items?msg=状态已更新", status_code=302)
 
 
 @router.post("/lab-items/{item_id}/delete")

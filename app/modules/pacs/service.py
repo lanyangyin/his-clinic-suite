@@ -125,7 +125,10 @@ def cancel_request(db: Session, request_id: int, operator: str = "") -> ImagingR
         .all()
     )
     if any(row.status in ("paid", "partially_refunded") for row in charges):
-        raise ValueError("该检查已收费，不能直接取消；请先按退费流程处理")
+        request.status = "dc"
+        db.commit()
+        db.refresh(request)
+        return request
     request.status = "cancelled"
     for row in charges:
         row.status = "cancelled"
@@ -244,19 +247,21 @@ def list_worklist(db: Session, status: str = "pending", priority: str | None = N
 
     from app.modules.billing.models import Payment
 
-    paid_encounters = db.query(Payment.encounter_id).filter(
-        Payment.status.in_(("paid", "partially_refunded"))
-    )
+    from app.modules.charges.models import EncounterCharge
+
     history_only = status in ("reported", "reviewed", "rejected")
     query = (
         db.query(ImagingRequest, Patient)
         .join(Encounter, ImagingRequest.encounter_id == Encounter.id)
         .join(Registration, Encounter.registration_id == Registration.id)
         .join(Patient, Registration.patient_id == Patient.id)
-        .filter(
-            true() if history_only else ImagingRequest.encounter_id.in_(paid_encounters)
-        )
     )
+    if not history_only:
+        paid_requests = db.query(EncounterCharge.source_id).filter(
+            EncounterCharge.source_type == "imaging_request",
+            EncounterCharge.status.in_(("paid", "partially_refunded")),
+        )
+        query = query.filter(ImagingRequest.id.in_(paid_requests))
     if status:
         query = query.filter(ImagingRequest.status == status)
     if priority:
