@@ -17,11 +17,18 @@
     <button type="submit">新增账号</button>
   </form>
   <table>
-    <tr><th>ID</th><th>账号</th><th>角色</th><th>显示名</th></tr>
+    <tr><th>ID</th><th>账号</th><th>角色</th><th>显示名</th><th>状态</th><th>操作</th></tr>
     {% for u in users %}
-    <tr><td>{{ u.id }}</td><td>{{ u.username }}</td><td>{{ u.role|zh('role') }}</td><td>{{ u.display_name }}</td></tr>
+    <tr>
+      <td>{{ u.id }}</td><td>{{ u.username }}</td><td>{{ u.role|zh('role') }}</td><td>{{ u.display_name }}</td>
+      <td>{{ '启用' if u.is_active else '停用' }}</td>
+      <td>
+        <form method="post" action="/admin/users/{{ u.id }}/toggle" style="display:inline"><button type="submit">{{ '停用' if u.is_active else '启用' }}</button></form>
+        <form method="post" action="/admin/users/{{ u.id }}/reset-password" style="display:inline"><input name="password" type="password" placeholder="新密码（≥6位）" style="width:130px"><button type="submit">重置密码</button></form>
+      </td>
+    </tr>
     {% else %}
-    <tr><td colspan="4">暂无账号</td></tr>
+    <tr><td colspan="6">暂无账号</td></tr>
     {% endfor %}
   </table>
 </div>

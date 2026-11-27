@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 def setup_data(client, auth):
     """建建档患者、医生与一次就诊（含待缴费处方）。"""
     patient = client.post(
@@ -59,7 +60,7 @@ def test_kiosk_registration_with_schedule(client, auth):
     patient, doctor, encounter = setup_data(client, auth)
     schedule = client.post(
         "/schedules/",
-        json={"doctor_id": doctor["id"], "schedule_date": "2026-11-12", "period": "morning", "capacity": 1},
+        json={"doctor_id": doctor["id"], "schedule_date": str(date.today() + timedelta(days=7)), "period": "morning", "capacity": 1},
         headers=auth["admin"],
     ).json()
     r = client.post(
@@ -71,11 +72,16 @@ def test_kiosk_registration_with_schedule(client, auth):
         },
     )
     assert r.status_code == 201
-    # 号源已满
+    # 号源已满（换患者，避免触发同日重复挂号校验）
+    other = client.post(
+        "/patients/",
+        json={"name": "李四", "id_number": "110101199001015678"},
+        headers=auth["cashier"],
+    ).json()
     r = client.post(
         "/kiosk/registrations",
         json={
-            "patient_id_number": patient["id_number"],
+            "patient_id_number": other["id_number"],
             "doctor_id": doctor["id"],
             "schedule_id": schedule["id"],
         },

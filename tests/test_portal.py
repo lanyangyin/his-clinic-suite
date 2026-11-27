@@ -38,6 +38,7 @@ def setup_patient_with_history(client, auth):
         json={"result": "白细胞 6.2×10^9/L，正常"},
         headers=auth["lab"],
     )
+    client.post(f"/lab/requests/{lab['id']}/review", headers=auth["lab"])
 
     # 影像项目 + 申请 + 报告
     img_item = client.post(
@@ -52,6 +53,11 @@ def setup_patient_with_history(client, auth):
     client.post(
         f"/pacs/requests/{img['id']}/report",
         json={"report": "双肺纹理增粗", "image_url": "http://pacs.local/x.dcm"},
+        headers=auth["radiology"],
+    )
+    client.post(
+        f"/pacs/requests/{img['id']}/review",
+        json={"approve": True},
         headers=auth["radiology"],
     )
     return patient, encounter

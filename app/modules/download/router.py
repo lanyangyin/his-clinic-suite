@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app import settings
+from app.client_compat import CLIENT_COMPATIBILITY, check_client
 from app.settings import CLIENT_ZIP_PATH
 from app.version import API_VERSION, APP_NAME, APP_VERSION, CLIENT_MIN_VERSION
 
@@ -19,8 +20,37 @@ def version():
         "version": APP_VERSION,
         "api_version": API_VERSION,
         "client_min_version": CLIENT_MIN_VERSION,
+        "server_version": APP_VERSION,
         "download_url": str(getattr(settings, "CLIENT_DOWNLOAD_URL", "") or ""),
+        "clients": {
+            key: {
+                **spec,
+                "download_url": (
+                    f"https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/"
+                    f"his-client-{key}-{spec['recommended']}.zip"
+                ),
+            }
+            for key, spec in CLIENT_COMPATIBILITY.items()
+        },
     }
+
+
+@router.get("/client/compatibility")
+def client_compatibility(profile: str, version: str):
+    return check_client(profile, version)
+
+
+@router.get("/download/client/{profile}")
+def download_profile_client(profile: str):
+    spec = CLIENT_COMPATIBILITY.get(profile)
+    if not spec:
+        raise HTTPException(status_code=404, detail="未知客户端岗位")
+    version = spec["recommended"]
+    url = (
+        f"https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/"
+        f"his-client-{profile}-{version}.zip"
+    )
+    return RedirectResponse(url, status_code=307)
 
 
 @router.get("/download/client")

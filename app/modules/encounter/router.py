@@ -43,6 +43,8 @@ from .service import (
     EncounterClosedError,
     PrescriptionRuleError,
     abandon_encounter,
+    complete_encounter_without_charge,
+    release_doctor_lock,
     add_prescription_item,
     create_encounter,
     create_medical_record,
@@ -87,7 +89,11 @@ def create(
     try:
         return create_encounter(db, data)
     except ValueError as e:
-        code = 400 if ("诊断编码" in str(e) or "尚未完成" in str(e)) else 404
+        text = str(e)
+        code = 400 if any(
+            key in text
+            for key in ("诊断编码", "尚未完成", "已取消", "不是待就诊", "已放弃")
+        ) else 404
         raise HTTPException(status_code=code, detail=str(e))
 
 
@@ -116,7 +122,12 @@ def lookup_by_barcode(
     encounter_id = None
     code_type = ""
     if normalized.startswith("RX") and normalized[2:].isdigit():
-        encounter_id = int(normalized[2:])
+        raw = normalized[2:]
+        # 新处方码：RX + yyyymmdd + 6 位就诊号 + 2 位序号
+        if len(raw) >= 16:
+            encounter_id = int(raw[8:14])
+        else:
+            encounter_id = int(raw)
         code_type = "western"
     elif normalized.startswith("TCM"):
         rx = (
@@ -241,6 +252,34 @@ def pause_visit(
         return pause_encounter(db, encounter_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/complete", response_model=EncounterResponse)
+def complete_visit_without_charge(
+    encounter_id: int,
+    waive_pending: bool = False,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        return complete_encounter_without_charge(db, encounter_id, waive_pending)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/release-lock")
+def release_lock(
+    doctor_id: int | None = None,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    target = doctor_id or getattr(user, "doctor_id", None)
+    if not target:
+        raise HTTPException(status_code=400, detail="当前账号未绑定医生档案，请指定 doctor_id")
+    try:
+        return release_doctor_lock(db, target)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{encounter_id}/abandon", response_model=EncounterResponse)

@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 def make_patient(client, auth, id_number="110101199001011234"):
     return client.post(
         "/patients/", json={"name": "张三", "id_number": id_number},
@@ -16,7 +17,8 @@ def make_doctor(client, auth, name="王医生"):
     ).json()
 
 
-def make_schedule(client, auth, doctor_id, capacity=2, schedule_date="2026-11-10", period="morning"):
+def make_schedule(client, auth, doctor_id, capacity=2, schedule_date=None, period="morning"):
+    schedule_date = schedule_date or str(date.today() + timedelta(days=7))
     return client.post(
         "/schedules/",
         json={
@@ -89,9 +91,10 @@ def test_registration_schedule_full_rejected(client, auth):
     )
     assert first.status_code == 201
 
+    other = make_patient(client, auth, id_number="110101199001015678")
     second = client.post(
         "/registrations/",
-        json={"patient_id": patient["id"], "doctor_id": doctor["id"], "schedule_id": schedule["id"]},
+        json={"patient_id": other["id"], "doctor_id": doctor["id"], "schedule_id": schedule["id"]},
         headers=auth["cashier"],
     )
     assert second.status_code == 400

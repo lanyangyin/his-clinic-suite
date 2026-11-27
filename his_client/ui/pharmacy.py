@@ -659,11 +659,11 @@ class PharmacyWidget(QWidget):
         left_row.addWidget(self.disp_search, 1)
         left_row.addWidget(refresh)
         left_layout.addLayout(left_row)
-        self.worklist_table = QTableWidget(0, 7)
+        self.worklist_table = QTableWidget(0, 8)
         self.worklist_table.setHorizontalHeaderLabels(
-            ["叫号", "取药码", "患者", "处方数", "药品", "状态", "窗口"]
+            ["叫号", "取药码", "患者号", "患者", "处方数", "药品", "状态", "窗口"]
         )
-        set_column_layout(self.worklist_table, stretch=(2, 4), contents=(0, 1, 3, 5, 6))
+        set_column_layout(self.worklist_table, stretch=(3, 5), contents=(0, 1, 2, 4, 6, 7))
         self.worklist_table.cellClicked.connect(self._select_worklist)
         self.worklist_table.cellDoubleClicked.connect(self._call_row)
         left_layout.addWidget(self.worklist_table, 1)
@@ -852,15 +852,19 @@ class PharmacyWidget(QWidget):
         items = record.get("items") or []
         if items:
             self.return_line_id.setValue(int(items[0]["id"]))
-        self._load_worklist()
+        self._load_worklist(keep_msg=True)
+        self.disp_msg.setText(
+            f"核对发药成功：记录 {record['id']}，取药人 {record['receiver_name'] or '—'}。"
+            + ("请前往治疗室执行治疗。" if record.get("pending_treatments") else "可直接离院。")
+        )
 
-    def _load_worklist(self) -> None:
+    def _load_worklist(self, keep_msg: bool = False) -> None:
         try:
             self.worklist_all = self.api.pharmacy_worklist()
         except ApiError as e:
             self.disp_msg.setText(f"队列加载失败（{e.status_code}）：{e.detail}")
             return
-        self._filter_worklist()
+        self._filter_worklist(keep_msg=keep_msg)
 
     def _load_dispense_detail(self, encounter_id: int) -> None:
         try:
@@ -901,7 +905,7 @@ class PharmacyWidget(QWidget):
                 self.disp_detail_table.setItem(index, col, QTableWidgetItem(str(value)))
         self.disp_detail_msg.setText(f"处方 {len(rows)} 条；库存为药房当前可用总量")
 
-    def _filter_worklist(self) -> None:
+    def _filter_worklist(self, keep_msg: bool = False) -> None:
         term = self.disp_search.text().strip().lower() if hasattr(self, "disp_search") else ""
         rows = getattr(self, "worklist_all", [])
         if term:
@@ -916,6 +920,7 @@ class PharmacyWidget(QWidget):
             values = [
                 item["queue_no"] or "—",
                 item.get("pickup_code", ""),
+                item.get("patient_no") or "—",
                 item["patient_name"],
                 item["item_count"],
                 item["drugs"],
@@ -926,9 +931,10 @@ class PharmacyWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.worklist_table.setItem(row, col, QTableWidgetItem(str(value)))
-        self.disp_msg.setText(
-            f"待发药 {len(rows)} 人" + (f"（筛选：{term}）" if term else "")
-        )
+        if not keep_msg:
+            self.disp_msg.setText(
+                f"待发药 {len(rows)} 人" + (f"（筛选：{term}）" if term else "")
+            )
 
     def _print_dispense_slip(self) -> None:
         encounter_id = getattr(self, "disp_last_encounter_id", None)
@@ -1037,10 +1043,12 @@ class PharmacyWidget(QWidget):
         if 0 <= row < len(getattr(self, "worklist", [])):
             item = self.worklist[row]
             self.disp_encounter_id.setValue(item["encounter_id"])
-            self.pickup_code.setText(item.get("pickup_code", ""))
+            # 不自动填充取药码，必须由患者出示/药师扫码核对
+            self.pickup_code.clear()
             self.banner.set_patient(
                 {
                     "id": item.get("patient_id"),
+                    "patient_no": item.get("patient_no"),
                     "name": item.get("patient_name"),
                     "allergy_label": item.get("allergy_label"),
                 },
@@ -1049,11 +1057,13 @@ class PharmacyWidget(QWidget):
             )
             self.disp_patient_label.setText(
                 f"当前患者：{item.get('patient_name') or '—'} · "
+                f"患者号 {item.get('patient_no') or '—'} · "
                 f"就诊 {item['encounter_id']} · 取药码 {item.get('pickup_code') or '—'}"
             )
             self.disp_info.set_patient(
                 {
                     "id": item.get("patient_id"),
+                    "patient_no": item.get("patient_no"),
                     "name": item.get("patient_name"),
                     "allergy_label": item.get("allergy_label"),
                 },

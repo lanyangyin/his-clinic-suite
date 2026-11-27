@@ -12,13 +12,26 @@ def create_treatment(
     db: Session, encounter_id: int, data: TreatmentOrderCreate, ordered_by: str
 ) -> TreatmentOrder:
     """医生开治疗单：就诊未关闭、项目有效；开单即计费（同事务）。"""
-    from app.modules.encounter.service import get_encounter
+    from app.modules.encounter.service import get_medical_record, get_encounter
 
     encounter = get_encounter(db, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
+    existing = (
+        db.query(TreatmentOrder)
+        .filter(
+            TreatmentOrder.encounter_id == encounter.id,
+            TreatmentOrder.charge_item_id == data.item_id,
+            TreatmentOrder.status == "pending",
+        )
+        .first()
+    )
+    if existing:
+        raise ValueError("该治疗项目已开立且未执行，请勿重复开单")
     if encounter.status == "closed":
         raise ValueError("就诊已收费，不能再开治疗单")
+    if get_medical_record(db, encounter.id) and get_medical_record(db, encounter.id).signed_at:
+        raise ValueError("病历已签名，不能再开治疗；请先申请病历修订")
     if encounter.status in ("abandoned", "cancelled"):
         raise ValueError("就诊已放弃，不能再开治疗单")
 
@@ -146,7 +159,7 @@ def cancel_treatment(db: Session, order_id: int) -> TreatmentOrder:
         raise ValueError("该治疗已收费，不能直接取消；请先按退费流程处理")
     order.status = "cancelled"
     for charge in treatment_charges:
-        charge.status = "refunded"
+        charge.status = "cancelled"
     db.commit()
     db.refresh(order)
     return order

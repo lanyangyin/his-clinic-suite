@@ -250,6 +250,13 @@ INSURANCE_ENABLED = (
 
 # 处方是否必须经药师审方后才能发药。生产默认开启；自动化测试通过环境变量关闭以保留旧用例，
 # 审方/阻断行为另用显式测试覆盖。
+_pharmacy_pickup_env = os.environ.get("HIS_PHARMACY_REQUIRE_PICKUP_CODE")
+PHARMACY_REQUIRE_PICKUP_CODE = (
+    _pharmacy_pickup_env.lower() in {"1", "true", "yes", "on"}
+    if _pharmacy_pickup_env is not None
+    else _ini.getboolean("features", "pharmacy_require_pickup_code", fallback=True)
+)
+
 REQUIRE_PRESCRIPTION_REVIEW = (
     os.environ.get("HIS_REQUIRE_PRESCRIPTION_REVIEW", "").lower() not in {"0", "false", "no", "off"}
     and _ini.getboolean("features", "prescription_review", fallback=True)

@@ -20,7 +20,16 @@ class UserResponse(BaseModel):
     employee_id: int | None = None
     doctor_id: int | None = None
     narcotic_right: bool = False
+    is_active: bool = True
     model_config = ConfigDict(from_attributes=True)
+
+
+class PasswordReset(BaseModel):
+    password: str
+
+
+class UserActiveUpdate(BaseModel):
+    active: bool
 
 
 class NarcoticRightUpdate(BaseModel):

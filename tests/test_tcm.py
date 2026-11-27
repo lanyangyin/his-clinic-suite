@@ -47,8 +47,8 @@ def _setup(client, auth):
     return patient, encounter, herb_a, herb_b
 
 
-def _prescribe(client, auth, encounter, herb_a, herb_b, service="decoct"):
-    return client.post(
+def _prescribe(client, auth, encounter, herb_a, herb_b, service="decoct", pay=True):
+    response = client.post(
         f"/tcm/encounters/{encounter['id']}/prescriptions",
         json={
             "formula_name": "桂枝汤",
@@ -63,6 +63,13 @@ def _prescribe(client, auth, encounter, herb_a, herb_b, service="decoct"):
         },
         headers=auth["doctor"],
     )
+    if response.status_code == 201 and pay:
+        client.post(
+            "/payments/",
+            json={"encounter_id": encounter["id"]},
+            headers=auth["cashier"],
+        )
+    return response
 
 
 def test_tcm_prescription_and_decoction_flow(client, auth):
@@ -157,6 +164,9 @@ def test_self_decoct_and_invalid_transitions(client, auth):
         headers=auth["pharmacist"],
     )
     assert blocked.status_code == 400
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     dispensed = client.post(
         f"/tcm/prescriptions/{prescription['id']}/dispense",
@@ -203,6 +213,9 @@ def test_tcm_links_to_unified_prescription_header(client, auth):
         f"/encounters/{encounter['id']}/prescription-lines", headers=auth["doctor"]
     ).json()
     assert any(row["kind"] == "herb" for row in lines)
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     headers = client.get(
         f"/encounters/{encounter['id']}/prescriptions/headers"
@@ -212,7 +225,7 @@ def test_tcm_links_to_unified_prescription_header(client, auth):
 
 def test_tcm_pending_item_edit_and_delete(client, auth):
     patient, encounter, herb_a, herb_b = _setup(client, auth)
-    prescription = _prescribe(client, auth, encounter, herb_a, herb_b).json()
+    prescription = _prescribe(client, auth, encounter, herb_a, herb_b, pay=False).json()
     item = prescription["items"][0]
     edited = client.put(
         f"/tcm/prescriptions/{prescription['id']}/items/{item['id']}",
@@ -297,6 +310,9 @@ def test_tcm_stock_deduct_and_insufficient_rejected(client, auth):
     )
     prescription = response.json()
     # 2 剂 × 8g = 16g，库存只有 10g
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     blocked = client.post(
         f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
@@ -317,6 +333,9 @@ def test_tcm_stock_is_deducted_on_dispense(client, auth):
         json={"packs": 2, "items": [{"herb_id": stocked["id"], "dose_g": 8}]},
         headers=auth["doctor"],
     ).json()
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     dispensed = client.post(
         f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
@@ -349,6 +368,9 @@ def test_tcm_batches_expire_first(client, auth):
         json={"packs": 2, "items": [{"herb_id": herb["id"], "dose_g": 8}]},
         headers=auth["doctor"],
     ).json()
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     assert client.post(
         f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]
@@ -376,6 +398,9 @@ def test_expired_tcm_batch_not_usable(client, auth):
         json={"items": [{"herb_id": herb["id"], "dose_g": 5}]},
         headers=auth["doctor"],
     ).json()
+    client.post(
+        "/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"]
+    )
     client.post(f"/tcm/prescriptions/{prescription['id']}/review", headers=auth["pharmacist"])
     blocked = client.post(
         f"/tcm/prescriptions/{prescription['id']}/dispense", headers=auth["pharmacist"]

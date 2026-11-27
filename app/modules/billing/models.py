@@ -95,8 +95,8 @@ class Payment(Base):
 
     @property
     def net_amount(self) -> float:
-        """扣除已退后的净收费金额。"""
-        return round(self.amount - self.refunded_amount, 2)
+        """扣除折扣和已退后的净收费金额。"""
+        return round(self.amount - self.discount_amount - self.refunded_amount, 2)
 
     @property
     def net_self_pay_amount(self) -> float:

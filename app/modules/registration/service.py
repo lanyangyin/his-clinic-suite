@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -56,12 +56,17 @@ def get_schedule(db: Session, schedule_id: int) -> DoctorSchedule | None:
 
 
 def list_schedules(
-    db: Session, doctor_id: int, schedule_date: date | None = None
+    db: Session,
+    doctor_id: int,
+    schedule_date: date | None = None,
+    upcoming_only: bool = False,
 ) -> list[DoctorSchedule]:
-    """医生的排班列表（可按日期过滤）。"""
+    """医生的排班列表；upcoming_only=True 时只看今天及未来。"""
     query = db.query(DoctorSchedule).filter(DoctorSchedule.doctor_id == doctor_id)
     if schedule_date is not None:
         query = query.filter(DoctorSchedule.schedule_date == schedule_date)
+    elif upcoming_only:
+        query = query.filter(DoctorSchedule.schedule_date >= date.today())
     return query.order_by(DoctorSchedule.schedule_date, DoctorSchedule.period).all()
 
 
@@ -75,6 +80,8 @@ def take_schedule_slot(db: Session, schedule_id: int, doctor_id: int) -> None:
         raise ValueError("排班不存在")
     if schedule.doctor_id != doctor_id:
         raise ValueError("排班与医生不匹配")
+    if schedule.schedule_date < date.today():
+        raise ValueError("该排班日期已过，不能挂号")
 
     affected = (
         db.query(DoctorSchedule)
@@ -128,6 +135,23 @@ def create_registration(
     doctor = get_doctor(db, data.doctor_id)
     if not doctor:
         raise ValueError("医生不存在")
+
+    if data.visit_type != "follow_up" and data.schedule_id is None:
+        today_start = datetime.combine(date.today(), time.min)
+        duplicate = (
+            db.query(Registration)
+            .filter(
+                Registration.patient_id == data.patient_id,
+                Registration.doctor_id == data.doctor_id,
+                Registration.status == "registered",
+                Registration.created_at >= today_start,
+            )
+            .first()
+        )
+        if duplicate:
+            raise ValueError(
+                f"该患者今天已挂该医生号（挂号 {duplicate.id}），请勿重复挂号"
+            )
 
     if data.schedule_id is not None:
         take_schedule_slot(db, data.schedule_id, data.doctor_id)

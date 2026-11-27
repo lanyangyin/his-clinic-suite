@@ -11,11 +11,12 @@ import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtCore import QPoint, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -76,6 +77,12 @@ class CashierDemo(LoginMixin, QMainWindow):
                 tabs.setCurrentIndex(index)
                 return tabs.widget(index)
         raise RuntimeError(f"找不到页签：{text}")
+
+    def accept_modal(self):
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, QMessageBox) and widget.isVisible():
+                QTest.mouseClick(widget.button(QMessageBox.Yes), Qt.LeftButton)
+                return
 
     def click(self, container, text):
         from PySide6.QtWidgets import QPushButton
@@ -202,7 +209,8 @@ class CashierDemo(LoginMixin, QMainWindow):
             assert self.widget.c_encounter_id.value() == enc["id"]
             assert "未收费" in self.widget.c_scan_status.text()
             self.click(charge_tab, "查询费用")
-            self.click(charge_tab, "收费")
+            with patch("his_client.ui.cashier.QMessageBox.question", return_value=QMessageBox.Yes):
+                self.click(charge_tab, "收费")
             payments = self.cashier.call("GET", "/payments/", params={"encounter_id": enc["id"]})
             payment = payments[0]
             assert payment["status"] == "paid"
@@ -210,8 +218,9 @@ class CashierDemo(LoginMixin, QMainWindow):
             self.widget.c_scan_code.setText(f"RX{enc['id']:06d}")
             self.click(charge_tab, "扫码带出")
             assert "已收费" in self.widget.c_scan_status.text()
-            self.click(charge_tab, "收费")
-            assert "已收费" in self.widget.charge_msg.text()
+            with patch("his_client.ui.cashier.QMessageBox.question", return_value=QMessageBox.Yes):
+                self.click(charge_tab, "收费")
+            assert "已收费" in self.widget.charge_msg.text() or "没有待收" in self.widget.charge_msg.text()
             self.scene("重复收费被拦截，进入打印页作废发票", self.tab("打印"))
             print_tab = self.tab("打印")
             self.widget.pr_payment_id.setValue(payment["id"])
@@ -223,7 +232,8 @@ class CashierDemo(LoginMixin, QMainWindow):
             charge_tab = self.tab("收费")
             self.widget.refund_payment_id.setValue(payment["id"])
             self.click(charge_tab, "加载收费明细")
-            self.click(charge_tab, "全部退")
+            with patch("his_client.ui.cashier.QMessageBox.question", return_value=QMessageBox.Yes):
+                self.click(charge_tab, "全部退")
             refunded = self.cashier.call("GET", f"/payments/{payment['id']}")
             assert refunded["status"] == "refunded", refunded
             self.scene("退费成功，最后看收费员交班/日结", self.tab("交班"))

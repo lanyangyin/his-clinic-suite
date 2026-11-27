@@ -60,7 +60,7 @@ def test_cancel_lab_request_before_payment(client, auth):
     assert cancelled.status_code == 200, cancelled.text
     assert cancelled.json()["status"] == "cancelled"
     charges = client.get(f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]).json()
-    assert next(c for c in charges if c["charge_type"] == "lab")["status"] == "refunded"
+    assert next(c for c in charges if c["charge_type"] == "lab")["status"] == "cancelled"
 
 
 def test_cancel_imaging_request_before_payment(client, auth):
@@ -196,7 +196,7 @@ def test_abandon_encounter_cancels_pending_items(client, auth):
     rows = client.get(f"/lab/encounters/{encounter['id']}/lab-requests", headers=auth["doctor"]).json()
     assert rows[0]["status"] == "cancelled"
     charges = client.get(f"/charges/encounters/{encounter['id']}", headers=auth["cashier"]).json()
-    assert all(row["status"] == "refunded" for row in charges if row["status"] != "refunded" or True)
+    assert all(row["status"] in ("cancelled", "refunded") for row in charges)
     # 已放弃就诊不能再开单
     blocked = client.post(
         f"/lab/encounters/{encounter['id']}/lab-requests",

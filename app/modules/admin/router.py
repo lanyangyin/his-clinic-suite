@@ -3,6 +3,8 @@ import io
 from datetime import date, datetime, time
 from urllib.parse import quote
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -13,6 +15,7 @@ from app.database import get_db
 from app.settings import ADMIN_TEMPLATES_DIR
 from app.modules.admin.institution import FIELDS as INSTITUTION_FIELDS
 from app.modules.admin.institution import load as load_institution
+from app.client_compat import CLIENT_COMPATIBILITY, CLIENT_TITLES
 from app.modules.admin.system_settings import FIELDS as SYSTEM_SETTING_FIELDS
 from app.modules.admin.system_settings import load as load_system_settings
 from app.modules.admin.system_settings import save as save_system_settings
@@ -31,11 +34,14 @@ from app.modules.auth.service import (
     list_audit_logs,
     list_users,
     list_recent_audit_logs,
+    reset_password,
+    set_user_active,
     verify_password,
 )
 from app.modules.charges.schemas import ChargeItemCreate
 from app.modules.charges.service import create_item as create_charge_item
 from app.modules.charges.service import delete_item as delete_charge_item
+from app.modules.charges.service import enable_item as enable_charge_item
 from app.modules.charges.service import get_item as get_charge_item
 from app.modules.charges.service import list_items as list_charge_items
 from app.modules.charges.service import update_item as update_charge_item
@@ -296,6 +302,10 @@ def _guard(request: Request, db: Session) -> RedirectResponse | None:
     if not user or user.role != "admin":
         request.session.clear()
         return RedirectResponse("/admin/login", status_code=302)
+    # 审计中间件使用这两个字符串；否则管理台写操作全部记成 anonymous
+    request.state.user_name = user.username
+    request.state.user_role = user.role
+    request.state.user = user
     return None
 
 
@@ -660,8 +670,42 @@ async def system_settings_save(request: Request, db: Session = Depends(get_db)):
             values[key] = form.get(key) == "1"
         else:
             values[key] = str(form.get(key, ""))
-    save_system_settings(db, values, "admin")
+    try:
+        save_system_settings(db, values, "admin")
+    except ValueError as e:
+        from urllib.parse import quote
+
+        return RedirectResponse(
+            f"/admin/system-settings?msg={quote(str(e))}", status_code=302
+        )
     return RedirectResponse("/admin/system-settings?msg=已保存并生效", status_code=302)
+
+
+@router.get("/client-releases", response_class=HTMLResponse)
+def client_releases_page(request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    rows = []
+    for key, spec in CLIENT_COMPATIBILITY.items():
+        folder = Path("dist") / f"his-client-{key}"
+        profile = folder / "client_profile.json"
+        size = 0
+        if folder.exists():
+            size = sum(path.stat().st_size for path in folder.rglob("*") if path.is_file())
+        rows.append({
+            "key": key,
+            "title": CLIENT_TITLES.get(key, key),
+            "version": spec["recommended"],
+            "min": spec["min"],
+            "max": spec["max"],
+            "built": profile.exists(),
+            "size_mb": round(size / 1024 / 1024, 1) if size else 0,
+            "download": f"/download/client/{key}",
+        })
+    return templates.TemplateResponse(
+        request, "client_releases.html", _ctx(request, rows=rows)
+    )
 
 
 @router.get("/institution-settings", response_class=HTMLResponse)
@@ -1482,6 +1526,18 @@ async def charge_items_update(item_id: int, request: Request, db: Session = Depe
     return RedirectResponse("/admin/master/charge-items?ok=1", status_code=302)
 
 
+@router.post("/master/charge-items/{item_id}/enable")
+def charge_items_enable(item_id: int, request: Request, db: Session = Depends(get_db)):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    try:
+        enable_charge_item(db, item_id)
+    except ValueError as e:
+        return RedirectResponse(f"/admin/master/charge-items?msg={quote(str(e))}", status_code=302)
+    return RedirectResponse("/admin/master/charge-items?ok=1", status_code=302)
+
+
 @router.post("/master/charge-items/{item_id}/delete")
 def charge_items_delete(item_id: int, request: Request, db: Session = Depends(get_db)):
     redirect = _guard(request, db)
@@ -1533,6 +1589,37 @@ def users_create(
             _ctx(request, users=list_users(db), error=str(e)),
             status_code=400,
         )
+    return RedirectResponse("/admin/users?ok=1", status_code=302)
+
+
+@router.post("/users/{user_id}/toggle")
+def users_toggle(
+    user_id: int, request: Request, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    user = get_user(db, user_id)
+    if not user:
+        return RedirectResponse("/admin/users?msg=用户不存在", status_code=302)
+    if user.username == request.session.get("admin_user"):
+        return RedirectResponse("/admin/users?msg=不能停用当前账号", status_code=302)
+    set_user_active(db, user_id, not user.is_active)
+    return RedirectResponse("/admin/users?ok=1", status_code=302)
+
+
+@router.post("/users/{user_id}/reset-password")
+async def users_reset_password(
+    user_id: int, request: Request, db: Session = Depends(get_db)
+):
+    redirect = _guard(request, db)
+    if redirect:
+        return redirect
+    form = await request.form()
+    try:
+        reset_password(db, user_id, str(form.get("password") or ""))
+    except ValueError as e:
+        return RedirectResponse(f"/admin/users?msg={quote(str(e))}", status_code=302)
     return RedirectResponse("/admin/users?ok=1", status_code=302)
 
 

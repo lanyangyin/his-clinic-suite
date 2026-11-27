@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -414,16 +415,22 @@ class HrWidget(QWidget):
         form.addRow("关联医生 ID", self.acc_doctor)
         form.addRow("", add)
         layout.addWidget(box)
-        self.acc_table = QTableWidget(0, 6)
+        self.acc_table = QTableWidget(0, 7)
         self.acc_table.setHorizontalHeaderLabels(
-            ["ID", "账号", "显示名", "角色", "员工 ID", "医生 ID"]
+            ["ID", "账号", "显示名", "角色", "员工 ID", "医生 ID", "状态"]
         )
-        set_column_layout(self.acc_table, stretch=(1, 2, 3), contents=(0, 4, 5))
+        set_column_layout(self.acc_table, stretch=(1, 2, 3), contents=(0, 4, 5, 6))
         layout.addWidget(self.acc_table, 1)
         actions = QHBoxLayout()
         refresh = QPushButton("刷新账号")
         refresh.clicked.connect(self._load_accounts)
+        toggle = QPushButton("停用/启用选中账号")
+        toggle.clicked.connect(self._toggle_account)
+        reset = QPushButton("重置选中密码")
+        reset.clicked.connect(self._reset_account_password)
         actions.addWidget(refresh)
+        actions.addWidget(toggle)
+        actions.addWidget(reset)
         self.acc_msg = QLabel("")
         actions.addWidget(self.acc_msg, 1)
         layout.addLayout(actions)
@@ -445,10 +452,48 @@ class HrWidget(QWidget):
                 role_names.get(row.get("role"), row.get("role", "")),
                 str(row.get("employee_id") or ""),
                 str(row.get("doctor_id") or ""),
+                "启用" if row.get("is_active", True) else "停用",
             ]
             for col, value in enumerate(values):
                 self.acc_table.setItem(i, col, QTableWidgetItem(str(value)))
         self.acc_msg.setText(f"账号 {len(self.users)} 个")
+
+    def _selected_account(self) -> dict | None:
+        row = self.acc_table.currentRow()
+        if not (0 <= row < len(getattr(self, "users", []))):
+            self.acc_msg.setText("请先选择账号")
+            return None
+        return self.users[row]
+
+    def _toggle_account(self) -> None:
+        user = self._selected_account()
+        if not user:
+            return
+        try:
+            self.api.set_user_active(user["id"], not user.get("is_active", True))
+        except ApiError as e:
+            self.acc_msg.setText(f"操作失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_accounts()
+        self.acc_msg.setText("账号状态已更新")
+
+    def _reset_account_password(self) -> None:
+        user = self._selected_account()
+        if not user:
+            return
+        password, ok = QInputDialog.getText(
+            self, "重置密码", f"为 {user['username']} 输入新密码（至少 6 位）：",
+            QLineEdit.Password,
+        )
+        if not ok or not password:
+            return
+        try:
+            self.api.reset_user_password(user["id"], password)
+        except ApiError as e:
+            self.acc_msg.setText(f"重置失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_accounts()
+        self.acc_msg.setText(f"已重置 {user['username']} 的密码")
 
     def _add_account(self) -> None:
         username = self.acc_username.text().strip()

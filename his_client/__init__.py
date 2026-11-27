@@ -5,6 +5,8 @@
 - api：REST API 封装
 - ui：登录对话框、主窗口、收费员工作站
 """
-CLIENT_VERSION = "1.3.16"
+from his_client.profiles import CLIENT_PROFILES
+
+CLIENT_VERSION = CLIENT_PROFILES["universal"].version
 
 __all__ = ["CLIENT_VERSION"]

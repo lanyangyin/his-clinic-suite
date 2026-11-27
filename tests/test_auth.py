@@ -96,7 +96,7 @@ def test_audit_logs_recorded(client, auth):
         json={"name": "张三", "id_number": "110101199001011234"},
         headers=auth["cashier"],
     )
-    logs = client.get("/audit/logs").json()
+    logs = client.get("/audit/logs", headers=auth["admin"]).json()
     assert len(logs) >= 1
     top = logs[0]
     assert top["username"] == "cashier"
@@ -109,7 +109,7 @@ def test_audit_logs_record_anonymous_failures(client, auth):
     client.post(
         "/patients/", json={"name": "张三", "id_number": "110101199001011234"}
     )
-    logs = client.get("/audit/logs").json()
+    logs = client.get("/audit/logs", headers=auth["admin"]).json()
     anonymous = [l for l in logs if l["username"] == "anonymous"]
     assert any(l["path"] == "/patients/" and l["status_code"] == 401 for l in anonymous)
 

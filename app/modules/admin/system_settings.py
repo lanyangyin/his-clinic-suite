@@ -12,6 +12,7 @@ FIELDS = [
     ("CLINIC_ADDRESS", "机构地址", "机构", "str", False, True),
     ("CLINIC_PHONE", "机构电话", "机构", "str", False, True),
     ("REQUIRE_PRESCRIPTION_REVIEW", "处方需药师审核", "业务开关", "bool", False, True),
+    ("PHARMACY_REQUIRE_PICKUP_CODE", "发药必须核验取药码/取药人", "业务开关", "bool", False, True),
     ("PAYMENT_ALLOW_MOCK", "允许支付模拟", "业务开关", "bool", False, True),
     ("ALLOW_ANONYMOUS_READ", "允许匿名只读", "业务开关", "bool", False, True),
     ("REFUND_APPROVAL_THRESHOLD", "退费审批阈值", "业务开关", "float", False, True),
@@ -56,8 +57,9 @@ def _default(key: str):
 def load(db: Session) -> dict:
     values = {key: _default(key) for key, *_ in FIELDS}
     for row in db.query(SystemSetting).all():
-        if row.key in BY_KEY:
-            values[row.key] = row.value
+        item = BY_KEY.get(row.key)
+        if item:
+            values[row.key] = _convert(item[3], row.value)
     return values
 
 
@@ -72,12 +74,27 @@ def _convert(kind: str, value):
 
 
 def save(db: Session, values: dict, operator: str = "") -> dict:
-    for key, _label, _group, kind, secret, _mutable in FIELDS:
+    # 先整体校验，避免“提示已保存但实际未生效”
+    converted = {}
+    for key, label, _group, kind, secret, _mutable in FIELDS:
         if key not in values:
             continue
         value = values[key]
         if secret and value in (None, ""):
             continue
+        if kind in ("int", "float"):
+            try:
+                converted[key] = _convert(kind, value)
+            except (TypeError, ValueError):
+                raise ValueError(f"参数“{label}”必须是数字")
+        elif kind == "bool":
+            converted[key] = _convert(kind, value)
+        else:
+            converted[key] = str(value or "")
+    for key, _label, _group, kind, secret, _mutable in FIELDS:
+        if key not in converted:
+            continue
+        value = converted[key]
         text = ("1" if value else "0") if kind == "bool" else str(value)
         row = db.get(SystemSetting, key)
         if row is None:

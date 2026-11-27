@@ -84,14 +84,21 @@ def create_encounter(
     if not registration:
         raise ValueError("挂号记录不存在")
 
+    if registration.status == "cancelled":
+        raise ValueError("该挂号已取消，不能接诊；请重新挂号")
     existing = (
         db.query(Encounter)
         .filter(Encounter.registration_id == data.registration_id)
         .order_by(Encounter.id.desc())
         .first()
     )
-    if existing:
+    # 放弃接诊后允许同一挂号重新接诊（保留原放弃记录）；其余已有就诊保持幂等。
+    if existing and existing.status != "abandoned":
         return existing
+    if registration.status != "registered" and not (
+        existing and existing.status == "abandoned"
+    ):
+        raise ValueError("该挂号不是待就诊状态，不能接诊")
 
     from app.modules.staff.models import Doctor
 
@@ -1008,6 +1015,58 @@ def list_encounters(db: Session, patient_id: int | None = None) -> list[Encounte
             return []
         query = query.filter(Encounter.registration_id.in_(registration_ids))
     return query.order_by(Encounter.id.desc()).all()
+
+
+def release_doctor_lock(db: Session, doctor_id: int) -> dict:
+    """解除医生当前接诊占用（用于旧数据/异常中断恢复）。"""
+    from app.modules.staff.models import Doctor
+
+    doctor = db.get(Doctor, doctor_id)
+    if not doctor:
+        raise ValueError("医生不存在")
+    old = doctor.current_encounter_id
+    doctor.current_encounter_id = None
+    db.commit()
+    return {"doctor_id": doctor_id, "released_encounter_id": old}
+
+
+def complete_encounter_without_charge(
+    db: Session, encounter_id: int, waive_pending: bool = False
+) -> Encounter:
+    """无费用完诊：适用于复诊/看结果，不生成 0 元发票。"""
+    encounter = db.get(Encounter, encounter_id)
+    if not encounter:
+        raise ValueError("就诊记录不存在")
+    if encounter.status in ("closed", "abandoned", "cancelled"):
+        raise ValueError("该就诊已经结束")
+    from app.modules.billing.models import Payment
+    from app.modules.charges.models import EncounterCharge
+
+    pending = db.query(EncounterCharge).filter(
+        EncounterCharge.encounter_id == encounter_id,
+        EncounterCharge.status == "pending",
+    ).all()
+    if pending and not waive_pending:
+        raise ValueError("仍有待收费项目，不能无费用完诊")
+    if pending and waive_pending:
+        for row in pending:
+            row.status = "refunded"
+    if db.query(Payment).filter(
+        Payment.encounter_id == encounter_id,
+        Payment.status.in_(("paid", "partially_refunded")),
+    ).first():
+        raise ValueError("该就诊已有收费，不能无费用完诊")
+    encounter.status = "closed"
+    from app.modules.registration.service import get_registration
+    from app.modules.staff.models import Doctor
+
+    registration = get_registration(db, encounter.registration_id)
+    doctor = db.get(Doctor, registration.doctor_id) if registration else None
+    if doctor and doctor.current_encounter_id == encounter.id:
+        doctor.current_encounter_id = None
+    db.commit()
+    db.refresh(encounter)
+    return encounter
 
 
 def abandon_encounter(db: Session, encounter_id: int, reason: str = "") -> Encounter:

@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.print_preview import open_print_preview
 from his_client.ui.theme import apply_theme
 
 
@@ -76,6 +77,8 @@ class RadiologyWidget(QWidget):
         approve.clicked.connect(lambda: self._review(True))
         reject = QPushButton("退回报告")
         reject.clicked.connect(lambda: self._review(False))
+        print_report = QPushButton("打印报告")
+        print_report.clicked.connect(self._print_report)
         dl.addWidget(self.info)
         dl.addWidget(self.report, 1)
         self.impression = QTextEdit()
@@ -104,6 +107,7 @@ class RadiologyWidget(QWidget):
         actions.addWidget(submit)
         actions.addWidget(approve)
         actions.addWidget(reject)
+        actions.addWidget(print_report)
         dl.addLayout(actions)
         self.msg = QLabel("")
         dl.addWidget(self.msg)
@@ -163,6 +167,12 @@ class RadiologyWidget(QWidget):
     def _select(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.rows):
             item = self.rows[row]
+            try:
+                detail = self.api.get_imaging_request(item["id"])
+                item = {**item, **{k: v for k, v in detail.items() if v is not None}}
+                self.rows[row] = item
+            except ApiError:
+                pass
             self.info.setText(
                 f"{item.get('accession_no')}　{item.get('patient_name')}　"
                 f"{item.get('item_name')}　申请：{item.get('requested_by')}"
@@ -173,6 +183,21 @@ class RadiologyWidget(QWidget):
             self.series_uid.setText(item.get("series_uid") or "")
             self.modality.setText(item.get("modality") or "")
             self.measurements.setText(item.get("measurements") or "")
+
+    def _print_report(self) -> None:
+        row = self.table.currentRow()
+        if not 0 <= row < len(self.rows):
+            self.msg.setText("请先选择检查申请")
+            return
+        item = self.rows[row]
+        if item.get("status") not in ("reported", "reviewed"):
+            self.msg.setText("只有已报告/已审核的检查可以打印")
+            return
+        open_print_preview(
+            self,
+            f"{self.api.base_url}/print/imaging-report/{item['id']}",
+            "检查报告单打印预览",
+        )
 
     def _open_image(self) -> None:
         url = self.image_url.text().strip()

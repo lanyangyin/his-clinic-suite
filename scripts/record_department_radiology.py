@@ -113,6 +113,9 @@ class RadiologyDemo(LoginMixin, QMainWindow):
         self.request = self.doctor_api.call(
             "POST", f"/pacs/encounters/{enc['id']}/imaging-requests", json={"item_id": item["id"]}
         )
+        self.cashier.call(
+            "POST", "/payments/", json={"encounter_id": enc["id"], "channel": "cash"}
+        )
 
     def run(self):
         try:

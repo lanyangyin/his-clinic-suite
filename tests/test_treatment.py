@@ -111,7 +111,7 @@ def test_cancel_treatment_refunds_charge(client, auth):
 
     charges = client.get(f"/charges/encounters/{encounter['id']}").json()
     treatment_charges = [c for c in charges if c["charge_type"] == "treatment"]
-    assert treatment_charges[0]["status"] == "refunded"
+    assert treatment_charges[0]["status"] == "cancelled"
 
     execute = client.post(f"/treatments/{order['id']}/execute", headers=auth["nurse"])
     assert execute.status_code == 400

@@ -118,8 +118,9 @@ def get_schedule_one(schedule_id: int, db: Session = Depends(get_db)):
 def get_doctor_schedules(
     doctor_id: int,
     schedule_date: date | None = None,
+    upcoming_only: bool = False,
     db: Session = Depends(get_db),
 ):
     if not get_doctor(db, doctor_id):
         raise HTTPException(status_code=404, detail="医生不存在")
-    return list_schedules(db, doctor_id, schedule_date)
+    return list_schedules(db, doctor_id, schedule_date, upcoming_only)

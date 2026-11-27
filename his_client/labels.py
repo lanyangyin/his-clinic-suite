@@ -64,6 +64,7 @@ LABELS: dict[str, dict[str, str]] = {
         "paid": "已收费",
         "partially_refunded": "部分退费",
         "refunded": "已退费",
+        "cancelled": "已取消（未收费）",
     },
     "dispense_status": {"dispensed": "已发药", "returned": "已退药"},
     "charge_status": {

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}客户端版本 · HIS 管理台{% endblock %}
+{% block content %}
+<h2>客户端版本与下载</h2>
+<p class="hint">每个岗位独立版本。构建后把目录放到服务器 dist/ 下即可在此看到；兼容范围由服务端 app/client_compat.py 统一声明。</p>
+<table>
+  <tr><th>岗位</th><th>客户端</th><th>当前版本</th><th>兼容范围</th><th>已构建</th><th>大小</th><th>下载</th></tr>
+  {% for row in rows %}
+  <tr>
+    <td>{{ row.key }}</td>
+    <td>{{ row.title }}</td>
+    <td>{{ row.version }}</td>
+    <td>{{ row.min }} ~ {{ row.max }}</td>
+    <td>{{ '是' if row.built else '否' }}</td>
+    <td>{{ row.size_mb }} MB</td>
+    <td><a href="{{ row.download }}">下载/跳转</a></td>
+  </tr>
+  {% endfor %}
+</table>
+<div class="panel">
+  <h3>更新规则</h3>
+  <ol class="hint">
+    <li>修改对应客户端版本（his_client/profiles.py）；</li>
+    <li>修改兼容范围（app/client_compat.py）；</li>
+    <li>只构建受影响岗位：<code>python scripts/build_client.py --profile cashier</code>；</li>
+    <li>更新 docs/版本发布记录.md 与兼容矩阵。</li>
+  </ol>
+</div>
+{% endblock %}

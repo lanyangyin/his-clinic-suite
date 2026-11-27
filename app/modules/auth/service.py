@@ -55,6 +55,30 @@ def create_user(db: Session, data: UserCreate) -> User:
     return user
 
 
+def set_user_active(db: Session, user_id: int, active: bool) -> User:
+    user = get_user(db, user_id)
+    if not user:
+        raise ValueError("用户不存在")
+    user.is_active = bool(active)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def reset_password(db: Session, user_id: int, password: str) -> User:
+    if len(password or "") < 6:
+        raise ValueError("密码至少 6 位")
+    user = get_user(db, user_id)
+    if not user:
+        raise ValueError("用户不存在")
+    digest, salt = hash_password(password)
+    user.password_hash = digest
+    user.salt = salt
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def get_user(db: Session, user_id: int) -> User | None:
     return db.get(User, user_id)
 

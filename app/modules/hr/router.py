@@ -71,11 +71,12 @@ def get_one(employee_id: int, db: Session = Depends(get_db)):
 @router.post("/employees/{employee_id}/resign", response_model=EmployeeResponse)
 def resign_employee(
     employee_id: int,
+    resign_date: date | None = None,
     db: Session = Depends(get_db),
     _: None = Depends(require_role("admin", "hr")),
 ):
     try:
-        return resign(db, employee_id)
+        return resign(db, employee_id, resign_date)
     except ValueError as e:
         code = 404 if str(e) == "员工不存在" else 400
         raise HTTPException(status_code=code, detail=str(e))

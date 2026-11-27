@@ -144,6 +144,9 @@ class LabDemo(LoginMixin, QMainWindow):
             "POST", f"/lab/encounters/{enc['id']}/lab-requests",
             json={"item_id": self.item["id"]},
         )
+        self.cashier.call(
+            "POST", "/payments/", json={"encounter_id": enc["id"], "channel": "cash"}
+        )
 
     def run(self):
         try:

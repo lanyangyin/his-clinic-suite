@@ -52,9 +52,11 @@ def test_without_key_no_dedup(client, auth):
         json={"patient_id": patient["id"], "doctor_id": doctor["id"]},
         headers=auth["cashier"],
     )
-    assert r1.status_code == r2.status_code == 201
-    assert r1.json()["id"] != r2.json()["id"]
-    assert len(client.get("/registrations/").json()) == 2
+    assert r1.status_code == 201
+    # 同日同医生重复挂号现在被服务端拦截，避免双击产生两条挂号
+    assert r2.status_code == 400
+    assert "重复挂号" in r2.json()["detail"]
+    assert len(client.get("/registrations/").json()) == 1
 
 
 def test_same_key_different_endpoints_isolated(client, auth):

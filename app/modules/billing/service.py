@@ -282,6 +282,25 @@ def refund_payment(
 
     total_amount = 0.0
     raw_insurance = 0.0
+    # 退费联动：未执行的检验/检查/治疗单同时取消，避免退费后成为不可见僵尸单
+    from app.modules.lis.models import LabRequest
+    from app.modules.pacs.models import ImagingRequest
+    from app.modules.treatment.models import TreatmentOrder
+
+    for charge, _quantity in plan:
+        if charge.source_type == "lab_request" and charge.source_id:
+            row = db.get(LabRequest, charge.source_id)
+            if row and row.status in ("pending", "collected", "received", "testing"):
+                row.status = "cancelled"
+        elif charge.source_type == "imaging_request" and charge.source_id:
+            row = db.get(ImagingRequest, charge.source_id)
+            if row and row.status == "pending":
+                row.status = "cancelled"
+        elif charge.source_type == "treatment" and charge.source_id:
+            row = db.get(TreatmentOrder, charge.source_id)
+            if row and row.status == "pending":
+                row.status = "cancelled"
+
     for charge, quantity in plan:
         amount = round(charge.unit_price * quantity, 2)
         total_amount += amount
@@ -312,7 +331,16 @@ def refund_payment(
         ), insurance_remaining),
         2,
     )
-    total_self_pay = round(total_amount - total_insurance, 2)
+    # 折扣按比例分摊到本次退费；不能退超过患者实际自付的剩余金额
+    discount_share = (
+        round(total_amount * (payment.discount_amount / payment.amount), 2)
+        if payment.amount > 0 else 0.0
+    )
+    refund_gross = round(total_amount - discount_share, 2)
+    self_pay_cap = max(
+        round(payment.self_pay_amount - payment.refunded_self_pay_amount, 2), 0.0
+    )
+    total_self_pay = round(min(total_amount - total_insurance, self_pay_cap), 2)
 
     if total_self_pay > 0:
         if payment.channel == "mixed":
@@ -382,7 +410,7 @@ def refund_payment(
             )
         )
 
-    payment.refunded_amount = round(payment.refunded_amount + total_amount, 2)
+    payment.refunded_amount = round(payment.refunded_amount + refund_gross, 2)
     payment.refunded_insurance_amount = round(
         payment.refunded_insurance_amount + total_insurance, 2
     )
@@ -396,6 +424,15 @@ def refund_payment(
         payment.invoice_voided_by = operator
         payment.invoice_void_reason = "全额退费自动红冲"
     if all_refunded:
+        from app.modules.pharmacy.models import PharmacyPickupCode
+
+        pickup = (
+            db.query(PharmacyPickupCode)
+            .filter(PharmacyPickupCode.encounter_id == payment.encounter_id)
+            .first()
+        )
+        if pickup:
+            pickup.used_at = datetime.now()
         encounter = get_encounter(db, payment.encounter_id)
         if encounter:
             encounter.status = "open"
@@ -403,6 +440,46 @@ def refund_payment(
     db.commit()
     db.refresh(payment)
     return payment
+
+
+def list_pending_encounters(db: Session, limit: int = 100) -> list[dict]:
+    """收费处待收费名单：按就诊聚合未收费金额。"""
+    from sqlalchemy import func
+
+    from app.modules.charges.models import EncounterCharge
+    from app.modules.encounter.models import Encounter
+    from app.modules.patient.models import Patient
+    from app.modules.registration.models import Registration
+    from app.modules.staff.models import Doctor
+
+    rows = (
+        db.query(
+            EncounterCharge.encounter_id,
+            func.sum(EncounterCharge.amount).label("pending_amount"),
+            func.count(EncounterCharge.id).label("item_count"),
+        )
+        .filter(EncounterCharge.status == "pending")
+        .group_by(EncounterCharge.encounter_id)
+        .order_by(EncounterCharge.encounter_id.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for encounter_id, amount, item_count in rows:
+        encounter = db.get(Encounter, encounter_id)
+        registration = db.get(Registration, encounter.registration_id) if encounter else None
+        patient = db.get(Patient, registration.patient_id) if registration else None
+        doctor = db.get(Doctor, registration.doctor_id) if registration else None
+        result.append({
+            "encounter_id": encounter_id,
+            "patient_id": patient.id if patient else 0,
+            "patient_no": patient.patient_no if patient else "",
+            "patient_name": patient.name if patient else "",
+            "doctor_name": doctor.name if doctor else "",
+            "pending_amount": round(float(amount or 0), 2),
+            "item_count": int(item_count or 0),
+        })
+    return result
 
 
 def get_summary(db: Session) -> dict:

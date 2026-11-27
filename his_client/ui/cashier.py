@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QCheckBox,
     QComboBox,
+    QDialog,
     QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
@@ -216,12 +217,11 @@ class CashierWidget(QWidget):
         query_layout.addWidget(query_btn)
         layout.addWidget(query_box)
 
-        self.patient_table = QTableWidget(0, 3)
-        self.patient_table.setHorizontalHeaderLabels(["患者编号", "姓名", "性别/年龄"])
+        self.patient_table = QTableWidget(0, 4)
+        self.patient_table.setHorizontalHeaderLabels(["患者编号", "姓名", "电话", "性别/年龄"])
         self.patient_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.patient_table.cellClicked.connect(self._select_patient_row)
         self.patient_table.cellDoubleClicked.connect(self._patient_to_registration)
-        self.patient_table.setColumnHidden(0, True)
         layout.addWidget(self.patient_table)
         if self.role in ("admin", "director"):
             merge_row = QHBoxLayout()
@@ -294,12 +294,11 @@ class CashierWidget(QWidget):
             return "请填写证件号码，或选择无证件"
         if not payload["birth_date"] and not self.birth_age.unknown.isChecked():
             return "请选择出生日期，或勾选年龄不详"
-        if not payload["phone"]:
-            return "请填写手机号"
-        if not payload["address"]:
-            return "请填写现住址"
-        if not payload["emergency_contact_name"] or not payload["emergency_contact_phone"]:
-            return "请填写紧急联系人和联系电话"
+        # 老年患者/儿童可能没有手机或固定地址；允许留空，不能因此拒绝建档。
+        if payload["phone"] and len(payload["phone"]) < 6:
+            return "手机号格式不正确"
+        if payload["emergency_contact_name"] and not payload["emergency_contact_phone"]:
+            return "填写了紧急联系人时请填写联系电话"
         if payload["gender"] == "unknown":
             return "请选择性别"
         if payload["allergy_status"] == "present" and not payload["allergy_detail"]:
@@ -318,6 +317,7 @@ class CashierWidget(QWidget):
         except ApiError as e:
             self.patient_msg.setText(f"查重失败（{e.status_code}）：{e.detail}")
             return None
+        self._duplicate_cancelled = False
         candidates = check.get("candidates") or []
         if not candidates:
             return None
@@ -326,12 +326,16 @@ class CashierWidget(QWidget):
             f"{row.get('phone') or '无电话'}"
             for row in candidates[:5]
         ]
-        text = "发现已有档案：\n" + "\n".join(lines) + "\n\n是否直接使用第一条档案？"
+        text = (
+            "发现已有档案：\n" + "\n".join(lines)
+            + "\n\n默认取消新建。请核对后选择：使用第一条档案，或取消并修改信息。"
+        )
         answer = QMessageBox.question(
-            self, "发现重复档案", text, QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+            self, "发现重复档案", text, QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         if answer == QMessageBox.Yes:
             return candidates[0]
+        self._duplicate_cancelled = True
         self.patient_msg.setText("已取消建档：请核对重复档案或修改证件信息")
         return None
 
@@ -342,6 +346,8 @@ class CashierWidget(QWidget):
             self.patient_msg.setText(error)
             return
         duplicate = self._confirm_duplicate(payload)
+        if getattr(self, "_duplicate_cancelled", False):
+            return
         if duplicate is not None:
             self.patient_msg.setText(
                 f"使用已有档案：{duplicate.get('patient_no') or duplicate['id']} "
@@ -559,6 +565,7 @@ class CashierWidget(QWidget):
             values = [
                 patient.get("patient_no") or "—",
                 patient["name"],
+                patient.get("phone") or "—",
                 f"{gender}/{age_display}",
             ]
             for col, value in enumerate(values):
@@ -779,6 +786,8 @@ class CashierWidget(QWidget):
             "privacy_consent": True,
         }
         duplicate = self._confirm_duplicate(payload)
+        if getattr(self, "_duplicate_cancelled", False):
+            return
         if duplicate is not None:
             patient = duplicate
         else:
@@ -878,8 +887,11 @@ class CashierWidget(QWidget):
         self.c_scan_code.returnPressed.connect(self._scan_barcode)
         scan_btn = QPushButton("扫码带出")
         scan_btn.clicked.connect(self._scan_barcode)
+        pending_btn = QPushButton("待收费名单")
+        pending_btn.clicked.connect(self._open_pending_charges)
         scan_row.addWidget(self.c_scan_code)
         scan_row.addWidget(scan_btn)
+        scan_row.addWidget(pending_btn)
         self.c_scan_status = QLabel("")
         self.c_scan_status.setWordWrap(True)
         scan_row.addWidget(self.c_scan_status)
@@ -1099,14 +1111,46 @@ class CashierWidget(QWidget):
             self.charge_msg.setText(f"收费失败（{e.status_code}）：{e.detail}")
             return
         self.refund_payment_id.setValue(payment["id"])
-        self._load_charges()
+        self._load_charges(keep_msg=True)
         self.charge_msg.setText(
             f"收费成功：单号 {payment['id']}，应收 {payment['amount']:.2f}，"
             f"优惠 {payment.get('discount_amount', 0):.2f}，"
             f"实收自费 {payment['self_pay_amount']:.2f}，渠道 {payment.get('channel')}"
         )
 
-    def _load_charges(self) -> None:
+    def _open_pending_charges(self) -> None:
+        try:
+            rows = self.api.pending_payment_encounters()
+        except ApiError as e:
+            self.charge_msg.setText(f"待收费名单加载失败（{e.status_code}）：{e.detail}")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("待收费患者名单")
+        dialog.resize(760, 460)
+        layout = QVBoxLayout(dialog)
+        table = QTableWidget(0, 5)
+        table.setHorizontalHeaderLabels(["就诊号", "患者号", "患者", "医生", "待收金额"])
+        table.setRowCount(len(rows))
+        for index, row in enumerate(rows):
+            for col, value in enumerate([
+                row["encounter_id"], row.get("patient_no") or "",
+                row.get("patient_name") or "", row.get("doctor_name") or "",
+                f"{row['pending_amount']:.2f}",
+            ]):
+                table.setItem(index, col, QTableWidgetItem(str(value)))
+        table.horizontalHeader().setStretchLastSection(True)
+        table.cellDoubleClicked.connect(
+            lambda r, _c: (self.c_encounter_id.setValue(rows[r]["encounter_id"]),
+                          self._load_charges(), dialog.accept())
+        )
+        layout.addWidget(QLabel(f"共 {len(rows)} 位待收费患者，双击行带入收费"))
+        layout.addWidget(table)
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.reject)
+        layout.addWidget(close_btn)
+        dialog.exec()
+
+    def _load_charges(self, keep_msg: bool = False) -> None:
         encounter_id = self.c_encounter_id.value()
         self._show_encounter_patient(encounter_id, self.c_patient_label)
         try:
@@ -1122,13 +1166,29 @@ class CashierWidget(QWidget):
             self.charge_table.setItem(row, 2, QTableWidgetItem(str(charge["quantity"])))
             self.charge_table.setItem(row, 3, QTableWidgetItem(f"{charge['amount']:.2f}"))
             self.charge_table.setItem(row, 4, QTableWidgetItem(zh('charge_status', charge["status"])))
-        self.charge_msg.setText(
-            f"待收 {summary['total_pending']:.2f} 元；已收 {summary['total_paid']:.2f} 元"
-            + ("；当前按全自费" if not self.insurance_enabled else "")
-        )
+        if not keep_msg:
+            self.charge_msg.setText(
+                f"待收 {summary['total_pending']:.2f} 元；已收 {summary['total_paid']:.2f} 元"
+                + ("；当前按全自费" if not self.insurance_enabled else "")
+            )
 
     def _pay(self) -> None:
         channel = self.c_channel.currentData()
+        try:
+            summary = self.api.get_charge_summary(self.c_encounter_id.value())
+            pending = float(summary.get("total_pending") or 0)
+        except ApiError as e:
+            self.charge_msg.setText(f"查询失败（{e.status_code}）：{e.detail}")
+            return
+        if pending <= 0:
+            self.charge_msg.setText("没有待收费用；如需结束无费用就诊，请使用完成接诊")
+            return
+        if QMessageBox.question(
+            self, "确认收费",
+            f"确认收取就诊 {self.c_encounter_id.value()} 的费用 {pending:.2f} 元？\n"
+            f"支付方式：{zh('payment_channel', channel)}",
+        ) != QMessageBox.Yes:
+            return
         try:
             payment = self.api.create_payment(
                 self.c_encounter_id.value(),
@@ -1139,6 +1199,8 @@ class CashierWidget(QWidget):
         except ApiError as e:
             self.charge_msg.setText(f"收费失败（{e.status_code}）：{e.detail}")
             return
+        self.refund_payment_id.setValue(payment["id"])
+        self._load_charges(keep_msg=True)
         self.charge_msg.setText(
             f"收费成功：单号 {payment['id']}，金额 {payment['amount']:.2f} 元，"
             + (
@@ -1146,11 +1208,9 @@ class CashierWidget(QWidget):
                 if self.insurance_enabled
                 else "实收 "
             )
-            + f"方式 {zh('payment_channel', payment.get('channel'))}"
-            + (f"，交易号 {payment['channel_trade_no']}" if payment.get("channel_trade_no") else "")
+            + f"方式 {zh('payment_channel', payment.get('channel'))}。"
+            + "下一步：请凭收据/取药码到药房；有检验/检查请到对应科室；有治疗请到治疗室。"
         )
-        self.refund_payment_id.setValue(payment["id"])
-        self._load_charges()
 
     def _load_refund_charges(self) -> None:
         payment_id = self.refund_payment_id.value()
@@ -1207,6 +1267,10 @@ class CashierWidget(QWidget):
         self.refund_qty.setValue(1 if left > 0 else 1)
 
     def _refund_selected(self) -> None:
+        if not QMessageBox.question(
+            self, "确认退费", f"确认退数量 {self.refund_qty.value()} 并退对应费用？"
+        ) == QMessageBox.Yes:
+            return
         if not self.refund_selected_btn.isEnabled():
             self.refund_msg.setText("该收费需整单全额退")
             return
@@ -1234,6 +1298,10 @@ class CashierWidget(QWidget):
         self._load_refund_charges()
 
     def _refund_all(self) -> None:
+        if QMessageBox.question(
+            self, "确认全部退费", "确认对该收费单全部退费？此操作会红冲发票。"
+        ) != QMessageBox.Yes:
+            return
         try:
             payment = self.api.refund_payment(self.refund_payment_id.value())
         except ApiError as e:

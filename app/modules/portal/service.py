@@ -68,7 +68,7 @@ def get_portal_reports(db: Session, id_number: str) -> dict:
             db.query(LabRequest)
             .filter(
                 LabRequest.encounter_id.in_(encounter_ids),
-                LabRequest.status == "reported",
+                LabRequest.status == "reviewed",
             )
             .order_by(LabRequest.id.desc())
             .all()
@@ -77,7 +77,7 @@ def get_portal_reports(db: Session, id_number: str) -> dict:
             db.query(ImagingRequest)
             .filter(
                 ImagingRequest.encounter_id.in_(encounter_ids),
-                ImagingRequest.status == "reported",
+                ImagingRequest.status.in_(("reported", "reviewed")),
             )
             .order_by(ImagingRequest.id.desc())
             .all()

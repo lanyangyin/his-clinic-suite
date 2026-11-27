@@ -263,7 +263,9 @@ class DoctorWidget(QWidget):
             if self.banner.encounter_id:
                 self._refresh_prescriptions()
         elif "病历" in label and self.banner.encounter_id:
-            self._load_record()
+            # 同一就诊内切页不重新拉取，避免覆盖医生正在写、尚未保存的草稿
+            if self.mr_encounter_id.value() != self.banner.encounter_id:
+                self._load_record()
         elif "检验" in label:
             if self.banner.encounter_id:
                 self._load_lab_items()
@@ -422,6 +424,7 @@ class DoctorWidget(QWidget):
                 ("挂起当前", self._pause_workbench),
                 ("继续接诊", self._resume_workbench),
                 ("药物反应 / 换药", self._adverse_reaction),
+                ("完成接诊（无费用）", self._complete_workbench),
                 ("放弃接诊", self._abandon_workbench),
                 ("回诊 / 看结果", self._return_workbench),
             ]
@@ -794,6 +797,8 @@ class DoctorWidget(QWidget):
     @staticmethod
     def _is_active_patient(item: dict) -> bool:
         """只有接诊中/挂起/治疗中的患者才进入全局患者条和左侧患者卡。"""
+        if item.get("encounter_status") in ("closed", "abandoned"):
+            return False
         return (
             item.get("encounter_status") in ("open", "paused")
             or item.get("treatment_status") in ("waiting", "in_progress")
@@ -891,7 +896,9 @@ class DoctorWidget(QWidget):
             )
         self.wb_convert.setVisible(follow_up and not item.get("encounter_id"))
         status = item.get("encounter_status") or ""
-        self.wb_start.setEnabled(not item.get("encounter_id") or status == "paused")
+        self.wb_start.setEnabled(
+            not item.get("encounter_id") or status in ("paused", "abandoned")
+        )
         if hasattr(self, "wb_action_buttons"):
             has_encounter = bool(item.get("encounter_id"))
             self._set_clinical_tabs(True, has_encounter, status == "closed")
@@ -901,6 +908,9 @@ class DoctorWidget(QWidget):
             self.wb_action_buttons["挂起当前"].setEnabled(status == "open")
             self.wb_action_buttons["继续接诊"].setEnabled(status == "paused")
             self.wb_action_buttons["药物反应 / 换药"].setEnabled(has_encounter)
+            self.wb_action_buttons["完成接诊（无费用）"].setEnabled(
+                status in ("open", "paused")
+            )
             self.wb_action_buttons["放弃接诊"].setEnabled(status in ("open", "paused"))
             self.wb_action_buttons["回诊 / 看结果"].setEnabled(
                 has_encounter and status == "closed"
@@ -908,6 +918,7 @@ class DoctorWidget(QWidget):
             if has_encounter and status == "closed":
                 for text in ("写病历", "开方", "开检验", "开治疗", "挂起当前", "继续接诊", "药物反应 / 换药"):
                     self.wb_action_buttons[text].setEnabled(False)
+                self.wb_action_buttons["完成接诊（无费用）"].setEnabled(False)
                 self.wb_action_buttons["放弃接诊"].setEnabled(False)
         if item.get("encounter_id"):
             self._set_encounter_everywhere(item["encounter_id"])
@@ -980,6 +991,17 @@ class DoctorWidget(QWidget):
             else:
                 encounter = self.api.create_encounter(item["registration_id"])
         except ApiError as e:
+            if "当前患者尚未完成诊治" in (e.detail or ""):
+                if QMessageBox.question(
+                    self, "接诊被占用",
+                    f"接诊失败：{e.detail}\n\n是否解除当前医生的异常接诊占用后重试？",
+                ) == QMessageBox.Yes:
+                    try:
+                        self.api.release_encounter_lock()
+                    except ApiError as inner:
+                        self.wb_summary.setText(f"解除占用失败：{inner.detail}")
+                        return
+                    return self._start_workbench()
             self.wb_summary.setText(f"接诊失败（{e.status_code}）：{e.detail}")
             return
         self._active_encounter_status = "open"
@@ -1027,6 +1049,50 @@ class DoctorWidget(QWidget):
         self._active_encounter_status = "paused"
         self.wb_summary.setText("已挂起当前患者；现在可以开始下一位，之后从队列继续接诊")
         self._load_workbench()
+
+    def _complete_workbench(self) -> None:
+        item = getattr(self, "wb_current", None)
+        if not item or not item.get("encounter_id"):
+            self.wb_summary.setText("请先选择当前接诊患者")
+            return
+        if QMessageBox.question(
+            self, "完成接诊",
+            "确认完成本次接诊？仅适用于没有待收费项目的复诊/看结果，不生成收费单。",
+        ) != QMessageBox.Yes:
+            return
+        try:
+            self.api.complete_encounter(item["encounter_id"])
+        except ApiError as e:
+            if "仍有待收费" in (e.detail or ""):
+                if QMessageBox.question(
+                    self, "作废未收费用",
+                    "该就诊仍有待收费项目。确认作废这些未收费用并完成接诊？"
+                    "\n费用会标记为已退，不会生成收费单，请确认已了解。",
+                ) == QMessageBox.Yes:
+                    try:
+                        self.api.complete_encounter(item["encounter_id"], waive_pending=True)
+                    except ApiError as inner:
+                        self.wb_summary.setText(
+                            f"完成接诊失败（{inner.status_code}）：{inner.detail}"
+                        )
+                        return
+                else:
+                    self.wb_summary.setText("仍有待收费项目；请到收费处收费或先处理费用")
+                    return
+            else:
+                self.wb_summary.setText(f"完成接诊失败（{e.status_code}）：{e.detail}")
+                return
+        self.wb_current = None
+        self._active_patient_id = None
+        self._active_patient_name = ""
+        self._active_encounter_status = ""
+        self._active_encounter_id = None
+        self.banner.clear()
+        self.side_info.clear()
+        self._clear_side_history()
+        self._set_clinical_tabs(False, False)
+        self._load_workbench()
+        self.wb_summary.setText("本次接诊已完成（无费用）")
 
     def _abandon_workbench(self) -> None:
         item = getattr(self, "wb_current", None)
@@ -2268,6 +2334,8 @@ class DoctorWidget(QWidget):
             self.record_msg.setText(f"签名失败（{e.status_code}）：{e.detail}")
             return
         self.record_msg.setText(f"已签名锁定：{record.get('signed_by')}")
+        # 签名成功后立即刷新为只读，避免界面仍可输入、提交时才报错
+        self._load_record()
 
     def _request_record_revision(self) -> None:
         encounter_id = self.mr_encounter_id.value()

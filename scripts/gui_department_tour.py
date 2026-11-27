@@ -50,7 +50,7 @@ for role, user, password in ROLES:
         window.resize(1600, 1000)
         window.show()
         app.processEvents()
-        tabs = window.centralWidget()
+        tabs = getattr(window, "tabs", None) or window.centralWidget()
         count = tabs.count()
         for index in range(count):
             tabs.setCurrentIndex(index)

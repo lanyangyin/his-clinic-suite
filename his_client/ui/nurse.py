@@ -53,8 +53,13 @@ class NurseWidget(QWidget):
             self._load_queue()
 
     def _auto_refresh(self) -> None:
-        if self.isVisible() and self.tabs.currentIndex() == 0:
+        if not self.isVisible():
+            return
+        if self.tabs.currentIndex() == 0:
             self._load_queue()
+        elif self.tabs.currentIndex() == 1:
+            self._load_pending_treatments()
+
 
     # ---------- 分诊 ----------
     def _build_triage_tab(self) -> QWidget:
@@ -64,6 +69,7 @@ class NurseWidget(QWidget):
         box = QGroupBox("预检分诊登记")
         grid = QGridLayout(box)
         self.triage_reg_id = QSpinBox()
+        self.triage_reg_id.setKeyboardTracking(False)
         self.triage_reg_id.setRange(0, 10_000_000)
         self.triage_reg_id.setSpecialValueText("请选择/扫码挂号")
         self.triage_reg_id.setValue(0)
@@ -245,6 +251,17 @@ class NurseWidget(QWidget):
             self.triage_msg.setText("请填写主诉")
             return
         pain_text = self.triage_pain.text().strip()
+        if pain_text:
+            try:
+                pain_value = int(pain_text)
+            except ValueError:
+                self.triage_msg.setText("疼痛评分必须是 0-10 的整数")
+                return
+            if not 0 <= pain_value <= 10:
+                self.triage_msg.setText("疼痛评分必须是 0-10 的整数")
+                return
+        else:
+            pain_value = None
         payload = {
             "triage_level": self.triage_level.currentData(),
             "chief_complaint": self.triage_complaint.text().strip(),
@@ -254,7 +271,7 @@ class NurseWidget(QWidget):
             "systolic": systolic,
             "diastolic": diastolic,
             "spo2": spo2,
-            "pain_score": int(pain_text) if pain_text else None,
+            "pain_score": pain_value,
             "isolation": self.triage_isolation.isChecked(),
         }
         try:
@@ -385,7 +402,8 @@ class NurseWidget(QWidget):
 
         top = QHBoxLayout()
         self.nurse_encounter_id = QSpinBox()
-        self.nurse_encounter_id.setRange(1, 10_000_000)
+        self.nurse_encounter_id.setSpecialValueText("全部患者")
+        self.nurse_encounter_id.setRange(0, 10_000_000)
         sync = QPushButton("同步医嘱")
         sync.clicked.connect(self._sync_nursing)
         refresh = QPushButton("刷新执行单")
@@ -406,11 +424,11 @@ class NurseWidget(QWidget):
         top.addWidget(self.nursing_filter)
         layout.addLayout(top)
 
-        self.nursing_table = QTableWidget(0, 9)
+        self.nursing_table = QTableWidget(0, 10)
         self.nursing_table.setHorizontalHeaderLabels(
-            ["患者", "项目", "类型", "用法", "状态", "座位", "滴速", "执行单", "高危"]
+            ["患者号", "患者", "项目", "类型", "用法", "状态", "收费", "座位", "执行单", "高危"]
         )
-        self.nursing_table.horizontalHeader().setStretchLastSection(True)
+        self.nursing_table.horizontalHeader().setStretchLastSection(False)
         self.nursing_table.cellClicked.connect(self._select_nursing)
         splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
@@ -503,9 +521,10 @@ class NurseWidget(QWidget):
 
     def _load_nursing(self) -> None:
         current_id = (getattr(self, "current_nursing", None) or {}).get("id")
+        selected_encounter = self.nurse_encounter_id.value() or None
         try:
             self.nursing_rows = self.api.list_nursing_orders(
-                self.nursing_filter.currentData()
+                self.nursing_filter.currentData(), encounter_id=selected_encounter
             )
         except ApiError as e:
             self.nursing_msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
@@ -514,6 +533,7 @@ class NurseWidget(QWidget):
         self.nursing_table.setRowCount(len(self.nursing_rows))
         for row, order in enumerate(self.nursing_rows):
             values = [
+                order.get("patient_no") or "—",
                 order.get("patient_name") or "",
                 order["item_name"],
                 {"infusion": "输液", "injection": "注射", "treatment": "治疗"}.get(
@@ -527,8 +547,8 @@ class NurseWidget(QWidget):
                     "completed": "已完成",
                     "skipped": "已跳过",
                 }.get(order["status"], order["status"]),
+                "已收" if order.get("paid") else "未收费",
                 order.get("seat_no") or "—",
-                f"{order['rate_ml_h']:g}" if order.get("rate_ml_h") else "—",
                 str(order["id"]),
                 "是" if order.get("high_alert") else "",
             ]
@@ -540,21 +560,42 @@ class NurseWidget(QWidget):
             if current_id is not None and order["id"] == current_id:
                 self.nursing_table.selectRow(row)
                 self.current_nursing = order
+        if current_id is not None and not any(
+            order["id"] == current_id for order in self.nursing_rows
+        ):
+            self.current_nursing = None
+            self.nursing_table.clearSelection()
         self.nursing_msg.setText(f"执行单 {len(self.nursing_rows)} 条")
 
     def _select_nursing(self, row: int, _col: int) -> None:
         if 0 <= row < len(self.nursing_rows):
             self.current_nursing = self.nursing_rows[row]
+            order = self.current_nursing
+            patient = {
+                "id": order.get("patient_id"),
+                "patient_no": order.get("patient_no"),
+                "name": order.get("patient_name"),
+                "gender": order.get("gender"),
+                "age": order.get("age"),
+                "allergy_status": order.get("allergy_status"),
+                "allergy_label": order.get("allergy_label"),
+            }
+            self.banner.set_patient(patient, order.get("encounter_id"), "输液执行")
             self.nursing_msg.setText(
-                f"当前：{self.current_nursing['item_name']} · "
-                f"{self.current_nursing['status']}"
-                + (" · 高危药品需双人核对" if self.current_nursing.get("high_alert") else "")
+                f"当前：{order.get('patient_no') or ''} {order.get('patient_name') or ''} · "
+                f"{order['item_name']} · {order['status']}"
+                + (" · 高危药品需双人核对" if order.get("high_alert") else "")
+                + ("" if order.get("paid") else " · 未收费，不能配药/执行")
             )
 
     def _selected_nursing(self) -> dict | None:
         order = getattr(self, "current_nursing", None)
         if not order:
             self.nursing_msg.setText("请先选择一条执行单")
+            return None
+        if not order.get("paid"):
+            self.nursing_msg.setText("该执行单尚未收费，不能配药/执行")
+            return None
         return order
 
     def _prepare_nursing(self) -> None:

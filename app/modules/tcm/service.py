@@ -548,6 +548,13 @@ def dispense_prescription(
         raise ValueError("中药处方不存在")
     if prescription.status != "reviewed":
         raise ValueError("处方未审核，不能发药")
+    from app.modules.billing.models import Payment
+
+    if not db.query(Payment).filter(
+        Payment.encounter_id == prescription.encounter_id,
+        Payment.status.in_(("paid", "partially_refunded")),
+    ).first():
+        raise ValueError("该中药处方尚未收费，不能发药")
     # 饮片库存校验：未启用库存（None）的饮片不拦截
     for item in prescription.items:
         herb = get_herb(db, item.herb_id)

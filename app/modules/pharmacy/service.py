@@ -25,10 +25,14 @@ from .schemas import DispenseRequest, StockInRequest
 
 
 def stock_in(db: Session, data: StockInRequest) -> DrugStock:
-    """入库（历史遗留入口）：同药品同批次累加数量，并记库存流水。"""
+    """入库：同药同批必须同效期；过期药品禁止入库。"""
     drug = get_drug(db, data.drug_id)
     if not drug:
         raise ValueError("药品不存在")
+    from datetime import date as _date
+
+    if data.expiry < _date.today():
+        raise ValueError("不能将已过期药品入库")
 
     existing = (
         db.query(DrugStock)
@@ -38,6 +42,8 @@ def stock_in(db: Session, data: StockInRequest) -> DrugStock:
         )
         .first()
     )
+    if existing and existing.expiry != data.expiry:
+        raise ValueError("同批号已存在不同效期，请使用不同批号或先核对库存")
     if existing:
         existing.quantity += data.quantity
         db.flush()
@@ -105,8 +111,23 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
     patient_id = registration.patient_id if registration else None
 
     payment = get_payment_by_encounter(db, data.encounter_id)
-    if not payment or payment.status != "paid":
+    if not payment or payment.status not in ("paid", "partially_refunded"):
         raise ValueError("该就诊尚未收费")
+    from app.modules.charges.models import EncounterCharge
+
+    drug_charges = (
+        db.query(EncounterCharge)
+        .filter(
+            EncounterCharge.encounter_id == data.encounter_id,
+            EncounterCharge.charge_type == "drug",
+            EncounterCharge.status.in_(("paid", "partially_refunded")),
+        )
+        .all()
+    )
+    if not drug_charges:
+        raise ValueError("该就诊药品费用尚未收费")
+    if any(getattr(row, "refunded_quantity", 0) > 0 for row in drug_charges):
+        raise ValueError("药品费用已部分退费，不能按原处方整方发药；请先处理处方")
 
     existing = (
         db.query(Dispense)
@@ -135,6 +156,11 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
             raise ValueError("存在未通过药师审核的处方，不能发药")
 
     pickup = None
+    require_pickup = bool(getattr(settings, "PHARMACY_REQUIRE_PICKUP_CODE", True))
+    if require_pickup and not data.pickup_code.strip():
+        raise ValueError("请扫描或输入取药码")
+    if require_pickup and not data.receiver_name.strip():
+        raise ValueError("请填写取药人姓名")
     if data.pickup_code.strip():
         pickup = (
             db.query(PharmacyPickupCode)
@@ -187,7 +213,7 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
         witness = data.witness.strip()
         if not witness:
             raise ValueError("高危/麻精药品发药必须填写第二见证人")
-        if witness == operator:
+        if witness.strip().lower() == (operator or "").strip().lower():
             raise ValueError("第二见证人不能与发药人相同")
         record.witness = witness
     for header in headers:
@@ -265,8 +291,19 @@ def call_patient(db: Session, encounter_id: int, window_no: str, operator: str, 
     if not encounter:
         raise ValueError("就诊记录不存在")
     payment = get_payment_by_encounter(db, encounter_id)
-    if not payment or payment.status != "paid":
+    if not payment or payment.status not in ("paid", "partially_refunded"):
         raise ValueError("该就诊尚未收费")
+    from app.modules.encounter.models import Prescription
+
+    headers = (
+        db.query(Prescription)
+        .filter(Prescription.encounter_id == encounter_id, Prescription.type != "tcm_herb")
+        .all()
+    )
+    if not headers or any(
+        row.status in ("pending_review", "draft", "rejected") for row in headers
+    ):
+        raise ValueError("存在未通过药师审核的处方，不能叫号")
     if (
         db.query(Dispense)
         .filter(
@@ -310,6 +347,19 @@ def _ensure_code(db: Session, encounter_id: int) -> PharmacyPickupCode:
         .first()
     )
     if row:
+        if row.used_at is not None:
+            # 退药/退费后重新开方：旧码作废，生成新码
+            alphabet = string.ascii_uppercase + string.digits
+            for _ in range(20):
+                new_code = "P" + "".join(secrets.choice(alphabet) for _ in range(6))
+                if not db.query(PharmacyPickupCode).filter(
+                    PharmacyPickupCode.code == new_code
+                ).first():
+                    row.code = new_code
+                    row.used_at = None
+                    db.commit()
+                    db.refresh(row)
+                    return row
         return row
     alphabet = string.ascii_uppercase + string.digits
     for _ in range(20):
@@ -355,14 +405,29 @@ def worklist(db: Session) -> list[dict]:
         .join(Encounter, Payment.encounter_id == Encounter.id)
         .join(Registration, Encounter.registration_id == Registration.id)
         .join(Patient, Registration.patient_id == Patient.id)
-        .filter(Payment.status == "paid")
+        .filter(Payment.status.in_(("paid", "partially_refunded")))
         .order_by(Payment.created_at)
         .all()
     )
+    from app.modules.encounter.models import Prescription
+
     result = []
     for payment, patient, registration in rows:
         items = list_prescription_items(db, payment.encounter_id)
         if not items:
+            continue
+        headers = (
+            db.query(Prescription)
+            .filter(
+                Prescription.encounter_id == payment.encounter_id,
+                Prescription.type != "tcm_herb",
+            )
+            .all()
+        )
+        # 只有全部处方已审方通过才进入待发药队列；待审/驳回不叫号。
+        if not headers or any(
+            row.status in ("pending_review", "draft", "rejected") for row in headers
+        ):
             continue
         dispense = (
             db.query(Dispense)
@@ -382,7 +447,12 @@ def worklist(db: Session) -> list[dict]:
         result.append(
             {
                 "encounter_id": payment.encounter_id,
+                "patient_id": patient.id,
+                "patient_no": patient.patient_no,
                 "patient_name": patient.name,
+                "gender": patient.gender,
+                "birth_date": patient.birth_date.isoformat() if patient.birth_date else "",
+                "allergy_label": patient.allergy_label,
                 "pickup_code": _ensure_code(db, payment.encounter_id).code,
                 "queue_no": call.queue_no if call else "",
                 "call_status": call.status if call else "waiting",
@@ -741,7 +811,7 @@ def get_active_dispense_by_encounter(
         db.query(Dispense)
         .filter(
             Dispense.encounter_id == encounter_id,
-            Dispense.status == "dispensed",
+            Dispense.status.in_(("dispensed", "partially_returned")),
         )
         .first()
     )

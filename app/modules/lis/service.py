@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy import case
+from sqlalchemy import true, case
 from sqlalchemy.orm import Session
 
 from app.modules.charges.service import add_charge
 from app.modules.encounter.models import Encounter
-from app.modules.encounter.service import get_encounter
+from app.modules.encounter.service import get_medical_record, get_encounter
 from app.modules.patient.models import Patient
 from app.modules.registration.models import Registration
 from app.modules.staff.models import Doctor
@@ -77,8 +77,21 @@ def create_request(
     encounter = get_encounter(db, encounter_id)
     if not encounter:
         raise ValueError("就诊记录不存在")
+    existing = (
+        db.query(LabRequest)
+        .filter(
+            LabRequest.encounter_id == encounter.id,
+            LabRequest.item_id == data.item_id,
+            LabRequest.status.notin_(("cancelled", "rejected")),
+        )
+        .first()
+    )
+    if existing:
+        raise ValueError("该检验项目已开立，请勿重复开单")
     if encounter.status == "closed":
         raise ValueError("就诊已关闭，不能开检验申请")
+    if get_medical_record(db, encounter.id) and get_medical_record(db, encounter.id).signed_at:
+        raise ValueError("病历已签名，不能再开检验；请先申请病历修订")
     if encounter.status == "abandoned":
         raise ValueError("就诊已放弃，不能开检验申请")
 
@@ -137,7 +150,7 @@ def cancel_request(db: Session, request_id: int, operator: str = "") -> LabReque
         raise ValueError("该检验已收费，不能直接取消；请先按退费流程处理")
     request.status = "cancelled"
     for row in charges:
-        row.status = "refunded"
+        row.status = "cancelled"
     db.commit()
     db.refresh(request)
     return request
@@ -353,12 +366,15 @@ def worklist(
     paid_encounters = db.query(Payment.encounter_id).filter(
         Payment.status.in_(("paid", "partially_refunded"))
     )
+    history_only = status in ("reported", "reviewed", "rejected")
     query = (
         db.query(LabRequest, Patient)
         .join(Encounter, LabRequest.encounter_id == Encounter.id)
         .join(Registration, Encounter.registration_id == Registration.id)
         .join(Patient, Registration.patient_id == Patient.id)
-        .filter(LabRequest.encounter_id.in_(paid_encounters))
+        .filter(
+            true() if history_only else LabRequest.encounter_id.in_(paid_encounters)
+        )
     )
     if status:
         statuses = [item.strip() for item in status.split(",") if item.strip()]

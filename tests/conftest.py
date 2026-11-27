@@ -11,6 +11,8 @@ from pathlib import Path
 os.environ["HIS_INSURANCE_ENABLED"] = "1"
 # 旧用例在开方后直接发药；处方审方的阻断行为由专门用例显式打开
 os.environ["HIS_REQUIRE_PRESCRIPTION_REVIEW"] = "0"
+# 旧用例大量直接发药；取药码强校验由专门用例打开验证
+os.environ["HIS_PHARMACY_REQUIRE_PICKUP_CODE"] = "0"
 os.environ["HIS_PAYMENT_ALLOW_MOCK"] = "1"
 os.environ["HIS_INSURANCE_ALLOW_MOCK"] = "1"
 os.environ["HIS_SMS_ALLOW_MOCK"] = "1"

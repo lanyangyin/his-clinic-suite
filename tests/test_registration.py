@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 def make_patient(client, auth, id_number="110101199001011234"):
     return client.post(
         "/patients/", json={"name": "张三", "id_number": id_number}, headers=auth["cashier"]
@@ -80,7 +81,7 @@ def test_cancel_unvisited_registration_releases_slot(client, auth):
     ).json()
     schedule = client.post(
         "/schedules/",
-        json={"doctor_id": doctor["id"], "schedule_date": "2026-11-25", "period": "morning", "capacity": 1},
+        json={"doctor_id": doctor["id"], "schedule_date": str(date.today() + timedelta(days=7)), "period": "morning", "capacity": 1},
         headers=auth["admin"],
     ).json()
     reg = client.post(

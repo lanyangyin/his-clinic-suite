@@ -16,6 +16,7 @@
       "处方审方",
       "库房工作站",
       "库房审核工作站",
+      "采购到货",
       "护士工作站",
       "检验工作站",
       "影像工作站",
@@ -30,7 +31,7 @@
     ],
     "errors": [],
     "screenshot": "docs\\gui_tour\\admin.png",
-    "tab_count": 24
+    "tab_count": 25
   },
   {
     "role": "cashier",
@@ -77,11 +78,12 @@
       "通知中心",
       "库房工作站",
       "库房审核工作站",
+      "采购到货",
       "审批待办"
     ],
     "errors": [],
     "screenshot": "docs\\gui_tour\\warehouse.png",
-    "tab_count": 4
+    "tab_count": 5
   },
   {
     "role": "nurse",

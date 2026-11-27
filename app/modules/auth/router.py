@@ -5,9 +5,14 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 
-from .schemas import AuditLogResponse, NarcoticRightUpdate, UserCreate, UserResponse
+from .schemas import (
+    AuditLogResponse, NarcoticRightUpdate, PasswordReset, UserActiveUpdate,
+    UserCreate, UserResponse,
+)
 from .security import require_login, require_role
-from .service import create_user, get_user, list_recent_audit_logs
+from .service import (
+    create_user, get_user, list_recent_audit_logs, reset_password, set_user_active,
+)
 
 router = APIRouter(tags=["auth"], dependencies=[Depends(require_read_login)])
 
@@ -28,6 +33,44 @@ def new_user(
         raise HTTPException(status_code=403, detail="人事不能创建管理员/院长账号")
     try:
         return create_user(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/users/{user_id}/active", response_model=UserResponse)
+def change_user_active(
+    user_id: int,
+    data: UserActiveUpdate,
+    db: Session = Depends(get_db),
+    current=Depends(require_role("admin", "hr")),
+):
+    target = get_user(db, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if target.id == current.id and not data.active:
+        raise HTTPException(status_code=400, detail="不能停用当前登录账号")
+    if current.role == "hr" and target.role in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="人事不能停用管理员/院长账号")
+    try:
+        return set_user_active(db, user_id, data.active)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/users/{user_id}/reset-password", response_model=UserResponse)
+def reset_user_password(
+    user_id: int,
+    data: PasswordReset,
+    db: Session = Depends(get_db),
+    current=Depends(require_role("admin", "hr")),
+):
+    target = get_user(db, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if current.role == "hr" and target.role in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="人事不能重置管理员/院长密码")
+    try:
+        return reset_password(db, user_id, data.password)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -67,5 +110,8 @@ def set_narcotic_right(
 
 
 @router.get("/audit/logs", response_model=list[AuditLogResponse])
-def audit_logs(db: Session = Depends(get_db)):
+def audit_logs(
+    db: Session = Depends(get_db),
+    _user=Depends(require_role("admin", "director")),
+):
     return list_recent_audit_logs(db)

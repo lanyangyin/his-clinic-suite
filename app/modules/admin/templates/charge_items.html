@@ -46,7 +46,7 @@
       <td>{{ item.insurance_category }}</td>
       <td>{{ item.unit }}</td>
       <td>{{ '是' if item.active else '否' }}</td>
-      <td><form method="post" action="/admin/master/charge-items/{{ item.id }}/delete" onsubmit="return confirm('停用该收费项目？')"><button type="submit">停用</button></form></td>
+      <td>{% if item.active %}<form method="post" action="/admin/master/charge-items/{{ item.id }}/delete" onsubmit="return confirm('停用该收费项目？')"><button type="submit">停用</button></form>{% else %}<form method="post" action="/admin/master/charge-items/{{ item.id }}/enable"><button type="submit">启用</button></form>{% endif %}</td>
     </tr>
     {% else %}
     <tr><td colspan="11">暂无收费项目</td></tr>

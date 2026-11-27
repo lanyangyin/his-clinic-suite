@@ -155,9 +155,14 @@ def test_worklist_permissions(client, auth):
 
 def test_lab_worklist_urgent_before_routine(client, auth):
     patient, encounter, item, urgent = _encounter(client, auth, pay=False)
+    routine_item = client.post(
+        "/lab/items/",
+        json={"code": "WBC-ROUTINE", "name": "白细胞常规", "price": 15.0},
+        headers=auth["admin"],
+    ).json()
     routine = client.post(
         f"/lab/encounters/{encounter['id']}/lab-requests",
-        json={"item_id": item["id"], "priority": "routine"},
+        json={"item_id": routine_item["id"], "priority": "routine"},
         headers=auth["doctor"],
     ).json()
     paid = client.post(

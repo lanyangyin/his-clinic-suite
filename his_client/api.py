@@ -22,11 +22,21 @@ class ApiClient:
         password: str | None = None,
         session: requests.Session | None = None,
         timeout: int = 10,
+        profile: str = "",
+        client_version: str = "",
     ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.profile = profile
+        self.client_version = client_version
+        self.server_version = ""
         self.session = session or requests.Session()
         self.session.headers.update({"Accept": "application/json"})
+        if profile:
+            self.session.headers.update({
+                "X-Client-Profile": profile,
+                "X-Client-Version": client_version,
+            })
         if username is not None:
             self.set_credentials(username, password or "")
 
@@ -114,6 +124,14 @@ class ApiClient:
     def create_user(self, payload: dict) -> dict:
         return self._request("POST", "/users/", json=payload)
 
+    def set_user_active(self, user_id: int, active: bool) -> dict:
+        return self._request("PATCH", f"/users/{user_id}/active", json={"active": active})
+
+    def reset_user_password(self, user_id: int, password: str) -> dict:
+        return self._request(
+            "POST", f"/users/{user_id}/reset-password", json={"password": password}
+        )
+
     def list_employees(self, status: str | None = None) -> list:
         params = {"status": status} if status else None
         return self._request("GET", "/hr/employees/", params=params)
@@ -131,7 +149,9 @@ class ApiClient:
         return self._request("GET", f"/drugs/by-barcode/{barcode}")
 
     def list_schedules(self, doctor_id: int) -> list:
-        return self._request("GET", f"/doctors/{doctor_id}/schedules")
+        return self._request(
+            "GET", f"/doctors/{doctor_id}/schedules", params={"upcoming_only": "true"}
+        )
 
     def list_charge_items(self, category: str | None = None) -> list:
         params = {"category": category} if category else {}
@@ -315,6 +335,12 @@ class ApiClient:
                 "diagnosis": diagnosis,
                 "diagnosis_code": diagnosis_code,
             },
+        )
+
+    def complete_encounter(self, encounter_id: int, waive_pending: bool = False) -> dict:
+        return self._request(
+            "POST", f"/encounters/{encounter_id}/complete",
+            params={"waive_pending": waive_pending},
         )
 
     def abandon_encounter(self, encounter_id: int, reason: str = "") -> dict:
@@ -784,6 +810,9 @@ class ApiClient:
             f"/pacs/requests/{request_id}/review",
             json={"approve": approve, "note": note},
         )
+
+    def get_imaging_request(self, request_id: int) -> dict:
+        return self._request("GET", f"/pacs/requests/{request_id}")
 
     def list_imaging_requests(self, encounter_id: int) -> list:
         return self._request("GET", f"/pacs/encounters/{encounter_id}/imaging-requests")
@@ -1320,6 +1349,9 @@ class ApiClient:
 
     def resolve_prescription_barcode(self, code: str) -> dict:
         return self._request("GET", f"/encounters/by-barcode/{quote(code.strip())}")
+
+    def pending_payment_encounters(self) -> list:
+        return self._request("GET", "/payments/pending-encounters", params={"limit": 200})
 
     def get_charge_summary(self, encounter_id: int) -> dict:
         return self._request("GET", f"/charges/encounters/{encounter_id}/summary")

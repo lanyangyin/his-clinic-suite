@@ -278,9 +278,17 @@ def test_dispense_skips_expired_batch(client, auth):
         auth,
         drug["id"],
         "B000",
-        (date.today() - timedelta(days=1)).isoformat(),
+        (date.today() + timedelta(days=365)).isoformat(),
         quantity=999,
     ).json()
+    from conftest import TestingSessionLocal
+    from app.modules.pharmacy.models import DrugStock
+
+    db = TestingSessionLocal()
+    row = db.get(DrugStock, expired["id"])
+    row.expiry = date.today() - timedelta(days=1)
+    db.commit()
+    db.close()
     valid = stock_in(client, auth, drug["id"], "B001", "2027-06-30", quantity=10).json()
     r = client.post(
         "/pharmacy/dispense",

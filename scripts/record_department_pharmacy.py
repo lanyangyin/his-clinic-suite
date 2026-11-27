@@ -200,6 +200,7 @@ class PharmacyDemo(LoginMixin, QMainWindow):
             self.scene("错误码被拦截；重新选中患者并核对正确取药码")
             self.widget.worklist_table.selectRow(target)
             self.widget._select_worklist(target, 0)
+            self.widget.pickup_code.setText(code)
             self.click(disp, "核对取药码")
             assert "通过" in self.widget.disp_msg.text(), self.widget.disp_msg.text()
             self.scene("核对通过，填写取药人并选择签名")

@@ -23,6 +23,8 @@ class Dispense(Base):
     note: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
     receiver_name: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
     receiver_relation: Mapped[str] = mapped_column(String(20), default="本人", server_default="本人", nullable=False)
+    # 高危/麻精药品第二见证人（必须落库，不能只放内存）
+    witness: Mapped[str] = mapped_column(String(50), default="", server_default="", nullable=False)
     signature_path: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
     signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     items: Mapped[list["DispenseItem"]] = relationship(

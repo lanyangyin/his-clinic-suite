@@ -37,10 +37,12 @@ def _split_server(url: str) -> tuple[str, int, str]:
 
 
 class LoginDialog(QDialog):
-    def __init__(self, config: ClientConfig, parent=None):
+    def __init__(self, config: ClientConfig, parent=None, profile=None):
         super().__init__(parent)
         apply_widget_theme(self)
-        self.setWindowTitle("HIS 客户端登录")
+        self.profile = profile
+        title = f"{profile.title} 登录" if profile else "HIS 客户端登录"
+        self.setWindowTitle(title)
         self.setMinimumWidth(460)
         self.config = config
         self.api: ApiClient | None = None
@@ -203,7 +205,11 @@ class LoginDialog(QDialog):
         server = f"{self.scheme}://{host_part}:{port}"
 
         self.error_label.setText("正在连接服务器…")
-        client = ApiClient(server, username, password, timeout=self.config.timeout)
+        client = ApiClient(
+            server, username, password, timeout=self.config.timeout,
+            profile=getattr(self.profile, "key", ""),
+            client_version=getattr(self.profile, "version", ""),
+        )
         try:
             user = client.me()
         except ApiError as e:

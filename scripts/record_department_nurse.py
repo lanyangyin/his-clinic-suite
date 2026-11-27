@@ -219,7 +219,7 @@ class NurseDemo(LoginMixin, QMainWindow):
             self.click(nursing, "刷新执行单")
             target = -1
             for row in range(self.widget.nursing_table.rowCount()):
-                if self.widget.nursing_table.item(row, 0).text() == self.patient["name"]:
+                if self.widget.nursing_table.item(row, 1).text() == self.patient["name"]:
                     target = row
                     break
             assert target >= 0, "护理执行单没有本次患者"

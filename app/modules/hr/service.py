@@ -44,6 +44,11 @@ def resign(db: Session, employee_id: int, resign_date: date | None = None) -> Em
 
     employee.status = "resigned"
     employee.resigned_at = resign_date or date.today()
+    # 离职联动账号停用，避免离职人员继续登录
+    from app.modules.auth.models import User
+
+    for user in db.query(User).filter(User.employee_id == employee.id).all():
+        user.is_active = False
     db.commit()
     db.refresh(employee)
     return employee

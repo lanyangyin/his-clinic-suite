@@ -11,7 +11,7 @@
 - 后端 62 个业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
 - 843 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
-- **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client.zip` 是构建产物，不是两个项目
+- **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client-cashier-1.0.0.zip` 是构建产物，不是两个项目
 
 ```text
 his-clinic-suite/
@@ -179,11 +179,24 @@ uv run python -m his_client --auto-login
 
 ## 下载（整包）
 
-GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）：
+GitHub **Releases** 页面提供 14 个岗位客户端独立包（Windows）+ 服务端：
 
-- `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`（首次启动自动建库并创建 `admin/admin123`）
-- `his-client.zip`：客户端，解压 → 改 `config.ini` 服务器地址 → 双击 `his-client.exe`
-- `his-server-termux-1.3.16.tar.gz`：Termux 专用服务端最小源码包，约 450 KB，不含客户端/测试/视频
+- `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`
+- `his-client-cashier-1.0.0.zip`：收费/挂号客户端
+- `his-client-doctor-1.0.0.zip`：医生客户端
+- `his-client-pharmacy-1.0.0.zip`：药房客户端
+- `his-client-warehouse-1.0.0.zip`：库房客户端
+- `his-client-nurse-1.0.0.zip`：护士客户端
+- `his-client-lab-1.0.0.zip`：检验客户端
+- `his-client-radiology-1.0.0.zip`：影像客户端
+- `his-client-treatment-1.0.0.zip`：治疗室客户端
+- `his-client-surgery-1.0.0.zip`：手术室客户端
+- `his-client-archive-1.0.0.zip`：病案客户端
+- `his-client-director-1.0.0.zip`：院长客户端
+- `his-client-hr-1.0.0.zip`：人事客户端
+- `his-client-decoction-1.0.0.zip`：煎药室客户端
+- `his-client-admin-1.0.0.zip`：管理端客户端
+- `his-server-termux-2.0.0.tar.gz`：Termux 专用服务端最小源码包，约 450 KB
 
 源码与构建脚本都在本仓库；国家医保接口模板与公开资料来源见 [docs/医保接口模板.md](docs/医保接口模板.md)；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 
@@ -192,9 +205,9 @@ GitHub **Releases** 页面提供两个可直接运行的绿色包（Windows）�
 ```
 app/                后端（modules/ 下按业务模块组织四件套 models/schemas/service/router）
   modules/admin/    Web 管理台（Jinja2 模板）
-alembic/            Alembic 迁移（0001~0089）
+alembic/            Alembic 迁移（0001~0159，head 0159）
 his_client/         PySide6 客户端（api/config/ui）
-tests/              pytest（834 个用例）
+tests/              pytest（868 个用例）
 scripts/            初始化、演示、并发检查、打包、服务安装脚本
 docs/               部署手册、试用手册、界面截图
 config.ini          服务端配置（端口/密钥/数据库）

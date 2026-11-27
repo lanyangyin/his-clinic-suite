@@ -66,7 +66,9 @@ def test_cashier_shift_and_daily(client, auth):
     assert daily["channels"][0]["channel"] == "cash"
     assert daily["shifts"]
 
-    expected = round(100 + payment["amount"] - payment.get("refunded_amount", 0), 2)
+    expected = round(
+        100 + payment["self_pay_amount"] - payment.get("refunded_self_pay_amount", 0), 2
+    )
     closed = client.post(
         f"/cashier/shifts/{shift['id']}/close",
         json={

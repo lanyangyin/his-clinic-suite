@@ -224,12 +224,20 @@ class DoctorDemo(LoginMixin, QMainWindow):
             )
             self.encounter = encounters[0]
             assert self.encounter["id"]
+            # 在收费关闭就诊前先建病历，保证后续真实界面“载入病历→编辑→保存”可走通
+            self.doctor_api.call(
+                "POST", f"/encounters/{self.encounter['id']}/medical-record",
+                json={"chief_complaint": "待填写"},
+            )
 
             self.scene("接诊成功，医生站自动进入病历页；继续演示检验危急值联动", self.tab("病历"))
 
             lab_request = self.doctor_api.call(
                 "POST", f"/lab/encounters/{self.encounter['id']}/lab-requests",
                 json={"item_id": self.lab["id"]},
+            )
+            self.cashier.call(
+                "POST", "/payments/", json={"encounter_id": self.encounter["id"], "channel": "cash"}
             )
             for action in ("collect", "receive", "start"):
                 self.lab_api.call("POST", f"/lab/requests/{lab_request['id']}/{action}")
@@ -272,6 +280,14 @@ class DoctorDemo(LoginMixin, QMainWindow):
             assert ack.get("critical_ack_by"), ack
             self.scene("危急值已确认，继续病历书写与签名", self.tab("病历"))
             record_tab = self.tab("病历")
+            # 先建空病历，使真实界面走“载入已有病历 → 修改 → 保存/签名”路径
+            try:
+                self.doctor_api.call(
+                    "POST", f"/encounters/{self.encounter['id']}/medical-record",
+                    json={"chief_complaint": "待填写"},
+                )
+            except Exception:
+                pass
             self.widget.mr_encounter_id.setValue(self.encounter["id"])
             self.click(record_tab, "载入病历")
             self.widget.record_edits["chief_complaint"].setPlainText("发热咳嗽 2 天")

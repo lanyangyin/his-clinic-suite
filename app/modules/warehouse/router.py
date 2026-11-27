@@ -81,10 +81,10 @@ def get_stocks(drug_id: int | None = None, db: Session = Depends(get_db)):
 def transfer_stock(
     data: TransferCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_role("warehouse")),
+    user=Depends(require_role("warehouse")),
 ):
     try:
-        return transfer(db, data)
+        return transfer(db, data, user.username)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

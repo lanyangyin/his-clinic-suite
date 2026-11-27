@@ -18,6 +18,8 @@ class User(Base):
     doctor_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 麻醉/第一类精神药品处方权；管理员默认放行，普通医生需显式授予
     narcotic_right: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    # 账号是否启用；离职/停用后禁止登录
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
 
 
 class AuditLog(Base):

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.modules.billing.models import ChargeRefund, Payment, PaymentAllocation
+from app.modules.billing.models import ChargeRefund, Payment, PaymentAllocation, PaymentAllocation
 from app.modules.charges.models import EncounterCharge
 
 from .models import CashierShift
@@ -17,6 +17,7 @@ CHANNEL_LABELS = {
     "alipay": "支付宝",
     "pos": "POS",
     "insurance_card": "医保卡",
+    "mixed": "混合支付",
 }
 
 
@@ -59,7 +60,6 @@ def close_shift(db: Session, shift_id: int, cashier: str, data: ShiftClose) -> C
         db.query(Payment)
         .filter(
             Payment.created_by == cashier,
-            Payment.channel == "cash",
             Payment.created_at >= shift.opened_at,
             Payment.created_at <= now,
         )
@@ -75,7 +75,17 @@ def close_shift(db: Session, shift_id: int, cashier: str, data: ShiftClose) -> C
         )
         .all()
     )
-    cash_in = sum(payment.net_amount for payment in payments)
+    cash_in = 0.0
+    for payment in payments:
+        if payment.allocations:
+            cash_in += sum(
+                allocation.amount
+                for allocation in payment.allocations
+                if allocation.channel == "cash"
+            )
+        elif payment.channel == "cash":
+            cash_in += payment.net_self_pay_amount
+    cash_in = round(cash_in, 2)
     cash_out = sum(refund.amount for refund in refunds)
     expected = round(shift.opening_float + cash_in - cash_out, 2)
     shift.closed_at = now
@@ -136,7 +146,7 @@ def shift_channel_summary(db: Session, shift_id: int) -> dict:
                     {"channel": allocation.channel, "amount": 0.0, "refunded": 0.0, "count": 0},
                 )
                 row["amount"] = round(row["amount"] + allocation.amount, 2)
-                row["count"] += 0  # 笔数按支付头计，分渠道金额按分配
+                row["count"] += 1
         else:
             row = channels.setdefault(
                 payment.channel,
@@ -237,15 +247,18 @@ def daily(db: Session, day: date | None = None, cashier: str | None = None) -> d
     )
     total_amount = sum(payment.amount for payment in payments)
     total_insurance = sum(payment.insurance_amount for payment in payments)
+    total_discount = sum(payment.discount_amount for payment in payments)
     total_refunded = sum(payment.refunded_amount for payment in payments)
+    total_net_self_pay = sum(payment.net_self_pay_amount for payment in payments)
     return {
         "date": day,
         "payment_count": len(payments),
         "amount": round(total_amount, 2),
         "insurance": round(total_insurance, 2),
-        "self_pay": round(total_amount - total_insurance, 2),
+        "self_pay": round(total_net_self_pay, 2),
+        "discount": round(total_discount, 2),
         "refunded": round(total_refunded, 2),
-        "net": round(total_amount - total_refunded, 2),
+        "net": round(total_amount - total_discount - total_refunded, 2),
         "refund_count": len(refunds),
         "refund_amount": round(sum(row.amount for row in refunds), 2),
         "pending_amount": round(float(pending_amount), 2),

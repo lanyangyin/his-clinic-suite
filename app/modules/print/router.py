@@ -362,6 +362,9 @@ def render_receipt(data: dict) -> str:
 <p class="right">支付方式：{ {'cash':'现金','wechat':'微信支付','alipay':'支付宝','pos':'POS 刷卡','insurance_card':'医保卡','mixed':'混合支付'}.get(payment.channel, payment.channel) }</p>
 <p class="right">状态：{ {'paid':'已支付','partially_refunded':'部分退费','refunded':'已退费'}.get(payment.status, payment.status) }</p>
 <div class="divider"></div>
+<p class="center"><b>下一步指引</b></p>
+<p class="center">{data.get('next_step') or '请按导诊单前往相应科室'}</p>
+<div class="divider"></div>
 <p class="center">打印时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
 </body></html>"""
 
@@ -557,9 +560,23 @@ def print_receipt(payment_id: int, db: Session = Depends(get_db), user=Depends(r
                 "qty": charge.quantity,
                 "price": charge.unit_price,
                 "amount": charge.amount,
+                "type": charge.charge_type,
             }
         )
-    data = {"payment": payment, "patient": patient, "lines": lines}
+    types = {line.get("type") for line in lines}
+    steps = []
+    if "drug" in types:
+        steps.append("药房取药")
+    if "lab" in types:
+        steps.append("检验科采样/取报告")
+    if "imaging" in types:
+        steps.append("影像/检查科")
+    if "treatment" in types:
+        steps.append("治疗室")
+    data = {
+        "payment": payment, "patient": patient, "lines": lines,
+        "next_step": " → ".join(steps) if steps else "可直接离院",
+    }
     pickup = (
         db.query(PharmacyPickupCode)
         .filter(PharmacyPickupCode.encounter_id == encounter.id)

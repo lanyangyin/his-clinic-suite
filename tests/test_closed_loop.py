@@ -91,6 +91,6 @@ def test_full_loop_audit_logged(client, auth):
         headers=auth["cashier"],
     )
     assert patient.status_code == 201
-    logs = client.get("/audit/logs").json()
+    logs = client.get("/audit/logs", headers=auth["admin"]).json()
     entries = [(l["username"], l["role"], l["path"], l["status_code"]) for l in logs]
     assert ("cashier", "cashier", "/patients/", 201) in entries

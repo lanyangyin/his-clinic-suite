@@ -52,3 +52,11 @@ def test_download_client_redirects_to_github(client, monkeypatch):
     response = client.get("/download/client", follow_redirects=False)
     assert response.status_code == 307
     assert response.headers["location"] == url
+
+
+def test_profile_download_redirects_and_unknown_404(client):
+    response = client.get("/download/client/cashier", follow_redirects=False)
+    assert response.status_code == 307
+    assert "his-client-cashier-1.0.0.zip" in response.headers["location"]
+    missing = client.get("/download/client/not-a-profile", follow_redirects=False)
+    assert missing.status_code == 404

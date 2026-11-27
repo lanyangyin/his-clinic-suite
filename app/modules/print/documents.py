@@ -437,7 +437,7 @@ def render_imaging_report(data: dict, profile: dict | None = None) -> str:
 <tr><td>患者：{_value(data.get('patient_name'))}</td><td>报告号：{_value(data.get('report_no'))}</td></tr>
 <tr><td>就诊：{_value(data.get('encounter_id'))}</td><td>检查项目：{_value(data.get('item_name'))}</td></tr>
 <tr><td>检查部位：{_value(data.get('body_part'))}</td><td>诊断：{_value(data.get('diagnosis'))}</td></tr>
-<tr><td>医生：{_value(data.get('doctor_name'))}</td><td>状态：{_value(data.get('status'))}</td></tr>
+<tr><td>医生：{_value(data.get('doctor_name'))}</td><td>状态：{ {'pending':'待检查','reported':'已报告','reviewed':'已审核','rejected':'已退回'}.get(data.get('status'), data.get('status')) }</td></tr>
 </table>
 <div class="rule-thin"></div>
 <div class="section"><span class="section-title">检查所见</span><br>{escape(str(data.get('findings') or '—'))}</div>

@@ -39,6 +39,16 @@ def update_item(db: Session, item_id: int, data: ChargeItemCreate) -> ChargeItem
     return item
 
 
+def enable_item(db: Session, item_id: int) -> ChargeItem:
+    item = get_item(db, item_id)
+    if not item:
+        raise ValueError("收费项目不存在")
+    item.active = True
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def delete_item(db: Session, item_id: int) -> ChargeItem:
     item = get_item(db, item_id)
     if not item:

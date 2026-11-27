@@ -33,9 +33,12 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _check_update(api) -> None:
-    """最低版本检查：客户端过旧时提示，并打开配置的下载地址。"""
+def _check_update(api, profile=None) -> None:
+    """岗位客户端兼容检查：客户端过旧/过新时提示，并打开配置的下载地址。"""
     from his_client import CLIENT_VERSION
+    from his_client.profiles import detect_profile
+
+    profile = profile or detect_profile()
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QDesktopServices
     from PySide6.QtWidgets import QMessageBox
@@ -44,28 +47,37 @@ def _check_update(api) -> None:
         info = api.version()
     except Exception:
         return
-    minimum = str(info.get("client_min_version") or "")
-    if not minimum or _version_tuple(CLIENT_VERSION) >= _version_tuple(minimum):
+    server_clients = info.get("clients") or {}
+    spec = server_clients.get(profile.key) or {}
+    minimum = str(spec.get("min") or info.get("client_min_version") or "")
+    maximum = str(spec.get("max") or "")
+    current = profile.version or CLIENT_VERSION
+    if not minimum:
+        return
+    if _version_tuple(current) >= _version_tuple(minimum) and (
+        not maximum or _version_tuple(current) <= _version_tuple(maximum)
+    ):
         return
     box = QMessageBox()
     box.setWindowTitle("客户端需要升级")
     box.setIcon(QMessageBox.Warning)
     box.setText(
-        f"当前客户端版本 {CLIENT_VERSION}，服务器要求至少 {minimum}。\n"
-        "请下载新客户端后再使用。"
+        f"当前客户端：{profile.title} v{current}。\n"
+        f"服务器支持范围：{minimum} ~ {maximum or '最新'}。\n"
+        "请下载本岗位对应的新客户端后再使用。"
     )
     download = QMessageBox()
     open_button = box.addButton("打开下载页", QMessageBox.AcceptRole)
     box.addButton("稍后", QMessageBox.RejectRole)
     box.exec()
     if box.clickedButton() is open_button:
-        url = str(info.get("download_url") or "").strip()
+        url = str(spec.get("download_url") or info.get("download_url") or "").strip()
         if not url:
-            url = api.base_url.rstrip("/") + "/download/client"
+            url = api.base_url.rstrip("/") + f"/download/client/{profile.key}"
         QDesktopServices.openUrl(QUrl(url))
 
 
-def _open_main_window(app, api, user):
+def _open_main_window(app, api, user, profile=None):
     """显示加载提示后再构造主窗口，避免认证成功后出现空白/像闪退。"""
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QMessageBox, QProgressDialog
@@ -80,7 +92,7 @@ def _open_main_window(app, api, user):
     progress.show()
     app.processEvents()
     try:
-        return MainWindow(api, user)
+        return MainWindow(api, user, profile=profile)
     except Exception as exc:
         progress.close()
         QMessageBox.critical(None, "启动失败", f"加载工作站失败：{exc}")
@@ -98,13 +110,15 @@ def main() -> int:
         return _self_test()
 
     from PySide6.QtGui import QFont
-    from PySide6.QtWidgets import QApplication, QDialog
+    from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
     from his_client.config import load_config
+    from his_client.profiles import detect_profile
     from his_client.ui.login import LoginDialog
     from his_client.ui.main_window import MainWindow
 
     app = QApplication(sys.argv)
+    profile = detect_profile()
     app.setFont(QFont("Microsoft YaHei", 10))
     from his_client.ui.window_theme import install_light_titlebars
     from his_client.ui.table_policy import install_readonly_table_policy
@@ -114,19 +128,28 @@ def main() -> int:
     if "--auto-login" in sys.argv:
         pair = _auto_login()
         if pair:
-            _check_update(pair[0])
-            window = _open_main_window(app, pair[0], pair[1])
+            _check_update(pair[0], profile)
+            if profile.roles and pair[1].get("role") not in profile.roles:
+                QMessageBox.critical(None, "岗位不匹配", "当前账号不能使用此岗位客户端。")
+                return 1
+            window = _open_main_window(app, pair[0], pair[1], profile)
             if window is None:
                 return 1
             window.show()
             return app.exec()
 
-    dialog = LoginDialog(load_config())
+    dialog = LoginDialog(load_config(), profile=profile)
     if dialog.exec() != QDialog.Accepted or not dialog.api or not dialog.user:
         return 0
-    _check_update(dialog.api)
+    _check_update(dialog.api, profile)
+    if profile.roles and dialog.user.get("role") not in profile.roles:
+        QMessageBox.critical(
+            None, "岗位不匹配",
+            f"当前账号是 {dialog.user.get('role')}，不能使用 {profile.title}。",
+        )
+        return 1
 
-    window = _open_main_window(app, dialog.api, dialog.user)
+    window = _open_main_window(app, dialog.api, dialog.user, profile)
     if window is None:
         return 1
     window.show()
@@ -148,7 +171,10 @@ def _self_test() -> int:
     from his_client.ui.pharmacy import PharmacyWidget
 
     app = QApplication(sys.argv)
-    dialog = LoginDialog(load_config())
+    from his_client.profiles import CLIENT_PROFILES
+
+    profile = CLIENT_PROFILES["universal"]
+    dialog = LoginDialog(load_config(), profile=profile)
     client = ApiClient("http://127.0.0.1:1")
     widgets = [
         CashierWidget(client),
@@ -163,8 +189,9 @@ def _self_test() -> int:
     )
     print(
         "SELF-TEST OK",
-        f"version={CLIENT_VERSION}",
+        f"version={profile.version}",
         f"login={dialog.windowTitle()}",
+        f"profile={profile.key}",
         f"tabs={window.tabs.count()}",
         f"widgets={len(widgets)}",
     )

@@ -5,7 +5,10 @@ from app.database import get_db
 from app.modules.auth.security import require_read_login, require_role
 
 from .schemas import BillingSummary, PaymentCreate, PaymentResponse, RefundRequest
-from .service import create_payment, get_payment, get_summary, list_payments, refund_payment
+from .service import (
+    create_payment, get_payment, get_summary, list_payments,
+    list_pending_encounters, refund_payment,
+)
 from .models import RefundApproval
 
 router = APIRouter(prefix="/payments", tags=["payments"], dependencies=[Depends(require_read_login)])
@@ -33,6 +36,15 @@ def get_all(
     db: Session = Depends(get_db),
 ):
     return list_payments(db, status, encounter_id)
+
+
+@router.get("/pending-encounters")
+def pending_encounters(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _=Depends(require_role("cashier", "doctor", "admin")),
+):
+    return list_pending_encounters(db, max(1, min(limit, 500)))
 
 
 @router.get("/summary", response_model=BillingSummary)

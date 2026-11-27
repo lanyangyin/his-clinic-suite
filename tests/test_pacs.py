@@ -158,9 +158,11 @@ def test_list_requests(client, auth):
 
 def test_accession_numbers_unique(client, auth):
     encounter = make_encounter(client, auth)
-    item = make_item(client, auth).json()
     accessions = set()
-    for _ in range(3):
+    for index in range(3):
+        item = make_item(
+            client, auth, code=f"ACC{index}", name=f"检查{index}"
+        ).json()
         body = client.post(
             f"/pacs/encounters/{encounter['id']}/imaging-requests",
             json={"item_id": item["id"]},
@@ -293,6 +295,7 @@ def test_imaging_report_template(client, auth):
 def test_imaging_worklist_urgent_first(client, auth):
     encounter = make_encounter(client, auth)
     item = make_item(client, auth).json()
+    urgent_item = make_item(client, auth, code="CXR-URGENT", name="胸部急诊").json()
     routine = client.post(
         f"/pacs/encounters/{encounter['id']}/imaging-requests",
         json={"item_id": item["id"], "priority": "routine"},
@@ -300,7 +303,7 @@ def test_imaging_worklist_urgent_first(client, auth):
     ).json()
     urgent = client.post(
         f"/pacs/encounters/{encounter['id']}/imaging-requests",
-        json={"item_id": item["id"], "priority": "urgent"},
+        json={"item_id": urgent_item["id"], "priority": "urgent"},
         headers=auth["doctor"],
     ).json()
     assert urgent["priority"] == "urgent"

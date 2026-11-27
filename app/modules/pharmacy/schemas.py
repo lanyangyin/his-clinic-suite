@@ -139,5 +139,5 @@ class DispenseReturnItem(BaseModel):
 
 
 class DispenseReturnRequest(BaseModel):
-    items: list[DispenseReturnItem]
+    items: list[DispenseReturnItem] = Field(min_length=1)
     reason: str = ""
