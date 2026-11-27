@@ -25,28 +25,14 @@ def test_auth_me(client, auth):
     assert bad.status_code == 401
 
 
-def test_download_client_without_package(client, monkeypatch):
+def test_download_client_redirects_to_clients_release(client, monkeypatch):
     monkeypatch.setattr(settings, "CLIENT_DOWNLOAD_URL", "")
-    monkeypatch.setattr(download_module, "CLIENT_ZIP", Path("missing-client-package.zip"))
-    r = client.get("/download/client")
-    assert r.status_code == 404
-    assert "客户端安装包尚未生成" in r.json()["detail"]
+    r = client.get("/download/client", follow_redirects=False)
+    assert r.status_code == 307
+    assert "clients-v1.0.1" in r.headers["location"]
 
 
-def test_download_client_with_package(client, monkeypatch):
-    monkeypatch.setattr(settings, "CLIENT_DOWNLOAD_URL", "")
-    path = Path("tmp_fake_client.zip")
-    try:
-        path.write_bytes(b"PK\x05\x06" + b"\x00" * 18)
-        monkeypatch.setattr(download_module, "CLIENT_ZIP", path)
-        r = client.get("/download/client")
-        assert r.status_code == 200
-        assert r.headers["content-type"] == "application/zip"
-    finally:
-        path.unlink(missing_ok=True)
-
-
-def test_download_client_redirects_to_github(client, monkeypatch):
+def test_download_client_config_override(client, monkeypatch):
     url = "https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/his-client.zip"
     monkeypatch.setattr(settings, "CLIENT_DOWNLOAD_URL", url)
     response = client.get("/download/client", follow_redirects=False)

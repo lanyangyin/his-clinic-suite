@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 
 from app import settings
 from app.client_compat import CLIENT_COMPATIBILITY, check_client
+from app.version import CLIENT_RELEASE_TAG
 from app.settings import CLIENT_ZIP_PATH
 from app.version import API_VERSION, APP_NAME, APP_VERSION, CLIENT_MIN_VERSION
 
@@ -26,8 +27,8 @@ def version():
             key: {
                 **spec,
                 "download_url": (
-                    f"https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/"
-                    f"his-client-{key}-{spec['recommended']}.zip"
+                    f"https://github.com/lanyangyin/his-clinic-suite/releases/download/"
+                    f"{CLIENT_RELEASE_TAG}/his-client-{key}-{spec['recommended']}.zip"
                 ),
             }
             for key, spec in CLIENT_COMPATIBILITY.items()
@@ -47,8 +48,8 @@ def download_profile_client(profile: str):
         raise HTTPException(status_code=404, detail="未知客户端岗位")
     version = spec["recommended"]
     url = (
-        f"https://github.com/lanyangyin/his-clinic-suite/releases/latest/download/"
-        f"his-client-{profile}-{version}.zip"
+        f"https://github.com/lanyangyin/his-clinic-suite/releases/download/"
+        f"{CLIENT_RELEASE_TAG}/his-client-{profile}-{version}.zip"
     )
     return RedirectResponse(url, status_code=307)
 
@@ -59,6 +60,11 @@ def download_client():
     url = str(getattr(settings, "CLIENT_DOWNLOAD_URL", "") or "").strip()
     if url:
         return RedirectResponse(url, status_code=307)
+    # 兼容旧入口：引导到客户端独立 Release 页面
+    return RedirectResponse(
+        f"https://github.com/lanyangyin/his-clinic-suite/releases/tag/{CLIENT_RELEASE_TAG}",
+        status_code=307,
+    )
     if not CLIENT_ZIP.exists():
         raise HTTPException(
             status_code=404,
