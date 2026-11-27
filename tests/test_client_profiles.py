@@ -51,6 +51,11 @@ def test_compatibility_matrix(client):
         "/client/compatibility", params={"profile": "cashier", "version": "0.9.0"}
     )
     assert old.json()["supported"] is False
+    newest = client.get(
+        "/client/compatibility", params={"profile": "cashier", "version": "1.0.2"}
+    )
+    assert newest.json()["supported"] is False
+    assert newest.json()["max"] == "1.0.1"
     unknown = client.get(
         "/client/compatibility", params={"profile": "unknown", "version": "1.0.1"}
     )
