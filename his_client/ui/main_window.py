@@ -1,5 +1,9 @@
 """主窗口：独立客户端只构建本岗位页签；通用客户端保留按角色显示。"""
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox, QFrame, QHBoxLayout, QLabel, QMainWindow, QScrollArea,
+    QVBoxLayout, QWidget,
+)
 
 from his_client.api import ApiClient
 from his_client.labels import zh
@@ -155,8 +159,12 @@ class MainWindow(QMainWindow):
                 _placeholder(f"当前岗位「{zh('role', role)}」不能使用此客户端"), "提示"
             )
         self.tabs = self.sidebar
+        central = QWidget()
+        central.setObjectName("scrollContent")
+        # 给内容画布一个最小工作尺寸：窗口再小也不压扁输入框/表格，
+        # 由外层 QScrollArea 提供上下滚动条。
+        central.setMinimumSize(960, 720)
         if self.sidebar.count() > 12:
-            central = QWidget()
             outer = QVBoxLayout(central)
             outer.setContentsMargins(8, 6, 8, 0)
             nav_row = QHBoxLayout()
@@ -171,9 +179,20 @@ class MainWindow(QMainWindow):
             outer.addLayout(nav_row)
             self.sidebar.tabBar().hide()
             outer.addWidget(self.sidebar, 1)
-            self.setCentralWidget(central)
         else:
-            self.setCentralWidget(self.sidebar)
+            outer = QVBoxLayout(central)
+            outer.setContentsMargins(0, 0, 0, 0)
+            outer.addWidget(self.sidebar)
+        scroll = QScrollArea()
+        scroll.setObjectName("mainScroll")
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setWidget(central)
+        self.scroll_area = scroll
+        self.setCentralWidget(scroll)
         self.sidebar.ensure_current()
 
         name = user.get("display_name") or user.get("username")

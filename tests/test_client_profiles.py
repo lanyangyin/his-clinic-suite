@@ -118,3 +118,27 @@ def test_admin_client_releases_page(client, auth):
     assert response.status_code == 200
     assert "客户端版本与下载" in response.text
     assert "cashier" in response.text and "管理端客户端" in response.text
+
+
+def test_main_window_has_vertical_scroll_when_small():
+    from PySide6.QtWidgets import QApplication
+
+    from his_client.api import ApiClient
+    from his_client.profiles import CLIENT_PROFILES
+    from his_client.ui.main_window import MainWindow
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(
+        ApiClient("http://127.0.0.1:1"),
+        {"username": "cashier", "role": "cashier", "display_name": "收费"},
+        profile=CLIENT_PROFILES["cashier"],
+    )
+    window.resize(1000, 640)
+    window.show()
+    app.processEvents()
+    assert window.scroll_area.widget().minimumHeight() >= 720
+    assert window.scroll_area.verticalScrollBar().maximum() > 0
+    assert window.scroll_area.horizontalScrollBar().maximum() == 0
+    window.close()
+    window.deleteLater()
+    app.processEvents()
