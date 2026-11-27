@@ -11,7 +11,7 @@
 - 后端 62 个业务模块，覆盖门诊、住院、药房、检验、影像、收费、医保、报表、人事等
 - 843 个 pytest 用例，Windows 与 Ubuntu 24.04 均全量通过
 - 服务端/客户端均可打包为"绿色包"，拷目录即用，无需安装 Python
-- **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client-cashier-1.0.0.zip` 是构建产物，不是两个项目
+- **一个 GitHub 仓库**：`app/` 是服务端，`his_client/` 是桌面客户端；Release 中的 `his-server.zip` / `his-client-cashier-1.0.1.zip` 是构建产物，不是两个项目
 
 ```text
 his-clinic-suite/
@@ -179,24 +179,27 @@ uv run python -m his_client --auto-login
 
 ## 下载（整包）
 
-GitHub **Releases** 页面提供 14 个岗位客户端独立包（Windows）+ 服务端：
+服务端 Release：[server-v2.0.1](https://github.com/lanyangyin/his-clinic-suite/releases/tag/server-v2.0.1)  
+客户端 Release：[clients-v1.0.1](https://github.com/lanyangyin/his-clinic-suite/releases/tag/clients-v1.0.1)
+
+服务端 Release 的说明里写明支持的客户端版本范围；14 个岗位客户端独立包（Windows）：
 
 - `his-server.zip`：服务端，解压 → 改 `config.ini` → 双击 `his-server.exe`
-- `his-client-cashier-1.0.0.zip`：收费/挂号客户端
-- `his-client-doctor-1.0.0.zip`：医生客户端
-- `his-client-pharmacy-1.0.0.zip`：药房客户端
-- `his-client-warehouse-1.0.0.zip`：库房客户端
-- `his-client-nurse-1.0.0.zip`：护士客户端
-- `his-client-lab-1.0.0.zip`：检验客户端
-- `his-client-radiology-1.0.0.zip`：影像客户端
-- `his-client-treatment-1.0.0.zip`：治疗室客户端
-- `his-client-surgery-1.0.0.zip`：手术室客户端
-- `his-client-archive-1.0.0.zip`：病案客户端
-- `his-client-director-1.0.0.zip`：院长客户端
-- `his-client-hr-1.0.0.zip`：人事客户端
-- `his-client-decoction-1.0.0.zip`：煎药室客户端
-- `his-client-admin-1.0.0.zip`：管理端客户端
-- `his-server-termux-2.0.0.tar.gz`：Termux 专用服务端最小源码包，约 450 KB
+- `his-client-cashier-1.0.1.zip`：收费/挂号客户端
+- `his-client-doctor-1.0.1.zip`：医生客户端
+- `his-client-pharmacy-1.0.1.zip`：药房客户端
+- `his-client-warehouse-1.0.1.zip`：库房客户端
+- `his-client-nurse-1.0.1.zip`：护士客户端
+- `his-client-lab-1.0.1.zip`：检验客户端
+- `his-client-radiology-1.0.1.zip`：影像客户端
+- `his-client-treatment-1.0.1.zip`：治疗室客户端
+- `his-client-surgery-1.0.1.zip`：手术室客户端
+- `his-client-archive-1.0.1.zip`：病案客户端
+- `his-client-director-1.0.1.zip`：院长客户端
+- `his-client-hr-1.0.1.zip`：人事客户端
+- `his-client-decoction-1.0.1.zip`：煎药室客户端
+- `his-client-admin-1.0.1.zip`：管理端客户端
+- `his-server-termux-2.0.1.tar.gz`：Termux 专用服务端最小源码包，约 450 KB
 
 源码与构建脚本都在本仓库；国家医保接口模板与公开资料来源见 [docs/医保接口模板.md](docs/医保接口模板.md)；数据库 `his.db` 属于运行数据，不入库（用 `seed_demo.py` 可重建演示数据）。
 
@@ -205,7 +208,7 @@ GitHub **Releases** 页面提供 14 个岗位客户端独立包（Windows）+ �
 ```
 app/                后端（modules/ 下按业务模块组织四件套 models/schemas/service/router）
   modules/admin/    Web 管理台（Jinja2 模板）
-alembic/            Alembic 迁移（0001~0159，head 0159）
+alembic/            Alembic 迁移（0001~0160，head 0160）
 his_client/         PySide6 客户端（api/config/ui）
 tests/              pytest（868 个用例）
 scripts/            初始化、演示、并发检查、打包、服务安装脚本
@@ -216,7 +219,7 @@ config.ini          服务端配置（端口/密钥/数据库）
 ## 验证与演示
 
 ```powershell
-uv run pytest                                  # 869 passed
+uv run pytest                                  # 870 passed
 uv run python scripts/demo.py                  # 50 步业务断言
 uv run python scripts/check_client_flow.py     # 客户端全流程 18 项
 uv run python scripts/check_concurrency.py     # 并发抢号验证
