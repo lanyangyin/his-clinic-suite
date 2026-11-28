@@ -30,9 +30,9 @@ def test_versions_are_independent():
     from app.version import APP_VERSION
     from his_client import CLIENT_VERSION
 
-    assert APP_VERSION == "2.0.1"
-    assert CLIENT_VERSION == "1.0.1"
-    assert all(profile.version == "1.0.1" for profile in CLIENT_PROFILES.values())
+    assert APP_VERSION == "2.0.2"
+    assert CLIENT_VERSION == "1.0.2"
+    assert all(profile.version == "1.0.2" for profile in CLIENT_PROFILES.values())
     assert set(CLIENT_COMPATIBILITY) == set(CLIENT_PROFILES)
 
 
@@ -40,10 +40,10 @@ def test_compatibility_matrix(client):
     response = client.get("/version")
     assert response.status_code == 200
     body = response.json()
-    assert body["server_version"] == "2.0.1"
+    assert body["server_version"] == "2.0.2"
     assert body["clients"]["cashier"]["min"] == "1.0.0"
     ok = client.get(
-        "/client/compatibility", params={"profile": "cashier", "version": "1.0.1"}
+        "/client/compatibility", params={"profile": "cashier", "version": "1.0.2"}
     )
     assert ok.status_code == 200
     assert ok.json()["supported"] is True
@@ -52,12 +52,12 @@ def test_compatibility_matrix(client):
     )
     assert old.json()["supported"] is False
     newest = client.get(
-        "/client/compatibility", params={"profile": "cashier", "version": "1.0.2"}
+        "/client/compatibility", params={"profile": "cashier", "version": "1.0.3"}
     )
     assert newest.json()["supported"] is False
-    assert newest.json()["max"] == "1.0.1"
+    assert newest.json()["max"] == "1.0.2"
     unknown = client.get(
-        "/client/compatibility", params={"profile": "unknown", "version": "1.0.1"}
+        "/client/compatibility", params={"profile": "unknown", "version": "1.0.2"}
     )
     assert unknown.json()["supported"] is False
 

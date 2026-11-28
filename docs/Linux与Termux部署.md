@@ -8,7 +8,7 @@
 
 ## 结论
 
-- 当前版本 2.0.1：Linux 用源码 + Python 3.12；Termux 用 2.0.1 最小服务端包；Windows 客户端用 2.0.1。
+- 当前版本 2.0.2：Linux 用源码 + Python 3.12；Termux 用 2.0.2 最小服务端包；Windows 客户端用 2.0.2。
 - Termux + Ubuntu：可以，适合小门诊/演示/备用；proot 免 root，chroot 需要 root。
 - 服务端不需要 PySide6；源码/备份可放 `/sdcard`；数据库优先内部，sdcard 模式需 DELETE 日志。
 - Termux 只提供服务端，没有 Android 客户端包；桌面客户端在 Windows 上运行。
