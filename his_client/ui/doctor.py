@@ -3625,6 +3625,8 @@ class DoctorWidget(QWidget):
         self.exam_rows = []
         try:
             for request in self.api.list_lab_requests(encounter_id):
+                if request.get("status") in ("cancelled", "dc"):
+                    continue
                 self.exam_rows.append({"kind": "lab", "id": request.get("id")})
                 rows.append(
                     (
@@ -3640,6 +3642,8 @@ class DoctorWidget(QWidget):
                     )
                 )
             for request in self.api.list_imaging_requests(encounter_id):
+                if request.get("status") in ("cancelled", "dc"):
+                    continue
                 self.exam_rows.append({"kind": "imaging", "id": request.get("id")})
                 rows.append(
                     (

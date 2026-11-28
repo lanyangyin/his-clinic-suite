@@ -400,6 +400,8 @@ def worklist(
         statuses = [item.strip() for item in status.split(",") if item.strip()]
         if statuses:
             query = query.filter(LabRequest.status.in_(statuses))
+    else:
+        query = query.filter(LabRequest.status.notin_(("cancelled", "dc")))
     if priority:
         query = query.filter(LabRequest.priority == priority)
     rows = query.order_by(

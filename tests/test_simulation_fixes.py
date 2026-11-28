@@ -433,3 +433,21 @@ def test_inactive_lab_item_hidden_from_doctor_and_blocked(client, auth):
     )
     assert blocked.status_code == 400
     assert "停用" in blocked.json()["detail"]
+
+
+def test_cancelled_or_dc_exams_leave_worklist(client, auth):
+    _patient, _doctor, _registration, encounter = _encounter(client, auth, "取消队列")
+    lab_item = client.post(
+        "/lab/items/", json={"code": "CANCELQ", "name": "取消队列检验", "price": 10},
+        headers=auth["admin"],
+    ).json()
+    lab = client.post(
+        f"/lab/encounters/{encounter['id']}/lab-requests",
+        json={"item_id": lab_item["id"]}, headers=auth["doctor"],
+    ).json()
+    client.post("/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"])
+    stopped = client.post(f"/lab/requests/{lab['id']}/cancel", headers=auth["doctor"])
+    assert stopped.status_code == 200, stopped.text
+    assert stopped.json()["status"] == "dc"
+    rows = client.get("/lab/worklist", headers=auth["lab"]).json()
+    assert all(row["id"] != lab["id"] for row in rows)

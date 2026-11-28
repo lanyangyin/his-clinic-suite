@@ -264,6 +264,8 @@ def list_worklist(db: Session, status: str = "pending", priority: str | None = N
         query = query.filter(ImagingRequest.id.in_(paid_requests))
     if status:
         query = query.filter(ImagingRequest.status == status)
+    else:
+        query = query.filter(ImagingRequest.status.notin_(("cancelled", "dc")))
     if priority:
         query = query.filter(ImagingRequest.priority == priority)
     rows = query.order_by(
