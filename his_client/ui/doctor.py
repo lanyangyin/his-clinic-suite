@@ -2897,7 +2897,7 @@ class DoctorWidget(QWidget):
         top.addWidget(suggest_drug)
         layout.addLayout(top)
 
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Horizontal)
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 16, 0)
@@ -2962,7 +2962,7 @@ class DoctorWidget(QWidget):
         splitter.addWidget(common)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([500, 280, 190])
+        splitter.setSizes([620, 420, 210])
         layout.addWidget(splitter, 1)
 
         rx_tabs = QTabWidget()
