@@ -1,5 +1,5 @@
 """门诊工作站：叫号接诊、结构化病历、开方（含用法）、检验检查开单、治疗开单。"""
-from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
+from PySide6.QtCore import QEvent, QSettings, Qt, QTimer, QUrl
 from datetime import date, datetime
 from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QRadioButton,
     QButtonGroup,
@@ -2067,11 +2069,12 @@ class DoctorWidget(QWidget):
             edit.setPlaceholderText(placeholders.get(key, f"填写{label}"))
             if key == "chief_complaint":
                 edit.setPlaceholderText("用一句话概括，如：发热咳嗽 2 天")
-                edit.setMinimumHeight(44)
-                edit.setMaximumHeight(52)
                 edit.setTabChangesFocus(True)
-            else:
-                edit.setMinimumHeight(72 if key != "treatment_advice" else 80)
+            edit.setMinimumHeight(34)
+            edit.setMaximumHeight(64 if key == "chief_complaint" else 140)
+            edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            edit.installEventFilter(self)
+            edit.textChanged.connect(lambda e=edit: self._fit_record_edit(e))
             self.record_edits[key] = edit
             box_layout.addWidget(edit)
             row, col = positions[key]
@@ -2081,6 +2084,9 @@ class DoctorWidget(QWidget):
                 grid.addWidget(box, row, col)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
+        body = QHBoxLayout()
+        body.addLayout(grid, 1)
+        body.addWidget(self._build_record_template_sidebar())
 
         diagnosis_box = QGroupBox("诊断（病史、查体后填写；结果未回可先记“待查”）")
         diagnosis_layout = QVBoxLayout(diagnosis_box)
@@ -2103,7 +2109,7 @@ class DoctorWidget(QWidget):
         diag_actions.addStretch(1)
         diagnosis_layout.addLayout(diag_actions)
         grid.addWidget(diagnosis_box, 4, 0, 1, 2)
-        layout.addLayout(grid, 1)
+        layout.addLayout(body, 1)
 
         buttons = QHBoxLayout()
         self.record_save = QPushButton("保存 / 更新")
@@ -2130,6 +2136,144 @@ class DoctorWidget(QWidget):
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll.setWidget(page)
         return scroll
+
+    def _build_record_template_sidebar(self) -> QWidget:
+        box = QGroupBox("字段模板")
+        box.setMaximumWidth(230)
+        layout = QVBoxLayout(box)
+        self.record_template_field = QLabel("点击左侧字段后套用")
+        self.record_template_field.setWordWrap(True)
+        self.record_template_field.setStyleSheet("color:#64748b")
+        layout.addWidget(self.record_template_field)
+        self.record_template_list = QListWidget()
+        self.record_template_list.setMaximumWidth(220)
+        layout.addWidget(self.record_template_list, 1)
+        apply = QPushButton("套用选中模板")
+        apply.clicked.connect(self._apply_sidebar_template)
+        add = QPushButton("新增当前字段模板")
+        add.clicked.connect(self._add_sidebar_template)
+        delete = QPushButton("删除选中模板")
+        delete.clicked.connect(self._delete_sidebar_template)
+        for button in (apply, add, delete):
+            layout.addWidget(button)
+        self.record_template_buttons = (apply, add, delete)
+        self.record_template_field_key = "chief_complaint"
+        self._refresh_sidebar_templates()
+        return box
+
+    def _template_settings(self) -> QSettings:
+        path = str(getattr(self.config, "ui_state_path", "") or "")
+        if path:
+            return QSettings(path, QSettings.IniFormat)
+        return QSettings("HIS", "doctor_templates")
+
+    @staticmethod
+    def _record_field_title(key: str) -> str:
+        return {item[0]: item[1] for item in _RECORD_FIELDS}.get(key, key)
+
+    @staticmethod
+    def _default_field_templates(key: str) -> list[str]:
+        defaults = {
+            "chief_complaint": ["发热咳嗽 2 天", "头晕 1 周", "腹痛 1 天", "复诊取药"],
+            "present_illness": [
+                "受凉后出现发热，最高 38.3℃，伴咳嗽、咽痛，无胸闷气促。",
+                "高血压病史，近期家庭自测血压偏高，伴轻度头晕。",
+            ],
+            "physical_exam": [
+                "T 36.8℃，P 80 次/分，R 20 次/分，BP 120/76 mmHg；心肺腹查体未见明显异常。",
+                "咽充血，双肺呼吸音清，未闻及干湿啰音。",
+            ],
+            "treatment_advice": [
+                "1. 对症治疗；2. 多饮水、休息；3. 如症状加重及时复诊。",
+                "1. 规律服药；2. 监测血压；3. 两周后复诊。",
+            ],
+        }
+        return defaults.get(key, [])
+
+    def _field_templates(self, key: str) -> list[str]:
+        raw = self._template_settings().value(f"templates/{key}", "")
+        if raw:
+            try:
+                import json
+                values = json.loads(str(raw))
+                if isinstance(values, list):
+                    return [str(item) for item in values if str(item).strip()]
+            except (ValueError, TypeError):
+                pass
+        return self._default_field_templates(key)
+
+    def _save_field_templates(self, key: str, values: list[str]) -> None:
+        import json
+        settings = self._template_settings()
+        settings.setValue(f"templates/{key}", json.dumps(values, ensure_ascii=False))
+        settings.sync()
+
+    def _refresh_sidebar_templates(self) -> None:
+        if not hasattr(self, "record_template_list"):
+            return
+        key = getattr(self, "record_template_field_key", "chief_complaint")
+        self.record_template_field.setText(f"当前字段：{self._record_field_title(key)}")
+        self.record_template_list.clear()
+        for text in self._field_templates(key):
+            self.record_template_list.addItem(text.replace("\n", " ")[:80])
+
+    def _fit_record_edit(self, edit: QTextEdit) -> None:
+        key = next((k for k, value in getattr(self, "record_edits", {}).items() if value is edit), "")
+        limit = 64 if key == "chief_complaint" else 140
+        height = int(edit.document().size().height()) + 14
+        target = max(34, min(height, limit))
+        edit.setFixedHeight(target)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.FocusIn:
+            for key, edit in getattr(self, "record_edits", {}).items():
+                if watched is edit:
+                    self.record_template_field_key = key
+                    self._refresh_sidebar_templates()
+                    break
+        return super().eventFilter(watched, event)
+
+    def _apply_sidebar_template(self) -> None:
+        if getattr(self, "_record_editable", True) is False:
+            self.record_msg.setText("病历当前只读，不能套用模板")
+            return
+        item = self.record_template_list.currentItem()
+        if not item:
+            self.record_msg.setText("请选择一个字段模板")
+            return
+        key = getattr(self, "record_template_field_key", "chief_complaint")
+        edit = self.record_edits.get(key)
+        if edit is None:
+            return
+        edit.setPlainText(item.text())
+        self.record_msg.setText(f"已套用{self._record_field_title(key)}模板")
+
+    def _add_sidebar_template(self) -> None:
+        if getattr(self, "_record_editable", True) is False:
+            self.record_msg.setText("病历当前只读，不能新增模板")
+            return
+        key = getattr(self, "record_template_field_key", "chief_complaint")
+        text, ok = QInputDialog.getMultiLineText(
+            self, "新增字段模板", f"{self._record_field_title(key)}模板："
+        )
+        if not ok or not text.strip():
+            return
+        values = self._field_templates(key)
+        values.insert(0, text.strip())
+        self._save_field_templates(key, values[:30])
+        self._refresh_sidebar_templates()
+
+    def _delete_sidebar_template(self) -> None:
+        if getattr(self, "_record_editable", True) is False:
+            self.record_msg.setText("病历当前只读，不能删除模板")
+            return
+        item = self.record_template_list.currentItem()
+        if not item:
+            return
+        key = getattr(self, "record_template_field_key", "chief_complaint")
+        values = [value for value in self._field_templates(key) if value[:80] != item.text()]
+        self._save_field_templates(key, values)
+        self._refresh_sidebar_templates()
 
     @staticmethod
     def _encounter_label() -> QLabel:
@@ -2804,9 +2948,21 @@ class DoctorWidget(QWidget):
         self.rx_msg.setWordWrap(True)
         right_layout.addWidget(self.rx_msg)
         splitter.addWidget(right)
+        common = QGroupBox("常用药")
+        common.setMaximumWidth(210)
+        common_layout = QVBoxLayout(common)
+        self.common_drug_list = QListWidget()
+        self.common_drug_list.itemDoubleClicked.connect(
+            lambda item: self._quick_add_drug(int(item.data(Qt.UserRole)))
+        )
+        common_layout.addWidget(self.common_drug_list, 1)
+        common_add = QPushButton("加入选中常用药")
+        common_add.clicked.connect(self._add_common_drug)
+        common_layout.addWidget(common_add)
+        splitter.addWidget(common)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
-        splitter.setSizes([560, 300])
+        splitter.setSizes([500, 280, 190])
         layout.addWidget(splitter, 1)
 
         rx_tabs = QTabWidget()
@@ -3252,6 +3408,12 @@ class DoctorWidget(QWidget):
         filters = " / ".join(
             part for part in (term, form) if part
         )
+        if hasattr(self, "common_drug_list"):
+            self.common_drug_list.clear()
+            for drug in rows[:20]:
+                item = QListWidgetItem(f"{drug['name']}  ¥{drug.get('base_price', 0):.2f}")
+                item.setData(Qt.UserRole, drug["id"])
+                self.common_drug_list.addItem(item)
         self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{filters}）" if filters else ""))
 
     def _load_tcm_herbs(self) -> None:
@@ -3479,6 +3641,13 @@ class DoctorWidget(QWidget):
             )
             for col, value in enumerate(values):
                 table.setItem(row, col, QTableWidgetItem(value))
+
+    def _add_common_drug(self) -> None:
+        item = self.common_drug_list.currentItem() if hasattr(self, "common_drug_list") else None
+        if not item:
+            self.rx_msg.setText("请选择一条常用药")
+            return
+        self._quick_add_drug(int(item.data(Qt.UserRole)))
 
     def _refresh_prescriptions(self) -> None:
         try:

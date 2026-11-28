@@ -936,8 +936,10 @@ def stop_prescription(
         raise ValueError("处方不存在")
     if row.status == "pending_review":
         row.status = "cancelled"
-    elif row.status in ("approved", "dispensing"):
+    elif row.status == "approved":
         row.status = "dc"
+    elif row.status == "dispensing":
+        raise ValueError("处方已开始调配，不能DC；请按退药/退费流程处理")
     else:
         raise ValueError("当前处方状态不能停止")
     row.updated_at = datetime.now()
