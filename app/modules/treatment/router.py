@@ -10,6 +10,7 @@ from .service import (
     create_treatment,
     execute_treatment,
     get_treatment,
+    start_treatment,
     list_all_treatments,
     list_treatments,
 )
@@ -53,6 +54,18 @@ def get_one(order_id: int, db: Session = Depends(get_db)):
     if not order:
         raise HTTPException(status_code=404, detail="治疗单不存在")
     return order
+
+
+@router.post("/{order_id}/start", response_model=TreatmentOrderResponse)
+def start(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("nurse")),
+):
+    try:
+        return start_treatment(db, order_id, started_by=user.username)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{order_id}/execute", response_model=TreatmentOrderResponse)

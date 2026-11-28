@@ -144,7 +144,7 @@ def test_treatment_pending_list():
     client = ApiClient("http://x", "nurse", "pw", session=session)
     client.list_pending_treatments()
     assert session.calls[0][1] == "http://x/treatments/"
-    assert session.calls[0][2]["params"] == {"status": "pending"}
+    assert session.calls[0][2]["params"] == {"status": "pending,executing"}
 
     work = _work_dir()
     try:

@@ -62,3 +62,34 @@ DC 的正确含义是“停止医嘱/停嘱”，不是“删除医嘱”，也�
 - 检查：`POST /pacs/requests/{id}/cancel`
 - 处方：`POST /encounters/{encounter_id}/prescriptions/{prescription_id}/stop`
 - 治疗：`POST /treatments/{id}/cancel`
+
+
+## 四、开始执行时状态必须变化
+
+现实医院不是“点了执行就直接从未执行变已完成”，而是至少：
+
+```text
+待执行 → 执行中/已开始 → 已完成
+```
+
+并记录：
+
+- 开始执行时间；
+- 开始执行人；
+- 结束时间；
+- 执行人；
+- 频次/次数（长期医嘱）。
+
+本系统对应：
+
+- 输液护理：`pending → prepared → executing → completed`；
+- 治疗室处置：`waiting → in_progress → completed`；
+- 护士站治疗单：`pending → executing → done`（本次补上）；
+- 开始执行写入 `started_by/started_at`，完成写入 `executed_by/executed_at`；
+- 执行中不能 DC，也不能重复开始。
+
+### 已执行/执行中与 DC
+
+- 未执行：可作废或停止；
+- 执行中：不能撤回成未发生，只能停止后续/记录异常；
+- 已完成：不能 DC，只能退药/退费/退治并保留执行记录。

@@ -834,10 +834,13 @@ class ApiClient:
         )
 
     def list_pending_treatments(self) -> list:
-        return self._request("GET", "/treatments/", params={"status": "pending"})
+        return self._request("GET", "/treatments/", params={"status": "pending,executing"})
 
     def list_treatments(self, encounter_id: int) -> list:
         return self._request("GET", f"/treatments/encounters/{encounter_id}")
+
+    def start_treatment(self, order_id: int) -> dict:
+        return self._request("POST", f"/treatments/{order_id}/start")
 
     def execute_treatment(self, order_id: int) -> dict:
         return self._request("POST", f"/treatments/{order_id}/execute")

@@ -84,6 +84,7 @@ LABELS: dict[str, dict[str, str]] = {
     },
     "treatment_status": {
         "pending": "待执行",
+        "executing": "执行中",
         "executed": "已执行",
         "done": "已执行",
         "cancelled": "已取消",

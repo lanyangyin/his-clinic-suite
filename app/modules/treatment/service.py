@@ -91,8 +91,10 @@ def list_all_treatments(
     from app.modules.charges.models import EncounterCharge
 
     query = db.query(TreatmentOrder)
-    if status is not None:
-        query = query.filter(TreatmentOrder.status == status)
+    if status:
+        statuses = [item.strip() for item in status.split(",") if item.strip()]
+        if statuses:
+            query = query.filter(TreatmentOrder.status.in_(statuses))
     rows = query.order_by(TreatmentOrder.id.desc()).all()
     paid_ids = {
         row.source_id
@@ -109,12 +111,36 @@ def list_all_treatments(
     return rows
 
 
+def start_treatment(db: Session, order_id: int, started_by: str) -> TreatmentOrder:
+    """护士开始治疗：pending → executing，记录开始时间和执行人。"""
+    order = get_treatment(db, order_id)
+    if not order:
+        raise ValueError("治疗单不存在")
+    if order.status != "pending":
+        raise ValueError("只有待执行治疗可以开始")
+    from app.modules.charges.models import EncounterCharge
+
+    paid = db.query(EncounterCharge).filter(
+        EncounterCharge.source_type == "treatment",
+        EncounterCharge.source_id == order.id,
+        EncounterCharge.status.in_(("paid", "partially_refunded")),
+    ).first()
+    if not paid:
+        raise ValueError("该治疗项目尚未收费，不能开始治疗")
+    order.status = "executing"
+    order.started_by = started_by
+    order.started_at = datetime.now()
+    db.commit()
+    db.refresh(order)
+    return order
+
+
 def execute_treatment(db: Session, order_id: int, executed_by: str) -> TreatmentOrder:
     """护士执行治疗：pending → done（原子状态机，并发只生效一次）。"""
     order = get_treatment(db, order_id)
     if not order:
         raise ValueError("治疗单不存在")
-    if order.status != "pending":
+    if order.status not in ("pending", "executing"):
         raise ValueError("该治疗单已执行或已取消")
     from app.modules.charges.models import EncounterCharge
 
@@ -128,10 +154,12 @@ def execute_treatment(db: Session, order_id: int, executed_by: str) -> Treatment
 
     affected = (
         db.query(TreatmentOrder)
-        .filter(TreatmentOrder.id == order_id, TreatmentOrder.status == "pending")
+        .filter(TreatmentOrder.id == order_id, TreatmentOrder.status.in_(("pending", "executing")))
         .update(
             {
                 TreatmentOrder.status: "done",
+                TreatmentOrder.started_by: order.started_by or executed_by,
+                TreatmentOrder.started_at: order.started_at or datetime.now(),
                 TreatmentOrder.executed_by: executed_by,
                 TreatmentOrder.executed_at: datetime.now(),
             },

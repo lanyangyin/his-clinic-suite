@@ -216,3 +216,20 @@ def test_paid_treatment_cannot_be_cancelled_without_refund(client, auth):
     charge = next(c for c in charges if c["charge_type"] == "treatment")
     assert charge["status"] == "paid"
     assert charge["status"] == "paid"
+
+
+def test_treatment_start_marks_executing_then_complete(client, auth):
+    _patient, _doctor, _reg, encounter, item = make_setup(client, auth)
+    order = client.post(
+        f"/treatments/encounters/{encounter['id']}", json={"item_id": item["id"]},
+        headers=auth["doctor"],
+    ).json()
+    client.post("/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"])
+    started = client.post(f"/treatments/{order['id']}/start", headers=auth["nurse"])
+    assert started.status_code == 200, started.text
+    assert started.json()["status"] == "executing"
+    assert started.json()["started_at"]
+    done = client.post(f"/treatments/{order['id']}/execute", headers=auth["nurse"])
+    assert done.status_code == 200, done.text
+    assert done.json()["status"] == "done"
+    assert done.json()["started_at"] and done.json()["executed_at"]

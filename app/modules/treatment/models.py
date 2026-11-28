@@ -20,11 +20,13 @@ class TreatmentOrder(Base):
     item_name: Mapped[str] = mapped_column(String(100), nullable=False)
     quantity: Mapped[int] = mapped_column(default=1, nullable=False)
     note: Mapped[str] = mapped_column(String(200), default="", nullable=False)
-    # pending 待执行 / done 已执行 / cancelled 已取消
+    # pending 待执行 / executing 执行中 / done 已执行 / cancelled 已取消 / dc 停止
     status: Mapped[str] = mapped_column(String(10), default="pending", nullable=False)
     ordered_by: Mapped[str] = mapped_column(String(50), default="", nullable=False)
     ordered_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, nullable=False
     )
+    started_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     executed_by: Mapped[str | None] = mapped_column(String(50), nullable=True)
     executed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -19,6 +19,8 @@ class TreatmentOrderResponse(BaseModel):
     status: str
     ordered_by: str
     ordered_at: datetime
+    started_by: str | None = None
+    started_at: datetime | None = None
     executed_by: str | None
     executed_at: datetime | None
     paid: bool = True

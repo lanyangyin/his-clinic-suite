@@ -341,9 +341,12 @@ class NurseWidget(QWidget):
         row = QHBoxLayout()
         refresh = QPushButton("刷新待执行治疗")
         refresh.clicked.connect(self._load_pending_treatments)
-        execute = QPushButton("执行选中治疗")
+        start = QPushButton("开始执行")
+        start.clicked.connect(self._start_treatment)
+        execute = QPushButton("完成治疗")
         execute.clicked.connect(self._execute_treatment)
         row.addWidget(refresh)
+        row.addWidget(start)
         row.addWidget(execute)
         row.addStretch(1)
         layout.addLayout(row)
@@ -378,6 +381,23 @@ class NurseWidget(QWidget):
             self.treat_table.setItem(row, 4, QTableWidgetItem(zh('treatment_status', order["status"])))
         self.treat_msg.setText(f"待执行治疗单 {len(orders)} 条")
 
+    def _start_treatment(self) -> None:
+        row = self.treat_table.currentRow()
+        if row < 0:
+            self.treat_msg.setText("请先选中一条治疗单")
+            return
+        order_id = int(self.treat_table.item(row, 0).text())
+        try:
+            order = self.api.start_treatment(order_id)
+        except ApiError as e:
+            self.treat_msg.setText(f"开始执行失败（{e.status_code}）：{e.detail}")
+            return
+        self._load_pending_treatments()
+        self.treat_msg.setText(
+            f"已开始：{order['item_name']}（执行人 {order.get('started_by') or '—'}，"
+            f"开始时间 {str(order.get('started_at') or '')[:19]}）"
+        )
+
     def _execute_treatment(self) -> None:
         row = self.treat_table.currentRow()
         if row < 0:
@@ -391,7 +411,8 @@ class NurseWidget(QWidget):
             return
         self._load_pending_treatments()
         self.treat_msg.setText(
-            f"已执行：{order['item_name']}（执行人 {order.get('executed_by') or '—'}）"
+            f"已完成：{order['item_name']}（执行人 {order.get('executed_by') or '—'}，"
+            f"完成时间 {str(order.get('executed_at') or '')[:19]}）"
         )
 
 
