@@ -57,6 +57,7 @@ except ImportError:  # 未安装拼音依赖时退化为药名/规格搜索
     Style = None
     lazy_pinyin = None
 from his_client.ui.adverse_reaction_dialog import AdverseReactionDialog
+from his_client.ui.pagination import PaginationBar
 from his_client.ui.patient_info_panel import PatientInfoPanel
 from his_client.ui.patient_clinical_dialog import PatientClinicalDialog
 from his_client.ui.diagnosis_editor import DiagnosisDialog, DiagnosisEditor
@@ -2918,6 +2919,10 @@ class DoctorWidget(QWidget):
         self.drug_table.cellClicked.connect(self._catalog_clicked)
         self.drug_table.cellDoubleClicked.connect(self._catalog_double_clicked)
         left_layout.addWidget(self.drug_table, 1)
+        self.drug_pager = PaginationBar((20, 50, 100, 200))
+        self.drug_pager.pageChanged.connect(lambda _page: self._render_drug_page())
+        self.drug_pager.pageSizeChanged.connect(lambda _size: self._render_drug_page())
+        left_layout.addWidget(self.drug_pager)
         splitter.addWidget(left)
 
         right = QWidget()
@@ -3385,6 +3390,25 @@ class DoctorWidget(QWidget):
                 return not any(key in text for key in ("注射", "口服", "片", "胶囊", "颗粒", "丸", "外用", "膏", "贴", "滴眼"))
 
             rows = [drug for drug in rows if matches(drug)]
+        self.drug_filtered_rows = rows
+        if hasattr(self, "common_drug_list"):
+            self.common_drug_list.clear()
+            for drug in rows[:20]:
+                item = QListWidgetItem(f"{drug['name']}  ¥{float(drug.get('base_price') or 0):.2f}")
+                item.setData(Qt.UserRole, drug["id"])
+                self.common_drug_list.addItem(item)
+        if hasattr(self, "drug_pager"):
+            self.drug_pager.set_page(1)
+            self.drug_pager.set_total(len(rows))
+        self._render_drug_page(term=term, form=form)
+
+    def _render_drug_page(self, term: str | None = None, form: str | None = None) -> None:
+        rows = getattr(self, "drug_filtered_rows", [])
+        if hasattr(self, "drug_pager"):
+            size = self.drug_pager.page_size()
+            page = self.drug_pager.page()
+            start = (page - 1) * size
+            rows = rows[start:start + size]
         self.drug_table.setRowCount(len(rows))
         for row, drug in enumerate(rows):
             category = drug.get("insurance_category") or ""
@@ -3405,16 +3429,15 @@ class DoctorWidget(QWidget):
                 if col == 4 and drug.get("stock", 0) <= 0:
                     cell.setForeground(Qt.red)
                 self.drug_table.setItem(row, col, cell)
-        filters = " / ".join(
-            part for part in (term, form) if part
+        if term is None:
+            term = self.rx_search.text().strip().lower() if hasattr(self, "rx_search") else ""
+        if form is None:
+            form = self.rx_form_filter.currentData() if hasattr(self, "rx_form_filter") else ""
+        filters = " / ".join(part for part in (term, form) if part)
+        self.rx_msg.setText(
+            f"药品 {len(getattr(self, 'drug_filtered_rows', []))} 种"
+            + (f"（筛选：{filters}）" if filters else "")
         )
-        if hasattr(self, "common_drug_list"):
-            self.common_drug_list.clear()
-            for drug in rows[:20]:
-                item = QListWidgetItem(f"{drug['name']}  ¥{float(drug.get('base_price') or 0):.2f}")
-                item.setData(Qt.UserRole, drug["id"])
-                self.common_drug_list.addItem(item)
-        self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{filters}）" if filters else ""))
 
     def _load_tcm_herbs(self) -> None:
         try:

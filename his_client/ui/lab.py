@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from his_client.api import ApiClient, ApiError
 from his_client.ui.theme import apply_theme
+from his_client.ui.pagination import PaginationBar
 from his_client.ui.table_policy import set_column_layout
 from his_client.ui.print_preview import open_print_preview
 from his_client.labels import zh
@@ -81,6 +82,10 @@ class LabWidget(QWidget):
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.addWidget(self.table, 1)
+        self.pager = PaginationBar((20, 50, 100, 200))
+        self.pager.pageChanged.connect(lambda _page: self._render_page())
+        self.pager.pageSizeChanged.connect(lambda _size: self._render_page())
+        left_layout.addWidget(self.pager)
         splitter.addWidget(left)
         right = QWidget()
         right_layout = QVBoxLayout(right)
@@ -190,8 +195,16 @@ class LabWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"加载失败（{e.status_code}）：{e.detail}")
             return
-        self.table.setRowCount(len(self.rows))
-        for row, item in enumerate(self.rows):
+        self.pager.set_page(1)
+        self.pager.set_total(len(self.rows))
+        self._render_page()
+
+    def _render_page(self) -> None:
+        size = self.pager.page_size()
+        start = (self.pager.page() - 1) * size
+        self.page_rows = self.rows[start:start + size]
+        self.table.setRowCount(len(self.page_rows))
+        for row, item in enumerate(self.page_rows):
             values = [
                 str(item["id"]),
                 item.get("specimen_no") or "—",
@@ -204,11 +217,11 @@ class LabWidget(QWidget):
             ]
             for col, value in enumerate(values):
                 self.table.setItem(row, col, QTableWidgetItem(value))
-        self.msg.setText(f"共 {len(self.rows)} 条检验申请")
+        self.msg.setText(f"共 {len(self.rows)} 条检验申请，当前第 {self.pager.page()} 页")
 
     def _select_row(self, row: int, _col: int) -> None:
-        if 0 <= row < len(self.rows):
-            self.current = self.rows[row]
+        if 0 <= row < len(getattr(self, "page_rows", [])):
+            self.current = self.page_rows[row]
             self.msg.setText(
                 f"申请 {self.current['id']} · 标本 {self.current.get('specimen_no') or '—'} "
                 f"· {zh('lab_status', self.current['status'])}"

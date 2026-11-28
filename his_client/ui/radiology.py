@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 
 from his_client.api import ApiClient, ApiError
+from his_client.ui.pagination import PaginationBar
 from his_client.ui.print_preview import open_print_preview
 from his_client.ui.theme import apply_theme
 
@@ -59,7 +60,15 @@ class RadiologyWidget(QWidget):
         )
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.cellClicked.connect(self._select)
-        splitter.addWidget(self.table)
+        table_page = QWidget()
+        table_layout = QVBoxLayout(table_page)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.addWidget(self.table, 1)
+        self.pager = PaginationBar((20, 50, 100, 200))
+        self.pager.pageChanged.connect(lambda _page: self._render_page())
+        self.pager.pageSizeChanged.connect(lambda _size: self._render_page())
+        table_layout.addWidget(self.pager)
+        splitter.addWidget(table_page)
         detail = QWidget()
         dl = QVBoxLayout(detail)
         self.info = QLabel("请选择一条检查申请")
@@ -141,8 +150,16 @@ class RadiologyWidget(QWidget):
         except ApiError as e:
             self.msg.setText(f"加载失败：{e.detail}")
             return
-        self.table.setRowCount(len(self.rows))
-        for i, item in enumerate(self.rows):
+        self.pager.set_page(1)
+        self.pager.set_total(len(self.rows))
+        self._render_page()
+
+    def _render_page(self) -> None:
+        size = self.pager.page_size()
+        start = (self.pager.page() - 1) * size
+        self.page_rows = self.rows[start:start + size]
+        self.table.setRowCount(len(self.page_rows))
+        for i, item in enumerate(self.page_rows):
             values = [
                 item.get("accession_no") or "",
                 f"{item.get('patient_name') or ''} {item.get('patient_no') or ''}",
@@ -165,12 +182,12 @@ class RadiologyWidget(QWidget):
         self.msg.setText(f"{label} {len(self.rows)} 条")
 
     def _select(self, row: int, _col: int) -> None:
-        if 0 <= row < len(self.rows):
-            item = self.rows[row]
+        if 0 <= row < len(getattr(self, "page_rows", [])):
+            item = getattr(self, "page_rows", [])[row]
             try:
                 detail = self.api.get_imaging_request(item["id"])
                 item = {**item, **{k: v for k, v in detail.items() if v is not None}}
-                self.rows[row] = item
+                getattr(self, "page_rows", [])[row] = item
             except ApiError:
                 pass
             self.info.setText(
@@ -186,10 +203,10 @@ class RadiologyWidget(QWidget):
 
     def _print_report(self) -> None:
         row = self.table.currentRow()
-        if not 0 <= row < len(self.rows):
+        if not 0 <= row < len(getattr(self, "page_rows", [])):
             self.msg.setText("请先选择检查申请")
             return
-        item = self.rows[row]
+        item = getattr(self, "page_rows", [])[row]
         if item.get("status") not in ("reported", "reviewed"):
             self.msg.setText("只有已报告/已审核的检查可以打印")
             return
@@ -209,7 +226,7 @@ class RadiologyWidget(QWidget):
 
     def _submit(self) -> None:
         row = self.table.currentRow()
-        if not 0 <= row < len(self.rows):
+        if not 0 <= row < len(getattr(self, "page_rows", [])):
             self.msg.setText("请先选择检查申请")
             return
         text = self.report.toPlainText().strip()
@@ -218,7 +235,7 @@ class RadiologyWidget(QWidget):
             return
         try:
             self.api.report_imaging(
-                self.rows[row]["id"],
+                getattr(self, "page_rows", [])[row]["id"],
                 text,
                 self.image_url.text().strip(),
                 self.impression.toPlainText().strip(),
@@ -242,10 +259,10 @@ class RadiologyWidget(QWidget):
 
     def _review(self, approve: bool) -> None:
         row = self.table.currentRow()
-        if not 0 <= row < len(self.rows):
+        if not 0 <= row < len(getattr(self, "page_rows", [])):
             self.msg.setText("请先选择检查申请")
             return
-        item = self.rows[row]
+        item = getattr(self, "page_rows", [])[row]
         if item.get("status") != "reported":
             self.msg.setText("只有已报告检查可以审核")
             return
