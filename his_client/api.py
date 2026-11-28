@@ -64,6 +64,9 @@ class ApiClient:
                 pass
             raise ApiError(response.status_code, detail)
 
+        # 204 / 空响应没有 JSON 内容；删除类接口大量使用 204，不能直接 json()
+        if response.status_code == 204 or not response.content:
+            return None
         if response.headers.get("content-type", "").startswith("application/json"):
             return response.json()
         return response.text

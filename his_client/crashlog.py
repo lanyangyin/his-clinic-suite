@@ -39,6 +39,19 @@ def install_crash_logging() -> Path:
     def hook(exc_type, exc_value, exc_tb):
         traceback.print_exception(exc_type, exc_value, exc_tb, file=stream)
         stream.flush()
+        try:
+            from PySide6.QtCore import QThread
+            from PySide6.QtWidgets import QApplication, QMessageBox
+
+            app = QApplication.instance()
+            if app is not None and QThread.currentThread() == app.thread():
+                QMessageBox.critical(
+                    None,
+                    "程序错误",
+                    f"操作失败，已写入日志：\n{path}\n\n{exc_type.__name__}: {exc_value}",
+                )
+        except Exception:  # noqa: BLE001
+            pass
         sys.__excepthook__(exc_type, exc_value, exc_tb)
 
     sys.excepthook = hook

@@ -11,21 +11,21 @@ CLIENT_TITLES = {
 }
 
 CLIENT_COMPATIBILITY = {
-    "cashier": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "doctor": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "pharmacy": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "warehouse": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "nurse": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "lab": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "radiology": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "treatment": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "surgery": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "archive": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "director": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "hr": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "decoction": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "admin": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
-    "universal": {"min": "1.0.0", "max": "1.0.2", "recommended": "1.0.2"},
+    "cashier": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "doctor": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "pharmacy": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "warehouse": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "nurse": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "lab": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "radiology": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "treatment": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "surgery": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "archive": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "director": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "hr": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "decoction": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "admin": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
+    "universal": {"min": "1.0.0", "max": "1.0.3", "recommended": "1.0.3"},
 }
 
 

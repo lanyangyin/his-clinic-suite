@@ -14,6 +14,7 @@ class FakeResponse:
         self._payload = payload
         self.headers = {"content-type": content_type}
         self.reason = "Bad Request"
+        self.content = b"" if status_code == 204 or payload is None else b"{}"
 
     def json(self):
         if self._payload is None:
@@ -316,3 +317,9 @@ def test_national_insurance_client_methods():
     assert client.national_insurance_transactions(7)[0]["infno"] == "2206"
     assert session.calls[1][1] == "http://x/insurance/national/pre-settle/7"
     assert session.calls[2][2]["json"] == {"setl_id": "SETL1"}
+
+
+def test_204_delete_returns_none_without_json_decode_error():
+    session = FakeSession([FakeResponse(204)])
+    client = ApiClient("http://x", "doctor", "pw", session=session)
+    assert client.delete_prescription(1, 2) is None

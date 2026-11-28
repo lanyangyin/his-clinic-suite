@@ -3394,9 +3394,9 @@ class DoctorWidget(QWidget):
                 str(drug["id"]),
                 drug["name"],
                 drug.get("spec") or "",
-                f"{drug['base_price']:.2f}",
+                f"{float(drug.get('base_price') or 0):.2f}",
                 str(drug.get("stock", 0)),
-                f"{drug.get('self_pay', drug['base_price']):.2f}",
+                f"{float(drug.get('self_pay', drug.get('base_price')) or 0):.2f}",
                 str(drug["insurance_ratio"]),
                 tag,
             ]
@@ -3411,7 +3411,7 @@ class DoctorWidget(QWidget):
         if hasattr(self, "common_drug_list"):
             self.common_drug_list.clear()
             for drug in rows[:20]:
-                item = QListWidgetItem(f"{drug['name']}  ¥{drug.get('base_price', 0):.2f}")
+                item = QListWidgetItem(f"{drug['name']}  ¥{float(drug.get('base_price') or 0):.2f}")
                 item.setData(Qt.UserRole, drug["id"])
                 self.common_drug_list.addItem(item)
         self.rx_msg.setText(f"药品 {len(rows)} 种" + (f"（筛选：{filters}）" if filters else ""))

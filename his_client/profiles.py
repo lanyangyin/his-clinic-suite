@@ -25,58 +25,58 @@ class ClientProfile:
 CLIENT_PROFILES: dict[str, ClientProfile] = {
     "cashier": ClientProfile(
         "cashier", "HIS 收费挂号客户端", ("cashier", "admin"),
-        ("cashier",), "1.0.2", "建档、挂号、收费、退费、发票、交班日结",
+        ("cashier",), "1.0.3", "建档、挂号、收费、退费、发票、交班日结",
     ),
     "doctor": ClientProfile(
         "doctor", "HIS 医生工作站客户端", ("doctor", "admin"),
-        ("doctor", "patient360", "tcm_doctor"), "1.0.2", "接诊、病历、诊断、开方、检验检查治疗、复诊",
+        ("doctor", "patient360", "tcm_doctor"), "1.0.3", "接诊、病历、诊断、开方、检验检查治疗、复诊",
     ),
     "pharmacy": ClientProfile(
         "pharmacy", "HIS 药房客户端", ("pharmacist", "admin"),
         ("pharmacy", "pharmacy_review", "rx_review", "narcotic", "tcm_pharmacy", "approval_inbox", "notifications"),
-        "1.0.2", "审方、发药、退药、麻精、中药房/煎药",
+        "1.0.3", "审方、发药、退药、麻精、中药房/煎药",
     ),
     "warehouse": ClientProfile(
         "warehouse", "HIS 库房客户端", ("warehouse", "admin"),
         ("warehouse", "warehouse_review", "purchase", "approval_inbox", "notifications"),
-        "1.0.2", "入库、出库、总库、效期、采购到货",
+        "1.0.3", "入库、出库、总库、效期、采购到货",
     ),
     "nurse": ClientProfile(
         "nurse", "HIS 护士站客户端", ("nurse", "admin"),
-        ("nurse",), "1.0.2", "分诊叫号、配药、执行、巡视、完成",
+        ("nurse",), "1.0.3", "分诊叫号、配药、执行、巡视、完成",
     ),
     "lab": ClientProfile(
         "lab", "HIS 检验科客户端", ("lab", "admin"),
-        ("lab",), "1.0.2", "采样、签收、报告、审核、危急值",
+        ("lab",), "1.0.3", "采样、签收、报告、审核、危急值",
     ),
     "radiology": ClientProfile(
         "radiology", "HIS 影像科客户端", ("radiology", "admin"),
-        ("radiology",), "1.0.2", "检查登记、报告、审核",
+        ("radiology",), "1.0.3", "检查登记、报告、审核",
     ),
     "treatment": ClientProfile(
         "treatment", "HIS 治疗室客户端", ("treatment", "admin"),
-        ("treatment",), "1.0.2", "处置、知情同意、耗材、随访",
+        ("treatment",), "1.0.3", "处置、知情同意、耗材、随访",
     ),
     "surgery": ClientProfile(
         "surgery", "HIS 手术室客户端", ("surgery", "anesthesia", "surgery_nurse", "admin"),
-        ("surgery",), "1.0.2", "手术排程、三方核查、麻醉/护理",
+        ("surgery",), "1.0.3", "手术排程、三方核查、麻醉/护理",
     ),
     "archive": ClientProfile(
         "archive", "HIS 病案档案客户端", ("archive", "admin"),
-        ("archive",), "1.0.2", "病案归档、借阅、复印、封存",
+        ("archive",), "1.0.3", "病案归档、借阅、复印、封存",
     ),
     "director": ClientProfile(
         "director", "HIS 院长审批客户端", ("director", "admin"),
         ("director", "audit", "narcotic", "treatment_review", "approval_inbox", "notifications"),
-        "1.0.2", "审批、审计、麻精、治疗项目审批",
+        "1.0.3", "审批、审计、麻精、治疗项目审批",
     ),
     "hr": ClientProfile(
         "hr", "HIS 人事客户端", ("hr", "admin"),
-        ("hr", "approval_inbox", "notifications"), "1.0.2", "员工档案、入职离职、账号",
+        ("hr", "approval_inbox", "notifications"), "1.0.3", "员工档案、入职离职、账号",
     ),
     "decoction": ClientProfile(
         "decoction", "HIS 煎药室客户端", ("decoction", "admin"),
-        ("tcm_decoction",), "1.0.2", "中药煎药、发药",
+        ("tcm_decoction",), "1.0.3", "中药煎药、发药",
     ),
     "admin": ClientProfile(
         "admin", "HIS 管理端客户端", ("admin",),
@@ -84,10 +84,10 @@ CLIENT_PROFILES: dict[str, ClientProfile] = {
          "doctor", "patient360", "pharmacy", "pharmacy_review", "rx_review", "warehouse",
          "warehouse_review", "purchase", "nurse", "lab", "radiology", "surgery", "archive",
          "narcotic", "audit", "director", "treatment_review", "tcm_admin", "treatment"),
-        "1.0.2", "全功能管理端",
+        "1.0.3", "全功能管理端",
     ),
     "universal": ClientProfile(
-        "universal", "HIS 门诊部客户端", (), tuple(), "1.0.2", "源码开发用通用客户端",
+        "universal", "HIS 门诊部客户端", (), tuple(), "1.0.3", "源码开发用通用客户端",
     ),
 }
 
