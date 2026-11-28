@@ -2793,9 +2793,12 @@ class DoctorWidget(QWidget):
         self.rx_edit.clicked.connect(self._edit_selected_rx)
         self.rx_delete = QPushButton("删除选中处方")
         self.rx_delete.clicked.connect(self._delete_selected_rx)
+        self.rx_stop = QPushButton("停止处方（DC）")
+        self.rx_stop.clicked.connect(self._stop_selected_rx)
         rx_actions.addStretch(1)
         rx_actions.addWidget(self.rx_edit)
         rx_actions.addWidget(self.rx_delete)
+        rx_actions.addWidget(self.rx_stop)
         right_layout.addLayout(rx_actions)
         self.rx_msg = QLabel("")
         self.rx_msg.setWordWrap(True)
@@ -3482,6 +3485,10 @@ class DoctorWidget(QWidget):
             items = self.api.list_prescriptions(self.rx_encounter_id.value())
         except ApiError:
             return
+        items = [
+            item for item in items
+            if (item.get("prescription_status") or "") != "cancelled"
+        ]
         self.rx_rows = items
         self.rx_table.setRowCount(len(items))
         for row, item in enumerate(items):
@@ -3531,6 +3538,30 @@ class DoctorWidget(QWidget):
             self.api, self.rx_encounter_id.value(), int(prescription_id), self
         )
         dialog.exec()
+        self._refresh_prescriptions()
+
+    def _stop_selected_rx(self) -> None:
+        row = self.rx_table.currentRow()
+        items = getattr(self, "rx_rows", [])
+        if not 0 <= row < len(items):
+            self.rx_msg.setText("请先选择一条本次处方")
+            return
+        item = items[row]
+        prescription_id = item.get("prescription_id")
+        if not prescription_id:
+            self.rx_msg.setText("该明细没有处方头，不能停止")
+            return
+        if QMessageBox.question(
+            self, "停止处方",
+            f"确认停止 {item.get('drug_name') or '该处方'}？\n已发送处方将标记 DC，药房不得发药。",
+        ) != QMessageBox.Yes:
+            return
+        try:
+            self.api.stop_prescription(self.rx_encounter_id.value(), int(prescription_id))
+        except ApiError as e:
+            self.rx_msg.setText(f"停止失败（{e.status_code}）：{e.detail}")
+            return
+        self.rx_msg.setText("处方已停止：DC，药房保留记录但禁止发药")
         self._refresh_prescriptions()
 
     def _delete_selected_rx(self) -> None:
@@ -3625,7 +3656,7 @@ class DoctorWidget(QWidget):
         self.exam_rows = []
         try:
             for request in self.api.list_lab_requests(encounter_id):
-                if request.get("status") in ("cancelled", "dc"):
+                if request.get("status") == "cancelled":
                     continue
                 self.exam_rows.append({"kind": "lab", "id": request.get("id")})
                 rows.append(
@@ -3642,7 +3673,7 @@ class DoctorWidget(QWidget):
                     )
                 )
             for request in self.api.list_imaging_requests(encounter_id):
-                if request.get("status") in ("cancelled", "dc"):
+                if request.get("status") == "cancelled":
                     continue
                 self.exam_rows.append({"kind": "imaging", "id": request.get("id")})
                 rows.append(
@@ -3679,13 +3710,14 @@ class DoctorWidget(QWidget):
         except ApiError as e:
             self.treat_msg.setText(f"已开治疗加载失败：{e.detail}")
             return
+        rows = [row for row in rows if (row.get("status") or "") != "cancelled"]
         self.treat_rows = rows
         self.treat_table.setRowCount(len(rows))
         for index, row in enumerate(rows):
             values = [
                 row.get("item_name") or "",
                 str(row.get("quantity") or ""),
-                {"pending": "待执行", "done": "已执行", "cancelled": "已取消"}.get(
+                {"pending": "待执行", "done": "已执行", "cancelled": "已取消", "dc": "已停止（DC）"}.get(
                     row.get("status") or "", row.get("status") or ""
                 ),
                 row.get("executed_by") or "—",

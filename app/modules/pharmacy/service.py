@@ -140,9 +140,14 @@ def dispense(db: Session, data: DispenseRequest, operator: str = "") -> Dispense
     if existing:
         raise ValueError("该就诊已发药")
 
-    if getattr(settings, "REQUIRE_PRESCRIPTION_REVIEW", True):
-        from app.modules.encounter.models import Prescription
+    from app.modules.encounter.models import Prescription
 
+    if db.query(Prescription).filter(
+        Prescription.encounter_id == data.encounter_id,
+        Prescription.status == "dc",
+    ).first():
+        raise ValueError("该就诊存在已停止（DC）的处方，不能发药；请先处理 DC 处方")
+    if getattr(settings, "REQUIRE_PRESCRIPTION_REVIEW", True):
         pending = (
             db.query(Prescription)
             .filter(
@@ -429,6 +434,7 @@ def worklist(db: Session) -> list[dict]:
             row.status in ("pending_review", "draft", "rejected") for row in headers
         ):
             continue
+        has_dc = any(row.status == "dc" for row in headers)
         dispense = (
             db.query(Dispense)
             .filter(
@@ -460,6 +466,7 @@ def worklist(db: Session) -> list[dict]:
                 "paid_at": payment.created_at,
                 "item_count": len(items),
                 "drugs": "、".join(item.drug_name for item in items[:4]),
+                "prescription_status": "dc" if has_dc else "active",
             }
         )
     db.commit()

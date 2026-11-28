@@ -411,3 +411,40 @@ def test_return_refund_then_redispense_same_encounter(client, auth, monkeypatch)
     )
     assert second.status_code == 201, second.text
     assert second.json()["id"] != first.json()["id"]
+
+
+def test_doctor_dc_prescription_stays_in_pharmacy_but_blocked(client, auth):
+    reg = make_registration(client, auth)
+    encounter = client.post(
+        "/encounters/", json={"registration_id": reg["id"]}, headers=auth["doctor"]
+    ).json()
+    drug = make_drug(client, auth, "DC药", 5.0)
+    client.post(
+        f"/encounters/{encounter['id']}/prescriptions",
+        json={"drug_id": drug["id"], "quantity": 1}, headers=auth["doctor"],
+    )
+    header = client.get(
+        f"/encounters/{encounter['id']}/prescriptions/headers", headers=auth["doctor"]
+    ).json()[0]
+    if header.get("status") == "pending_review":
+        reviewed = client.post(
+            f"/encounters/{encounter['id']}/prescriptions/{header['id']}/review",
+            json={"approve": True}, headers=auth["pharmacist"],
+        )
+        assert reviewed.status_code == 200, reviewed.text
+    client.post("/payments/", json={"encounter_id": encounter["id"]}, headers=auth["cashier"])
+    stopped = client.post(
+        f"/encounters/{encounter['id']}/prescriptions/{header['id']}/stop",
+        headers=auth["doctor"],
+    )
+    assert stopped.status_code == 200, stopped.text
+    assert stopped.json()["status"] == "dc"
+    queue = client.get("/pharmacy/worklist", headers=auth["pharmacist"]).json()
+    row = next(item for item in queue if item["encounter_id"] == encounter["id"])
+    assert row["prescription_status"] == "dc"
+    blocked = client.post(
+        "/pharmacy/dispense", json={"encounter_id": encounter["id"]},
+        headers=auth["pharmacist"],
+    )
+    assert blocked.status_code == 400
+    assert "DC" in blocked.json()["detail"]

@@ -921,6 +921,31 @@ def update_prescription_item(
     return item
 
 
+def stop_prescription(
+    db: Session, encounter_id: int, prescription_id: int, operator: str = ""
+) -> Prescription:
+    """医生停止已发送处方：状态置 dc，保留记录，药房不得发药。"""
+    from .models import Prescription
+
+    row = (
+        db.query(Prescription)
+        .filter(Prescription.id == prescription_id, Prescription.encounter_id == encounter_id)
+        .first()
+    )
+    if not row:
+        raise ValueError("处方不存在")
+    if row.status == "pending_review":
+        row.status = "cancelled"
+    elif row.status in ("approved", "dispensing"):
+        row.status = "dc"
+    else:
+        raise ValueError("当前处方状态不能停止")
+    row.updated_at = datetime.now()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def delete_prescription_item(db: Session, encounter_id: int, item_id: int) -> None:
     """删除未收费的处方明细，并同步删除未收费的药品费用。"""
     encounter = db.get(Encounter, encounter_id)

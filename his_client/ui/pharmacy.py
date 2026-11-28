@@ -925,7 +925,9 @@ class PharmacyWidget(QWidget):
                 item["item_count"],
                 item["drugs"],
                 {"waiting": "待叫号", "called": "已叫号"}.get(
-                    item["call_status"], item["call_status"]
+                    item["call_status"], (
+                    "DC 已停止" if item.get("prescription_status") == "dc" else item["call_status"]
+                )
                 ),
                 item["window_no"] or "—",
             ]

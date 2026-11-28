@@ -304,7 +304,8 @@ class TreatmentRoomWidget(QWidget):
                 case["procedure_name"],
                 case.get("room_name") or "—",
                 "加急" if case["priority"] == "urgent" else "普通",
-                {"waiting": "候诊", "in_progress": "处置中", "completed": "已完成", "cancelled": "已取消"}.get(
+                {"waiting": "候诊", "in_progress": "处置中", "completed": "已完成",
+                 "cancelled": "已取消", "dc": "已停止（DC）"}.get(
                     case["status"], case["status"]
                 ),
                 f"{case['price']:.2f}",

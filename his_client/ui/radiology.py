@@ -31,7 +31,7 @@ class RadiologyWidget(QWidget):
         title = QLabel("影像科工作站")
         title.setStyleSheet("font-size:16px;font-weight:bold")
         self.status_filter = QComboBox()
-        self.status_filter.addItem("待检查", "pending")
+        self.status_filter.addItem("待处理（含DC）", "pending,dc")
         self.status_filter.addItem("已报告", "reported")
         self.status_filter.addItem("已审核", "reviewed")
         self.template_combo = QComboBox()

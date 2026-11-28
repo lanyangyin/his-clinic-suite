@@ -431,6 +431,9 @@ class ApiClient:
             json=payload,
         )
 
+    def stop_prescription(self, encounter_id: int, prescription_id: int) -> dict:
+        return self._request("POST", f"/encounters/{encounter_id}/prescriptions/{prescription_id}/stop")
+
     def delete_prescription(self, encounter_id: int, item_id: int) -> None:
         self._request("DELETE", f"/encounters/{encounter_id}/prescriptions/{item_id}")
 

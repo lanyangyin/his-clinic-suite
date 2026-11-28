@@ -60,6 +60,7 @@ LABELS: dict[str, dict[str, str]] = {
         "reviewed": "已审核",
         "rejected": "标本拒收",
         "cancelled": "已取消",
+        "dc": "已停止（DC）",
     },
     "payment_status": {
         "paid": "已收费",
@@ -86,6 +87,7 @@ LABELS: dict[str, dict[str, str]] = {
         "executed": "已执行",
         "done": "已执行",
         "cancelled": "已取消",
+        "dc": "已停止（DC）",
     },
     "charge_type": {
         "registration": "挂号费",

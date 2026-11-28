@@ -68,6 +68,7 @@ from .service import (
     update_diagnosis,
     update_medical_record,
     update_prescription_item,
+    stop_prescription,
     worklist,
     encounter_summary,
     pause_encounter,
@@ -474,6 +475,22 @@ def insurance_upload(
         row = upload_prescription_insurance(
             db, encounter_id, prescription_id, user.username
         )
+        return PrescriptionHeaderResponse.model_validate(row).model_copy(
+            update={"item_count": len(row.items)}
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{encounter_id}/prescriptions/{prescription_id}/stop", response_model=PrescriptionHeaderResponse)
+def stop_prescription_header(
+    encounter_id: int,
+    prescription_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("doctor", "admin")),
+):
+    try:
+        row = stop_prescription(db, encounter_id, prescription_id, user.username)
         return PrescriptionHeaderResponse.model_validate(row).model_copy(
             update={"item_count": len(row.items)}
         )

@@ -49,7 +49,7 @@ class LabWidget(QWidget):
         top = QHBoxLayout()
         self.status_filter = QComboBox()
         for label, value in [
-            ("全部未审核", "pending,collected,received,testing,reported,rejected"),
+            ("全部未审核", "pending,collected,received,testing,reported,rejected,dc"),
             ("待采样", "pending"),
             ("已采样", "collected"),
             ("已签收", "received"),

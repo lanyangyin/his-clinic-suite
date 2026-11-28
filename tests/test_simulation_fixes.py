@@ -450,4 +450,7 @@ def test_cancelled_or_dc_exams_leave_worklist(client, auth):
     assert stopped.status_code == 200, stopped.text
     assert stopped.json()["status"] == "dc"
     rows = client.get("/lab/worklist", headers=auth["lab"]).json()
-    assert all(row["id"] != lab["id"] for row in rows)
+    dc_row = next(row for row in rows if row["id"] == lab["id"])
+    assert dc_row["status"] == "dc"
+    blocked = client.post(f"/lab/requests/{lab['id']}/collect", headers=auth["lab"])
+    assert blocked.status_code == 400
